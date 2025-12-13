@@ -5,7 +5,9 @@ import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.commons.framework.web.Results;
 import io.github.somehow.mysite.dto.req.user.UserFollowReqDTO;
 import io.github.somehow.mysite.dto.resp.user.UserPageQueryFollowRespDTO;
+import io.github.somehow.mysite.dto.req.user.UserPageQueryReqDTO;
 import io.github.somehow.mysite.dto.req.user.UserRegistryReqDTO;
+import io.github.somehow.mysite.dto.resp.user.UserSearchRespDTO;
 import io.github.somehow.mysite.dto.resp.user.UserSelectRespDTO;
 import io.github.somehow.mysite.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -54,4 +56,11 @@ public class UserController {
     @GetMapping("/api/user/followers/{id}")
     public Result<IPage<UserPageQueryFollowRespDTO>> selectFollowings(@PathVariable("id") String id) {
         return Results.success(userService.selectFollowings(id));
-    }}
+    }
+    
+    @Operation(summary = "分页搜索用户")
+    @GetMapping("/api/user/search")
+    public Result<IPage<UserSearchRespDTO>> searchUsers(UserPageQueryReqDTO requestParam) {
+        return Results.success(userService.pageQueryUser(requestParam));
+    }
+}

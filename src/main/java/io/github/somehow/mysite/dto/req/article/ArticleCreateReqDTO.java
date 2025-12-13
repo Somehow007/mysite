@@ -16,6 +16,12 @@ public class ArticleCreateReqDTO {
     private String authorId;
 
     /**
+     * 作者名称
+     */
+    @Schema(description = "作者名称", example = "Somehow007", requiredMode = Schema.RequiredMode.REQUIRED)
+    private String authorName;
+
+    /**
      * 文章标题
      */
     @Schema(description = "文章标题",

@@ -6,6 +6,8 @@ import io.github.somehow.mysite.dao.entity.UserDO;
 import io.github.somehow.mysite.dto.resp.user.UserPageQueryFollowRespDTO;
 import org.apache.ibatis.annotations.Param;
 
+import java.util.List;
+
 /**
  * 用户信息数据库持久层
  */
@@ -36,4 +38,12 @@ public interface UserMapper extends BaseMapper<UserDO> {
      * @param id 用户ID
      */
     IPage<UserPageQueryFollowRespDTO> pageFollowingsResult(IPage<UserPageQueryFollowRespDTO> page, @Param("id") String id);
+    
+    /**
+     * 根据用户名搜索用户
+     * 
+     * @param username 用户名（模糊搜索）
+     * @return 匹配的用户列表
+     */
+    List<UserDO> selectByUsernameLike(@Param("username") String username);
 }

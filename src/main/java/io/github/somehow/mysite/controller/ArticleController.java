@@ -44,8 +44,8 @@ public class ArticleController {
         return Results.success();
     }
 
-    @Operation(summary = "分页获取文章信息")
-    @GetMapping("/api/article/page")
+    @Operation(summary = "分页搜索文章信息")
+    @GetMapping("/api/article/search")
     public Result<IPage<ArticlePageQueryRespDTO>> pageQueryArticle(ArticlePageQueryReqDTO requestParam) {
         return Results.success(articleService.pageQueryArticle(requestParam));
     }
