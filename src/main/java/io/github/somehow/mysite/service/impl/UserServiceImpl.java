@@ -31,7 +31,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.CollectionUtils;
 
 import java.util.List;
 import java.util.Objects;
@@ -199,7 +198,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 (int) requestParam.getSize());
         
         // 获取搜索关键词
-        String keyword = StrUtil.blankToDefault(requestParam.getKeyword(), "");
+        String keyword = StrUtil.blankToDefault(requestParam.getKeyword(), "").toLowerCase();
         
         // 获取搜索类型，默认按用户名搜索
 //        String searchType = StrUtil.blankToDefault(requestParam.getSearchType(), "username");

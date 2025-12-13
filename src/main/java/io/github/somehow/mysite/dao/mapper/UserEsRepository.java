@@ -12,6 +12,7 @@ public interface UserEsRepository extends ElasticsearchRepository<UserDocument, 
 
     /**
      * 根据用户名搜索用户
+     *
      * @param username 用户名关键词
      * @param pageable 分页参数
      * @return 用户分页结果

@@ -30,13 +30,13 @@ public class UserDocument {
     /**
      * 用户名
      */
-    @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart")
+    @Field(type = FieldType.Text, analyzer = "ik_smart", searchAnalyzer = "ik_max_word")
     private String username;
 
     /**
      * 真实姓名
      */
-    @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart")
+    @Field(type = FieldType.Text, analyzer = "ik_smart", searchAnalyzer = "ik_max_word")
     private String realName;
 
     /**

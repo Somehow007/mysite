@@ -14,6 +14,7 @@ public interface ArticleEsRepository extends ElasticsearchRepository<ArticleDocu
 
     /**
      * 根据标题搜索文章
+     *
      * @param title 标题关键词
      * @param pageable 分页参数
      * @return 文章分页结果
@@ -22,6 +23,7 @@ public interface ArticleEsRepository extends ElasticsearchRepository<ArticleDocu
     
     /**
      * 根据内容搜索文章
+     *
      * @param content 内容关键词
      * @param pageable 分页参数
      * @return 文章分页结果
@@ -30,6 +32,7 @@ public interface ArticleEsRepository extends ElasticsearchRepository<ArticleDocu
     
     /**
      * 根据作者ID搜索文章
+     *
      * @param authorId 作者ID
      * @param pageable 分页参数
      * @return 文章分页结果
@@ -38,6 +41,7 @@ public interface ArticleEsRepository extends ElasticsearchRepository<ArticleDocu
     
     /**
      * 根据作者ID列表搜索文章
+     *
      * @param authorIds 作者ID列表
      * @param pageable 分页参数
      * @return 文章分页结果

@@ -9,7 +9,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.baomidou.mybatisplus.extension.toolkit.SqlHelper;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.dao.entity.UserDO;
@@ -31,7 +30,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -143,7 +141,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                 (int) requestParam.getSize());
         
         // 获取搜索关键词
-        String keyword = StrUtil.blankToDefault(requestParam.getKeyword(), "");
+        String keyword = StrUtil.blankToDefault(requestParam.getKeyword(), "").toLowerCase();
         
         // 获取搜索类型，默认按标题搜索
         String searchType = StrUtil.blankToDefault(requestParam.getSearchType(), "title");
