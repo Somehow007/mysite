@@ -11,7 +11,7 @@ public class ArticleSelectRespDTO {
     /**
      * 主键 ID
      */
-    private Long id;
+    private String id;
 
     /**
      * 文章标题

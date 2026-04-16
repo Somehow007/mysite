@@ -1,6 +1,9 @@
 package io.github.somehow.mysite.dto.resp;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
+
+import java.util.Date;
 
 /**
  * 分页查询文章请求返回体
@@ -11,7 +14,7 @@ public class ArticlePageQueryRespDTO {
     /**
      * 主键 ID
      */
-    private Long id;
+    private String id;
 
     /**
      * 文章标题
@@ -37,4 +40,15 @@ public class ArticlePageQueryRespDTO {
      * 作者名称
      */
     private String authorName;
+
+    /**
+     * 作者ID
+     */
+    private String authorId;
+
+    /**
+     * 最后一次修改时间
+     */
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
+    private Date updateTime;
 }

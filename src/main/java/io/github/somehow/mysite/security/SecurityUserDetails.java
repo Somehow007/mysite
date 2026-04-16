@@ -17,6 +17,20 @@ public class SecurityUserDetails implements UserDetails {
     private final UserDO userDO;
 
     /**
+     * 获取用户ID
+     */
+    public Long getUserId() {
+        return userDO.getId();
+    }
+
+    /**
+     * 获取用户实体
+     */
+    public UserDO getUserDO() {
+        return userDO;
+    }
+
+    /**
      * 获取用户角色权限集合
      */
     @Override

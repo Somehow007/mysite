@@ -199,11 +199,13 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             List<ArticlePageQueryRespDTO> records = articles.stream()
                     .map(article -> {
                         ArticlePageQueryRespDTO dto = new ArticlePageQueryRespDTO();
-                        dto.setId(article.getId());
+                        dto.setId(article.getId().toString());
                         dto.setTitle(article.getTitle());
                         dto.setSummary(article.getSummary());
                         dto.setViewCount(article.getViewCount());
                         dto.setFavoriteCount(article.getFavoriteCount());
+                        dto.setAuthorId(article.getAuthorId().toString());
+                        dto.setUpdateTime(article.getUpdateTime());
                         
                         // 设置作者名称
                         String authorName = authors.stream()
