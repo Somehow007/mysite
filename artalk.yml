@@ -1,0 +1,80 @@
+host: 0.0.0.0
+port: 23366
+debug: false
+locale: zh-CN
+timezone: Asia/Shanghai
+
+app_key: "your-secret-key-please-change-in-production"
+
+site_default: "MySite博客"
+
+sites:
+  - name: "MySite博客"
+    urls:
+      - "http://localhost:5173"
+      - "http://localhost:8081"
+
+trusted_domains:
+  - "localhost"
+  - "localhost:5173"
+  - "localhost:8081"
+  - "127.0.0.1"
+
+admin_users:
+  - name: admin
+    email: somehow007@163.com
+    password: "000000"
+    badge_name: 博主
+    link: /
+
+db:
+  type: mysql
+  name: mysite
+  host: 172.17.0.1
+  port: 3306
+  user: root
+  password: 'Sh20060401'
+  charset: utf8mb4
+  table_prefix: 'atk_'
+  ssl: false
+  prepare_stmt: true
+
+cache:
+  enabled: true
+  type: builtin
+  expires: 60
+  warm_up: true
+
+log:
+  enabled: true
+  path: ./data/logs/
+  filename: artalk.log
+
+img_upload:
+  enabled: false
+  path: ./data/images/
+  max_size: 5
+
+frontend:
+  placeholder: "写下你的评论..."
+  no_comment: "暂无评论，快来发表第一条评论吧！"
+  send_btn: "发送"
+  editor_travel: true
+  flat_mode: auto
+  nest_max: 3
+  vote: true
+  vote_down: false
+  ua_badge: false
+  list_sort: true
+  emoticons: "https://cdn.jsdelivr.net/gh/ArtalkJS/Emoticons/grps/default.json"
+  pagination:
+    page_size: 15
+    read_more: true
+    auto_load: true
+  height_limit:
+    content: 400
+    children: 500
+    scrollable: false
+  img_lazy_load: true
+  preview: true
+  version_check: false
