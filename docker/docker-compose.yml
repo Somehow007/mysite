@@ -53,7 +53,6 @@ services:
       - discovery.type=single-node
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-Sh20060401}
       - xpack.security.enabled=false
     ulimits:
       memlock:
@@ -97,7 +96,7 @@ services:
       - "23366:23366"
     volumes:
       - artalk_data:/data
-      - ./artalk-docker.yml:/data/artalk.yml:ro
+      - ./artalk.yml:/data/artalk.yml:ro
     environment:
       - TZ=Asia/Shanghai
     healthcheck:
