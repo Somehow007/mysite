@@ -35,3 +35,4 @@ build/
 ### Project specific ###
 artalk-data/
 mysite-frontend/mysite/
+docker/.env
