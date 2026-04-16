@@ -12,6 +12,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -56,6 +58,15 @@ public class GlobalExceptionHandler {
         }
         log.error("[{}] {} [ex] {} \n\n{}", request.getMethod(), request.getRequestURL().toString(), ex, stackTraceBuilder);
         return Results.failure(ex);
+    }
+
+    /**
+     * 拦截登录失败异常（用户名或密码错误、用户不存在）
+     */
+    @ExceptionHandler(value = {BadCredentialsException.class, UsernameNotFoundException.class})
+    public Result loginExceptionHandler(HttpServletRequest request, Exception ex) {
+        log.warn("[{}] {} 登录失败: {}", request.getMethod(), getUrl(request), ex.getMessage());
+        return Results.failure(BaseErrorCode.USER_LOGIN_ERROR.code(), BaseErrorCode.USER_LOGIN_ERROR.message());
     }
 
     /**

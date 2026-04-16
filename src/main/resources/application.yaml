@@ -8,7 +8,7 @@ spring:
     password: Sh20060401
   servlet:
     session:
-      timeout: 30ms
+      timeout: 30m
   data:
     redis:
       host: localhost
