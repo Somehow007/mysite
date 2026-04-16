@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  artalk:
+    container_name: mysite-artalk
+    image: artalk/artalk-go:latest
+    restart: unless-stopped
+    ports:
+      - "23366:23366"
+    volumes:
+      - artalk_data:/data
+      - ./artalk-host.yml:/data/artalk.yml:ro
+    environment:
+      - TZ=Asia/Shanghai
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:23366/api/stat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - mysite-network
+
+volumes:
+  artalk_data:
+
+networks:
+  mysite-network:
+    driver: bridge
