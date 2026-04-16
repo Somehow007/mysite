@@ -16,6 +16,10 @@ public class SecurityUserDetails implements UserDetails {
 
     private final UserDO userDO;
 
+    public UserDO getUserDO() {
+        return userDO;
+    }
+
     /**
      * 获取用户角色权限集合
      */

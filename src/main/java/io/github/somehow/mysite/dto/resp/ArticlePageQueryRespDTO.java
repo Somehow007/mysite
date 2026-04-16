@@ -1,16 +1,13 @@
 package io.github.somehow.mysite.dto.resp;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
-/**
- * 分页查询文章请求返回体
- */
 @Data
 public class ArticlePageQueryRespDTO {
 
-    /**
-     * 主键 ID
-     */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
     /**

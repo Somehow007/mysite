@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.elasticsearch.annotations.DateFormat;
 import org.springframework.data.elasticsearch.annotations.Document;
 import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
@@ -30,13 +31,13 @@ public class ArticleDocument {
     /**
      * 文章标题
      */
-    @Field(type = FieldType.Text, analyzer = "ik_smart", searchAnalyzer = "ik_max_word")
+    @Field(type = FieldType.Text, analyzer = "standard", searchAnalyzer = "standard")
     private String title;
 
     /**
      * 文章内容
      */
-    @Field(type = FieldType.Text, analyzer = "ik_smart", searchAnalyzer = "ik_max_word")
+    @Field(type = FieldType.Text, analyzer = "standard", searchAnalyzer = "standard")
     private String content;
 
     /**
@@ -48,6 +49,6 @@ public class ArticleDocument {
     /**
      * 创建时间
      */
-    @Field(type = FieldType.Date)
+    @Field(type = FieldType.Date, format = DateFormat.date_optional_time)
     private Date createTime;
 }

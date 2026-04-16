@@ -19,10 +19,10 @@ spring:
   elasticsearch:
     uris: http://localhost:9200
     username: elastic
-    password: z2i1UYcH
+    password: Sh20060401
 
 server:
-  port: 8080
+  port: 8081
   servlet:
     encoding:
       charset: UTF-8
@@ -50,3 +50,8 @@ knife4j:
   enable: true
   setting:
     language: zh_cn
+
+artalk:
+  server: http://localhost:23366
+  site: MySite博客
+  enabled: true

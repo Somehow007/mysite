@@ -135,44 +135,41 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
     @Override
     public IPage<ArticlePageQueryRespDTO> pageQueryArticle(ArticlePageQueryReqDTO requestParam) {
-        // 构建ES分页参数
         PageRequest pageRequest = PageRequest.of(
                 (int) (requestParam.getCurrent() - 1), 
                 (int) requestParam.getSize());
         
-        // 获取搜索关键词
-        String keyword = StrUtil.blankToDefault(requestParam.getKeyword(), "").toLowerCase();
-        
-        // 获取搜索类型，默认按标题搜索
+        String keyword = StrUtil.blankToDefault(requestParam.getKeyword(), "");
         String searchType = StrUtil.blankToDefault(requestParam.getSearchType(), "title");
         
         org.springframework.data.domain.Page<ArticleDocument> esPage;
-        switch (searchType) {
-            case "title":
-                // 按标题搜索
-                esPage = esRepository.findByTitleContaining(keyword, pageRequest);
-                break;
-            case "content":
-                // 按内容搜索
-                esPage = esRepository.findByContentContaining(keyword, pageRequest);
-                break;
-            case "author":
-                // 按作者搜索
-                List<UserDO> matchedUsers = userMapper.selectByUsernameLike(keyword);
-                if (!CollectionUtils.isEmpty(matchedUsers)) {
-                    List<String> authorIds = matchedUsers.stream()
-                            .map(user -> user.getId().toString())
-                            .collect(Collectors.toList());
-                    esPage = esRepository.findByAuthorIdIn(authorIds, pageRequest);
-                } else {
-                    // 没有匹配的用户，返回空结果
-                    return new Page<>();
-                }
-                break;
-            default:
-                // 默认按标题搜索
-                esPage = esRepository.findByTitleContaining(keyword, pageRequest);
-                break;
+        
+        if (StrUtil.isBlank(keyword)) {
+            esPage = esRepository.findAll(pageRequest);
+        } else {
+            keyword = keyword.toLowerCase();
+            switch (searchType) {
+                case "title":
+                    esPage = esRepository.findByTitleContaining(keyword, pageRequest);
+                    break;
+                case "content":
+                    esPage = esRepository.findByContentContaining(keyword, pageRequest);
+                    break;
+                case "author":
+                    List<UserDO> matchedUsers = userMapper.selectByUsernameLike(keyword);
+                    if (!CollectionUtils.isEmpty(matchedUsers)) {
+                        List<String> authorIds = matchedUsers.stream()
+                                .map(user -> user.getId().toString())
+                                .collect(Collectors.toList());
+                        esPage = esRepository.findByAuthorIdIn(authorIds, pageRequest);
+                    } else {
+                        return new Page<>();
+                    }
+                    break;
+                default:
+                    esPage = esRepository.findByTitleContaining(keyword, pageRequest);
+                    break;
+            }
         }
         
         // 将ES查询结果转换为需要的DTO格式
