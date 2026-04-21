@@ -46,4 +46,10 @@ public interface UserMapper extends BaseMapper<UserDO> {
      * @return 匹配的用户列表
      */
     List<UserDO> selectByUsernameLike(@Param("username") String username);
+
+    default UserDO selectOneByUsername(String username) {
+        return selectOne(com.baomidou.mybatisplus.core.toolkit.Wrappers.lambdaQuery(UserDO.class)
+                .eq(UserDO::getUsername, username)
+                .eq(UserDO::getDelFlag, 0));
+    }
 }

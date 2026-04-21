@@ -1,0 +1,128 @@
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { useHead } from '@unhead/vue'
+import { useRouter } from 'vue-router'
+import { FileText, Plus, Trash2, Edit, Eye } from 'lucide-vue-next'
+import { getArticles, deleteArticle } from '@/api/article'
+import type { ArticleListItem, Pagination } from '@/types'
+
+useHead(() => ({
+  title: '文章管理 - MySite',
+}))
+
+const router = useRouter()
+const articles = ref<ArticleListItem[]>([])
+const pagination = ref<Pagination | null>(null)
+const loading = ref(false)
+const deleting = ref<string | null>(null)
+
+async function fetchArticles(page = 1) {
+  loading.value = true
+  try {
+    const res = await getArticles({ page, size: 20 })
+    articles.value = res.list
+    pagination.value = res.pagination
+  } catch {
+    articles.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleDelete(id: string) {
+  if (!confirm('确定要删除这篇文章吗？')) return
+  deleting.value = id
+  try {
+    await deleteArticle(id)
+    await fetchArticles(pagination.value?.page || 1)
+  } catch {
+  } finally {
+    deleting.value = null
+  }
+}
+
+onMounted(() => {
+  fetchArticles()
+})
+</script>
+
+<template>
+  <div>
+    <div class="flex items-center justify-between mb-8">
+      <h1 class="text-2xl font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">
+        文章管理
+      </h1>
+      <button
+        @click="router.push('/dashboard/posts/new')"
+        class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] hover:opacity-90 transition-opacity"
+      >
+        <Plus :size="14" />
+        写文章
+      </button>
+    </div>
+
+    <div v-if="loading" class="py-16 text-center text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+      加载中...
+    </div>
+
+    <div v-else-if="articles.length === 0" class="py-16 text-center">
+      <FileText :size="48" class="mx-auto mb-4 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]" />
+      <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">还没有文章，开始写第一篇吧</p>
+      <button
+        @click="router.push('/dashboard/posts/new')"
+        class="mt-4 px-4 py-2 text-sm rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] hover:opacity-90 transition-opacity"
+      >
+        写文章
+      </button>
+    </div>
+
+    <div v-else class="space-y-3">
+      <div
+        v-for="article in articles"
+        :key="article.id"
+        class="flex items-center justify-between p-4 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] hover:border-[var(--color-text-muted)] dark:hover:border-[var(--color-dark-text-muted)] transition-colors"
+      >
+        <div class="flex-1 min-w-0">
+          <h3 class="text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] truncate">
+            {{ article.title }}
+          </h3>
+          <div class="flex items-center gap-3 mt-1 text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+            <span v-if="article.categoryName" class="px-1.5 py-0.5 rounded bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]">
+              {{ article.categoryName }}
+            </span>
+            <span class="inline-flex items-center gap-1">
+              <Eye :size="10" />
+              {{ article.viewCount }}
+            </span>
+            <span>{{ article.updateTime ? new Date(article.updateTime).toLocaleDateString('zh-CN') : '' }}</span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 ml-4">
+          <button
+            @click="router.push(`/post/${article.id}`)"
+            class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+            title="查看"
+          >
+            <Eye :size="14" />
+          </button>
+          <button
+            @click="router.push(`/dashboard/posts/${article.id}/edit`)"
+            class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+            title="编辑"
+          >
+            <Edit :size="14" />
+          </button>
+          <button
+            @click="handleDelete(article.id)"
+            :disabled="deleting === article.id"
+            class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors disabled:opacity-50"
+            title="删除"
+          >
+            <Trash2 :size="14" />
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>

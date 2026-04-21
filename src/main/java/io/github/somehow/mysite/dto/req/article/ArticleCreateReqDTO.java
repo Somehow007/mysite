@@ -3,45 +3,32 @@ package io.github.somehow.mysite.dto.req.article;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-/**
- * 创建文章请求体
- */
+import java.util.List;
+
 @Data
 public class ArticleCreateReqDTO {
 
-    /**
-     * 作者id
-     */
-    @Schema(description = "作者id", example = "1992826310106120192", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "作者id", requiredMode = Schema.RequiredMode.REQUIRED)
     private String authorId;
 
-    /**
-     * 作者名称
-     */
-    @Schema(description = "作者名称", example = "Somehow007", requiredMode = Schema.RequiredMode.REQUIRED)
-    private String authorName;
-
-    /**
-     * 文章标题
-     */
-    @Schema(description = "文章标题",
-            example = "如何一夜暴富迎娶白富美",
-            requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "文章标题", requiredMode = Schema.RequiredMode.REQUIRED)
     private String title;
 
-    /**
-     * 文章内容（通常为 HTML 或 Markdown 格式）
-     */
-    @Schema(description = "文章内容",
-            example = "睡一觉",
-            requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "文章内容", requiredMode = Schema.RequiredMode.REQUIRED)
     private String content;
 
-    /**
-     * 摘要/简介（可选，用于列表页展示）
-     */
-    @Schema(description = "文章摘要",
-            example = "彩！彩！彩！",
-            requiredMode = Schema.RequiredMode.NOT_REQUIRED)
+    @Schema(description = "文章摘要")
     private String summary;
+
+    @Schema(description = "封面图片URL")
+    private String coverImage;
+
+    @Schema(description = "分类ID")
+    private Long categoryId;
+
+    @Schema(description = "标签ID列表")
+    private List<Long> tagIds;
+
+    @Schema(description = "是否发布: 0-草稿, 1-发布")
+    private Integer published;
 }

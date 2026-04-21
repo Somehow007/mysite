@@ -1,251 +1,172 @@
-<template>
-  <div class="blog-post">
-    <div class="progress-container">
-      <span class="progress-bar" :style="{ width: `${progress}%` }"></span>
-    </div>
-
-    <template v-if="post">
-      <header class="post-header" :class="{ 'has-cover': post.feature_image }">
-        <div class="inner">
-          <a class="back-link" href="#" aria-label="返回" @click.prevent="goBack">
-            <i class="icon icon-arrow-left">
-              <IconArrowLeft />
-            </i>
-            <span>返回</span>
-          </a>
-          <span class="post-info">
-            <span class="post-type">文章</span>
-          </span>
-          <h1 class="post-title">{{ post.title }}</h1>
-          <div class="post-meta">
-            <div class="post-meta-avatars">
-              <figure class="post-meta-avatar avatar"></figure>
-            </div>
-            <h4 class="post-meta-author">
-              <router-link :to="`/author/${post.authorId}`">{{ post.authorName || '匿名' }}</router-link>
-            </h4>
-            <time v-if="post.createTime" :datetime="formatDateISO(post.createTime)">
-              {{ formatDate(post.createTime) }}
-            </time>
-            &bull; {{ post.reading_time }}
-          </div>
-          <div v-if="post.feature_image" class="post-cover cover">
-            <img :src="post.feature_image" :alt="post.title" />
-          </div>
-        </div>
-      </header>
-
-      <main class="content" role="main">
-        <article class="post">
-          <div class="inner">
-            <section class="post-content" v-html="post.content"></section>
-
-            <section class="post-footer">
-              <div class="post-share">
-                <span class="post-info-label">分享</span>
-                <a title="Twitter" aria-label="Twitter" class="twitter" :href="getTwitterShareUrl()" @click.prevent="shareToTwitter">
-                  <i class="icon icon-twitter"><IconTwitter /></i>
-                </a>
-                <a title="Facebook" aria-label="Facebook" class="facebook" :href="getFacebookShareUrl()" @click.prevent="shareToFacebook">
-                  <i class="icon icon-facebook"><IconFacebook /></i>
-                </a>
-                <a title="LinkedIn" aria-label="LinkedIn" class="linkedin" :href="getLinkedInShareUrl()" @click.prevent="shareToLinkedIn">
-                  <i class="icon icon-linkedin"><IconLinkedin /></i>
-                </a>
-                <a title="Email" aria-label="Email" class="email" :href="getEmailShareUrl()">
-                  <i class="icon icon-mail"><IconMail /></i>
-                </a>
-              </div>
-
-              <div class="post-stats">
-                <span class="stat-item">
-                  <i class="icon"><IconEye /></i>
-                  {{ post.viewCount }} 次阅读
-                </span>
-                <span class="stat-item">
-                  <i class="icon"><IconStar /></i>
-                  {{ post.favoriteCount }} 次收藏
-                </span>
-              </div>
-            </section>
-
-            <section class="post-comments">
-              <h3 class="comments-title">评论</h3>
-              <ArtalkComment
-                v-if="post.id"
-                :page-key="`/post/${post.id}`"
-                :page-title="post.title"
-              />
-            </section>
-          </div>
-        </article>
-      </main>
-    </template>
-    <div v-else-if="loading" class="inner" style="padding: 4rem 0; text-align: center;">
-      加载中...
-    </div>
-    <div v-else class="inner" style="padding: 4rem 0; text-align: center;">
-      文章不存在或已被删除。
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useReadingProgress } from '@/composables/useReadingProgress'
-import { formatDate, formatDateISO } from '@/utils/date'
-import { initCodeHighlight } from '@/utils/codeHighlight'
-import { initResponsiveVideos } from '@/utils/reframe'
+import { useHead } from '@unhead/vue'
+import { ArrowLeft, Calendar, Eye, Clock, Tag } from 'lucide-vue-next'
 import { getArticleById } from '@/api/article'
-import type { Post, ArticleSelectRespDTO } from '@/types/blog'
-import IconTwitter from '@/components/icons/IconTwitter.vue'
-import IconFacebook from '@/components/icons/IconFacebook.vue'
-import IconLinkedin from '@/components/icons/IconLinkedin.vue'
-import IconMail from '@/components/icons/IconMail.vue'
-import IconArrowLeft from '@/components/icons/IconArrowLeft.vue'
-import IconStar from '@/components/icons/IconStar.vue'
-import IconEye from '@/components/icons/IconEye.vue'
-import ArtalkComment from '@/components/ArtalkComment.vue'
+import { formatDate, calculateReadingTime } from '@/utils/date'
+import { useScrollProgress } from '@/composables/useScrollProgress'
+import ArticleContent from '@/components/article/ArticleContent.vue'
+import ArticleToc from '@/components/article/ArticleToc.vue'
+import ArtalkComment from '@/components/comment/ArtalkComment.vue'
+import type { Article } from '@/types'
+import type { TocItem } from '@/composables/useMarkdown'
 
 const route = useRoute()
 const router = useRouter()
-const { progress } = useReadingProgress()
+const { progress } = useScrollProgress()
 
-const post = ref<Post | null>(null)
+const article = ref<Article | null>(null)
 const loading = ref(false)
+const error = ref(false)
+const tocItems = ref<TocItem[]>([])
 
-const goBack = () => {
-  if (typeof window !== 'undefined' && window.history.length > 1) {
-    router.back()
-  } else {
-    router.push('/')
-  }
+const readingTime = computed(() =>
+  article.value ? calculateReadingTime(article.value.content || article.value.summary || '') : 0,
+)
+
+useHead(() => ({
+  title: article.value ? `${article.value.title} - MySite` : '加载中...',
+  meta: article.value
+    ? [
+        { name: 'description', content: article.value.summary || '' },
+        { property: 'og:title', content: article.value.title },
+        { property: 'og:description', content: article.value.summary || '' },
+        { property: 'og:type', content: 'article' },
+        ...(article.value.coverImage ? [{ property: 'og:image', content: article.value.coverImage }] : []),
+      ]
+    : [],
+}))
+
+function handleTocReady(items: TocItem[]) {
+  tocItems.value = items
 }
 
-const getPostUrl = (): string => {
-  return typeof window !== 'undefined' ? window.location.href : ''
-}
-
-const getTwitterShareUrl = (): string => {
-  return `https://twitter.com/share?text=${encodeURIComponent(post.value?.title ?? '')}&url=${encodeURIComponent(getPostUrl())}`
-}
-
-const getFacebookShareUrl = (): string => {
-  return `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getPostUrl())}`
-}
-
-const getLinkedInShareUrl = (): string => {
-  return `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(getPostUrl())}&title=${encodeURIComponent(post.value?.title ?? '')}`
-}
-
-const getEmailShareUrl = (): string => {
-  return `mailto:?subject=${encodeURIComponent(post.value?.title ?? '')}&body=${encodeURIComponent(getPostUrl())}`
-}
-
-const shareToTwitter = () => {
-  window.open(getTwitterShareUrl(), 'twitter-share', 'width=550,height=235')
-}
-
-const shareToFacebook = () => {
-  window.open(getFacebookShareUrl(), 'facebook-share', 'width=580,height=296')
-}
-
-const shareToLinkedIn = () => {
-  window.open(getLinkedInShareUrl(), 'linkedin-share', 'width=930,height=720')
-}
-
-const mapArticleToPost = (article: ArticleSelectRespDTO): Post => {
-  return {
-    id: String(article.id),
-    title: article.title,
-    summary: article.summary,
-    content: article.content,
-    featured: false,
-    createTime: article.createTime,
-    updateTime: article.updateTime,
-    reading_time: '1 min read',
-    viewCount: article.viewCount,
-    favoriteCount: article.favoriteCount,
-    authorName: '',
-    authorId: String(article.authorId),
-    tags: [],
-    url: `/post/${article.id}`,
-    authors: [],
-    published_at: article.createTime,
-    excerpt: article.summary,
-  }
-}
-
-const fetchPost = async (id: string) => {
+async function fetchArticle(id: string) {
+  loading.value = true
+  error.value = false
   try {
-    loading.value = true
-    const response = await getArticleById(id)
-    if (response && response.data) {
-      post.value = mapArticleToPost(response.data)
-    }
-  } catch (error) {
-    console.error('获取文章详情失败:', error)
-    post.value = null
+    article.value = await getArticleById(id)
+  } catch {
+    error.value = true
+    article.value = null
   } finally {
     loading.value = false
   }
 }
 
-onMounted(async () => {
-  const id = route.params.id as string
-  if (id) {
-    await fetchPost(id)
-  }
+watch(
+  () => route.params.id,
+  (newId) => {
+    if (newId) fetchArticle(newId as string)
+  },
+)
 
-  setTimeout(() => {
-    initResponsiveVideos()
-    initCodeHighlight()
-  }, 300)
+onMounted(() => {
+  if (route.params.id) {
+    fetchArticle(route.params.id as string)
+  }
 })
 </script>
 
-<style scoped>
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin-bottom: 1rem;
-  color: var(--color-content-secondary);
-  text-decoration: none;
-  font-size: 1.4rem;
-  transition: color 0.15s ease;
-}
-.back-link:hover {
-  color: var(--ghost-accent-color);
-}
-.back-link .icon {
-  display: inline-flex;
-}
+<template>
+  <div class="relative">
+    <div
+      v-if="progress > 0"
+      class="fixed top-0 left-0 h-[2px] bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] z-50 transition-[width] duration-150"
+      :style="{ width: `${progress * 100}%` }"
+    />
 
-.comments-title {
-  font-size: 1.8rem;
-  margin-bottom: 2rem;
-  color: var(--color-content-lead);
-}
+    <div v-if="loading" class="animate-pulse space-y-6">
+      <div class="skeleton h-8 w-3/4 rounded" />
+      <div class="flex gap-4">
+        <div class="skeleton h-4 w-24 rounded" />
+        <div class="skeleton h-4 w-20 rounded" />
+        <div class="skeleton h-4 w-16 rounded" />
+      </div>
+      <div class="skeleton h-4 w-full rounded" />
+      <div class="skeleton h-4 w-5/6 rounded" />
+      <div class="skeleton h-4 w-4/5 rounded" />
+      <div class="skeleton h-64 w-full rounded-lg" />
+      <div class="skeleton h-4 w-full rounded" />
+      <div class="skeleton h-4 w-3/4 rounded" />
+    </div>
 
-.post-stats {
-  display: flex;
-  gap: 2rem;
-  margin-top: 1rem;
-}
+    <div v-else-if="error" class="py-16 text-center">
+      <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] mb-4">文章加载失败</p>
+      <button
+        @click="router.push('/')"
+        class="text-sm text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] hover:opacity-70 transition-opacity"
+      >
+        返回首页
+      </button>
+    </div>
 
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--color-content-secondary);
-  font-size: 1.4rem;
-}
+    <template v-else-if="article">
+      <div class="flex gap-12">
+        <article class="flex-1 min-w-0 max-w-[720px] mx-auto">
+          <header class="mb-10">
+            <button
+              @click="router.back()"
+              class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] transition-colors mb-6"
+            >
+              <ArrowLeft :size="14" />
+              返回
+            </button>
 
-.loading {
-  text-align: center;
-  padding: 4rem;
-  color: var(--color-content-secondary);
-}
-</style>
+            <h1 class="text-3xl sm:text-4xl font-bold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] leading-tight tracking-tight mb-4">
+              {{ article.title }}
+            </h1>
+
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+              <span class="inline-flex items-center gap-1.5">
+                <Calendar :size="14" />
+                <time :datetime="article.updateTime">{{ formatDate(article.updateTime) }}</time>
+              </span>
+              <span v-if="article.viewCount > 0" class="inline-flex items-center gap-1.5">
+                <Eye :size="14" />
+                <span>{{ article.viewCount }} 阅读</span>
+              </span>
+              <span class="inline-flex items-center gap-1.5">
+                <Clock :size="14" />
+                <span>{{ readingTime }} 分钟</span>
+              </span>
+              <RouterLink
+                v-if="article.categorySlug"
+                :to="`/category/${article.categorySlug}`"
+                class="inline-flex items-center gap-1.5 hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] transition-colors"
+              >
+                <Tag :size="14" />
+                <span>{{ article.categoryName }}</span>
+              </RouterLink>
+            </div>
+
+            <div v-if="article.tags && article.tags.length > 0" class="flex flex-wrap gap-2 mt-3">
+              <RouterLink
+                v-for="tag in article.tags"
+                :key="tag.id"
+                :to="`/tag/${tag.slug}`"
+                class="text-xs px-2.5 py-1 rounded-full border border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] hover:border-[var(--color-text-heading)] dark:hover:border-[var(--color-dark-text-heading)] transition-colors"
+              >
+                #{{ tag.name }}
+              </RouterLink>
+            </div>
+          </header>
+
+          <ArticleContent :content="article.content" @toc-ready="handleTocReady" />
+
+          <ArtalkComment
+            :page-key="`/post/${article.id}`"
+            :page-title="article.title"
+          />
+        </article>
+
+        <aside class="hidden lg:block w-56 shrink-0">
+          <div class="sticky top-24">
+            <ArticleToc :items="tocItems" />
+          </div>
+        </aside>
+      </div>
+    </template>
+  </div>
+</template>

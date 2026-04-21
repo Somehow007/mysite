@@ -12,9 +12,6 @@ import org.springframework.data.elasticsearch.annotations.FieldType;
 
 import java.util.Date;
 
-/**
- * ElasticSearch 文档实体类
- */
 @Data
 @Builder
 @NoArgsConstructor
@@ -22,33 +19,27 @@ import java.util.Date;
 @Document(indexName = "blog_articles")
 public class ArticleDocument {
 
-    /**
-     * 文档唯一标识
-     */
     @Id
     private String id;
 
-    /**
-     * 文章标题
-     */
-    @Field(type = FieldType.Text, analyzer = "standard", searchAnalyzer = "standard")
+    @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart")
     private String title;
 
-    /**
-     * 文章内容
-     */
-    @Field(type = FieldType.Text, analyzer = "standard", searchAnalyzer = "standard")
+    @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart")
     private String content;
 
-    /**
-     * 作者id
-     */
-    @Field(type = FieldType.Keyword) // 不分词，用于精确匹配
+    @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart")
+    private String summary;
+
+    @Field(type = FieldType.Keyword)
     private String authorId;
 
-    /**
-     * 创建时间
-     */
+    @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart")
+    private String authorName;
+
+    @Field(type = FieldType.Keyword)
+    private String categoryId;
+
     @Field(type = FieldType.Date, format = DateFormat.date_optional_time)
     private Date createTime;
 }

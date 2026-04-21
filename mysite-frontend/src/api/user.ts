@@ -1,93 +1,32 @@
-import { get, post } from './config'
-import type { ApiResponse, PaginatedResponse, UserSelectRespDTO, UserPageQueryFollowRespDTO, UserSearchRespDTO } from '@/types/blog'
+import { get, getPaginated, post, put } from './client'
+import type { User, PaginatedResponse } from '@/types'
 
-export interface UserRegisterParams {
-  username: string
-  password: string
-  realName: string
-  email?: string
-  phoneNumber?: string
-  sex?: number
+export function getCurrentUser(): Promise<User> {
+  return get<User>('/v1/auth/me')
 }
 
-export interface UserLoginParams {
-  username: string
-  password: string
+export function getUserById(id: string): Promise<User> {
+  return get<User>(`/v1/users/${id}`)
 }
 
-export interface UserFollowParams {
-  userId: string
-  isFollow: boolean
+export function updateUser(data: Partial<User>): Promise<User> {
+  return put<User>('/v1/users/me', data)
 }
 
-export interface UserFollowListParams {
-  userId: string | number
+export function followUser(userId: string): Promise<void> {
+  return post<void>('/v1/users/follow', { userId })
+}
+
+export function getFollowers(userId: string, params?: {
   page?: number
   size?: number
+}): Promise<PaginatedResponse<User>> {
+  return getPaginated<User>(`/v1/users/${userId}/followers`, params as Record<string, unknown>)
 }
 
-export interface UserSearchParams {
-  keyword?: string
+export function getFollowings(userId: string, params?: {
   page?: number
   size?: number
-}
-
-export const registerUser = (params: UserRegisterParams): Promise<ApiResponse<void>> => {
-  return post<void>('/registry', params)
-}
-
-export const loginUser = (params: UserLoginParams): Promise<ApiResponse<void>> => {
-  const formData = new URLSearchParams()
-  formData.append('username', params.username)
-  formData.append('password', params.password)
-  
-  return post<void>('/login', formData, {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-  })
-}
-
-export const logoutUser = (): Promise<ApiResponse<void>> => {
-  return post<void>('/logout')
-}
-
-export const getCurrentUser = (): Promise<ApiResponse<UserSelectRespDTO>> => {
-  return get<UserSelectRespDTO>('/api/user/current')
-}
-
-export const getUserById = (id: string | number): Promise<ApiResponse<UserSelectRespDTO>> => {
-  return get<UserSelectRespDTO>(`/api/user/query/${id}`)
-}
-
-export const followUser = (params: UserFollowParams): Promise<ApiResponse<void>> => {
-  return post<void>('/api/user/follow', params)
-}
-
-export const getFollowers = (params: UserFollowListParams): Promise<ApiResponse<PaginatedResponse<UserPageQueryFollowRespDTO>>> => {
-  return get<PaginatedResponse<UserPageQueryFollowRespDTO>>(`/api/user/followees/${params.userId}`, {
-    params: {
-      page: params.page || 1,
-      size: params.size || 10,
-    }
-  })
-}
-
-export const getFollowings = (params: UserFollowListParams): Promise<ApiResponse<PaginatedResponse<UserPageQueryFollowRespDTO>>> => {
-  return get<PaginatedResponse<UserPageQueryFollowRespDTO>>(`/api/user/followers/${params.userId}`, {
-    params: {
-      page: params.page || 1,
-      size: params.size || 10,
-    }
-  })
-}
-
-export const searchUsers = (params: UserSearchParams = {}): Promise<ApiResponse<PaginatedResponse<UserSearchRespDTO>>> => {
-  return get<PaginatedResponse<UserSearchRespDTO>>('/api/user/search', {
-    params: {
-      keyword: params.keyword || '',
-      page: params.page || 1,
-      size: params.size || 10,
-    }
-  })
+}): Promise<PaginatedResponse<User>> {
+  return getPaginated<User>(`/v1/users/${userId}/followings`, params as Record<string, unknown>)
 }

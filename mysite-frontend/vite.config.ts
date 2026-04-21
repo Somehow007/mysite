@@ -3,11 +3,13 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   plugins: [
     vue(),
     vueDevTools(),
+    tailwindcss(),
   ],
   resolve: {
     alias: {
@@ -17,7 +19,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:23366',
+        target: 'http://localhost:8081',
         changeOrigin: true,
         secure: false,
       },

@@ -1,56 +1,37 @@
-/**
- * 日期格式化工具函数
- */
-
-/**
- * 格式化日期为 "DD MMM YYYY" 格式
- * @example formatDate(new Date('2023-01-15')) => "15 Jan 2023"
- */
-export function formatDate(date: Date | string | null | undefined): string {
-  if (date == null) return ''
-  const d = typeof date === 'string' ? new Date(date) : date
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ]
-
-  const day = d.getDate()
-  const month = months[d.getMonth()]
-  const year = d.getFullYear()
-
-  return `${day} ${month} ${year}`
+export function formatDate(dateStr: string): string {
+  const date = new Date(dateStr)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
-/**
- * 格式化日期为 "DD-MM-YYYY" 格式（用于 datetime 属性）
- */
-export function formatDateISO(date: Date | string | null | undefined): string {
-  if (date == null) return ''
-  const d = typeof date === 'string' ? new Date(date) : date
-  const day = String(d.getDate()).padStart(2, '0')
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const year = d.getFullYear()
-  return `${day}-${month}-${year}`
+export function formatDateISO(dateStr: string): string {
+  return new Date(dateStr).toISOString().split('T')[0] ?? dateStr
 }
 
-/**
- * 计算阅读时间（基于字数）
- */
-export function calculateReadingTime(wordCount: number, wordsPerMinute = 200): string {
-  const minutes = Math.ceil(wordCount / wordsPerMinute)
-  if (minutes === 1) {
-    return '1 min read'
-  }
-  return `${minutes} min read`
+export function calculateReadingTime(content: string): number {
+  const wordsPerMinute = 300
+  const chineseCharsPerMinute = 500
+  const chineseChars = (content.match(/[\u4e00-\u9fa5]/g) || []).length
+  const englishWords = (content.match(/[a-zA-Z]+/g) || []).length
+  const minutes = chineseChars / chineseCharsPerMinute + englishWords / wordsPerMinute
+  return Math.max(1, Math.ceil(minutes))
 }
 
+export function formatRelativeTime(dateStr: string): string {
+  const now = Date.now()
+  const date = new Date(dateStr).getTime()
+  const diff = now - date
+
+  const seconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+
+  if (days > 30) return formatDate(dateStr)
+  if (days > 0) return `${days} 天前`
+  if (hours > 0) return `${hours} 小时前`
+  if (minutes > 0) return `${minutes} 分钟前`
+  return '刚刚'
+}

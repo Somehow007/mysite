@@ -7,44 +7,31 @@ import org.springframework.data.elasticsearch.repository.ElasticsearchRepository
 
 import java.util.List;
 
-/**
- * Elasticsearch 持久层
- */
 public interface ArticleEsRepository extends ElasticsearchRepository<ArticleDocument, String> {
 
-    /**
-     * 根据标题搜索文章
-     *
-     * @param title 标题关键词
-     * @param pageable 分页参数
-     * @return 文章分页结果
-     */
     Page<ArticleDocument> findByTitleContaining(String title, Pageable pageable);
-    
-    /**
-     * 根据内容搜索文章
-     *
-     * @param content 内容关键词
-     * @param pageable 分页参数
-     * @return 文章分页结果
-     */
+
     Page<ArticleDocument> findByContentContaining(String content, Pageable pageable);
-    
-    /**
-     * 根据作者ID搜索文章
-     *
-     * @param authorId 作者ID
-     * @param pageable 分页参数
-     * @return 文章分页结果
-     */
+
     Page<ArticleDocument> findByAuthorId(String authorId, Pageable pageable);
-    
-    /**
-     * 根据作者ID列表搜索文章
-     *
-     * @param authorIds 作者ID列表
-     * @param pageable 分页参数
-     * @return 文章分页结果
-     */
+
     Page<ArticleDocument> findByAuthorIdIn(List<String> authorIds, Pageable pageable);
+
+    Page<ArticleDocument> findByCategoryId(String categoryId, Pageable pageable);
+
+    Page<ArticleDocument> findByCategoryIdIn(List<String> categoryIds, Pageable pageable);
+
+    Page<ArticleDocument> findByIdIn(List<String> ids, Pageable pageable);
+
+    Page<ArticleDocument> findByCategoryIdAndTitleContaining(String categoryId, String title, Pageable pageable);
+
+    Page<ArticleDocument> findByCategoryIdAndContentContaining(String categoryId, String content, Pageable pageable);
+
+    Page<ArticleDocument> findByCategoryIdAndAuthorIdIn(String categoryId, List<String> authorIds, Pageable pageable);
+
+    Page<ArticleDocument> findByIdInAndTitleContaining(List<String> ids, String title, Pageable pageable);
+
+    Page<ArticleDocument> findByIdInAndContentContaining(List<String> ids, String content, Pageable pageable);
+
+    Page<ArticleDocument> findByIdInAndAuthorIdIn(List<String> ids, List<String> authorIds, Pageable pageable);
 }

@@ -1,26 +1,32 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import type { Site } from '@/types/blog'
+import type { SiteConfig } from '@/types'
+import { get } from '@/api/client'
 
 export const useSiteStore = defineStore('site', () => {
-  const site = ref<Site>({
-    title: '我的博客',
-    description: '个人博客网站',
-    url: '/',
-    locale: 'zh',
-    members_enabled: true,
-    members_invite_only: false,
+  const site = ref<SiteConfig>({
+    title: 'MySite',
+    description: '一个极简的个人博客',
+    author: 'Admin',
+    url: '',
+    navigation: [
+      { label: '首页', path: '/' },
+      { label: '归档', path: '/archive' },
+      { label: '关于', path: '/about' },
+    ],
   })
   const loading = ref(false)
 
-  const fetchSite = async () => {
-    site.value = {
-      title: '我的博客',
-      description: '个人博客网站',
-      url: '/',
-      locale: 'zh',
-      members_enabled: true,
-      members_invite_only: false,
+  async function fetchSite() {
+    loading.value = true
+    try {
+      const data = await get<SiteConfig>('/v1/site/config')
+      if (data) {
+        site.value = data
+      }
+    } catch {
+    } finally {
+      loading.value = false
     }
   }
 

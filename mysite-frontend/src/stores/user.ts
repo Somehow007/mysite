@@ -1,55 +1,52 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getCurrentUser, logoutUser } from '@/api/user'
-import type { User } from '@/types/blog'
+import type { User } from '@/types'
+import { getItem, setItem, removeItem } from '@/utils/storage'
+import * as authApi from '@/api/auth'
 
 export const useUserStore = defineStore('user', () => {
   const user = ref<User | null>(null)
   const loading = ref(false)
 
-  const isLoggedIn = computed(() => user.value !== null)
+  const isLoggedIn = computed(() => !!user.value)
+  const displayName = computed(() => user.value?.realName || user.value?.username || '')
 
-  const displayName = computed(() => {
-    if (!user.value) return ''
-    return user.value.username || user.value.realName || '用户'
-  })
-
-  const fetchCurrentUser = async () => {
+  async function fetchCurrentUser() {
+    loading.value = true
     try {
-      loading.value = true
-      const response = await getCurrentUser()
-      if (response && response.data) {
-        user.value = {
-          id: response.data.id,
-          username: response.data.username,
-          realName: response.data.realName,
-          sex: response.data.sex,
-          email: response.data.email,
-          phoneNumber: response.data.phoneNumber,
-          followingCount: response.data.followingCount || 0,
-          followerCount: response.data.followerCount || 0,
-        }
-      } else {
-        user.value = null
-      }
+      user.value = await authApi.getCurrentUser()
     } catch {
       user.value = null
+      removeItem('access_token')
+      removeItem('refresh_token')
     } finally {
       loading.value = false
     }
   }
 
-  const setUser = (userData: User | null) => {
+  function setUser(userData: User | null) {
     user.value = userData
   }
 
-  const logout = async () => {
+  function setTokens(accessToken: string, refreshToken: string) {
+    setItem('access_token', accessToken)
+    setItem('refresh_token', refreshToken)
+  }
+
+  async function logout() {
     try {
-      await logoutUser()
-    } catch {
-      // ignore
+      await authApi.logout()
     } finally {
       user.value = null
+      removeItem('access_token')
+      removeItem('refresh_token')
+    }
+  }
+
+  function init() {
+    const token = getItem<string>('access_token')
+    if (token) {
+      fetchCurrentUser()
     }
   }
 
@@ -60,6 +57,8 @@ export const useUserStore = defineStore('user', () => {
     displayName,
     fetchCurrentUser,
     setUser,
+    setTokens,
     logout,
+    init,
   }
 })

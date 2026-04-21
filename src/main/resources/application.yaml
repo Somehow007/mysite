@@ -6,9 +6,6 @@ spring:
     url: jdbc:mysql://127.0.0.1:3306/mysite?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: Sh20060401
-  servlet:
-    session:
-      timeout: 30m
   data:
     redis:
       host: localhost
@@ -18,8 +15,6 @@ spring:
         enabled: true
   elasticsearch:
     uris: http://localhost:9200
-    username: elastic
-    password: Sh20060401
 
 server:
   port: 8081
@@ -55,3 +50,11 @@ artalk:
   server: http://localhost:23366
   site: MySite博客
   enabled: true
+
+jwt:
+  secret: mysite-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm-2026
+  access-token-expiration: 86400000
+  refresh-token-expiration: 604800000
+
+cors:
+  allowed-origins: http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000

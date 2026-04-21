@@ -1,129 +1,89 @@
-<template>
-  <div class="tag-page">
-    <header class="blog-header" :class="{ 'has-cover': false }">
-      <div class="inner">
-        <div class="archive archive-tag box archive-box">
-          <span class="archive-info">
-            <span class="archive-type">话题</span>
-            <span class="archive-count">
-              {{ pagination.total === 0 ? '无文章' : `${pagination.total} 篇文章` }}
-            </span>
-          </span>
-          <h2 class="archive-title">{{ tag.name }}</h2>
-          <span v-if="tag.description" class="archive-description" v-html="tag.description"></span>
-        </div>
-      </div>
-    </header>
-
-    <div id="index" class="container">
-      <main class="content" role="main">
-        <div v-if="loading" class="loading">
-          <p>加载中...</p>
-        </div>
-        <div v-else-if="posts.length === 0" class="no-posts">
-          <p>暂无文章</p>
-        </div>
-        <PostList v-else :posts="posts" :pagination="pagination" @page-change="handlePageChange" />
-      </main>
-    </div>
-  </div>
-</template>
-
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import type { Tag, Post, Pagination, ArticlePageQueryRespDTO } from '@/types/blog'
-import PostList from '@/components/PostList.vue'
-import { searchArticles } from '@/api/article'
+import { useHead } from '@unhead/vue'
+import { getTagBySlug, getTagArticles } from '@/api/tag'
+import ArticleList from '@/components/article/ArticleList.vue'
+import type { Tag, ArticleListItem, Pagination } from '@/types'
 
 const route = useRoute()
 
-const tag = ref<Tag>({
-  id: '1',
-  name: '标签名',
-  slug: 'tag',
-  description: '这是标签的描述...',
-})
-
-const posts = ref<Post[]>([])
-const pagination = ref<Pagination>({
-  current: 1,
-  size: 10,
-  pages: 1,
-  total: 0,
-})
+const tag = ref<Tag | null>(null)
+const articles = ref<ArticleListItem[]>([])
+const pagination = ref<Pagination | null>(null)
 const loading = ref(false)
+const error = ref(false)
 
-const mapArticleToPost = (article: ArticlePageQueryRespDTO): Post => {
-  return {
-    id: String(article.id),
-    title: article.title,
-    summary: article.summary,
-    content: '',
-    featured: false,
-    createTime: article.createTime || '',
-    updateTime: article.updateTime || '',
-    reading_time: '1 min read',
-    viewCount: article.viewCount,
-    favoriteCount: article.favoriteCount,
-    authorName: article.authorName,
-    authorId: '',
-    tags: [],
-    url: `/post/${article.id}`,
-    authors: [],
-    published_at: article.createTime || '',
-    excerpt: article.summary,
-  }
-}
+useHead(() => ({
+  title: tag.value ? `#${tag.value.name} - MySite` : '标签 - MySite',
+}))
 
-const fetchTagPosts = async (page = 1) => {
+async function fetchData(slug: string, page = 1) {
+  loading.value = true
+  error.value = false
   try {
-    loading.value = true
-    const response = await searchArticles({ page, size: 10 })
-    if (response && response.data) {
-      posts.value = (response.data.records || []).map(mapArticleToPost)
-      pagination.value = {
-        current: response.data.current || 1,
-        size: response.data.size || 10,
-        total: response.data.total || 0,
-        pages: response.data.pages || 1,
-      }
-    }
-  } catch (error) {
-    console.error('获取文章列表失败:', error)
+    const [tagData, artData] = await Promise.all([
+      getTagBySlug(slug),
+      getTagArticles(slug, { page, size: 10 }),
+    ])
+    tag.value = tagData
+    articles.value = artData.list
+    pagination.value = artData.pagination
+  } catch {
+    error.value = true
+    tag.value = null
+    articles.value = []
+    pagination.value = null
   } finally {
     loading.value = false
   }
 }
 
-const handlePageChange = (page: number) => {
-  fetchTagPosts(page)
+function handlePageChange(page: number) {
+  if (tag.value) {
+    fetchData(tag.value.slug, page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 }
 
-onMounted(async () => {
-  const slug = route.params.slug as string
-  if (slug) {
-    tag.value = {
-      id: slug,
-      name: slug,
-      slug: slug,
-      description: '',
-    }
-    await fetchTagPosts()
+watch(
+  () => route.params.slug,
+  (newSlug) => {
+    if (newSlug) fetchData(newSlug as string)
+  },
+)
+
+onMounted(() => {
+  if (route.params.slug) {
+    fetchData(route.params.slug as string)
   }
 })
 </script>
 
-<style scoped>
-.loading {
-  text-align: center;
-  padding: 2rem;
-  color: var(--color-content-secondary);
-}
+<template>
+  <div>
+    <div v-if="loading && !tag" class="animate-pulse space-y-4">
+      <div class="skeleton h-8 w-32 rounded" />
+    </div>
 
-.no-posts {
-  text-align: center;
-  padding: 4rem;
-  color: var(--color-content-secondary);
-}
-</style>
+    <div v-else-if="error" class="py-16 text-center">
+      <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">标签不存在或加载失败</p>
+    </div>
+
+    <template v-else-if="tag">
+      <header class="mb-12 pb-8 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
+        <h1 class="text-3xl font-bold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">
+          #{{ tag.name }}
+        </h1>
+      </header>
+
+      <ArticleList
+        :articles="articles"
+        :pagination="pagination"
+        :loading="loading"
+        :skeleton-count="5"
+        @page-change="handlePageChange"
+      />
+    </template>
+  </div>
+</template>

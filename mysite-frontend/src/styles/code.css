@@ -1,0 +1,66 @@
+@layer components {
+  .shiki {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.7;
+    tab-size: 2;
+    border-radius: 8px;
+    overflow-x: auto;
+  }
+
+  .shiki .line {
+    min-height: 1.7em;
+  }
+
+  .shiki .line.highlighted {
+    background-color: rgba(128, 128, 128, 0.1);
+    display: inline-block;
+    width: 100%;
+  }
+
+  .prose pre.shiki {
+    margin: 1.5em 0;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .prose pre.shiki code {
+    display: grid;
+  }
+
+  .prose pre.shiki .line {
+    padding: 0 1.5rem;
+  }
+
+  .code-block-wrapper {
+    position: relative;
+    margin: 1.5em 0;
+  }
+
+  .code-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 1rem;
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    color: var(--color-text-muted);
+    background-color: var(--color-bg-code);
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 8px 8px 0 0;
+  }
+
+  .dark .code-block-header {
+    color: var(--color-dark-text-muted);
+    background-color: var(--color-dark-bg-code);
+    border-bottom-color: var(--color-dark-border);
+  }
+
+  .code-block-wrapper pre.shiki {
+    border-radius: 0 0 8px 8px;
+    margin: 0;
+  }
+
+  .code-block-wrapper:has(pre.shiki:first-child) pre.shiki {
+    border-radius: 8px;
+  }
+}

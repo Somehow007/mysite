@@ -9,29 +9,16 @@ public class ArticlePageQueryRespDTO {
 
     @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
-
-    /**
-     * 文章标题
-     */
     private String title;
-
-    /**
-     * 摘要/简介（可选，用于列表页展示）
-     */
     private String summary;
-
-    /**
-     * 阅读量
-     */
+    private String coverImage;
     private Integer viewCount;
-
-    /**
-     * 收藏量
-     */
     private Integer favoriteCount;
-
-    /**
-     * 作者名称
-     */
     private String authorName;
+
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long authorId;
+    private String categoryName;
+    private String categorySlug;
+    private java.util.Date updateTime;
 }

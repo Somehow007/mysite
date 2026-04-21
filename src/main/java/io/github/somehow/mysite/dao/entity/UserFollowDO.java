@@ -4,28 +4,15 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import io.github.somehow.mysite.commons.database.BaseDO;
 import lombok.Builder;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
-/**
- * 用户关注数据库信息
- */
 @Data
+@EqualsAndHashCode(callSuper = false)
 @Builder
 @TableName(value = "t_user_follow")
 public class UserFollowDO extends BaseDO {
 
-    /**
-     * 主键
-     */
     private Long id;
-
-    /**
-     * 关注者Id
-     */
     private Long followerId;
-
-    /**
-     * 被关注者Id
-     */
     private Long followeeId;
-
 }

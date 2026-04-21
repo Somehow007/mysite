@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @Schema(description = "更新文章请求实体")
 public class ArticleUpdateReqDTO {
@@ -13,11 +15,10 @@ public class ArticleUpdateReqDTO {
     private Long id;
 
     private String title;
-
     private String content;
-
     private String summary;
-
+    private String coverImage;
+    private Long categoryId;
     private Integer published;
-
+    private List<Long> tagIds;
 }

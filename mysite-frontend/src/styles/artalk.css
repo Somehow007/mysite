@@ -1,0 +1,15 @@
+@layer components {
+  .artalk-custom {
+    --at-color-bg: var(--color-bg-card);
+    --at-color-font: var(--color-text-body);
+    --at-color-border: var(--color-border);
+    --at-color-main: var(--color-accent);
+  }
+
+  .dark .artalk-custom {
+    --at-color-bg: var(--color-dark-bg-card);
+    --at-color-font: var(--color-dark-text-body);
+    --at-color-border: var(--color-dark-border);
+    --at-color-main: var(--color-dark-accent);
+  }
+}

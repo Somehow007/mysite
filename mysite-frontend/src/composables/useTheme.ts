@@ -1,49 +1,40 @@
-/**
- * 主题切换组合式函数
- */
-import { ref, watch, onMounted } from 'vue'
-import { getThemeMode, setThemeMode, applyTheme, type ThemeMode } from '@/utils/theme'
+import { ref, watch } from 'vue'
+import { usePreferredDark, useStorage } from '@vueuse/core'
 
-export function useTheme() {
-  const currentTheme = ref<ThemeMode>(getThemeMode())
+type ThemeMode = 'light' | 'dark' | 'system'
 
-  // 初始化主题
-  onMounted(() => {
-    applyTheme(currentTheme.value)
-  })
+const mode = useStorage<ThemeMode>('mysite_theme', 'system')
+const preferredDark = usePreferredDark()
+const isDark = ref(false)
 
-  // 切换主题
-  const changeTheme = (mode: ThemeMode) => {
-    currentTheme.value = mode
-    setThemeMode(mode)
+function updateIsDark() {
+  if (mode.value === 'system') {
+    isDark.value = preferredDark.value
+  } else {
+    isDark.value = mode.value === 'dark'
   }
-
-  // 循环切换主题：system -> light -> dark -> system
-  const toggleTheme = () => {
-    const modes: ThemeMode[] = ['system', 'light', 'dark']
-    const currentIndex = modes.indexOf(currentTheme.value)
-    const nextIndex = (currentIndex + 1) % modes.length
-    const nextMode = modes[nextIndex]
-    if (nextMode) {
-      changeTheme(nextMode)
-    }
-  }
-
-  // 监听系统主题变化
-  if (typeof window !== 'undefined') {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleChange = () => {
-      if (currentTheme.value === 'system') {
-        applyTheme('system')
-      }
-    }
-    mediaQuery.addEventListener('change', handleChange)
-  }
-
-  return {
-    currentTheme,
-    changeTheme,
-    toggleTheme,
+  if (typeof document !== 'undefined') {
+    document.documentElement.classList.toggle('dark', isDark.value)
   }
 }
 
+watch([mode, preferredDark], updateIsDark, { immediate: true })
+
+export function useTheme() {
+  function setTheme(newMode: ThemeMode) {
+    mode.value = newMode
+  }
+
+  function toggleTheme() {
+    const modes: ThemeMode[] = ['light', 'dark', 'system']
+    const currentIndex = modes.indexOf(mode.value)
+    mode.value = modes[(currentIndex + 1) % modes.length]
+  }
+
+  return {
+    mode,
+    isDark,
+    setTheme,
+    toggleTheme,
+  }
+}
