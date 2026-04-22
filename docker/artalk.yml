@@ -28,16 +28,8 @@ admin_users:
     link: /
 
 db:
-  type: mysql
-  name: mysite
-  host: mysite-mysql
-  port: 3306
-  user: root
-  password: 'root123456'
-  charset: utf8mb4
-  table_prefix: 'atk_'
-  ssl: false
-  prepare_stmt: true
+  type: sqlite
+  file: ./data/artalk.db
 
 cache:
   enabled: true

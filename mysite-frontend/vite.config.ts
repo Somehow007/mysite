@@ -23,6 +23,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      '/artalk-api': {
+        target: 'http://localhost:23366',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/artalk-api/, ''),
+        secure: false,
+      },
     },
   },
 })
