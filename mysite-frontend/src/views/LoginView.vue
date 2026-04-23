@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import LoginForm from '@/components/auth/LoginForm.vue'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 
 async function onLoginSuccess() {
   await userStore.fetchCurrentUser()
-  router.push('/')
+  const redirect = (route.query.redirect as string) || '/'
+  router.push(redirect)
 }
 </script>
 

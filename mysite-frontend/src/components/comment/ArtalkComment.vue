@@ -1,17 +1,35 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import Artalk from 'artalk'
 import 'artalk/dist/Artalk.css'
+import { useUserStore } from '@/stores/user'
 
 const props = defineProps<{
   pageKey: string
   pageTitle: string
 }>()
 
+const route = useRoute()
+const router = useRouter()
+const userStore = useUserStore()
+
+const wrapperRef = ref<HTMLElement | null>(null)
 const containerRef = ref<HTMLElement | null>(null)
 const loadError = ref(false)
-const loading = ref(true)
 let artalkInstance: Artalk | null = null
+
+const isLoggedIn = computed(() => userStore.isLoggedIn)
+const showLoading = computed(() => userStore.loading && !userStore.user)
+const showContent = computed(() => !userStore.loading || userStore.user)
+
+const loginRedirectUrl = computed(() => {
+  return `/login?redirect=${encodeURIComponent(route.fullPath)}`
+})
+
+function goToLogin() {
+  router.push(loginRedirectUrl.value)
+}
 
 async function checkServerHealth(server: string): Promise<boolean> {
   try {
@@ -26,9 +44,41 @@ async function checkServerHealth(server: string): Promise<boolean> {
   }
 }
 
-async function initArtalk() {
-  if (!containerRef.value) return
+function applyLoggedInState() {
+  if (!artalkInstance || !containerRef.value) return
 
+  const user = userStore.user
+  if (!user || !isLoggedIn.value) return
+
+  try {
+    const editor = artalkInstance.ctx.get('editor')
+    if (!editor) return
+
+    const inputs = editor.getHeaderInputEls()
+
+    if (inputs.name) {
+      inputs.name.value = user.username
+      inputs.name.readOnly = true
+      inputs.name.dispatchEvent(new Event('input', { bubbles: true }))
+      inputs.name.dispatchEvent(new Event('change', { bubbles: true }))
+      const nameItem = inputs.name.closest('.atk-item')
+      if (nameItem) nameItem.classList.add('atk-item-hidden')
+    }
+
+    if (inputs.email) {
+      inputs.email.value = user.email || ''
+      inputs.email.readOnly = true
+      inputs.email.dispatchEvent(new Event('input', { bubbles: true }))
+      inputs.email.dispatchEvent(new Event('change', { bubbles: true }))
+      const emailItem = inputs.email.closest('.atk-item')
+      if (emailItem) emailItem.classList.add('atk-item-hidden')
+    }
+  } catch {
+    // Editor might not be ready yet
+  }
+}
+
+async function initArtalk() {
   if (artalkInstance) {
     artalkInstance.destroy()
     artalkInstance = null
@@ -36,17 +86,20 @@ async function initArtalk() {
 
   const server = import.meta.env.VITE_ARTALK_SERVER || '/artalk-api'
 
-  loading.value = true
   loadError.value = false
 
   const healthy = await checkServerHealth(server)
   if (!healthy) {
     loadError.value = true
-    loading.value = false
     return
   }
 
-  loading.value = false
+  await nextTick()
+
+  if (!containerRef.value) {
+    setTimeout(() => initArtalk(), 100)
+    return
+  }
 
   artalkInstance = Artalk.init({
     el: containerRef.value,
@@ -57,6 +110,18 @@ async function initArtalk() {
     darkMode: document.documentElement.classList.contains('dark'),
     locale: 'zh-CN',
   })
+
+  artalkInstance.on('list-loaded', () => {
+    if (isLoggedIn.value) {
+      applyLoggedInState()
+    }
+  })
+
+  if (isLoggedIn.value) {
+    setTimeout(() => {
+      applyLoggedInState()
+    }, 300)
+  }
 }
 
 watch(
@@ -66,8 +131,19 @@ watch(
   },
 )
 
-onMounted(() => {
-  initArtalk()
+watch(showContent, async (show) => {
+  if (show && !artalkInstance && !loadError.value) {
+    await nextTick()
+    initArtalk()
+  }
+})
+
+onMounted(async () => {
+  await nextTick()
+
+  if (showContent.value) {
+    initArtalk()
+  }
 
   const observer = new MutationObserver(() => {
     if (artalkInstance) {
@@ -94,8 +170,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="artalk-custom mt-12 pt-8 border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
-    <div v-if="loading" class="flex items-center justify-center py-8 gap-2">
+  <div
+    ref="wrapperRef"
+    class="artalk-custom mt-12 pt-8 border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)]"
+    :class="{
+      'artalk-guest-mode': !isLoggedIn,
+      'artalk-logged-in': isLoggedIn
+    }"
+  >
+    <div v-if="showLoading" class="flex items-center justify-center py-8 gap-2">
       <div class="w-4 h-4 border-2 border-[var(--color-accent)] dark:border-[var(--color-dark-accent)] border-t-transparent rounded-full animate-spin" />
       <span class="text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">评论加载中...</span>
     </div>
@@ -110,6 +193,20 @@ onUnmounted(() => {
         点击重试
       </button>
     </div>
-    <div v-show="!loading && !loadError" ref="containerRef" />
+    <template v-else>
+      <div v-if="!isLoggedIn" class="artalk-login-overlay">
+        <div class="artalk-login-overlay-content">
+          <svg class="artalk-login-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+          <p class="artalk-login-text">登录后即可参与评论</p>
+          <button @click="goToLogin" class="artalk-login-btn">
+            去登录
+          </button>
+        </div>
+      </div>
+      <div ref="containerRef" />
+    </template>
   </div>
 </template>

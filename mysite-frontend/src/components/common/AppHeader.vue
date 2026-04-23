@@ -14,6 +14,7 @@ const route = useRoute()
 const mobileMenuOpen = ref(false)
 const scrolled = ref(false)
 const userMenuOpen = ref(false)
+let menuCloseTimer: ReturnType<typeof setTimeout> | null = null
 
 function handleScroll() {
   scrolled.value = window.scrollY > 10
@@ -25,6 +26,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
+  if (menuCloseTimer) clearTimeout(menuCloseTimer)
 })
 
 function toggleMobileMenu() {
@@ -41,6 +43,19 @@ function toggleUserMenu() {
 
 function closeUserMenu() {
   userMenuOpen.value = false
+}
+
+function handleMenuEnter() {
+  if (menuCloseTimer) {
+    clearTimeout(menuCloseTimer)
+    menuCloseTimer = null
+  }
+}
+
+function handleMenuLeave() {
+  menuCloseTimer = setTimeout(() => {
+    userMenuOpen.value = false
+  }, 150)
 }
 
 async function handleLogout() {
@@ -93,7 +108,7 @@ async function handleLogout() {
           </template>
 
           <template v-else>
-            <div class="relative" @mouseleave="closeUserMenu">
+            <div class="relative" @mouseenter="handleMenuEnter" @mouseleave="handleMenuLeave">
               <button
                 @click="toggleUserMenu"
                 class="flex items-center gap-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] transition-colors"

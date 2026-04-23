@@ -17,6 +17,8 @@ public class UserSelectRespDTO {
 
     private String realName;
 
+    private String email;
+
     private Integer sex;
 
     private Integer followingCount;

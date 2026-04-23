@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import RegisterForm from '@/components/auth/RegisterForm.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 function onRegisterSuccess() {
-  router.push('/login')
+  const redirect = route.query.redirect as string
+  router.push(redirect ? `/login?redirect=${encodeURIComponent(redirect)}` : '/login')
 }
 </script>
 
