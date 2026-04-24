@@ -1,13 +1,20 @@
 package io.github.somehow.mysite.config;
 
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.elasticsearch.repository.config.EnableElasticsearchRepositories;
 
-/**
- * Elasticsearch 配置类
- * todo：后续考虑可以加上 canal 对数据进行同步，或采用 mq 进行异步操作
- */
+@Slf4j
 @Configuration
 @EnableElasticsearchRepositories(basePackages = "io.github.somehow.mysite.dao.mapper")
+@ConditionalOnProperty(prefix = "elasticsearch", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class ElasticsearchConfiguration {
+
+    public ElasticsearchConfiguration() {
+        log.info("========================================");
+        log.info("Elasticsearch 已启用");
+        log.info("ES Repositories 已加载");
+        log.info("========================================");
+    }
 }

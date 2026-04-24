@@ -1,0 +1,96 @@
+server:
+  port: 8081
+  shutdown: graceful
+
+spring:
+  profiles:
+    active: production
+    
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+    
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/mysite?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=true
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 3
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
+      pool-name: MySiteHikariPool
+      
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+      lettuce:
+        pool:
+          max-active: 10
+          max-idle: 5
+          min-idle: 2
+          max-wait: 3000ms
+          
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: none
+      
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+  global-config:
+    db-config:
+      logic-delete-field: delFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+artalk:
+  server: ${ARTALK_SERVER:http://localhost:23366}
+  site: ${ARTALK_SITE:MySite博客}
+  enabled: true
+  
+jwt:
+  secret: ${JWT_SECRET:mysite-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm-2026}
+  access-token-expiration: 86400000
+  refresh-token-expiration: 604800000
+  
+cors:
+  allowed-origins: https://${DOMAIN:localhost},https://www.${DOMAIN:localhost}
+
+logging:
+  level:
+    root: INFO
+    io.github.somehow.mysite: INFO
+    org.springframework.web: WARN
+    org.hibernate: WARN
+  file:
+    name: /var/log/mysite/application.log
+    max-size: 10MB
+    max-history: 30
+    total-size-cap: 300MB
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    tags:
+      application: mysite

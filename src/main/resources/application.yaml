@@ -36,7 +36,7 @@ springdoc:
     operations-sorter: alpha
   api-docs:
     path: /v3/api-docs
-  group-configs:
+    group-configs:
     - group: 'default'
       paths-to-match: '/**'
       packages-to-scan: io.github.somehow.mysite
@@ -58,3 +58,10 @@ jwt:
 
 cors:
   allowed-origins: http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000
+
+elasticsearch:
+  enabled: false
+  uris:
+    - http://localhost:9200
+  connection-timeout: 5000
+  socket-timeout: 30000

@@ -1,92 +1,90 @@
 services:
-#  mysql:
-#    container_name: mysite-mysql
-#    image: mysql:8.0
-#    restart: unless-stopped
-#    ports:
-#      - "3306:3306"
-#    environment:
-#      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
-#      MYSQL_DATABASE: mysite
-#      TZ: Asia/Shanghai
-#    volumes:
-#      - mysql_data:/var/lib/mysql
-#      - ./init:/docker-entrypoint-initdb.d:ro
-#    command:
-#      - --character-set-server=utf8mb4
-#      - --collation-server=utf8mb4_unicode_ci
-#      - --default-authentication-plugin=mysql_native_password
-#    healthcheck:
-#      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-root123456}"]
-#      interval: 10s
-#      timeout: 5s
-#      retries: 5
-#    networks:
-#      - mysite-network
-#
-#  redis:
-#    container_name: mysite-redis
-#    image: redis:7-alpine
-#    restart: unless-stopped
-#    ports:
-#      - "6379:6379"
-#    volumes:
-#      - redis_data:/data
-#    command: redis-server --appendonly yes
-#    healthcheck:
-#      test: ["CMD", "redis-cli", "ping"]
-#      interval: 10s
-#      timeout: 5s
-#      retries: 5
-#    networks:
-#      - mysite-network
-
-  elasticsearch:
-    container_name: mysite-elasticsearch
-    build:
-      context: ./elasticsearch
-      dockerfile: Dockerfile
+  mysql:
+    container_name: mysite-mysql
+    image: mysql:8.4
     restart: unless-stopped
-    environment:
-      - node.name=elasticsearch
-      - cluster.name=es-docker-cluster
-      - discovery.type=single-node
-      - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-      - xpack.security.enabled=false
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-    volumes:
-      - es_data:/usr/share/elasticsearch/data
-      - es_logs:/usr/share/elasticsearch/logs
     ports:
-      - "9200:9200"
-      - "9300:9300"
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Sh20060401}
+      MYSQL_DATABASE: mysite
+      TZ: Asia/Shanghai
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+      - --innodb-buffer-pool-size=64M
+    deploy:
+      resources:
+        limits:
+          memory: 300M
     networks:
       - mysite-network
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"yellow\"' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
 
-  kibana:
-    container_name: mysite-kibana
-    image: docker.elastic.co/kibana/kibana:7.17.21
+  redis:
+    container_name: mysite-redis
+    image: redis:7-alpine
     restart: unless-stopped
-    environment:
-      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-    volumes:
-      - kibana_data:/usr/share/kibana/data
     ports:
-      - "5601:5601"
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command:
+      - redis-server
+      - --appendonly yes
+      - --maxmemory 100M
+      - --maxmemory-policy allkeys-lru
     networks:
       - mysite-network
-    depends_on:
-      - elasticsearch
+
+  # elasticsearch:
+  #   container_name: mysite-elasticsearch
+  #   build:
+  #     context: ./elasticsearch
+  #     dockerfile: Dockerfile
+  #   restart: unless-stopped
+  #   environment:
+  #     - node.name=elasticsearch
+  #     - cluster.name=es-docker-cluster
+  #     - discovery.type=single-node
+  #     - bootstrap.memory_lock=true
+  #     - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+  #     - xpack.security.enabled=false
+  #   ulimits:
+  #     memlock:
+  #       soft: -1
+  #       hard: -1
+  #   volumes:
+  #     - es_data:/usr/share/elasticsearch/data
+  #     - es_logs:/usr/share/elasticsearch/logs
+  #   ports:
+  #     - "9200:9200"
+  #     - "9300:9300"
+  #   networks:
+  #     - mysite-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"yellow\"' || exit 1"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
+  #     start_period: 60s
+
+  # kibana:
+  #   container_name: mysite-kibana
+  #   image: docker.elastic.co/kibana/kibana:7.17.21
+  #   restart: unless-stopped
+  #   environment:
+  #     - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+  #   volumes:
+  #     - kibana_data:/usr/share/kibana/data
+  #   ports:
+  #     - "5601:5601"
+  #   networks:
+  #     - mysite-network
+  #   depends_on:
+  #     - elasticsearch
 
   artalk:
     container_name: mysite-artalk
@@ -99,20 +97,15 @@ services:
       - ./artalk.yml:/data/artalk.yml:ro
     environment:
       - TZ=Asia/Shanghai
-    healthcheck:
-      test: ["CMD-SHELL", "printf 'GET / HTTP/1.0\\r\\n\\r\\n' | nc -w 2 127.0.0.1 23366 | grep -q 'HTTP' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     networks:
       - mysite-network
 
 volumes:
   mysql_data:
   redis_data:
-  es_data:
-  es_logs:
-  kibana_data:
+  # es_data:
+  # es_logs:
+  # kibana_data:
   artalk_data:
 
 networks:

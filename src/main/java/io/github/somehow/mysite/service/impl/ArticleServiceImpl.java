@@ -16,12 +16,11 @@ import io.github.somehow.mysite.dto.req.article.*;
 import io.github.somehow.mysite.dto.resp.ArchiveRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticlePageQueryRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleSelectRespDTO;
-import io.github.somehow.mysite.elasticsearch.ArticleDocument;
+import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.ArticleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -36,7 +35,7 @@ import java.util.stream.Collectors;
 public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> implements ArticleService {
 
     private final ArticleMapper articleMapper;
-    private final ArticleEsRepository esRepository;
+    private final ArticleSearchService articleSearchService;
     private final UserMapper userMapper;
     private final UserFavoriteArticleMapper userFavoriteArticleMapper;
     private final CategoryMapper categoryMapper;
@@ -80,16 +79,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             }
         }
 
-        ArticleDocument doc = ArticleDocument.builder()
-                .id(articleDO.getId().toString())
-                .title(requestParam.getTitle())
-                .content(requestParam.getContent())
-                .summary(requestParam.getSummary())
-                .authorId(articleDO.getAuthorId().toString())
-                .categoryId(requestParam.getCategoryId() != null ? requestParam.getCategoryId().toString() : null)
-                .createTime(articleDO.getCreateTime())
-                .build();
-        esRepository.save(doc);
+        articleSearchService.indexArticle(articleDO);
     }
 
     @Override
@@ -131,16 +121,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                 .eq(ArticleDO::getDelFlag, 0));
 
         if (updatedArticle != null) {
-            ArticleDocument articleDocument = ArticleDocument.builder()
-                    .id(updatedArticle.getId().toString())
-                    .title(updatedArticle.getTitle())
-                    .content(updatedArticle.getContent())
-                    .summary(updatedArticle.getSummary())
-                    .authorId(updatedArticle.getAuthorId().toString())
-                    .categoryId(updatedArticle.getCategoryId() != null ? updatedArticle.getCategoryId().toString() : null)
-                    .createTime(updatedArticle.getCreateTime())
-                    .build();
-            esRepository.save(articleDocument);
+            articleSearchService.updateArticle(updatedArticle);
         }
     }
 
@@ -157,215 +138,12 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             throw new ClientException("删除文章失败，文章不存在");
         }
 
-        esRepository.deleteById(id.toString());
+        articleSearchService.deleteArticle(id);
     }
 
     @Override
     public IPage<ArticlePageQueryRespDTO> pageQueryArticle(ArticlePageQueryReqDTO requestParam) {
-        PageRequest pageRequest = PageRequest.of(
-                (int) (requestParam.getCurrent() - 1),
-                (int) requestParam.getSize());
-
-        String keyword = StrUtil.blankToDefault(requestParam.getKeyword(), "");
-        String searchType = StrUtil.blankToDefault(requestParam.getSearchType(), "title");
-        String categorySlug = requestParam.getCategorySlug();
-        String tagSlug = requestParam.getTagSlug();
-
-        if (StrUtil.isNotBlank(tagSlug)) {
-            return pageQueryByTagSlug(tagSlug, keyword, searchType, requestParam, pageRequest);
-        }
-
-        if (StrUtil.isNotBlank(categorySlug)) {
-            return pageQueryByCategorySlug(categorySlug, keyword, searchType, requestParam, pageRequest);
-        }
-
-        org.springframework.data.domain.Page<ArticleDocument> esPage;
-
-        if (StrUtil.isBlank(keyword)) {
-            esPage = esRepository.findAll(pageRequest);
-        } else {
-            keyword = keyword.toLowerCase();
-            switch (searchType) {
-                case "content":
-                    esPage = esRepository.findByContentContaining(keyword, pageRequest);
-                    break;
-                case "author":
-                    List<UserDO> matchedUsers = userMapper.selectByUsernameLike(keyword);
-                    if (!CollectionUtils.isEmpty(matchedUsers)) {
-                        List<String> authorIds = matchedUsers.stream()
-                                .map(user -> user.getId().toString())
-                                .collect(Collectors.toList());
-                        esPage = esRepository.findByAuthorIdIn(authorIds, pageRequest);
-                    } else {
-                        return new Page<>();
-                    }
-                    break;
-                default:
-                    esPage = esRepository.findByTitleContaining(keyword, pageRequest);
-                    break;
-            }
-        }
-
-        return buildArticlePageResult(esPage, requestParam);
-    }
-
-    private IPage<ArticlePageQueryRespDTO> pageQueryByCategorySlug(String categorySlug, String keyword, String searchType,
-                                                                     ArticlePageQueryReqDTO requestParam, PageRequest pageRequest) {
-        CategoryDO category = categoryMapper.selectOne(Wrappers.<CategoryDO>lambdaQuery()
-                .eq(CategoryDO::getSlug, categorySlug));
-        if (category == null) {
-            return new Page<>();
-        }
-        String categoryId = category.getId().toString();
-
-        org.springframework.data.domain.Page<ArticleDocument> esPage;
-        if (StrUtil.isBlank(keyword)) {
-            esPage = esRepository.findByCategoryId(categoryId, pageRequest);
-        } else {
-            keyword = keyword.toLowerCase();
-            switch (searchType) {
-                case "content":
-                    esPage = esRepository.findByCategoryIdAndContentContaining(categoryId, keyword, pageRequest);
-                    break;
-                case "author":
-                    List<UserDO> matchedUsers = userMapper.selectByUsernameLike(keyword);
-                    if (!CollectionUtils.isEmpty(matchedUsers)) {
-                        List<String> authorIds = matchedUsers.stream()
-                                .map(user -> user.getId().toString())
-                                .collect(Collectors.toList());
-                        esPage = esRepository.findByCategoryIdAndAuthorIdIn(categoryId, authorIds, pageRequest);
-                    } else {
-                        return new Page<>();
-                    }
-                    break;
-                default:
-                    esPage = esRepository.findByCategoryIdAndTitleContaining(categoryId, keyword, pageRequest);
-                    break;
-            }
-        }
-        return buildArticlePageResult(esPage, requestParam);
-    }
-
-    private IPage<ArticlePageQueryRespDTO> pageQueryByTagSlug(String tagSlug, String keyword, String searchType,
-                                                                ArticlePageQueryReqDTO requestParam, PageRequest pageRequest) {
-        TagDO tag = tagMapper.selectOne(Wrappers.<TagDO>lambdaQuery()
-                .eq(TagDO::getSlug, tagSlug));
-        if (tag == null) {
-            return new Page<>();
-        }
-        List<ArticleTagDO> articleTags = articleTagMapper.selectList(Wrappers.<ArticleTagDO>lambdaQuery()
-                .eq(ArticleTagDO::getTagId, tag.getId())
-                .eq(ArticleTagDO::getDelFlag, 0));
-        if (CollectionUtils.isEmpty(articleTags)) {
-            return new Page<>();
-        }
-        List<String> articleIds = articleTags.stream()
-                .map(at -> at.getArticleId().toString())
-                .collect(Collectors.toList());
-
-        org.springframework.data.domain.Page<ArticleDocument> esPage;
-        if (StrUtil.isBlank(keyword)) {
-            esPage = esRepository.findByIdIn(articleIds, pageRequest);
-        } else {
-            keyword = keyword.toLowerCase();
-            switch (searchType) {
-                case "content":
-                    esPage = esRepository.findByIdInAndContentContaining(articleIds, keyword, pageRequest);
-                    break;
-                case "author":
-                    List<UserDO> matchedUsers = userMapper.selectByUsernameLike(keyword);
-                    if (!CollectionUtils.isEmpty(matchedUsers)) {
-                        List<String> authorIds = matchedUsers.stream()
-                                .map(user -> user.getId().toString())
-                                .collect(Collectors.toList());
-                        esPage = esRepository.findByIdInAndAuthorIdIn(articleIds, authorIds, pageRequest);
-                    } else {
-                        return new Page<>();
-                    }
-                    break;
-                default:
-                    esPage = esRepository.findByIdInAndTitleContaining(articleIds, keyword, pageRequest);
-                    break;
-            }
-        }
-        return buildArticlePageResult(esPage, requestParam);
-    }
-
-    private IPage<ArticlePageQueryRespDTO> buildArticlePageResult(org.springframework.data.domain.Page<ArticleDocument> esPage,
-                                                                    ArticlePageQueryReqDTO requestParam) {
-        if (esPage.hasContent()) {
-            List<Long> articleIds = esPage.getContent().stream()
-                    .map(doc -> Long.valueOf(doc.getId()))
-                    .collect(Collectors.toList());
-
-            List<ArticleDO> articles = baseMapper.selectList(Wrappers.<ArticleDO>lambdaQuery()
-                    .in(ArticleDO::getId, articleIds)
-                    .eq(ArticleDO::getDelFlag, 0));
-
-            List<Long> authorIds = articles.stream()
-                    .map(ArticleDO::getAuthorId)
-                    .distinct()
-                    .collect(Collectors.toList());
-
-            List<UserDO> authors = userMapper.selectList(Wrappers.<UserDO>lambdaQuery()
-                    .in(UserDO::getId, authorIds));
-
-            Set<Long> categoryIds = articles.stream()
-                    .map(ArticleDO::getCategoryId)
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toSet());
-
-            Map<Long, CategoryDO> categoryMap = new HashMap<>();
-            if (!categoryIds.isEmpty()) {
-                categoryMapper.selectList(Wrappers.<CategoryDO>lambdaQuery()
-                        .in(CategoryDO::getId, categoryIds))
-                        .forEach(c -> categoryMap.put(c.getId(), c));
-            }
-
-            List<ArticlePageQueryRespDTO> records = articles.stream()
-                    .map(article -> {
-                        ArticlePageQueryRespDTO dto = new ArticlePageQueryRespDTO();
-                        dto.setId(article.getId());
-                        dto.setTitle(article.getTitle());
-                        dto.setSummary(article.getSummary());
-                        dto.setCoverImage(article.getCoverImage());
-                        dto.setViewCount(article.getViewCount());
-                        dto.setFavoriteCount(article.getFavoriteCount());
-                        dto.setAuthorId(article.getAuthorId());
-                        dto.setCreateTime(article.getCreateTime());
-                        dto.setUpdateTime(article.getUpdateTime());
-
-                        String authorName = authors.stream()
-                                .filter(user -> user.getId().equals(article.getAuthorId()))
-                                .map(UserDO::getUsername)
-                                .findFirst()
-                                .orElse("");
-                        dto.setAuthorName(authorName);
-
-                        if (article.getCategoryId() != null) {
-                            CategoryDO cat = categoryMap.get(article.getCategoryId());
-                            if (cat != null) {
-                                dto.setCategoryName(cat.getName());
-                                dto.setCategorySlug(cat.getSlug());
-                            }
-                        }
-
-                        return dto;
-                    })
-                    .sorted((a, b) -> {
-                        if (a.getCreateTime() == null && b.getCreateTime() == null) return 0;
-                        if (a.getCreateTime() == null) return 1;
-                        if (b.getCreateTime() == null) return -1;
-                        return b.getCreateTime().compareTo(a.getCreateTime());
-                    })
-                    .collect(Collectors.toList());
-
-            IPage<ArticlePageQueryRespDTO> result = new Page<>(requestParam.getCurrent(), requestParam.getSize(), esPage.getTotalElements());
-            result.setRecords(records);
-            return result;
-        } else {
-            return new Page<>();
-        }
+        return articleSearchService.searchArticles(requestParam);
     }
 
     @Override
