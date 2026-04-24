@@ -2,11 +2,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { Loader2, Eye, Save, ArrowLeft, ImagePlus } from 'lucide-vue-next'
+import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle } from 'lucide-vue-next'
 import { createArticle, updateArticle, getArticleById } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { getTags } from '@/api/tag'
 import { useUserStore } from '@/stores/user'
+import MarkdownEditor from '@/components/editor/MarkdownEditor.vue'
 import type { Category, Tag } from '@/types'
 
 const route = useRoute()
@@ -26,16 +27,15 @@ const summary = ref('')
 const coverImage = ref('')
 const categoryId = ref('')
 const selectedTagIds = ref<string[]>([])
-const published = ref(1)
 
 const categories = ref<Category[]>([])
 const tags = ref<Tag[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
-const showPreview = ref(false)
 
-const previewHtml = ref('')
+const showMetaPanel = ref(false)
+const showSummaryHint = ref(false)
 
 onMounted(async () => {
   loading.value = true
@@ -57,6 +57,9 @@ onMounted(async () => {
       if (article.tags) {
         selectedTagIds.value = article.tags.map(t => t.id)
       }
+      if (summary.value || categoryId.value || coverImage.value || selectedTagIds.value.length > 0) {
+        showMetaPanel.value = true
+      }
     }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : '加载失败'
@@ -72,6 +75,16 @@ async function handleSave(isPublish: boolean) {
   }
   if (!content.value.trim()) {
     error.value = '请输入文章内容'
+    return
+  }
+
+  if (isPublish && !summary.value.trim()) {
+    showMetaPanel.value = true
+    showSummaryHint.value = true
+    error.value = '发布文章前，建议填写文章摘要'
+    setTimeout(() => {
+      showSummaryHint.value = false
+    }, 3000)
     return
   }
 
@@ -126,28 +139,18 @@ function toggleTag(tagId: string) {
   }
 }
 
-function togglePreview() {
-  showPreview.value = !showPreview.value
-  if (showPreview.value && content.value) {
-    renderMarkdown(content.value).then(html => {
-      previewHtml.value = html
-    })
-  }
+function toggleMetaPanel() {
+  showMetaPanel.value = !showMetaPanel.value
 }
 
-async function renderMarkdown(md: string): Promise<string> {
-  try {
-    const { marked } = await import('marked')
-    return await marked(md)
-  } catch {
-    return md.replace(/\n/g, '<br>')
-  }
+async function handleImageUpload(file: File) {
+  console.log('图片上传功能待实现:', file.name)
 }
 </script>
 
 <template>
-  <div class="max-w-[1080px] mx-auto">
-    <div class="flex items-center justify-between mb-8">
+  <div class="max-w-[1400px] mx-auto">
+    <div class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-4">
         <button
           @click="router.back()"
@@ -162,12 +165,19 @@ async function renderMarkdown(md: string): Promise<string> {
 
       <div class="flex items-center gap-3">
         <button
-          @click="togglePreview"
-          class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
-          :class="{ 'bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]': showPreview }"
+          @click="toggleMetaPanel"
+          class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+          :class="{ 'bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]': showMetaPanel }"
+          :aria-expanded="showMetaPanel"
+          :aria-label="showMetaPanel ? '收起文章信息面板' : '展开文章信息面板'"
         >
-          <Eye :size="14" />
-          预览
+          <FileText :size="14" />
+          <span class="hidden sm:inline">{{ showMetaPanel ? '收起' : '文章信息' }}</span>
+          <ChevronRight
+            :size="14"
+            class="transition-transform duration-200"
+            :class="{ 'rotate-90': showMetaPanel }"
+          />
         </button>
         <button
           @click="handleSave(false)"
@@ -189,7 +199,8 @@ async function renderMarkdown(md: string): Promise<string> {
       </div>
     </div>
 
-    <div v-if="error" class="mb-6 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
+    <div v-if="error" class="mb-6 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm flex items-center gap-2">
+      <AlertCircle :size="16" />
       {{ error }}
     </div>
 
@@ -197,8 +208,8 @@ async function renderMarkdown(md: string): Promise<string> {
       加载中...
     </div>
 
-    <div v-else class="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6">
-      <div class="space-y-4">
+    <div v-else class="flex gap-6">
+      <div class="flex-1 min-w-0 space-y-4">
         <input
           v-model="title"
           type="text"
@@ -206,84 +217,112 @@ async function renderMarkdown(md: string): Promise<string> {
           class="w-full px-0 py-3 text-2xl font-semibold bg-transparent border-none outline-none text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)]"
         />
 
-        <div v-if="showPreview" class="prose prose-sm max-w-none min-h-[400px] p-6 bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)]" v-html="previewHtml" />
-
-        <textarea
-          v-else
-          v-model="content"
-          placeholder="用 Markdown 写文章..."
-          class="w-full min-h-[400px] px-0 py-3 bg-transparent border-none outline-none resize-y text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] font-mono text-sm leading-relaxed"
-        />
-
-        <div>
-          <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
-            摘要
-          </label>
-          <textarea
-            v-model="summary"
-            placeholder="文章摘要（可选）..."
-            rows="2"
-            class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent text-sm resize-y"
+        <div class="h-[calc(100vh-280px)] min-h-[500px] rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] overflow-hidden bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)]">
+          <MarkdownEditor
+            v-model="content"
+            placeholder="用 Markdown 写文章..."
+            @image-upload="handleImageUpload"
           />
         </div>
       </div>
 
-      <div class="space-y-6">
-        <div>
-          <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
-            分类
-          </label>
-          <select
-            v-model="categoryId"
-            class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent text-sm"
-          >
-            <option value="">未分类</option>
-            <option v-for="cat in categories" :key="cat.id" :value="cat.id">
-              {{ cat.name }}
-            </option>
-          </select>
-        </div>
+      <transition
+        name="slide"
+        @enter="showMetaPanel = true"
+        @leave="showMetaPanel = false"
+      >
+        <div
+          v-show="showMetaPanel"
+          class="w-80 flex-shrink-0 space-y-6 overflow-y-auto max-h-[calc(100vh-200px)]"
+          role="region"
+          aria-label="文章元数据"
+        >
+          <div>
+            <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+              摘要
+              <span v-if="showSummaryHint" class="text-red-500 ml-1">*</span>
+            </label>
+            <textarea
+              v-model="summary"
+              placeholder="文章摘要（建议填写）..."
+              rows="3"
+              class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent text-sm resize-y"
+              :class="{ 'ring-2 ring-red-500': showSummaryHint }"
+            />
+          </div>
 
-        <div>
-          <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
-            标签
-          </label>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="tag in tags"
-              :key="tag.id"
-              @click="toggleTag(tag.id)"
-              class="text-xs px-2.5 py-1 rounded-full border transition-colors"
-              :class="selectedTagIds.includes(tag.id)
-                ? 'border-[var(--color-accent)] dark:border-[var(--color-dark-accent)] bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)]'
-                : 'border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:border-[var(--color-text-body)] dark:hover:border-[var(--color-dark-text-body)]'"
+          <div>
+            <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+              分类
+            </label>
+            <select
+              v-model="categoryId"
+              class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent text-sm"
             >
-              #{{ tag.name }}
-            </button>
-            <span v-if="tags.length === 0" class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
-              暂无标签
-            </span>
+              <option value="">未分类</option>
+              <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+                {{ cat.name }}
+              </option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+              标签
+            </label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="tag in tags"
+                :key="tag.id"
+                @click="toggleTag(tag.id)"
+                class="text-xs px-2.5 py-1 rounded-full border transition-colors"
+                :class="selectedTagIds.includes(tag.id)
+                  ? 'border-[var(--color-accent)] dark:border-[var(--color-dark-accent)] bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)]'
+                  : 'border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:border-[var(--color-text-body)] dark:hover:border-[var(--color-dark-text-body)]'"
+              >
+                #{{ tag.name }}
+              </button>
+              <span v-if="tags.length === 0" class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+                暂无标签
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+              封面图片
+            </label>
+            <input
+              v-model="coverImage"
+              type="text"
+              placeholder="图片URL（可选）"
+              class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent text-sm"
+            />
+          </div>
+
+          <div class="p-4 rounded-lg bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]">
+            <p class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] leading-relaxed mb-2">
+              编辑器支持丰富的Markdown快捷键，点击工具栏的 <strong>?</strong> 按钮查看所有快捷键。
+            </p>
+            <p class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] leading-relaxed">
+              支持实时预览、语法高亮和自动补全功能。
+            </p>
           </div>
         </div>
-
-        <div>
-          <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
-            封面图片
-          </label>
-          <input
-            v-model="coverImage"
-            type="text"
-            placeholder="图片URL（可选）"
-            class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent text-sm"
-          />
-        </div>
-
-        <div class="p-4 rounded-lg bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]">
-          <p class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] leading-relaxed">
-            支持 Markdown 语法。标题使用 #，粗体使用 **文字**，链接使用 [文字](URL)，代码使用 \`code\`。
-          </p>
-        </div>
-      </div>
+      </transition>
     </div>
   </div>
 </template>
+
+<style scoped>
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.3s ease;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  opacity: 0;
+  transform: translateX(20px);
+}
+</style>

@@ -6,8 +6,8 @@ export interface User {
   sex?: number
   followingCount?: number
   followerCount?: number
-  favorites?: any[]
-  histories?: any[]
+  favorites?: Record<string, unknown>[]
+  histories?: Record<string, unknown>[]
 }
 
 export interface Category {
