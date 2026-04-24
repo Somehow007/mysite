@@ -10,7 +10,7 @@ services:
       MYSQL_DATABASE: mysite
       TZ: Asia/Shanghai
     volumes:
-      - mysql_data:/var/lib/mysql
+      - ./mysql_data:/var/lib/mysql
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -29,7 +29,7 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - ./redis_data:/data
     command:
       - redis-server
       - --appendonly yes
@@ -92,20 +92,20 @@ services:
     ports:
       - "23366:23366"
     volumes:
-      - artalk_data:/data
+      - ./artalk_data:/data
       - ./artalk.yml:/data/artalk.yml:ro
     environment:
       - TZ=Asia/Shanghai
     networks:
       - mysite-network
 
-volumes:
-  mysql_data:
-  redis_data:
-  # es_data:
-  # es_logs:
-  # kibana_data:
-  artalk_data:
+# volumes:
+#   mysql_data:
+#   redis_data:
+#   es_data:
+#   es_logs:
+#   kibana_data:
+#   artalk_data:
 
 networks:
   mysite-network:
