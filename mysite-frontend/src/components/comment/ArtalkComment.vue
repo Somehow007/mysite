@@ -173,10 +173,6 @@ onUnmounted(() => {
   <div
     ref="wrapperRef"
     class="artalk-custom mt-12 pt-8 border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)]"
-    :class="{
-      'artalk-guest-mode': !isLoggedIn,
-      'artalk-logged-in': isLoggedIn
-    }"
   >
     <div v-if="showLoading" class="flex items-center justify-center py-8 gap-2">
       <div class="w-4 h-4 border-2 border-[var(--color-accent)] dark:border-[var(--color-dark-accent)] border-t-transparent rounded-full animate-spin" />
@@ -194,18 +190,6 @@ onUnmounted(() => {
       </button>
     </div>
     <template v-else>
-      <div v-if="!isLoggedIn" class="artalk-login-overlay">
-        <div class="artalk-login-overlay-content">
-          <svg class="artalk-login-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-          <p class="artalk-login-text">登录后即可参与评论</p>
-          <button @click="goToLogin" class="artalk-login-btn">
-            去登录
-          </button>
-        </div>
-      </div>
       <div ref="containerRef" />
     </template>
   </div>

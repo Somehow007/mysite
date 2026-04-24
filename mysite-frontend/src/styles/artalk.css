@@ -258,17 +258,7 @@
     border: 0;
   }
 
-  .artalk-custom.artalk-guest-mode .atk-editor {
-    display: none !important;
-  }
 
-  .artalk-custom.artalk-guest-mode .atk-main-editor {
-    display: none !important;
-  }
-
-  .artalk-custom.artalk-guest-mode .atk-comment-actions {
-    display: none !important;
-  }
 
   .artalk-login-overlay {
     border: 1px dashed var(--color-border);
