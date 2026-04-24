@@ -2,6 +2,7 @@ package io.github.somehow.mysite.controller;
 
 import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.commons.framework.web.Results;
+import io.github.somehow.mysite.dto.req.auth.ChangePasswordReqDTO;
 import io.github.somehow.mysite.dto.req.auth.LoginReqDTO;
 import io.github.somehow.mysite.dto.req.auth.RefreshTokenReqDTO;
 import io.github.somehow.mysite.dto.req.auth.RegisterReqDTO;
@@ -60,5 +61,17 @@ public class AuthController {
             return Results.success(null);
         }
         return Results.success(userService.selectUserById(userDetails.getUserId().toString()));
+    }
+
+    @Operation(summary = "修改密码")
+    @PostMapping("/v1/auth/change-password")
+    public Result<Void> changePassword(
+            @AuthenticationPrincipal SecurityUserDetails userDetails,
+            @Valid @RequestBody ChangePasswordReqDTO requestParam) {
+        if (userDetails == null) {
+            return Results.success();
+        }
+        userService.changePassword(userDetails.getUserId(), requestParam);
+        return Results.success();
     }
 }

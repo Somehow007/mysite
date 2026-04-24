@@ -332,6 +332,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                         dto.setViewCount(article.getViewCount());
                         dto.setFavoriteCount(article.getFavoriteCount());
                         dto.setAuthorId(article.getAuthorId());
+                        dto.setCreateTime(article.getCreateTime());
                         dto.setUpdateTime(article.getUpdateTime());
 
                         String authorName = authors.stream()
@@ -350,6 +351,12 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                         }
 
                         return dto;
+                    })
+                    .sorted((a, b) -> {
+                        if (a.getCreateTime() == null && b.getCreateTime() == null) return 0;
+                        if (a.getCreateTime() == null) return 1;
+                        if (b.getCreateTime() == null) return -1;
+                        return b.getCreateTime().compareTo(a.getCreateTime());
                     })
                     .collect(Collectors.toList());
 

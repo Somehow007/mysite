@@ -54,6 +54,7 @@ export interface ArticleListItem {
   categorySlug: string | null
   viewCount: number
   favoriteCount: number
+  createTime: string
   updateTime: string
 }
 
@@ -88,6 +89,11 @@ export interface RegisterRequest {
   email: string
   realName: string
   phoneNumber: string
+}
+
+export interface ChangePasswordRequest {
+  oldPassword: string
+  newPassword: string
 }
 
 export interface AuthTokens {

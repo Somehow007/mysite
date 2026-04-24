@@ -20,5 +20,6 @@ public class ArticlePageQueryRespDTO {
     private Long authorId;
     private String categoryName;
     private String categorySlug;
+    private java.util.Date createTime;
     private java.util.Date updateTime;
 }

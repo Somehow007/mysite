@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { setRedirectUrl } from '@/utils/redirect'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -51,6 +52,7 @@ const router = createRouter({
           path: 'login',
           name: 'login',
           component: () => import('@/views/LoginView.vue'),
+          meta: { isLoginPage: true },
         },
         {
           path: 'register',
@@ -62,6 +64,7 @@ const router = createRouter({
     {
       path: '/dashboard',
       component: () => import('@/app/layouts/DashboardLayout.vue'),
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
@@ -78,6 +81,11 @@ const router = createRouter({
           name: 'post-edit',
           component: () => import('@/views/PostEditorView.vue'),
         },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('@/views/SettingsView.vue'),
+        },
       ],
     },
   ],
@@ -85,6 +93,23 @@ const router = createRouter({
     if (savedPosition) return savedPosition
     return { top: 0 }
   },
+})
+
+router.beforeEach((to, _from, next) => {
+  const token = localStorage.getItem('mysite_access_token')
+
+  if (to.meta.requiresAuth && !token) {
+    setRedirectUrl(to.fullPath)
+    next({ name: 'login' })
+    return
+  }
+
+  if (to.meta.isLoginPage && token) {
+    next({ name: 'home' })
+    return
+  }
+
+  next()
 })
 
 export default router

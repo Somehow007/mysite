@@ -33,7 +33,7 @@ function handleInput() {
   search()
 }
 
-function goToResult(id: number) {
+function goToResult(id: string) {
   close()
   router.push(`/post/${id}`)
 }

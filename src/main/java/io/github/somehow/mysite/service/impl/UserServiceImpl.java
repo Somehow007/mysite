@@ -14,6 +14,7 @@ import io.github.somehow.mysite.dao.entity.UserDO;
 import io.github.somehow.mysite.dao.entity.UserFollowDO;
 import io.github.somehow.mysite.dao.mapper.UserFollowMapper;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
+import io.github.somehow.mysite.dto.req.auth.ChangePasswordReqDTO;
 import io.github.somehow.mysite.dto.req.user.UserFollowReqDTO;
 import io.github.somehow.mysite.dto.req.user.UserPageQueryReqDTO;
 import io.github.somehow.mysite.dto.req.user.UserUpdateReqDTO;
@@ -27,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import com.alibaba.fastjson2.JSON;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +42,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     private final UserFollowMapper userFollowMapper;
     private final UserEsRepository userEsRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public UserSelectRespDTO selectUserById(String id) {
@@ -87,6 +90,33 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                     .createTime(updatedUser.getCreateTime())
                     .build();
             userEsRepository.save(userDocument);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void changePassword(Long userId, ChangePasswordReqDTO requestParam) {
+        UserDO userDO = baseMapper.selectById(userId);
+        if (Objects.isNull(userDO) || userDO.getDelFlag() == 1) {
+            throw new ClientException("用户不存在");
+        }
+        
+        if (!passwordEncoder.matches(requestParam.getOldPassword(), userDO.getPassword())) {
+            throw new ClientException("旧密码错误");
+        }
+        
+        if (passwordEncoder.matches(requestParam.getNewPassword(), userDO.getPassword())) {
+            throw new ClientException("新密码不能与旧密码相同");
+        }
+        
+        LambdaUpdateWrapper<UserDO> updateWrapper = Wrappers.lambdaUpdate(UserDO.class)
+                .eq(UserDO::getId, userId)
+                .eq(UserDO::getDelFlag, 0)
+                .set(UserDO::getPassword, passwordEncoder.encode(requestParam.getNewPassword()));
+        
+        int affectRow = baseMapper.update(updateWrapper);
+        if (!SqlHelper.retBool(affectRow)) {
+            throw new ClientException("修改密码失败");
         }
     }
 

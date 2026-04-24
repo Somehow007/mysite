@@ -18,7 +18,11 @@ async function fetchArticles(page = 1) {
   loading.value = true
   try {
     const res = await getArticles({ page, size: 10 })
-    articles.value = res.list
+    articles.value = res.list.sort((a, b) => {
+      const timeA = new Date(a.createTime).getTime()
+      const timeB = new Date(b.createTime).getTime()
+      return timeB - timeA
+    })
     pagination.value = res.pagination
   } catch {
     articles.value = []

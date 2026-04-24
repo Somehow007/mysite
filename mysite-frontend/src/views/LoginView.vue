@@ -1,17 +1,48 @@
 <script setup lang="ts">
-import { useRouter, useRoute } from 'vue-router'
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { RouterLink } from 'vue-router'
 import LoginForm from '@/components/auth/LoginForm.vue'
 import { useUserStore } from '@/stores/user'
+import { getRedirectUrl, getRedirectUrlFromQuery, setRedirectUrl, clearRedirectUrl } from '@/utils/redirect'
+import { getItem } from '@/utils/storage'
 
 const router = useRouter()
-const route = useRoute()
 const userStore = useUserStore()
+
+onMounted(async () => {
+  const token = getItem<string>('access_token')
+
+  if (!token) {
+    const queryRedirect = getRedirectUrlFromQuery()
+    if (queryRedirect) {
+      setRedirectUrl(queryRedirect)
+    }
+    return
+  }
+
+  if (!userStore.user) {
+    try {
+      await userStore.fetchCurrentUser()
+    } catch {
+      const queryRedirect = getRedirectUrlFromQuery()
+      if (queryRedirect) {
+        setRedirectUrl(queryRedirect)
+      }
+      return
+    }
+  }
+
+  const redirectUrl = getRedirectUrl() || '/'
+  clearRedirectUrl()
+  router.replace(redirectUrl)
+})
 
 async function onLoginSuccess() {
   await userStore.fetchCurrentUser()
-  const redirect = (route.query.redirect as string) || '/'
-  router.push(redirect)
+  const redirect = getRedirectUrl() || '/'
+  clearRedirectUrl()
+  router.replace(redirect)
 }
 </script>
 

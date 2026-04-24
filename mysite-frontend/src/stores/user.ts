@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import type { User } from '@/types'
 import { getItem, setItem, removeItem } from '@/utils/storage'
 import * as authApi from '@/api/auth'
+import * as userApi from '@/api/user'
 
 export const useUserStore = defineStore('user', () => {
   const user = ref<User | null>(null)
@@ -33,6 +34,12 @@ export const useUserStore = defineStore('user', () => {
     setItem('refresh_token', refreshToken)
   }
 
+  async function updateUser(data: Partial<User>) {
+    const updated = await userApi.updateUser(data)
+    user.value = updated
+    return updated
+  }
+
   async function logout() {
     try {
       await authApi.logout()
@@ -58,6 +65,7 @@ export const useUserStore = defineStore('user', () => {
     fetchCurrentUser,
     setUser,
     setTokens,
+    updateUser,
     logout,
     init,
   }
