@@ -21,4 +21,13 @@ public class CategoryDO extends BaseDO {
     private String slug;
     private String description;
     private Integer sortOrder;
+    private Long parentId;
+    private Integer level;
+    private String path;
+    private Integer status;
+    private String icon;
+    private String color;
+    private String seoTitle;
+    private String seoDescription;
+    private String seoKeywords;
 }

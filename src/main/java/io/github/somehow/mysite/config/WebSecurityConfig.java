@@ -58,7 +58,10 @@ public class WebSecurityConfig {
                                 "/v1/auth/register",
                                 "/v1/auth/refresh",
                                 "/v1/articles/**",
-                                "/v1/categories/**",
+                                "/v1/categories/query",
+                                "/v1/categories/tree",
+                                "/v1/categories/id/*",
+                                "/v1/categories/*",
                                 "/v1/tags/**",
                                 "/v1/search/**",
                                 "/v1/site/**",
@@ -68,6 +71,21 @@ public class WebSecurityConfig {
                                 "/webjars/**",
                                 "/favicon.ico"
                         ).permitAll()
+                        .requestMatchers(
+                                "/v1/categories/*/children"
+                        ).authenticated()
+                        .requestMatchers(
+                                "/v1/categories"
+                        ).authenticated()
+                        .requestMatchers(
+                                "/v1/categories/batch/**"
+                        ).authenticated()
+                        .requestMatchers(
+                                "/v1/categories/*/status"
+                        ).authenticated()
+                        .requestMatchers(
+                                "/v1/categories/sort"
+                        ).authenticated()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {

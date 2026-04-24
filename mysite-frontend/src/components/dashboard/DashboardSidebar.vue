@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterLink, useRoute } from 'vue-router'
-import { FileText, PenSquare, Settings, LogOut } from 'lucide-vue-next'
+import { FileText, PenSquare, FolderTree, Settings, LogOut } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
@@ -9,6 +9,7 @@ const userStore = useUserStore()
 const navItems = [
   { label: '文章管理', path: '/dashboard', icon: FileText },
   { label: '写文章', path: '/dashboard/posts/new', icon: PenSquare },
+  { label: '分类管理', path: '/dashboard/categories', icon: FolderTree },
   { label: '设置', path: '/dashboard/settings', icon: Settings },
 ]
 

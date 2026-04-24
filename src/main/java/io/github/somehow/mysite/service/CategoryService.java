@@ -1,7 +1,6 @@
 package io.github.somehow.mysite.service;
 
-import io.github.somehow.mysite.dto.req.category.CategoryCreateReqDTO;
-import io.github.somehow.mysite.dto.req.category.CategoryUpdateReqDTO;
+import io.github.somehow.mysite.dto.req.category.*;
 import io.github.somehow.mysite.dto.resp.category.CategoryRespDTO;
 
 import java.util.List;
@@ -17,4 +16,20 @@ public interface CategoryService {
     List<CategoryRespDTO> listCategories();
 
     CategoryRespDTO getCategoryBySlug(String slug);
+
+    CategoryRespDTO getCategoryById(Long id);
+
+    List<CategoryRespDTO> queryCategories(CategoryQueryReqDTO requestParam);
+
+    void updateCategoryStatus(Long id, Integer status);
+
+    void batchUpdateStatus(CategoryBatchStatusReqDTO requestParam);
+
+    void batchDelete(CategoryBatchDeleteReqDTO requestParam);
+
+    void updateSortOrder(CategorySortReqDTO requestParam);
+
+    List<CategoryRespDTO> getCategoryTree();
+
+    List<CategoryRespDTO> getChildrenByParentId(Long parentId);
 }

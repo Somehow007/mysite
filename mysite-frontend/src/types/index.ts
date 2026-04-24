@@ -16,7 +16,17 @@ export interface Category {
   slug: string
   description: string
   sortOrder: number
+  parentId?: string
+  level: number
+  path?: string
+  status: number
+  icon?: string
+  color?: string
+  seoTitle?: string
+  seoDescription?: string
+  seoKeywords?: string
   articleCount?: number
+  children?: Category[]
 }
 
 export interface Tag {
