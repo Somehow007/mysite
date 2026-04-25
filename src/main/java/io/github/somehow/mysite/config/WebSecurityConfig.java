@@ -105,10 +105,17 @@ public class WebSecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowCredentials(true);
-        // 使用 allowedOriginPatterns 而不是 allowedOrigins
-        configuration.addAllowedOriginPattern("*");
+        
+        List<String> allowedOrigins = corsProperties.getAllowedOriginsList();
+        if (allowedOrigins.contains("*")) {
+            configuration.addAllowedOriginPattern("*");
+        } else {
+            configuration.setAllowedOrigins(allowedOrigins);
+        }
+        
         configuration.addAllowedHeader("*");
         configuration.addAllowedMethod("*");
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
