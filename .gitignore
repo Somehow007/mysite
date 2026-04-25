@@ -36,3 +36,4 @@ build/
 artalk-data/
 mysite-frontend/mysite/
 docker/.env
+deploy/config/.env

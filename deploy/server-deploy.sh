@@ -85,6 +85,16 @@ deploy_backend() {
         echo -e "${GREEN}✓ 配置文件已更新${NC}"
     fi
 
+    if [ -f "$PROJECT_DIR/deploy/config/.env" ]; then
+        sudo cp "$PROJECT_DIR/deploy/config/.env" "$APP_DIR/"
+        echo -e "${GREEN}✓ 环境变量文件已更新${NC}"
+    else
+        if [ ! -f "$APP_DIR/.env" ]; then
+            echo -e "${YELLOW}⚠ 未找到 .env 文件，请手动创建: $APP_DIR/.env${NC}"
+            echo -e "${YELLOW}  参考: deploy/config/.env.example${NC}"
+        fi
+    fi
+
     if [ -f "$PROJECT_DIR/deploy/scripts/start.sh" ]; then
         sudo cp "$PROJECT_DIR/deploy/scripts/start.sh" "$APP_START_SCRIPT"
         echo -e "${GREEN}✓ 启动脚本已更新${NC}"
