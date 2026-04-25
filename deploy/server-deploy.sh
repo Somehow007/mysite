@@ -80,6 +80,12 @@ deploy_backend() {
 
     sudo cp "$PROJECT_DIR/target"/*.jar "$APP_JAR"
 
+    # 复制生产配置文件
+    if [ -f "$PROJECT_DIR/deploy/config/application-production.yml" ]; then
+        sudo cp "$PROJECT_DIR/deploy/config/application-production.yml" "$APP_DIR/"
+        echo -e "${GREEN}✓ 配置文件已更新${NC}"
+    fi
+
     if [ -f "$APP_START_SCRIPT" ]; then
         if [ -f "$PID_FILE" ]; then
             PID=$(cat "$PID_FILE")
