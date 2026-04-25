@@ -80,31 +80,42 @@ deploy_backend() {
 
     sudo cp "$PROJECT_DIR/target"/*.jar "$APP_JAR"
 
-    # 复制生产配置文件
     if [ -f "$PROJECT_DIR/deploy/config/application-production.yml" ]; then
         sudo cp "$PROJECT_DIR/deploy/config/application-production.yml" "$APP_DIR/"
         echo -e "${GREEN}✓ 配置文件已更新${NC}"
     fi
 
-    if [ -f "$APP_START_SCRIPT" ]; then
-        if [ -f "$PID_FILE" ]; then
-            PID=$(cat "$PID_FILE")
+    if [ -f "$PROJECT_DIR/deploy/scripts/start.sh" ]; then
+        sudo cp "$PROJECT_DIR/deploy/scripts/start.sh" "$APP_START_SCRIPT"
+        echo -e "${GREEN}✓ 启动脚本已更新${NC}"
+    fi
+
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if ps -p $PID > /dev/null 2>&1; then
+            echo "停止旧的后端服务 (PID: $PID)..."
+            sudo kill $PID 2>/dev/null || true
+            sleep 5
             if ps -p $PID > /dev/null 2>&1; then
-                echo "重启后端服务..."
-                kill $PID 2>/dev/null || true
+                echo "强制停止..."
+                sudo kill -9 $PID 2>/dev/null || true
                 sleep 2
             fi
         fi
+        sudo rm -f "$PID_FILE"
+    fi
 
+    if [ -f "$APP_START_SCRIPT" ]; then
         sudo chmod +x "$APP_START_SCRIPT"
-        sudo nohup "$APP_START_SCRIPT" start > /dev/null 2>&1 &
+        echo "启动后端服务..."
+        sudo "$APP_START_SCRIPT" start
 
-        sleep 3
+        sleep 5
 
         if [ -f "$PID_FILE" ] && ps -p $(cat "$PID_FILE") > /dev/null 2>&1; then
             echo -e "${GREEN}✓ 后端部署成功 (PID: $(cat $PID_FILE))${NC}"
         else
-            echo -e "${YELLOW}⚠ 后端已启动，请检查日志${NC}"
+            echo -e "${YELLOW}⚠ 后端可能未正确启动，请检查日志: $APP_START_SCRIPT logs${NC}"
         fi
     else
         echo -e "${YELLOW}⚠ 未找到启动脚本，后端 JAR 已复制到 $APP_DIR${NC}"
