@@ -20,6 +20,10 @@ JAVA_OPTS="$JAVA_OPTS -Djava.security.egd=file:/dev/./urandom"
 JAVA_OPTS="$JAVA_OPTS -Dspring.profiles.active=production"
 JAVA_OPTS="$JAVA_OPTS -Dserver.port=8081"
 
+if [ -f "$APP_DIR/application-production.yml" ]; then
+    JAVA_OPTS="$JAVA_OPTS -Dspring.config.additional-location=file:$APP_DIR/application-production.yml"
+fi
+
 sudo mkdir -p "$LOG_DIR"
 
 start() {
