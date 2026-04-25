@@ -105,12 +105,8 @@ public class WebSecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowCredentials(true);
-        List<String> origins = corsProperties.getAllowedOriginsList();
-        if (origins.isEmpty() || origins.contains("*")) {
-            configuration.addAllowedOriginPattern("*");
-        } else {
-            origins.forEach(configuration::addAllowedOrigin);
-        }
+        // 使用 allowedOriginPatterns 而不是 allowedOrigins
+        configuration.addAllowedOriginPattern("*");
         configuration.addAllowedHeader("*");
         configuration.addAllowedMethod("*");
 
