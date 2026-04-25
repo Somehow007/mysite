@@ -9,6 +9,7 @@ export interface CategoryQueryParams {
   tree?: boolean
   current?: number
   size?: number
+  [key: string]: unknown
 }
 
 export interface CategoryCreateData {

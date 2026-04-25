@@ -495,7 +495,7 @@ onMounted(() => {
                 v-for="option in parentOptions"
                 :key="String(option.id)"
                 :value="option.id"
-                :disabled="editingCategory && option.id === editingCategory.id"
+                :disabled="!!editingCategory && option.id === editingCategory.id"
               >
                 {{ '&nbsp;&nbsp;'.repeat(option.level) }}{{ option.name }}
               </option>

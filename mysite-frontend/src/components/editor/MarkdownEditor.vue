@@ -269,7 +269,7 @@ function applyAutocomplete() {
   textareaRef.value.value = beforeLine + selected + '\n' + afterCursor
   content.value = textareaRef.value.value
 
-  const newPos = beforeLine.length + selected.length + 1
+  const newPos = beforeLine.length + (selected?.length || 0) + 1
   textareaRef.value.setSelectionRange(newPos, newPos)
   textareaRef.value.focus()
 
