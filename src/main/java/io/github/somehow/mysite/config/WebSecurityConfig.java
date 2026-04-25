@@ -71,6 +71,7 @@ public class WebSecurityConfig {
                                 "/webjars/**",
                                 "/favicon.ico"
                         ).permitAll()
+                        .requestMatchers(org.springframework.web.cors.CorsUtils::isPreFlightRequest).permitAll()
                         .requestMatchers(
                                 "/v1/categories/*/children"
                         ).authenticated()
@@ -115,6 +116,7 @@ public class WebSecurityConfig {
         
         configuration.addAllowedHeader("*");
         configuration.addAllowedMethod("*");
+        configuration.setExposedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
