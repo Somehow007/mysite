@@ -2,7 +2,6 @@ package io.github.somehow.mysite.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.commons.framework.result.Result;
-import io.github.somehow.mysite.commons.framework.web.Results;
 import io.github.somehow.mysite.security.CustomUserDetailsService;
 import io.github.somehow.mysite.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
@@ -19,12 +18,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-
-import java.util.Arrays;
-import java.util.List;
 
 @Configuration
 @EnableWebSecurity
