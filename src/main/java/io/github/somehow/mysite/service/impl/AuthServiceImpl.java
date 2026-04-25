@@ -16,6 +16,7 @@ import io.github.somehow.mysite.elasticsearch.UserDocument;
 import io.github.somehow.mysite.security.JwtUtil;
 import io.github.somehow.mysite.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -28,10 +29,12 @@ import java.util.Objects;
 public class AuthServiceImpl implements AuthService {
 
     private final UserMapper userMapper;
-    private final UserEsRepository userEsRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final JwtProperties jwtProperties;
+
+    @Autowired(required = false)
+    private UserEsRepository userEsRepository;
 
     @Override
     public LoginRespDTO login(LoginReqDTO requestParam) {
@@ -104,16 +107,19 @@ public class AuthServiceImpl implements AuthService {
         userDO.setPassword(passwordEncoder.encode(requestParam.getPassword()));
         try {
             userMapper.insert(userDO);
-            UserDocument userDocument = UserDocument.builder()
-                    .id(userDO.getId().toString())
-                    .username(userDO.getUsername())
-                    .realName(userDO.getRealName())
-                    .sex(userDO.getSex())
-                    .followingCount(userDO.getFollowingCount())
-                    .followerCount(userDO.getFollowerCount())
-                    .createTime(userDO.getCreateTime())
-                    .build();
-            userEsRepository.save(userDocument);
+            
+            if (userEsRepository != null) {
+                UserDocument userDocument = UserDocument.builder()
+                        .id(userDO.getId().toString())
+                        .username(userDO.getUsername())
+                        .realName(userDO.getRealName())
+                        .sex(userDO.getSex())
+                        .followingCount(userDO.getFollowingCount())
+                        .followerCount(userDO.getFollowerCount())
+                        .createTime(userDO.getCreateTime())
+                        .build();
+                userEsRepository.save(userDocument);
+            }
         } catch (DuplicateKeyException ex) {
             throw new ClientException("注册失败，该用户名已创建");
         }
