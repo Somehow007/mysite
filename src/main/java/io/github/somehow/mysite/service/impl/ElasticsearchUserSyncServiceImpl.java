@@ -2,7 +2,7 @@ package io.github.somehow.mysite.service.impl;
 
 import io.github.somehow.mysite.config.ElasticsearchProperties;
 import io.github.somehow.mysite.dao.entity.UserDO;
-import io.github.somehow.mysite.dao.mapper.UserEsRepository;
+import io.github.somehow.mysite.elasticsearch.repository.UserEsRepository;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
 import io.github.somehow.mysite.elasticsearch.UserDocument;
 import io.github.somehow.mysite.service.UserSyncService;

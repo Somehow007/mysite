@@ -6,17 +6,15 @@ import cn.hutool.core.util.StrUtil;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.config.JwtProperties;
 import io.github.somehow.mysite.dao.entity.UserDO;
-import io.github.somehow.mysite.dao.mapper.UserEsRepository;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
 import io.github.somehow.mysite.dto.req.auth.LoginReqDTO;
 import io.github.somehow.mysite.dto.req.auth.RefreshTokenReqDTO;
 import io.github.somehow.mysite.dto.req.auth.RegisterReqDTO;
 import io.github.somehow.mysite.dto.resp.auth.LoginRespDTO;
-import io.github.somehow.mysite.elasticsearch.UserDocument;
+import io.github.somehow.mysite.elasticsearch.service.UserIndexService;
 import io.github.somehow.mysite.security.JwtUtil;
 import io.github.somehow.mysite.service.AuthService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -32,9 +30,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final JwtProperties jwtProperties;
-
-    @Autowired(required = false)
-    private UserEsRepository userEsRepository;
+    private final UserIndexService userIndexService;
 
     @Override
     public LoginRespDTO login(LoginReqDTO requestParam) {
@@ -107,19 +103,7 @@ public class AuthServiceImpl implements AuthService {
         userDO.setPassword(passwordEncoder.encode(requestParam.getPassword()));
         try {
             userMapper.insert(userDO);
-            
-            if (userEsRepository != null) {
-                UserDocument userDocument = UserDocument.builder()
-                        .id(userDO.getId().toString())
-                        .username(userDO.getUsername())
-                        .realName(userDO.getRealName())
-                        .sex(userDO.getSex())
-                        .followingCount(userDO.getFollowingCount())
-                        .followerCount(userDO.getFollowerCount())
-                        .createTime(userDO.getCreateTime())
-                        .build();
-                userEsRepository.save(userDocument);
-            }
+            userIndexService.indexUser(userDO);
         } catch (DuplicateKeyException ex) {
             throw new ClientException("注册失败，该用户名已创建");
         }

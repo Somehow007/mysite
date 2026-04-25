@@ -21,20 +21,16 @@ import io.github.somehow.mysite.dto.req.user.UserUpdateReqDTO;
 import io.github.somehow.mysite.dto.resp.user.UserPageQueryFollowRespDTO;
 import io.github.somehow.mysite.dto.resp.user.UserSearchRespDTO;
 import io.github.somehow.mysite.dto.resp.user.UserSelectRespDTO;
-import io.github.somehow.mysite.elasticsearch.UserDocument;
-import io.github.somehow.mysite.dao.mapper.UserEsRepository;
+import io.github.somehow.mysite.elasticsearch.service.UserIndexService;
 import io.github.somehow.mysite.service.UserService;
 import lombok.RequiredArgsConstructor;
 import com.alibaba.fastjson2.JSON;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -42,9 +38,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     private final UserFollowMapper userFollowMapper;
     private final PasswordEncoder passwordEncoder;
-
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    private UserEsRepository userEsRepository;
+    private final UserIndexService userIndexService;
 
     @Override
     public UserSelectRespDTO selectUserById(String id) {
@@ -81,17 +75,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
 
         UserDO updatedUser = baseMapper.selectById(Long.parseLong(requestParam.getUserId()));
-        if (updatedUser != null && userEsRepository != null) {
-            UserDocument userDocument = UserDocument.builder()
-                    .id(updatedUser.getId().toString())
-                    .username(updatedUser.getUsername())
-                    .realName(updatedUser.getRealName())
-                    .sex(updatedUser.getSex())
-                    .followingCount(updatedUser.getFollowingCount())
-                    .followerCount(updatedUser.getFollowerCount())
-                    .createTime(updatedUser.getCreateTime())
-                    .build();
-            userEsRepository.save(userDocument);
+        if (updatedUser != null) {
+            userIndexService.indexUser(updatedUser);
         }
     }
 
@@ -176,42 +161,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     @Override
     public IPage<UserSearchRespDTO> pageQueryUser(UserPageQueryReqDTO requestParam) {
-        if (userEsRepository == null) {
-            IPage<UserSearchRespDTO> result = new Page<>(requestParam.getCurrent(), requestParam.getSize());
-            String keyword = StrUtil.blankToDefault(requestParam.getKeyword(), "");
-            List<UserDO> users = baseMapper.selectList(Wrappers.lambdaQuery(UserDO.class)
-                    .like(StrUtil.isNotBlank(keyword), UserDO::getUsername, keyword)
-                    .eq(UserDO::getDelFlag, 0));
-            List<UserSearchRespDTO> data = users.stream()
-                    .map(each -> BeanUtil.toBean(each, UserSearchRespDTO.class))
-                    .toList();
-            result.setRecords(data);
-            return result;
-        }
-
-        PageRequest pageRequest = PageRequest.of(
-                (int) (requestParam.getCurrent() - 1),
-                (int) requestParam.getSize());
-
-        String keyword = StrUtil.blankToDefault(requestParam.getKeyword(), "").toLowerCase();
-
-        org.springframework.data.domain.Page<UserDocument> esPage = userEsRepository.findByUsernameContaining(keyword, pageRequest);
-
-        if (esPage.hasContent()) {
-            List<Long> userIds = esPage.getContent().stream()
-                    .map(doc -> Long.valueOf(doc.getId()))
-                    .collect(Collectors.toList());
-
-            List<UserDO> users = baseMapper.selectBatchIds(userIds);
-
-            IPage<UserSearchRespDTO> result = new Page<>(requestParam.getCurrent(), requestParam.getSize(), esPage.getTotalElements());
-            List<UserSearchRespDTO> data = users.stream()
-                    .map(each -> BeanUtil.toBean(each, UserSearchRespDTO.class))
-                    .toList();
-            result.setRecords(data);
-            return result;
-        } else {
-            return new Page<>();
-        }
+        return userIndexService.searchUsers(requestParam);
     }
 }

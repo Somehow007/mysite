@@ -1,4 +1,4 @@
-package io.github.somehow.mysite.dao.mapper;
+package io.github.somehow.mysite.elasticsearch.repository;
 
 import io.github.somehow.mysite.elasticsearch.ArticleDocument;
 import org.springframework.data.domain.Page;

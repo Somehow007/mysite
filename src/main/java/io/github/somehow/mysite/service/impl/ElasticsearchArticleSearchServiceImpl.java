@@ -10,7 +10,7 @@ import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.dao.entity.CategoryDO;
 import io.github.somehow.mysite.dao.entity.TagDO;
 import io.github.somehow.mysite.dao.entity.UserDO;
-import io.github.somehow.mysite.dao.mapper.ArticleEsRepository;
+import io.github.somehow.mysite.elasticsearch.repository.ArticleEsRepository;
 import io.github.somehow.mysite.dao.mapper.ArticleMapper;
 import io.github.somehow.mysite.dao.mapper.ArticleTagMapper;
 import io.github.somehow.mysite.dao.mapper.CategoryMapper;

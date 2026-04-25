@@ -1,8 +1,8 @@
 package io.github.somehow.mysite.elasticsearch;
 
 import io.github.somehow.mysite.config.ElasticsearchProperties;
-import io.github.somehow.mysite.dao.mapper.ArticleEsRepository;
-import io.github.somehow.mysite.dao.mapper.UserEsRepository;
+import io.github.somehow.mysite.elasticsearch.repository.ArticleEsRepository;
+import io.github.somehow.mysite.elasticsearch.repository.UserEsRepository;
 import io.github.somehow.mysite.dao.mapper.ArticleMapper;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
 import io.github.somehow.mysite.service.ArticleSearchService;
