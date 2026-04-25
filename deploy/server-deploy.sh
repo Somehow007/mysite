@@ -76,9 +76,9 @@ build_frontend() {
 deploy_backend() {
     echo -e "${YELLOW}[4/6] 部署后端...${NC}"
 
-    mkdir -p "$APP_DIR"
+    sudo mkdir -p "$APP_DIR"
 
-    cp "$PROJECT_DIR/target"/*.jar "$APP_JAR"
+    sudo cp "$PROJECT_DIR/target"/*.jar "$APP_JAR"
 
     if [ -f "$APP_START_SCRIPT" ]; then
         if [ -f "$PID_FILE" ]; then
@@ -90,8 +90,8 @@ deploy_backend() {
             fi
         fi
 
-        chmod +x "$APP_START_SCRIPT"
-        nohup "$APP_START_SCRIPT" start > /dev/null 2>&1 &
+        sudo chmod +x "$APP_START_SCRIPT"
+        sudo nohup "$APP_START_SCRIPT" start > /dev/null 2>&1 &
 
         sleep 3
 

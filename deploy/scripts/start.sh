@@ -20,11 +20,11 @@ JAVA_OPTS="$JAVA_OPTS -Djava.security.egd=file:/dev/./urandom"
 JAVA_OPTS="$JAVA_OPTS -Dspring.profiles.active=production"
 JAVA_OPTS="$JAVA_OPTS -Dserver.port=8081"
 
-mkdir -p "$LOG_DIR"
+sudo mkdir -p "$LOG_DIR"
 
 start() {
     if [ -f "$PID_FILE" ]; then
-        PID=$(cat "$PID_FILE)
+        PID=$(cat "$PID_FILE")
         if ps -p $PID > /dev/null 2>&1; then
             echo "$APP_NAME is already running (PID: $PID)"
             return 1
