@@ -106,7 +106,7 @@ public class WebSecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowCredentials(true);
         List<String> origins = corsProperties.getAllowedOriginsList();
-        if (origins.isEmpty()) {
+        if (origins.isEmpty() || origins.contains("*")) {
             configuration.addAllowedOriginPattern("*");
         } else {
             origins.forEach(configuration::addAllowedOrigin);

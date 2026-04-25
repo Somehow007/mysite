@@ -12,11 +12,14 @@ import java.util.List;
 @ConfigurationProperties(prefix = "cors")
 public class CorsProperties {
 
-    private String allowedOrigins = "";
+    private String allowedOrigins = "*";
     private List<String> allowedOriginsList = new ArrayList<>();
 
     public List<String> getAllowedOriginsList() {
         if (allowedOriginsList.isEmpty() && allowedOrigins != null && !allowedOrigins.isBlank()) {
+            if (allowedOrigins.equals("*")) {
+                return List.of("*");
+            }
             return List.of(allowedOrigins.split(","));
         }
         return allowedOriginsList;
