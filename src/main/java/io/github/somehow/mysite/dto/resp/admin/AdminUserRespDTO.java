@@ -1,14 +1,15 @@
-package io.github.somehow.mysite.dto.resp.user;
+package io.github.somehow.mysite.dto.resp.admin;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
-import io.github.somehow.mysite.dto.resp.ArticlePageQueryRespDTO;
+import lombok.Builder;
 import lombok.Data;
 
-import java.util.List;
+import java.util.Date;
 
 @Data
-public class UserSelectRespDTO {
+@Builder
+public class AdminUserRespDTO {
 
     @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
@@ -19,16 +20,19 @@ public class UserSelectRespDTO {
 
     private String email;
 
+    private String phoneNumber;
+
     private Integer sex;
 
     private String role;
+
+    private Integer status;
 
     private Integer followingCount;
 
     private Integer followerCount;
 
-    private List<ArticlePageQueryRespDTO> favorites;
+    private Date createTime;
 
-    private List<ArticlePageQueryRespDTO> histories;
-
+    private Date updateTime;
 }

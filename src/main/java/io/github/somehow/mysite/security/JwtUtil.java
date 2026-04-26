@@ -3,6 +3,7 @@ package io.github.somehow.mysite.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import io.github.somehow.mysite.commons.enums.UserRole;
 import io.github.somehow.mysite.config.JwtProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -24,18 +25,20 @@ public class JwtUtil {
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    public String generateAccessToken(Long userId, String username) {
+    public String generateAccessToken(Long userId, String username, UserRole role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
+        claims.put("role", role.name());
         claims.put("type", "access");
         return buildToken(claims, userId.toString(), jwtProperties.getAccessTokenExpiration());
     }
 
-    public String generateRefreshToken(Long userId, String username) {
+    public String generateRefreshToken(Long userId, String username, UserRole role) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
+        claims.put("role", role.name());
         claims.put("type", "refresh");
         return buildToken(claims, userId.toString(), jwtProperties.getRefreshTokenExpiration());
     }
@@ -77,6 +80,19 @@ public class JwtUtil {
     public String getUsernameFromToken(String token) {
         Claims claims = parseToken(token);
         return claims.get("username", String.class);
+    }
+
+    public UserRole getRoleFromToken(String token) {
+        Claims claims = parseToken(token);
+        String roleName = claims.get("role", String.class);
+        if (roleName != null) {
+            try {
+                return UserRole.valueOf(roleName);
+            } catch (IllegalArgumentException e) {
+                return UserRole.USER;
+            }
+        }
+        return UserRole.USER;
     }
 
     public boolean isRefreshToken(String token) {

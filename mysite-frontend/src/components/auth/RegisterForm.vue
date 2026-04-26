@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { Loader2 } from 'lucide-vue-next'
 import * as authApi from '@/api/auth'
-import { validateEmail } from '@/utils/emailValidator'
+import { useFormValidation } from '@/composables/useFormValidation'
 
 const emit = defineEmits<{
   success: []
@@ -15,42 +15,72 @@ const phoneNumber = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const error = ref('')
-const emailError = ref('')
 const loading = ref(false)
 
-function validateEmailField() {
-  if (!email.value.trim()) {
-    emailError.value = ''
-    return
+const {
+  validateRequired,
+  validateEmailField: validateEmail,
+  validatePhoneField: validatePhone,
+  validateMinLength,
+  validateMatch,
+  onFieldBlur,
+  getFieldError,
+  isFieldInvalid,
+  clearAll,
+  setFieldTouched,
+} = useFormValidation()
+
+function handleEmailBlur() {
+  setFieldTouched('email')
+  if (email.value.trim()) {
+    validateEmail('email', email.value)
   }
-  const result = validateEmail(email.value)
-  emailError.value = result.valid ? '' : result.message
+}
+
+function handlePhoneBlur() {
+  setFieldTouched('phoneNumber')
+  if (phoneNumber.value.trim()) {
+    validatePhone('phoneNumber', phoneNumber.value)
+  }
+}
+
+function handlePhoneInput() {
+  if (isFieldInvalid('phoneNumber') || getFieldError('phoneNumber')) {
+    validatePhone('phoneNumber', phoneNumber.value)
+  }
+}
+
+function handleConfirmBlur() {
+  setFieldTouched('confirmPassword')
+  if (confirmPassword.value) {
+    validateMatch('confirmPassword', password.value, confirmPassword.value, '两次输入的密码不一致')
+  }
 }
 
 async function handleSubmit() {
   error.value = ''
-  emailError.value = ''
+  clearAll()
 
-  if (!username.value.trim() || !email.value.trim() || !password.value.trim() || !realName.value.trim() || !phoneNumber.value.trim()) {
-    error.value = '请填写所有必填字段'
-    return
+  const fields: [string, string, string][] = [
+    ['username', username.value, '用户名'],
+    ['realName', realName.value, '真实姓名'],
+    ['password', password.value, '密码'],
+    ['phoneNumber', phoneNumber.value, '手机号'],
+    ['email', email.value, '邮箱'],
+  ]
+
+  for (const [field, value, label] of fields) {
+    setFieldTouched(field)
+    if (!validateRequired(field, value, label)) {
+      error.value = '请填写所有必填字段'
+      return
+    }
   }
 
-  const emailResult = validateEmail(email.value)
-  if (!emailResult.valid) {
-    emailError.value = emailResult.message
-    return
-  }
-
-  if (password.value !== confirmPassword.value) {
-    error.value = '两次输入的密码不一致'
-    return
-  }
-
-  if (password.value.length < 6) {
-    error.value = '密码至少 6 位'
-    return
-  }
+  if (!validateEmail('email', email.value)) return
+  if (!validatePhone('phoneNumber', phoneNumber.value)) return
+  if (!validateMinLength('password', password.value, 6, '密码')) return
+  if (!validateMatch('confirmPassword', password.value, confirmPassword.value, '两次输入的密码不一致')) return
 
   loading.value = true
   try {
@@ -69,6 +99,10 @@ async function handleSubmit() {
     loading.value = false
   }
 }
+
+const inputBaseClass = 'w-full px-3 py-2.5 rounded-lg border bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:border-transparent transition-shadow text-sm'
+const inputNormalClass = `${inputBaseClass} border-[var(--color-border)] dark:border-[var(--color-dark-border)] focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)]`
+const inputErrorClass = `${inputBaseClass} border-red-400 dark:border-red-500 focus:ring-red-400 dark:focus:ring-red-500`
 </script>
 
 <template>
@@ -91,7 +125,7 @@ async function handleSubmit() {
         type="text"
         autocomplete="username"
         required
-        class="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-shadow text-sm"
+        :class="inputNormalClass"
         placeholder="请输入用户名"
       />
     </div>
@@ -106,15 +140,12 @@ async function handleSubmit() {
         type="email"
         autocomplete="email"
         required
-        @blur="validateEmailField"
-        class="w-full px-3 py-2.5 rounded-lg border bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:border-transparent transition-shadow text-sm"
-        :class="emailError
-          ? 'border-red-400 dark:border-red-500 focus:ring-red-400 dark:focus:ring-red-500'
-          : 'border-[var(--color-border)] dark:border-[var(--color-dark-border)] focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)]'"
+        @blur="handleEmailBlur"
+        :class="isFieldInvalid('email') ? inputErrorClass : inputNormalClass"
         placeholder="请输入邮箱"
       />
-      <p v-if="emailError" class="mt-1 text-xs text-red-500 dark:text-red-400">
-        {{ emailError }}
+      <p v-if="getFieldError('email')" class="mt-1 text-xs text-red-500 dark:text-red-400">
+        {{ getFieldError('email') }}
       </p>
     </div>
 
@@ -128,7 +159,7 @@ async function handleSubmit() {
         type="text"
         autocomplete="name"
         required
-        class="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-shadow text-sm"
+        :class="inputNormalClass"
         placeholder="请输入真实姓名"
       />
     </div>
@@ -143,9 +174,15 @@ async function handleSubmit() {
         type="tel"
         autocomplete="tel"
         required
-        class="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-shadow text-sm"
+        @blur="handlePhoneBlur"
+        @input="handlePhoneInput"
+        :class="isFieldInvalid('phoneNumber') ? inputErrorClass : inputNormalClass"
         placeholder="请输入手机号"
+        maxlength="11"
       />
+      <p v-if="getFieldError('phoneNumber')" class="mt-1 text-xs text-red-500 dark:text-red-400">
+        {{ getFieldError('phoneNumber') }}
+      </p>
     </div>
 
     <div>
@@ -158,9 +195,12 @@ async function handleSubmit() {
         type="password"
         autocomplete="new-password"
         required
-        class="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-shadow text-sm"
+        :class="isFieldInvalid('password') ? inputErrorClass : inputNormalClass"
         placeholder="至少 6 位"
       />
+      <p v-if="getFieldError('password')" class="mt-1 text-xs text-red-500 dark:text-red-400">
+        {{ getFieldError('password') }}
+      </p>
     </div>
 
     <div>
@@ -173,9 +213,13 @@ async function handleSubmit() {
         type="password"
         autocomplete="new-password"
         required
-        class="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-shadow text-sm"
+        @blur="handleConfirmBlur"
+        :class="isFieldInvalid('confirmPassword') ? inputErrorClass : inputNormalClass"
         placeholder="再次输入密码"
       />
+      <p v-if="getFieldError('confirmPassword')" class="mt-1 text-xs text-red-500 dark:text-red-400">
+        {{ getFieldError('confirmPassword') }}
+      </p>
     </div>
 
     <button

@@ -1,9 +1,12 @@
+export type UserRole = 'DEVELOPER' | 'USER'
+
 export interface User {
   id: string
   username: string
   realName: string
   email?: string
   sex?: number
+  role?: UserRole
   followingCount?: number
   followerCount?: number
   favorites?: Record<string, unknown>[]
@@ -112,6 +115,7 @@ export interface AuthTokens {
   expiresIn: number
   userId: string
   username: string
+  role?: UserRole
 }
 
 export interface SiteConfig {

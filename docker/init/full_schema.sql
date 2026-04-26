@@ -1,9 +1,14 @@
--- MySite 数据库初始化脚本
+-- MySite 数据库完整结构和数据脚本
+-- 包含所有表结构、索引、默认数据
+-- 版本：2026-04-26
+
 CREATE DATABASE IF NOT EXISTS mysite DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 USE mysite;
 
--- 用户表
+-- ==============================================
+-- 1. 用户表 (t_user)
+-- ==============================================
 CREATE TABLE IF NOT EXISTS `t_user` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `username` VARCHAR(50) NOT NULL COMMENT '昵称',
@@ -25,7 +30,14 @@ CREATE TABLE IF NOT EXISTS `t_user` (
     KEY `idx_email` (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
--- 分类表
+-- 插入默认管理员用户 (密码: admin123)
+INSERT INTO `t_user` (`username`, `password`, `real_name`, `sex`, `email`, `phone_number`, `role`, `status`, `following_count`, `follower_count`)
+VALUES ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH', '管理员', 0, 'admin@mysite.com', '13800138000', 'DEVELOPER', 1, 0, 0)
+ON DUPLICATE KEY UPDATE `username` = `username`;
+
+-- ==============================================
+-- 2. 分类表 (t_category)
+-- ==============================================
 CREATE TABLE IF NOT EXISTS `t_category` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `name` VARCHAR(50) NOT NULL COMMENT '分类名称',
@@ -39,7 +51,14 @@ CREATE TABLE IF NOT EXISTS `t_category` (
     UNIQUE KEY `uk_slug` (`slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分类表';
 
--- 标签表
+-- 插入默认分类
+INSERT INTO `t_category` (`name`, `slug`, `description`, `sort_order`)
+VALUES ('未分类', 'uncategorized', '默认分类', 0)
+ON DUPLICATE KEY UPDATE `name` = `name`;
+
+-- ==============================================
+-- 3. 标签表 (t_tag)
+-- ==============================================
 CREATE TABLE IF NOT EXISTS `t_tag` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `name` VARCHAR(50) NOT NULL COMMENT '标签名称',
@@ -51,7 +70,9 @@ CREATE TABLE IF NOT EXISTS `t_tag` (
     UNIQUE KEY `uk_slug` (`slug`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='标签表';
 
--- 文章表
+-- ==============================================
+-- 4. 文章表 (t_article)
+-- ==============================================
 CREATE TABLE IF NOT EXISTS `t_article` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `title` VARCHAR(200) NOT NULL COMMENT '文章标题',
@@ -73,7 +94,9 @@ CREATE TABLE IF NOT EXISTS `t_article` (
     KEY `idx_category_id` (`category_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文章表';
 
--- 文章-标签关联表
+-- ==============================================
+-- 5. 文章-标签关联表 (t_article_tag)
+-- ==============================================
 CREATE TABLE IF NOT EXISTS `t_article_tag` (
     `id` BIGINT NOT NULL AUTO_INCREMENT,
     `article_id` BIGINT NOT NULL COMMENT '文章ID',
@@ -85,7 +108,9 @@ CREATE TABLE IF NOT EXISTS `t_article_tag` (
     KEY `idx_tag_id` (`tag_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文章标签关联表';
 
--- 用户关注表
+-- ==============================================
+-- 6. 用户关注表 (t_user_follow)
+-- ==============================================
 CREATE TABLE IF NOT EXISTS `t_user_follow` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `follower_id` BIGINT NOT NULL COMMENT '关注者ID',
@@ -99,7 +124,9 @@ CREATE TABLE IF NOT EXISTS `t_user_follow` (
     KEY `idx_followee_id` (`followee_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户关注表';
 
--- 用户收藏文章表
+-- ==============================================
+-- 7. 用户收藏文章表 (t_user_article_favorites)
+-- ==============================================
 CREATE TABLE IF NOT EXISTS `t_user_article_favorites` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `user_id` BIGINT NOT NULL COMMENT '用户ID',
@@ -113,17 +140,9 @@ CREATE TABLE IF NOT EXISTS `t_user_article_favorites` (
     KEY `idx_article_id` (`article_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户收藏文章表';
 
--- 插入默认分类
-INSERT INTO `t_category` (`name`, `slug`, `description`, `sort_order`)
-VALUES ('未分类', 'uncategorized', '默认分类', 0)
-ON DUPLICATE KEY UPDATE `name` = `name`;
-
--- 插入默认管理员用户 (密码: admin123)
-INSERT INTO `t_user` (`username`, `password`, `real_name`, `sex`, `email`, `phone_number`, `role`, `status`, `following_count`, `follower_count`)
-VALUES ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH', '管理员', 0, 'admin@mysite.com', '13800138000', 'DEVELOPER', 1, 0, 0)
-ON DUPLICATE KEY UPDATE `username` = `username`;
-
--- 用户操作日志表
+-- ==============================================
+-- 8. 用户操作日志表 (t_user_operation_log)
+-- ==============================================
 CREATE TABLE IF NOT EXISTS `t_user_operation_log` (
     `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `operator_id` BIGINT DEFAULT NULL COMMENT '操作者ID',
@@ -138,3 +157,8 @@ CREATE TABLE IF NOT EXISTS `t_user_operation_log` (
     KEY `idx_target_user_id` (`target_user_id`),
     KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户操作日志表';
+
+-- ==============================================
+-- 数据库初始化完成
+-- ==============================================
+SELECT 'MySite 数据库初始化完成' AS message;

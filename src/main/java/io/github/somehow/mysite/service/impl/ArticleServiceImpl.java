@@ -9,6 +9,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import io.github.somehow.mysite.commons.context.UserContext;
+import io.github.somehow.mysite.commons.enums.UserRole;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.dao.entity.*;
 import io.github.somehow.mysite.dao.mapper.*;
@@ -89,6 +91,8 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             throw new ClientException("更新失败，未传递更新参数");
         }
 
+        checkArticleOwnership(requestParam.getId());
+
         LambdaUpdateWrapper<ArticleDO> updateWrapper = Wrappers.lambdaUpdate(ArticleDO.class)
                 .eq(ArticleDO::getId, requestParam.getId())
                 .set(StrUtil.isNotBlank(requestParam.getTitle()), ArticleDO::getTitle, requestParam.getTitle())
@@ -127,6 +131,8 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
     @Override
     public void deleteArticle(Long id) {
+        checkArticleOwnership(id);
+
         LambdaUpdateWrapper<ArticleDO> updateWrapper = Wrappers.lambdaUpdate(ArticleDO.class)
                 .eq(ArticleDO::getId, id)
                 .eq(ArticleDO::getDelFlag, 0);
@@ -277,5 +283,28 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                                 .collect(Collectors.toList()))
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    private void checkArticleOwnership(Long articleId) {
+        UserRole currentRole = UserContext.getRole();
+        if (UserRole.DEVELOPER.equals(currentRole)) {
+            return;
+        }
+
+        String currentUserId = UserContext.getUserId();
+        if (currentUserId == null) {
+            throw new ClientException("无法验证文章所有权，请重新登录");
+        }
+
+        ArticleDO article = baseMapper.selectOne(Wrappers.lambdaQuery(ArticleDO.class)
+                .eq(ArticleDO::getId, articleId)
+                .eq(ArticleDO::getDelFlag, 0));
+        if (article == null) {
+            throw new ClientException("文章不存在");
+        }
+
+        if (!currentUserId.equals(article.getAuthorId().toString())) {
+            throw new ClientException("权限不足，只能操作自己的文章");
+        }
     }
 }

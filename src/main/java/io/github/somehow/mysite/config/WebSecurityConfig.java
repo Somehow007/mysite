@@ -50,7 +50,11 @@ public class WebSecurityConfig {
                                 "/v1/auth/login",
                                 "/v1/auth/register",
                                 "/v1/auth/refresh",
-                                "/v1/articles/**",
+                                "/v1/articles",
+                                "/v1/articles/archive",
+                                "/v1/articles/{id:\\d+}"
+                        ).permitAll()
+                        .requestMatchers(
                                 "/v1/categories/query",
                                 "/v1/categories/tree",
                                 "/v1/categories/id/*",
@@ -69,16 +73,19 @@ public class WebSecurityConfig {
                         ).authenticated()
                         .requestMatchers(
                                 "/v1/categories"
-                        ).authenticated()
+                        ).hasRole("DEVELOPER")
                         .requestMatchers(
                                 "/v1/categories/batch/**"
-                        ).authenticated()
+                        ).hasRole("DEVELOPER")
                         .requestMatchers(
                                 "/v1/categories/*/status"
-                        ).authenticated()
+                        ).hasRole("DEVELOPER")
                         .requestMatchers(
                                 "/v1/categories/sort"
-                        ).authenticated()
+                        ).hasRole("DEVELOPER")
+                        .requestMatchers(
+                                "/v1/admin/users/**"
+                        ).hasRole("DEVELOPER")
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
@@ -88,6 +95,15 @@ public class WebSecurityConfig {
                             Result<Void> result = new Result<Void>()
                                     .setCode("A000001")
                                     .setMessage("未登录或Token已过期");
+                            objectMapper.writeValue(response.getWriter(), result);
+                        })
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+                            response.setCharacterEncoding("UTF-8");
+                            response.setStatus(403);
+                            Result<Void> result = new Result<Void>()
+                                    .setCode("A000003")
+                                    .setMessage("权限不足，无法访问该资源");
                             objectMapper.writeValue(response.getWriter(), result);
                         }))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

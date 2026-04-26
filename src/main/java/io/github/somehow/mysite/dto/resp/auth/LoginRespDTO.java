@@ -16,4 +16,5 @@ public class LoginRespDTO {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
     private String username;
+    private String role;
 }

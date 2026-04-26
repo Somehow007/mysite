@@ -3,6 +3,7 @@ package io.github.somehow.mysite.security;
 import io.github.somehow.mysite.dao.entity.UserDO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
@@ -23,7 +24,10 @@ public class SecurityUserDetails implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of();
+        if (userDO.getRole() != null) {
+            return List.of(new SimpleGrantedAuthority(userDO.getRole().getAuthority()));
+        }
+        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
     }
 
     @Override

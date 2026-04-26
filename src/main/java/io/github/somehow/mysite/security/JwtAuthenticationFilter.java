@@ -34,6 +34,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             try {
                 Long userId = jwtUtil.getUserIdFromToken(token);
                 String username = jwtUtil.getUsernameFromToken(token);
+                io.github.somehow.mysite.commons.enums.UserRole role = jwtUtil.getRoleFromToken(token);
 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                 UsernamePasswordAuthenticationToken authentication =
@@ -43,6 +44,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 UserContext.setUser(UserInfoDTO.builder()
                         .userId(userId.toString())
                         .name(username)
+                        .role(role)
                         .build());
             } catch (Exception e) {
                 log.warn("JWT authentication failed: {}", e.getMessage());

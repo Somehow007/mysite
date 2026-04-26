@@ -41,7 +41,21 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !isNoAuthPath) {
       removeItem('access_token')
       removeItem('refresh_token')
-      window.location.href = '/login'
+      removeItem('user_role')
+      const currentPath = window.location.pathname
+      const publicPaths = ['/', '/login', '/register', '/about', '/search', '/archive']
+      const isPublicPath = publicPaths.some(p => currentPath === p) ||
+        currentPath.startsWith('/post/') ||
+        currentPath.startsWith('/category/') ||
+        currentPath.startsWith('/tag/') ||
+        currentPath.startsWith('/page/')
+      if (!isPublicPath) {
+        window.location.href = '/login'
+      }
+    }
+    if (error.response?.status === 403) {
+      const message = error.response?.data?.message || '权限不足，无法访问该资源'
+      return Promise.reject(new Error(message))
     }
     const message = error.response?.data?.message || error.message || '网络错误'
     return Promise.reject(new Error(message))

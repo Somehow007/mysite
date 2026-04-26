@@ -1,20 +1,27 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { FileText, PenSquare, FolderTree, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { FileText, PenSquare, FolderTree, Users, Settings, LogOut, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
+import { usePermission } from '@/composables/usePermission'
 
 const route = useRoute()
 const userStore = useUserStore()
+const { isDeveloper } = usePermission()
 
 const isCollapsed = ref(false)
 
-const navItems = [
-  { label: '文章管理', path: '/dashboard', icon: FileText },
-  { label: '写文章', path: '/dashboard/posts/new', icon: PenSquare },
-  { label: '分类管理', path: '/dashboard/categories', icon: FolderTree },
-  { label: '设置', path: '/dashboard/settings', icon: Settings },
+const allNavItems = [
+  { label: '文章管理', path: '/dashboard', icon: FileText, requireDeveloper: false },
+  { label: '写文章', path: '/dashboard/posts/new', icon: PenSquare, requireDeveloper: false },
+  { label: '分类管理', path: '/dashboard/categories', icon: FolderTree, requireDeveloper: true },
+  { label: '用户管理', path: '/dashboard/users', icon: Users, requireDeveloper: true },
+  { label: '设置', path: '/dashboard/settings', icon: Settings, requireDeveloper: false },
 ]
+
+const navItems = computed(() =>
+  allNavItems.filter(item => !item.requireDeveloper || isDeveloper.value)
+)
 
 async function handleLogout() {
   await userStore.logout()

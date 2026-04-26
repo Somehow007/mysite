@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { User } from '@/types'
+import type { User, UserRole } from '@/types'
 import { getItem, setItem, removeItem } from '@/utils/storage'
 import * as authApi from '@/api/auth'
 import * as userApi from '@/api/user'
@@ -11,15 +11,21 @@ export const useUserStore = defineStore('user', () => {
 
   const isLoggedIn = computed(() => !!user.value)
   const displayName = computed(() => user.value?.realName || user.value?.username || '')
+  const role = computed<UserRole | undefined>(() => user.value?.role)
+  const isDeveloper = computed(() => role.value === 'DEVELOPER')
 
   async function fetchCurrentUser() {
     loading.value = true
     try {
       user.value = await authApi.getCurrentUser()
+      if (user.value?.role) {
+        setItem('user_role', user.value.role)
+      }
     } catch {
       user.value = null
       removeItem('access_token')
       removeItem('refresh_token')
+      removeItem('user_role')
     } finally {
       loading.value = false
     }
@@ -27,6 +33,9 @@ export const useUserStore = defineStore('user', () => {
 
   function setUser(userData: User | null) {
     user.value = userData
+    if (userData?.role) {
+      setItem('user_role', userData.role)
+    }
   }
 
   function setTokens(accessToken: string, refreshToken: string) {
@@ -47,6 +56,7 @@ export const useUserStore = defineStore('user', () => {
       user.value = null
       removeItem('access_token')
       removeItem('refresh_token')
+      removeItem('user_role')
     }
   }
 
@@ -62,6 +72,8 @@ export const useUserStore = defineStore('user', () => {
     loading,
     isLoggedIn,
     displayName,
+    role,
+    isDeveloper,
     fetchCurrentUser,
     setUser,
     setTokens,

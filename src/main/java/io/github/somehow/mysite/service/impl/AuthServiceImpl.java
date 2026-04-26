@@ -41,9 +41,12 @@ public class AuthServiceImpl implements AuthService {
         if (!passwordEncoder.matches(requestParam.getPassword(), userDO.getPassword())) {
             throw new ClientException("用户名或密码错误");
         }
+        if (userDO.getStatus() != null && userDO.getStatus() == 0) {
+            throw new ClientException("账户已被禁用，请联系管理员");
+        }
 
-        String accessToken = jwtUtil.generateAccessToken(userDO.getId(), userDO.getUsername());
-        String refreshToken = jwtUtil.generateRefreshToken(userDO.getId(), userDO.getUsername());
+        String accessToken = jwtUtil.generateAccessToken(userDO.getId(), userDO.getUsername(), userDO.getRole());
+        String refreshToken = jwtUtil.generateRefreshToken(userDO.getId(), userDO.getUsername(), userDO.getRole());
 
         return LoginRespDTO.builder()
                 .accessToken(accessToken)
@@ -51,6 +54,7 @@ public class AuthServiceImpl implements AuthService {
                 .expiresIn(jwtProperties.getAccessTokenExpiration() / 1000)
                 .userId(userDO.getId())
                 .username(userDO.getUsername())
+                .role(userDO.getRole() != null ? userDO.getRole().name() : "USER")
                 .build();
     }
 
@@ -72,9 +76,12 @@ public class AuthServiceImpl implements AuthService {
         if (Objects.isNull(userDO) || userDO.getDelFlag() == 1) {
             throw new ClientException("用户不存在");
         }
+        if (userDO.getStatus() != null && userDO.getStatus() == 0) {
+            throw new ClientException("账户已被禁用，请联系管理员");
+        }
 
-        String newAccessToken = jwtUtil.generateAccessToken(userId, username);
-        String newRefreshToken = jwtUtil.generateRefreshToken(userId, username);
+        String newAccessToken = jwtUtil.generateAccessToken(userId, username, userDO.getRole());
+        String newRefreshToken = jwtUtil.generateRefreshToken(userId, username, userDO.getRole());
 
         return LoginRespDTO.builder()
                 .accessToken(newAccessToken)
@@ -82,6 +89,7 @@ public class AuthServiceImpl implements AuthService {
                 .expiresIn(jwtProperties.getAccessTokenExpiration() / 1000)
                 .userId(userId)
                 .username(username)
+                .role(userDO.getRole() != null ? userDO.getRole().name() : "USER")
                 .build();
     }
 

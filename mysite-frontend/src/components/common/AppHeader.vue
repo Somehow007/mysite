@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { Menu, X, LogOut, PenSquare, LayoutDashboard, Settings } from 'lucide-vue-next'
+import { Menu, X, LogOut, PenSquare, LayoutDashboard, Settings, FolderTree, Users } from 'lucide-vue-next'
 import ThemeToggle from './ThemeToggle.vue'
 import SearchDialog from './SearchDialog.vue'
 import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
+import { usePermission } from '@/composables/usePermission'
 
 const siteStore = useSiteStore()
 const userStore = useUserStore()
+const { isDeveloper } = usePermission()
 const route = useRoute()
 
 const mobileMenuOpen = ref(false)
@@ -148,6 +150,24 @@ async function handleLogout() {
                     写文章
                   </RouterLink>
                   <RouterLink
+                    v-if="isDeveloper"
+                    to="/dashboard/categories"
+                    class="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+                    @click="closeUserMenu"
+                  >
+                    <FolderTree :size="14" />
+                    分类管理
+                  </RouterLink>
+                  <RouterLink
+                    v-if="isDeveloper"
+                    to="/dashboard/users"
+                    class="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+                    @click="closeUserMenu"
+                  >
+                    <Users :size="14" />
+                    用户管理
+                  </RouterLink>
+                  <RouterLink
                     to="/dashboard/settings"
                     class="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
                     @click="closeUserMenu"
@@ -223,6 +243,22 @@ async function handleLogout() {
               @click="closeMobileMenu"
             >
               写文章
+            </RouterLink>
+            <RouterLink
+              v-if="isDeveloper"
+              to="/dashboard/categories"
+              class="text-sm py-2 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]"
+              @click="closeMobileMenu"
+            >
+              分类管理
+            </RouterLink>
+            <RouterLink
+              v-if="isDeveloper"
+              to="/dashboard/users"
+              class="text-sm py-2 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]"
+              @click="closeMobileMenu"
+            >
+              用户管理
             </RouterLink>
             <RouterLink
               to="/dashboard/settings"

@@ -4,6 +4,8 @@ import { useHead } from '@unhead/vue'
 import { useRouter } from 'vue-router'
 import { FileText, Plus, Trash2, Edit, Eye } from 'lucide-vue-next'
 import { getArticles, deleteArticle } from '@/api/article'
+import { useUserStore } from '@/stores/user'
+import { usePermission } from '@/composables/usePermission'
 import type { ArticleListItem, Pagination } from '@/types'
 
 useHead(() => ({
@@ -11,6 +13,9 @@ useHead(() => ({
 }))
 
 const router = useRouter()
+const userStore = useUserStore()
+const { isDeveloper, canDeleteArticle } = usePermission()
+
 const articles = ref<ArticleListItem[]>([])
 const pagination = ref<Pagination | null>(null)
 const loading = ref(false)
@@ -20,7 +25,13 @@ async function fetchArticles(page = 1) {
   loading.value = true
   try {
     const res = await getArticles({ page, size: 20 })
-    articles.value = res.list
+    if (isDeveloper.value) {
+      articles.value = res.list
+    } else {
+      articles.value = res.list.filter(
+        (a: ArticleListItem) => a.authorId === userStore.user?.id
+      )
+    }
     pagination.value = res.pagination
   } catch {
     articles.value = []
@@ -35,10 +46,22 @@ async function handleDelete(id: string) {
   try {
     await deleteArticle(id)
     await fetchArticles(pagination.value?.page || 1)
-  } catch {
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '删除失败'
+    alert(msg)
   } finally {
     deleting.value = null
   }
+}
+
+function canEdit(article: ArticleListItem): boolean {
+  if (isDeveloper.value) return true
+  return article.authorId === userStore.user?.id
+}
+
+function canDelete(article: ArticleListItem): boolean {
+  if (isDeveloper.value) return true
+  return article.authorId === userStore.user?.id
 }
 
 onMounted(() => {
@@ -107,6 +130,7 @@ onMounted(() => {
             <Eye :size="14" />
           </button>
           <button
+            v-if="canEdit(article)"
             @click="router.push(`/dashboard/posts/${article.id}/edit`)"
             class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
             title="编辑"
@@ -114,6 +138,7 @@ onMounted(() => {
             <Edit :size="14" />
           </button>
           <button
+            v-if="canDelete(article)"
             @click="handleDelete(article.id)"
             :disabled="deleting === article.id"
             class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors disabled:opacity-50"
