@@ -74,7 +74,7 @@ async function handleLogout() {
         : 'bg-transparent'
     ]"
   >
-    <div class="max-w-[1080px] mx-auto px-6 h-16 flex items-center justify-between">
+    <div class="max-w-[1080px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
       <RouterLink
         to="/"
         class="text-lg font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] hover:opacity-70 transition-opacity"

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Loader2 } from 'lucide-vue-next'
 import * as authApi from '@/api/auth'
+import { validateEmail } from '@/utils/emailValidator'
 
 const emit = defineEmits<{
   success: []
@@ -14,13 +15,30 @@ const phoneNumber = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const error = ref('')
+const emailError = ref('')
 const loading = ref(false)
+
+function validateEmailField() {
+  if (!email.value.trim()) {
+    emailError.value = ''
+    return
+  }
+  const result = validateEmail(email.value)
+  emailError.value = result.valid ? '' : result.message
+}
 
 async function handleSubmit() {
   error.value = ''
+  emailError.value = ''
 
   if (!username.value.trim() || !email.value.trim() || !password.value.trim() || !realName.value.trim() || !phoneNumber.value.trim()) {
     error.value = '请填写所有必填字段'
+    return
+  }
+
+  const emailResult = validateEmail(email.value)
+  if (!emailResult.valid) {
+    emailError.value = emailResult.message
     return
   }
 
@@ -59,9 +77,13 @@ async function handleSubmit() {
       {{ error }}
     </div>
 
+    <p class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+      <span class="text-red-500">*</span> 表示必填项
+    </p>
+
     <div>
       <label for="reg-username" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
-        用户名
+        用户名 <span class="text-red-500">*</span>
       </label>
       <input
         id="reg-username"
@@ -76,7 +98,7 @@ async function handleSubmit() {
 
     <div>
       <label for="reg-email" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
-        邮箱
+        邮箱 <span class="text-red-500">*</span>
       </label>
       <input
         id="reg-email"
@@ -84,14 +106,21 @@ async function handleSubmit() {
         type="email"
         autocomplete="email"
         required
-        class="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-shadow text-sm"
+        @blur="validateEmailField"
+        class="w-full px-3 py-2.5 rounded-lg border bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:border-transparent transition-shadow text-sm"
+        :class="emailError
+          ? 'border-red-400 dark:border-red-500 focus:ring-red-400 dark:focus:ring-red-500'
+          : 'border-[var(--color-border)] dark:border-[var(--color-dark-border)] focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)]'"
         placeholder="请输入邮箱"
       />
+      <p v-if="emailError" class="mt-1 text-xs text-red-500 dark:text-red-400">
+        {{ emailError }}
+      </p>
     </div>
 
     <div>
       <label for="reg-realname" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
-        真实姓名
+        真实姓名 <span class="text-red-500">*</span>
       </label>
       <input
         id="reg-realname"
@@ -106,7 +135,7 @@ async function handleSubmit() {
 
     <div>
       <label for="reg-phone" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
-        手机号
+        手机号 <span class="text-red-500">*</span>
       </label>
       <input
         id="reg-phone"
@@ -121,7 +150,7 @@ async function handleSubmit() {
 
     <div>
       <label for="reg-password" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
-        密码
+        密码 <span class="text-red-500">*</span>
       </label>
       <input
         id="reg-password"
@@ -136,7 +165,7 @@ async function handleSubmit() {
 
     <div>
       <label for="reg-confirm" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
-        确认密码
+        确认密码 <span class="text-red-500">*</span>
       </label>
       <input
         id="reg-confirm"

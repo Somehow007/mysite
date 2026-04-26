@@ -3,12 +3,24 @@
   <head>
     <meta charset="UTF-8">
     <link rel="icon" href="/favicon.ico">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
     <meta name="description" content="MySite - 个人博客">
+    <meta name="theme-color" content="#FAFAFA" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#09090B" media="(prefers-color-scheme: dark)">
+    <meta name="format-detection" content="telephone=no">
     <title>MySite</title>
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+      @font-face {
+        font-family: 'Inter Fallback';
+        src: local('BlinkMacSystemFont'), local('Segoe UI'), local('Helvetica Neue'), local('Arial');
+        font-display: swap;
+      }
+    </style>
   </head>
   <body>
     <div id="app"></div>

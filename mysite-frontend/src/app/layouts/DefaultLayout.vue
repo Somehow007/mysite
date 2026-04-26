@@ -8,7 +8,7 @@ import BackToTop from '@/components/common/BackToTop.vue'
 <template>
   <div class="min-h-screen flex flex-col">
     <AppHeader />
-    <main class="flex-1 w-full max-w-[1080px] mx-auto px-6 py-12">
+    <main class="flex-1 w-full max-w-[1080px] mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <RouterView v-slot="{ Component }">
         <transition name="page" mode="out-in">
           <component :is="Component" />

@@ -97,6 +97,9 @@ public class AuthServiceImpl implements AuthService {
         if (StrUtil.isBlank(requestParam.getRealName())) {
             throw new ClientException("请填写您的真实姓名");
         }
+        if (StrUtil.isBlank(requestParam.getEmail())) {
+            throw new ClientException("请填写您的邮箱");
+        }
 
         UserDO userDO = BeanUtil.toBean(requestParam, UserDO.class);
         userDO.setId(IdUtil.getSnowflakeNextId());

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
 import Artalk from 'artalk'
 import 'artalk/dist/Artalk.css'
 import { useUserStore } from '@/stores/user'
@@ -10,8 +9,6 @@ const props = defineProps<{
   pageTitle: string
 }>()
 
-const route = useRoute()
-const router = useRouter()
 const userStore = useUserStore()
 
 const wrapperRef = ref<HTMLElement | null>(null)
@@ -22,14 +19,6 @@ let artalkInstance: Artalk | null = null
 const isLoggedIn = computed(() => userStore.isLoggedIn)
 const showLoading = computed(() => userStore.loading && !userStore.user)
 const showContent = computed(() => !userStore.loading || userStore.user)
-
-const loginRedirectUrl = computed(() => {
-  return `/login?redirect=${encodeURIComponent(route.fullPath)}`
-})
-
-function goToLogin() {
-  router.push(loginRedirectUrl.value)
-}
 
 async function checkServerHealth(server: string): Promise<boolean> {
   try {

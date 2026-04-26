@@ -47,7 +47,7 @@ async function onLoginSuccess() {
 </script>
 
 <template>
-  <div class="min-h-[80vh] flex items-center justify-center">
+  <div class="min-h-[80vh] flex items-center justify-center px-4">
     <div class="w-full max-w-sm">
       <div class="text-center mb-8">
         <h1 class="text-2xl font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">
