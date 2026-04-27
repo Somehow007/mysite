@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS `t_article_tag` (
     `article_id` BIGINT NOT NULL COMMENT '文章ID',
     `tag_id` BIGINT NOT NULL COMMENT '标签ID',
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `del_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '删除标识 0:未删除 1:已删除',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_article_tag` (`article_id`, `tag_id`),
