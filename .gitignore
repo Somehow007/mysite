@@ -35,5 +35,8 @@ build/
 ### Project specific ###
 artalk-data/
 mysite-frontend/mysite/
+mysite-frontend/dist/
+mysite-frontend/node_modules/
+docker/artalk_data/
 docker/.env
 deploy/config/.env
