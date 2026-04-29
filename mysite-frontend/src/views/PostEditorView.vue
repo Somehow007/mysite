@@ -154,9 +154,9 @@ async function handleImageUpload(file: File) {
       <div class="flex items-center gap-4">
         <button
           @click="router.back()"
-          class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+          class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200 group"
         >
-          <ArrowLeft :size="18" />
+          <ArrowLeft :size="18" class="group-hover:-translate-x-0.5 transition-transform duration-200" />
         </button>
         <h1 class="text-2xl font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">
           {{ pageTitle }}
@@ -166,8 +166,8 @@ async function handleImageUpload(file: File) {
       <div class="flex items-center gap-3">
         <button
           @click="toggleMetaPanel"
-          class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
-          :class="{ 'bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]': showMetaPanel }"
+          class="btn-secondary"
+          :class="{ 'bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] border-[var(--color-accent)]/30 dark:border-[var(--color-dark-accent)]/30': showMetaPanel }"
           :aria-expanded="showMetaPanel"
           :aria-label="showMetaPanel ? '收起文章信息面板' : '展开文章信息面板'"
         >
@@ -182,7 +182,7 @@ async function handleImageUpload(file: File) {
         <button
           @click="handleSave(false)"
           :disabled="saving"
-          class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors disabled:opacity-50"
+          class="btn-secondary disabled:opacity-50"
         >
           <Loader2 v-if="saving" :size="14" class="animate-spin" />
           <Save v-else :size="14" />
@@ -191,7 +191,7 @@ async function handleImageUpload(file: File) {
         <button
           @click="handleSave(true)"
           :disabled="saving"
-          class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] hover:opacity-90 transition-opacity disabled:opacity-50"
+          class="btn-primary disabled:opacity-50"
         >
           <Loader2 v-if="saving" :size="14" class="animate-spin" />
           发布
@@ -217,7 +217,7 @@ async function handleImageUpload(file: File) {
           class="w-full px-0 py-3 text-2xl font-semibold bg-transparent border-none outline-none text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)]"
         />
 
-        <div class="h-[calc(100vh-280px)] min-h-[500px] rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] overflow-hidden bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)]">
+        <div class="h-[calc(100vh-280px)] min-h-[500px] rounded-xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] overflow-hidden bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] card-shadow">
           <MarkdownEditor
             v-model="content"
             placeholder="用 Markdown 写文章..."
@@ -246,7 +246,7 @@ async function handleImageUpload(file: File) {
               v-model="summary"
               placeholder="文章摘要（建议填写）..."
               rows="3"
-              class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent text-sm resize-y"
+              class="input-base resize-y"
               :class="{ 'ring-2 ring-red-500': showSummaryHint }"
             />
           </div>
@@ -255,10 +255,7 @@ async function handleImageUpload(file: File) {
             <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
               分类
             </label>
-            <select
-              v-model="categoryId"
-              class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent text-sm"
-            >
+            <select v-model="categoryId" class="input-base">
               <option value="">未分类</option>
               <option v-for="cat in categories" :key="cat.id" :value="cat.id">
                 {{ cat.name }}
@@ -275,10 +272,10 @@ async function handleImageUpload(file: File) {
                 v-for="tag in tags"
                 :key="tag.id"
                 @click="toggleTag(tag.id)"
-                class="text-xs px-2.5 py-1 rounded-full border transition-colors"
+                class="text-xs px-2.5 py-1 rounded-full border transition-all duration-200"
                 :class="selectedTagIds.includes(tag.id)
-                  ? 'border-[var(--color-accent)] dark:border-[var(--color-dark-accent)] bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)]'
-                  : 'border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:border-[var(--color-text-body)] dark:hover:border-[var(--color-dark-text-body)]'"
+                  ? 'border-[var(--color-accent)] dark:border-[var(--color-dark-accent)] bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)]'
+                  : 'border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:border-[var(--color-accent)] dark:hover:border-[var(--color-dark-accent)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)]'"
               >
                 #{{ tag.name }}
               </button>
@@ -296,7 +293,7 @@ async function handleImageUpload(file: File) {
               v-model="coverImage"
               type="text"
               placeholder="图片URL（可选）"
-              class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent text-sm"
+              class="input-base"
             />
           </div>
 
@@ -317,7 +314,7 @@ async function handleImageUpload(file: File) {
 <style scoped>
 .slide-enter-active,
 .slide-leave-active {
-  transition: all 0.3s ease;
+  transition: all 0.3s var(--ease-out);
 }
 
 .slide-enter-from,

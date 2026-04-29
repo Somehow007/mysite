@@ -25,22 +25,22 @@ function handleLoginRequired() {
 </script>
 
 <template>
-  <article class="group">
+  <article class="group relative">
     <div class="flex items-start justify-between gap-3">
       <RouterLink :to="`/post/${article.id}`" class="flex-1 min-w-0">
         <div
           v-if="article.coverImage"
-          class="aspect-[2/1] rounded-lg overflow-hidden mb-4 bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]"
+          class="aspect-[2/1] rounded-xl overflow-hidden mb-4 bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]"
         >
           <img
             :src="article.coverImage"
             :alt="article.title"
-            class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
             loading="lazy"
           />
         </div>
 
-        <h2 class="text-xl font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] group-hover:opacity-70 transition-opacity mb-2 leading-snug">
+        <h2 class="text-xl font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] group-hover:text-[var(--color-accent)] dark:group-hover:text-[var(--color-dark-accent)] transition-colors duration-200 mb-2 leading-snug">
           {{ article.title }}
         </h2>
 

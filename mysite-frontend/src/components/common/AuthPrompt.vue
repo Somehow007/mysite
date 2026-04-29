@@ -17,8 +17,8 @@ function handleLoginClick() {
 
 <template>
   <div class="flex flex-col items-center justify-center py-12 px-4 text-center">
-    <div class="w-14 h-14 rounded-full bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] flex items-center justify-center mb-4">
-      <LogIn :size="24" class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]" />
+    <div class="w-14 h-14 rounded-full bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)] flex items-center justify-center mb-4">
+      <LogIn :size="24" class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]" />
     </div>
     <p class="text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] font-medium mb-2">
       需要登录才能{{ actionText }}
@@ -29,7 +29,7 @@ function handleLoginClick() {
     <RouterLink
       to="/login"
       @click="handleLoginClick"
-      class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] font-medium text-sm hover:opacity-90 transition-opacity"
+      class="btn-primary"
     >
       <LogIn :size="16" />
       立即登录

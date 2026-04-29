@@ -1,22 +1,22 @@
 @layer utilities {
   .page-enter-active,
   .page-leave-active {
-    transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+    transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out);
   }
 
   .page-enter-from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
 
   .page-leave-to {
     opacity: 0;
-    transform: translateY(-4px);
+    transform: translateY(-3px);
   }
 
   .fade-enter-active,
   .fade-leave-active {
-    transition: opacity 200ms ease;
+    transition: opacity 200ms var(--ease-smooth);
   }
 
   .fade-enter-from,
@@ -26,17 +26,17 @@
 
   .slide-up-enter-active,
   .slide-up-leave-active {
-    transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out);
+    transition: opacity 250ms var(--ease-out), transform 250ms var(--ease-out);
   }
 
   .slide-up-enter-from {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(12px);
   }
 
   .slide-up-leave-to {
     opacity: 0;
-    transform: translateY(-8px);
+    transform: translateY(-6px);
   }
 
   @keyframes shimmer {
@@ -67,7 +67,7 @@
   }
 
   .animate-favorite-bounce {
-    animation: favorite-bounce 400ms ease-out;
+    animation: favorite-bounce 400ms var(--ease-spring);
   }
 
   .skeleton {
@@ -89,5 +89,20 @@
       var(--color-dark-bg-code) 75%
     );
     background-size: 200% 100%;
+  }
+
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .animate-scale-in {
+    animation: scale-in 200ms var(--ease-out);
   }
 }

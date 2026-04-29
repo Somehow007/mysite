@@ -77,7 +77,7 @@ onMounted(() => {
       </h1>
       <button
         @click="router.push('/dashboard/posts/new')"
-        class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] hover:opacity-90 transition-opacity"
+        class="btn-primary"
       >
         <Plus :size="14" />
         写文章
@@ -90,27 +90,28 @@ onMounted(() => {
 
     <div v-else-if="articles.length === 0" class="py-16 text-center">
       <FileText :size="48" class="mx-auto mb-4 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]" />
-      <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">还没有文章，开始写第一篇吧</p>
+      <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] mb-4">还没有文章，开始写第一篇吧</p>
       <button
         @click="router.push('/dashboard/posts/new')"
-        class="mt-4 px-4 py-2 text-sm rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] hover:opacity-90 transition-opacity"
+        class="btn-primary"
       >
+        <Plus :size="14" />
         写文章
       </button>
     </div>
 
-    <div v-else class="space-y-3">
+    <div v-else class="space-y-2">
       <div
         v-for="article in articles"
         :key="article.id"
-        class="flex items-center justify-between p-4 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] hover:border-[var(--color-text-muted)] dark:hover:border-[var(--color-dark-text-muted)] transition-colors"
+        class="flex items-center justify-between p-4 rounded-xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] hover:border-[var(--color-accent)]/30 dark:hover:border-[var(--color-dark-accent)]/30 card-shadow hover:card-shadow-hover transition-all duration-200"
       >
         <div class="flex-1 min-w-0">
           <h3 class="text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] truncate">
             {{ article.title }}
           </h3>
           <div class="flex items-center gap-3 mt-1 text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
-            <span v-if="article.categoryName" class="px-1.5 py-0.5 rounded bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]">
+            <span v-if="article.categoryName" class="px-1.5 py-0.5 rounded bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">
               {{ article.categoryName }}
             </span>
             <span class="inline-flex items-center gap-1">
@@ -121,10 +122,10 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="flex items-center gap-2 ml-4">
+        <div class="flex items-center gap-1 ml-4">
           <button
             @click="router.push(`/post/${article.id}`)"
-            class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+            class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
             title="查看"
           >
             <Eye :size="14" />
@@ -132,7 +133,7 @@ onMounted(() => {
           <button
             v-if="canEdit(article)"
             @click="router.push(`/dashboard/posts/${article.id}/edit`)"
-            class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+            class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
             title="编辑"
           >
             <Edit :size="14" />
@@ -141,7 +142,7 @@ onMounted(() => {
             v-if="canDelete(article)"
             @click="handleDelete(article.id)"
             :disabled="deleting === article.id"
-            class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors disabled:opacity-50"
+            class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all duration-200 disabled:opacity-50"
             title="删除"
           >
             <Trash2 :size="14" />

@@ -8,7 +8,7 @@ const { mode, toggleTheme } = useTheme()
 <template>
   <button
     @click="toggleTheme"
-    class="p-2 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+    class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-all duration-200"
     :aria-label="`当前主题: ${mode === 'system' ? '跟随系统' : mode === 'dark' ? '暗色' : '亮色'}，点击切换`"
   >
     <Sun v-if="mode === 'light'" :size="18" />

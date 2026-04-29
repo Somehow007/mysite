@@ -100,7 +100,7 @@ onMounted(() => {
             v-model="searchInput"
             type="text"
             placeholder="搜索收藏的文章..."
-            class="w-full pl-9 pr-9 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-all"
+            class="input-base pl-9 pr-9"
           />
           <button
             v-if="searchInput"
@@ -113,7 +113,7 @@ onMounted(() => {
         </div>
         <button
           type="submit"
-          class="px-4 py-2 text-sm font-medium rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] hover:opacity-90 transition-opacity"
+          class="btn-primary"
         >
           搜索
         </button>
@@ -124,7 +124,7 @@ onMounted(() => {
         class="flex items-center gap-2 mt-3 text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]"
       >
         <span>搜索：</span>
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] font-medium">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] font-medium">
           {{ searchKeyword }}
         </span>
         <button
@@ -144,7 +144,7 @@ onMounted(() => {
       </p>
       <button
         @click="router.push('/')"
-        class="mt-4 text-sm text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] hover:opacity-70 transition-opacity"
+        class="mt-4 text-sm text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] hover:opacity-80 transition-opacity font-medium"
       >
         去看看文章
       </button>

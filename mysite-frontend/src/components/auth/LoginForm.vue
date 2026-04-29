@@ -59,7 +59,7 @@ async function handleSubmit() {
         type="text"
         autocomplete="username"
         required
-        class="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-shadow text-sm"
+        class="input-base"
         placeholder="请输入用户名"
       />
     </div>
@@ -74,7 +74,7 @@ async function handleSubmit() {
         type="password"
         autocomplete="current-password"
         required
-        class="w-full px-3 py-2.5 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-shadow text-sm"
+        class="input-base"
         placeholder="请输入密码"
       />
     </div>
@@ -82,7 +82,7 @@ async function handleSubmit() {
     <button
       type="submit"
       :disabled="loading"
-      class="w-full py-2.5 px-4 rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      class="btn-primary w-full py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <Loader2 v-if="loading" :size="16" class="animate-spin" />
       {{ loading ? '登录中...' : '登录' }}

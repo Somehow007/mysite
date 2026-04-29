@@ -181,7 +181,7 @@ onMounted(() => {
       </h1>
       <button
         @click="viewAllLogs"
-        class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-border)] dark:hover:bg-[var(--color-dark-border)] transition-colors"
+        class="btn-secondary"
       >
         <FileText :size="14" />
         操作日志
@@ -201,7 +201,7 @@ onMounted(() => {
       </div>
       <button
         @click="handleSearch"
-        class="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] hover:opacity-90 transition-opacity"
+        class="btn-primary"
       >
         搜索
       </button>
@@ -316,8 +316,8 @@ onMounted(() => {
     </div>
 
     <Teleport to="body">
-      <div v-if="confirmDialog.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="confirmDialog.show = false">
-        <div class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+      <div v-if="confirmDialog.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="confirmDialog.show = false">
+        <div class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-2xl shadow-2xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6 w-full max-w-md mx-4 animate-scale-in">
           <h3 class="text-lg font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-2">
             {{ confirmDialog.title }}
           </h3>
@@ -327,13 +327,13 @@ onMounted(() => {
           <div class="flex justify-end gap-3">
             <button
               @click="confirmDialog.show = false"
-              class="px-4 py-2 rounded-lg text-sm font-medium bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-border)] dark:hover:bg-[var(--color-dark-border)] transition-colors"
+              class="btn-secondary"
             >
               取消
             </button>
             <button
               @click="confirmDialog.action()"
-              class="px-4 py-2 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+              class="inline-flex items-center justify-center gap-0.5 px-4 py-2 text-sm font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all duration-200"
             >
               确认
             </button>
@@ -343,8 +343,8 @@ onMounted(() => {
     </Teleport>
 
     <Teleport to="body">
-      <div v-if="showLogs" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40" @click.self="closeLogs">
-        <div class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-xl shadow-xl p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+      <div v-if="showLogs" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="closeLogs">
+        <div class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-2xl shadow-2xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto animate-scale-in">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">
               操作日志

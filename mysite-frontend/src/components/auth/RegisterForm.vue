@@ -99,10 +99,6 @@ async function handleSubmit() {
     loading.value = false
   }
 }
-
-const inputBaseClass = 'w-full px-3 py-2.5 rounded-lg border bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:border-transparent transition-shadow text-sm'
-const inputNormalClass = `${inputBaseClass} border-[var(--color-border)] dark:border-[var(--color-dark-border)] focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)]`
-const inputErrorClass = `${inputBaseClass} border-red-400 dark:border-red-500 focus:ring-red-400 dark:focus:ring-red-500`
 </script>
 
 <template>
@@ -125,7 +121,7 @@ const inputErrorClass = `${inputBaseClass} border-red-400 dark:border-red-500 fo
         type="text"
         autocomplete="username"
         required
-        :class="inputNormalClass"
+        class="input-base"
         placeholder="请输入用户名"
       />
     </div>
@@ -141,7 +137,8 @@ const inputErrorClass = `${inputBaseClass} border-red-400 dark:border-red-500 fo
         autocomplete="email"
         required
         @blur="handleEmailBlur"
-        :class="isFieldInvalid('email') ? inputErrorClass : inputNormalClass"
+        class="input-base"
+        :class="{ 'border-red-400 dark:border-red-500 focus:ring-red-400 dark:focus:ring-red-500': isFieldInvalid('email') }"
         placeholder="请输入邮箱"
       />
       <p v-if="getFieldError('email')" class="mt-1 text-xs text-red-500 dark:text-red-400">
@@ -159,7 +156,7 @@ const inputErrorClass = `${inputBaseClass} border-red-400 dark:border-red-500 fo
         type="text"
         autocomplete="name"
         required
-        :class="inputNormalClass"
+        class="input-base"
         placeholder="请输入真实姓名"
       />
     </div>
@@ -176,7 +173,8 @@ const inputErrorClass = `${inputBaseClass} border-red-400 dark:border-red-500 fo
         required
         @blur="handlePhoneBlur"
         @input="handlePhoneInput"
-        :class="isFieldInvalid('phoneNumber') ? inputErrorClass : inputNormalClass"
+        class="input-base"
+        :class="{ 'border-red-400 dark:border-red-500 focus:ring-red-400 dark:focus:ring-red-500': isFieldInvalid('phoneNumber') }"
         placeholder="请输入手机号"
         maxlength="11"
       />
@@ -195,7 +193,8 @@ const inputErrorClass = `${inputBaseClass} border-red-400 dark:border-red-500 fo
         type="password"
         autocomplete="new-password"
         required
-        :class="isFieldInvalid('password') ? inputErrorClass : inputNormalClass"
+        class="input-base"
+        :class="{ 'border-red-400 dark:border-red-500 focus:ring-red-400 dark:focus:ring-red-500': isFieldInvalid('password') }"
         placeholder="至少 6 位"
       />
       <p v-if="getFieldError('password')" class="mt-1 text-xs text-red-500 dark:text-red-400">
@@ -214,7 +213,8 @@ const inputErrorClass = `${inputBaseClass} border-red-400 dark:border-red-500 fo
         autocomplete="new-password"
         required
         @blur="handleConfirmBlur"
-        :class="isFieldInvalid('confirmPassword') ? inputErrorClass : inputNormalClass"
+        class="input-base"
+        :class="{ 'border-red-400 dark:border-red-500 focus:ring-red-400 dark:focus:ring-red-500': isFieldInvalid('confirmPassword') }"
         placeholder="再次输入密码"
       />
       <p v-if="getFieldError('confirmPassword')" class="mt-1 text-xs text-red-500 dark:text-red-400">
@@ -225,7 +225,7 @@ const inputErrorClass = `${inputBaseClass} border-red-400 dark:border-red-500 fo
     <button
       type="submit"
       :disabled="loading"
-      class="w-full py-2.5 px-4 rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] font-medium text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      class="btn-primary w-full py-2.5 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <Loader2 v-if="loading" :size="16" class="animate-spin" />
       {{ loading ? '注册中...' : '注册' }}

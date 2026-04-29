@@ -113,7 +113,7 @@ onMounted(() => {
       <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] mb-4">文章加载失败</p>
       <button
         @click="router.push('/')"
-        class="text-sm text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] hover:opacity-70 transition-opacity"
+        class="btn-primary"
       >
         返回首页
       </button>
@@ -125,9 +125,9 @@ onMounted(() => {
           <header class="mb-10">
             <button
               @click="router.back()"
-              class="inline-flex items-center gap-1 text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] transition-colors mb-6"
+              class="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-200 mb-6 group"
             >
-              <ArrowLeft :size="14" />
+              <ArrowLeft :size="14" class="group-hover:-translate-x-0.5 transition-transform duration-200" />
               返回
             </button>
 
@@ -162,7 +162,7 @@ onMounted(() => {
               <RouterLink
                 v-if="article.categorySlug"
                 :to="`/category/${article.categorySlug}`"
-                class="inline-flex items-center gap-1.5 hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] transition-colors"
+                class="inline-flex items-center gap-1.5 hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-200"
               >
                 <Tag :size="14" />
                 <span>{{ article.categoryName }}</span>
@@ -174,7 +174,7 @@ onMounted(() => {
                 v-for="tag in article.tags"
                 :key="tag.id"
                 :to="`/tag/${tag.slug}`"
-                class="text-xs px-2.5 py-1 rounded-full border border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] hover:border-[var(--color-text-heading)] dark:hover:border-[var(--color-dark-text-heading)] transition-colors"
+                class="text-xs px-2.5 py-1 rounded-full border border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:border-[var(--color-accent)] dark:hover:border-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-all duration-200"
               >
                 #{{ tag.name }}
               </RouterLink>

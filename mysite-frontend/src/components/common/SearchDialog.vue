@@ -50,7 +50,7 @@ onUnmounted(() => {
 <template>
   <button
     @click="openAndFocus"
-    class="p-2 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+    class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-all duration-200"
     aria-label="搜索"
   >
     <Search :size="18" />
@@ -63,11 +63,11 @@ onUnmounted(() => {
         class="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]"
       >
         <div
-          class="absolute inset-0 bg-black/50"
+          class="absolute inset-0 bg-black/40 backdrop-blur-sm"
           @click="close"
         />
         <div
-          class="relative w-full max-w-lg mx-4 bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-xl shadow-2xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] overflow-hidden"
+          class="relative w-full max-w-lg mx-4 bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-2xl shadow-2xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] overflow-hidden animate-scale-in"
         >
           <div class="flex items-center gap-3 px-4 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
             <Search :size="18" class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] shrink-0" />
@@ -81,7 +81,7 @@ onUnmounted(() => {
             />
             <button
               @click="close"
-              class="p-1 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-body)] dark:hover:text-[var(--color-dark-text-body)]"
+              class="p-1 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-body)] dark:hover:text-[var(--color-dark-text-body)] transition-colors"
             >
               <X :size="16" />
             </button>
@@ -101,7 +101,7 @@ onUnmounted(() => {
                 v-for="article in results"
                 :key="article.id"
                 @click="goToResult(article.id)"
-                class="w-full text-left px-4 py-3 hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors flex items-center justify-between gap-3"
+                class="w-full text-left px-4 py-3 hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-colors duration-150 flex items-center justify-between gap-3"
               >
                 <div class="min-w-0">
                   <p class="text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] truncate">
@@ -120,13 +120,13 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="px-4 py-2 border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)] flex items-center gap-4 text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+          <div class="px-4 py-2.5 border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)] flex items-center gap-4 text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
             <span class="flex items-center gap-1">
-              <kbd class="px-1.5 py-0.5 rounded bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[10px]">ESC</kbd>
+              <kbd class="px-1.5 py-0.5 rounded bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[10px] font-medium">ESC</kbd>
               关闭
             </span>
             <span class="flex items-center gap-1">
-              <kbd class="px-1.5 py-0.5 rounded bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[10px]">↵</kbd>
+              <kbd class="px-1.5 py-0.5 rounded bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[10px] font-medium">↵</kbd>
               打开
             </span>
           </div>

@@ -147,8 +147,8 @@ onMounted(() => {
           @click="setSort(opt.field, opt.order)"
           class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200"
           :class="isSortActive(opt.field, opt.order)
-            ? 'bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] shadow-sm'
-            : 'bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] hover:bg-[var(--color-border)] dark:hover:bg-[var(--color-dark-border)]'"
+            ? 'bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] shadow-sm'
+            : 'bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)]'"
         >
           <component :is="opt.icon" :size="10" />
           {{ opt.label }}
@@ -166,8 +166,8 @@ onMounted(() => {
             @click="selectCategory(null)"
             class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200"
             :class="!selectedCategorySlug
-              ? 'bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] shadow-sm'
-              : 'bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] hover:bg-[var(--color-border)] dark:hover:bg-[var(--color-dark-border)]'"
+              ? 'bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] shadow-sm'
+              : 'bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)]'"
           >
             全部
           </button>
@@ -177,8 +177,8 @@ onMounted(() => {
             @click="selectCategory(cat.slug)"
             class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200"
             :class="selectedCategorySlug === cat.slug
-              ? 'bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] shadow-sm'
-              : 'bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] hover:bg-[var(--color-border)] dark:hover:bg-[var(--color-dark-border)]'"
+              ? 'bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] shadow-sm'
+              : 'bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)]'"
           >
             {{ cat.name }}
             <span v-if="cat.articleCount" class="opacity-60">{{ cat.articleCount }}</span>
@@ -191,7 +191,7 @@ onMounted(() => {
         class="flex items-center gap-2 text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]"
       >
         <span>当前筛选：</span>
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] font-medium">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] font-medium">
           {{ selectedCategoryName }}
         </span>
         <button

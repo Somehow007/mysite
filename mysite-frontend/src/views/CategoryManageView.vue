@@ -220,14 +220,14 @@ onMounted(() => {
         <button
           v-if="selectedIds.size > 0"
           @click="handleBatchDelete"
-          class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          class="inline-flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-red-500 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all duration-200"
         >
           <Trash2 :size="14" />
           删除选中 ({{ selectedIds.size }})
         </button>
         <button
           @click="openCreateModal()"
-          class="flex items-center gap-2 px-4 py-2 text-sm rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] hover:opacity-90 transition-opacity"
+          class="btn-primary"
         >
           <Plus :size="14" />
           新建分类
@@ -244,7 +244,7 @@ onMounted(() => {
       <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">还没有分类，开始创建第一个吧</p>
       <button
         @click="openCreateModal()"
-        class="mt-4 px-4 py-2 text-sm rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] hover:opacity-90 transition-opacity"
+        class="btn-primary"
       >
         新建分类
       </button>
@@ -442,17 +442,17 @@ onMounted(() => {
 
     <div
       v-if="showEditor"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       @click.self="showEditor = false"
     >
-      <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] shadow-xl">
-        <div class="sticky top-0 flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)]">
+      <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] shadow-2xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] animate-scale-in">
+        <div class="sticky top-0 flex items-center justify-between px-6 py-4 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] z-10">
           <h2 class="text-lg font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">
             {{ editingCategory ? '编辑分类' : '新建分类' }}
           </h2>
           <button
             @click="showEditor = false"
-            class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+            class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-all duration-200"
           >
             ✕
           </button>
@@ -615,14 +615,14 @@ onMounted(() => {
         <div class="sticky bottom-0 flex items-center justify-end gap-2 px-6 py-4 border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)]">
           <button
             @click="showEditor = false"
-            class="px-4 py-2 text-sm rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text)] dark:text-[var(--color-dark-text)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+            class="btn-secondary"
           >
             取消
           </button>
           <button
             @click="handleSave"
             :disabled="saving"
-            class="px-4 py-2 text-sm rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] hover:opacity-90 transition-opacity disabled:opacity-50"
+            class="btn-primary disabled:opacity-50"
           >
             {{ saving ? '保存中...' : '保存' }}
           </button>

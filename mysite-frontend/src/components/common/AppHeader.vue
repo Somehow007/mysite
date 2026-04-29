@@ -72,38 +72,38 @@ async function handleLogout() {
     class="sticky top-0 z-50 transition-all duration-300"
     :class="[
       scrolled
-        ? 'bg-[var(--color-bg-card)]/80 dark:bg-[var(--color-dark-bg-card)]/80 backdrop-blur-lg border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)]'
+        ? 'bg-[var(--color-bg-card)]/85 dark:bg-[var(--color-dark-bg-card)]/85 backdrop-blur-xl border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)] shadow-sm'
         : 'bg-transparent'
     ]"
   >
     <div class="max-w-[1080px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
       <RouterLink
         to="/"
-        class="text-lg font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] hover:opacity-70 transition-opacity"
+        class="text-lg font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-200"
         @click="closeMobileMenu"
       >
         {{ siteStore.site.title }}
       </RouterLink>
 
-      <nav class="hidden md:flex items-center gap-6">
+      <nav class="hidden md:flex items-center gap-1">
         <RouterLink
           v-for="item in siteStore.site.navigation"
           :key="item.path"
           :to="item.path"
-          class="text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] transition-colors"
-          :class="{ 'font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]': route.path === item.path }"
+          class="px-3 py-1.5 rounded-md text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-all duration-200"
+          :class="{ 'font-medium text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)]': route.path === item.path }"
         >
           {{ item.label }}
         </RouterLink>
 
-        <div class="flex items-center gap-3 ml-2">
+        <div class="flex items-center gap-1 ml-3 pl-3 border-l border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
           <SearchDialog />
           <ThemeToggle />
 
           <template v-if="!userStore.isLoggedIn">
             <RouterLink
               to="/login"
-              class="text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] transition-colors"
+              class="ml-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-all duration-200"
             >
               登录
             </RouterLink>
@@ -113,82 +113,85 @@ async function handleLogout() {
             <div class="relative" @mouseenter="handleMenuEnter" @mouseleave="handleMenuLeave">
               <button
                 @click="toggleUserMenu"
-                class="flex items-center gap-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] transition-colors"
+                class="flex items-center gap-2 px-2 py-1 rounded-md text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-all duration-200"
               >
-                <div class="w-7 h-7 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] flex items-center justify-center text-xs font-medium">
+                <div class="w-7 h-7 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] flex items-center justify-center text-xs font-medium">
                   {{ userStore.displayName?.charAt(0)?.toUpperCase() || 'U' }}
                 </div>
                 <span class="hidden lg:inline">{{ userStore.displayName }}</span>
               </button>
 
               <transition
-                enter-active-class="transition duration-150 ease-out"
-                enter-from-class="opacity-0 scale-95"
-                enter-to-class="opacity-100 scale-100"
-                leave-active-class="transition duration-100 ease-in"
+                enter-active-class="transition duration-200 var(--ease-out)"
+                enter-from-class="opacity-0 scale-95 -translate-y-1"
+                enter-to-class="opacity-100 scale-100 translate-y-0"
+                leave-active-class="transition duration-150 ease-in"
                 leave-from-class="opacity-100 scale-100"
                 leave-to-class="opacity-0 scale-95"
               >
                 <div
                   v-if="userMenuOpen"
-                  class="absolute right-0 mt-2 w-48 bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] border border-[var(--color-border)] dark:border-[var(--color-dark-border)] rounded-lg shadow-lg py-1 z-50"
+                  class="absolute right-0 mt-2 w-52 bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] border border-[var(--color-border)] dark:border-[var(--color-dark-border)] rounded-xl shadow-lg py-1.5 z-50 card-shadow-hover"
                 >
+                  <div class="px-3 py-2 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)] mb-1">
+                    <p class="text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">{{ userStore.displayName }}</p>
+                  </div>
                   <RouterLink
                     to="/dashboard"
-                    class="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
-                    <LayoutDashboard :size="14" />
+                    <LayoutDashboard :size="15" />
                     仪表盘
                   </RouterLink>
                   <RouterLink
                     to="/favorites"
-                    class="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
-                    <Heart :size="14" />
+                    <Heart :size="15" />
                     我的收藏
                   </RouterLink>
                   <RouterLink
                     to="/dashboard/posts/new"
-                    class="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
-                    <PenSquare :size="14" />
+                    <PenSquare :size="15" />
                     写文章
                   </RouterLink>
                   <RouterLink
                     v-if="isDeveloper"
                     to="/dashboard/categories"
-                    class="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
-                    <FolderTree :size="14" />
+                    <FolderTree :size="15" />
                     分类管理
                   </RouterLink>
                   <RouterLink
                     v-if="isDeveloper"
                     to="/dashboard/users"
-                    class="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
-                    <Users :size="14" />
+                    <Users :size="15" />
                     用户管理
                   </RouterLink>
                   <RouterLink
                     to="/dashboard/settings"
-                    class="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
-                    <Settings :size="14" />
+                    <Settings :size="15" />
                     个人设置
                   </RouterLink>
-                  <hr class="my-1 border-[var(--color-border)] dark:border-[var(--color-dark-border)]" />
+                  <hr class="my-1.5 border-[var(--color-border)] dark:border-[var(--color-dark-border)]" />
                   <button
                     @click="handleLogout"
-                    class="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors w-full text-left"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-150 w-full text-left mx-1 rounded-md"
                   >
-                    <LogOut :size="14" />
+                    <LogOut :size="15" />
                     退出登录
                   </button>
                 </div>
@@ -198,11 +201,11 @@ async function handleLogout() {
         </div>
       </nav>
 
-      <div class="flex md:hidden items-center gap-3">
+      <div class="flex md:hidden items-center gap-2">
         <SearchDialog />
         <ThemeToggle />
         <button
-          class="p-1 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]"
+          class="p-2 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors duration-200"
           @click="toggleMobileMenu"
           :aria-label="mobileMenuOpen ? '关闭菜单' : '打开菜单'"
         >
@@ -215,14 +218,15 @@ async function handleLogout() {
     <transition name="slide-up">
       <div
         v-if="mobileMenuOpen"
-        class="md:hidden border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] px-6 py-4"
+        class="md:hidden border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)]/95 dark:bg-[var(--color-dark-bg-card)]/95 backdrop-blur-xl px-6 py-4"
       >
-        <nav class="flex flex-col gap-3">
+        <nav class="flex flex-col gap-1">
           <RouterLink
             v-for="item in siteStore.site.navigation"
             :key="item.path"
             :to="item.path"
-            class="text-sm py-2 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] transition-colors"
+            class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
+            :class="{ 'font-medium text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)]': route.path === item.path }"
             @click="closeMobileMenu"
           >
             {{ item.label }}
@@ -231,30 +235,31 @@ async function handleLogout() {
           <template v-if="!userStore.isLoggedIn">
             <RouterLink
               to="/login"
-              class="text-sm py-2 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]"
+              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] font-medium hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-all duration-200"
               @click="closeMobileMenu"
             >
               登录
             </RouterLink>
           </template>
           <template v-else>
+            <div class="h-px bg-[var(--color-border)] dark:bg-[var(--color-dark-border)] my-2" />
             <RouterLink
               to="/dashboard"
-              class="text-sm py-2 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]"
+              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
               @click="closeMobileMenu"
             >
               仪表盘
             </RouterLink>
             <RouterLink
               to="/favorites"
-              class="text-sm py-2 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]"
+              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
               @click="closeMobileMenu"
             >
               我的收藏
             </RouterLink>
             <RouterLink
               to="/dashboard/posts/new"
-              class="text-sm py-2 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]"
+              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
               @click="closeMobileMenu"
             >
               写文章
@@ -262,7 +267,7 @@ async function handleLogout() {
             <RouterLink
               v-if="isDeveloper"
               to="/dashboard/categories"
-              class="text-sm py-2 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]"
+              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
               @click="closeMobileMenu"
             >
               分类管理
@@ -270,21 +275,21 @@ async function handleLogout() {
             <RouterLink
               v-if="isDeveloper"
               to="/dashboard/users"
-              class="text-sm py-2 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]"
+              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
               @click="closeMobileMenu"
             >
               用户管理
             </RouterLink>
             <RouterLink
               to="/dashboard/settings"
-              class="text-sm py-2 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]"
+              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
               @click="closeMobileMenu"
             >
               个人设置
             </RouterLink>
             <button
               @click="handleLogout"
-              class="text-sm py-2 text-left text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]"
+              class="text-sm py-2.5 px-3 rounded-lg text-left text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200"
             >
               退出登录
             </button>

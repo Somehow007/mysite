@@ -24,13 +24,13 @@ function onRegisterSuccess() {
         </p>
       </div>
 
-      <div class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6">
+      <div class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6 card-shadow">
         <RegisterForm @success="onRegisterSuccess" />
       </div>
 
       <p class="mt-6 text-center text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
         已有账户？
-        <RouterLink to="/login" class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] hover:opacity-70 transition-opacity">
+        <RouterLink to="/login" class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] hover:opacity-80 transition-opacity font-medium">
           登录
         </RouterLink>
       </p>

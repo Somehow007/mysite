@@ -54,7 +54,7 @@ async function handleUpdateProfile() {
   profileLoading.value = true
   profileMessage.value = ''
   profileError.value = ''
-  
+
   try {
     await userStore.updateUser({
       username: profileForm.value.username,
@@ -73,19 +73,19 @@ async function handleUpdateProfile() {
 async function handleChangePassword() {
   passwordMessage.value = ''
   passwordError.value = ''
-  
+
   if (passwordForm.value.newPassword !== confirmPassword.value) {
     passwordError.value = '两次输入的新密码不一致'
     return
   }
-  
+
   if (passwordForm.value.newPassword.length < 6) {
     passwordError.value = '新密码长度至少为 6 位'
     return
   }
-  
+
   passwordLoading.value = true
-  
+
   try {
     await changePassword(passwordForm.value)
     passwordMessage.value = '密码修改成功'
@@ -106,9 +106,9 @@ async function handleChangePassword() {
     </h1>
 
     <div class="space-y-8">
-      <section class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6">
+      <section class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6 card-shadow">
         <h2 class="text-lg font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-6 flex items-center gap-2">
-          <User :size="20" />
+          <User :size="20" class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]" />
           个人资料
         </h2>
 
@@ -120,7 +120,7 @@ async function handleChangePassword() {
             <input
               v-model="profileForm.username"
               type="text"
-              class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg)] dark:bg-[var(--color-dark-bg)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-colors"
+              class="input-base"
               placeholder="输入昵称"
             />
           </div>
@@ -132,7 +132,7 @@ async function handleChangePassword() {
             <input
               v-model="profileForm.realName"
               type="text"
-              class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg)] dark:bg-[var(--color-dark-bg)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-colors"
+              class="input-base"
               placeholder="输入真实姓名"
             />
           </div>
@@ -146,7 +146,7 @@ async function handleChangePassword() {
               <input
                 v-model="profileForm.email"
                 type="email"
-                class="w-full pl-10 pr-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg)] dark:bg-[var(--color-dark-bg)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-colors"
+                class="input-base pl-10"
                 placeholder="输入邮箱"
               />
             </div>
@@ -156,20 +156,17 @@ async function handleChangePassword() {
             <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
               性别
             </label>
-            <select
-              v-model="profileForm.sex"
-              class="w-full px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg)] dark:bg-[var(--color-dark-bg)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-colors"
-            >
+            <select v-model="profileForm.sex" class="input-base">
               <option :value="0">男</option>
               <option :value="1">女</option>
               <option :value="2">保密</option>
             </select>
           </div>
 
-          <div v-if="profileMessage" class="text-sm text-green-600 dark:text-green-400">
+          <div v-if="profileMessage" class="text-sm text-green-600 dark:text-green-400 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/20">
             {{ profileMessage }}
           </div>
-          <div v-if="profileError" class="text-sm text-red-500">
+          <div v-if="profileError" class="text-sm text-red-500 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20">
             {{ profileError }}
           </div>
 
@@ -177,7 +174,7 @@ async function handleChangePassword() {
             <button
               type="submit"
               :disabled="profileLoading"
-              class="px-4 py-2 text-sm rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] hover:opacity-90 transition-opacity disabled:opacity-50"
+              class="btn-primary"
             >
               {{ profileLoading ? '保存中...' : '保存修改' }}
             </button>
@@ -185,9 +182,9 @@ async function handleChangePassword() {
         </form>
       </section>
 
-      <section class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6">
+      <section class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6 card-shadow">
         <h2 class="text-lg font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-6 flex items-center gap-2">
-          <Lock :size="20" />
+          <Lock :size="20" class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]" />
           修改密码
         </h2>
 
@@ -200,7 +197,7 @@ async function handleChangePassword() {
               <input
                 v-model="passwordForm.oldPassword"
                 :type="showOldPassword ? 'text' : 'password'"
-                class="w-full px-3 py-2 pr-10 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg)] dark:bg-[var(--color-dark-bg)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-colors"
+                class="input-base pr-10"
                 placeholder="输入旧密码"
               />
               <button
@@ -222,7 +219,7 @@ async function handleChangePassword() {
               <input
                 v-model="passwordForm.newPassword"
                 :type="showNewPassword ? 'text' : 'password'"
-                class="w-full px-3 py-2 pr-10 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg)] dark:bg-[var(--color-dark-bg)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-colors"
+                class="input-base pr-10"
                 placeholder="输入新密码"
               />
               <button
@@ -244,7 +241,7 @@ async function handleChangePassword() {
               <input
                 v-model="confirmPassword"
                 :type="showConfirmPassword ? 'text' : 'password'"
-                class="w-full px-3 py-2 pr-10 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg)] dark:bg-[var(--color-dark-bg)] text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent transition-colors"
+                class="input-base pr-10"
                 placeholder="再次输入新密码"
               />
               <button
@@ -258,10 +255,10 @@ async function handleChangePassword() {
             </div>
           </div>
 
-          <div v-if="passwordMessage" class="text-sm text-green-600 dark:text-green-400">
+          <div v-if="passwordMessage" class="text-sm text-green-600 dark:text-green-400 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/20">
             {{ passwordMessage }}
           </div>
-          <div v-if="passwordError" class="text-sm text-red-500">
+          <div v-if="passwordError" class="text-sm text-red-500 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20">
             {{ passwordError }}
           </div>
 
@@ -269,7 +266,7 @@ async function handleChangePassword() {
             <button
               type="submit"
               :disabled="passwordLoading"
-              class="px-4 py-2 text-sm rounded-lg bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] hover:opacity-90 transition-opacity disabled:opacity-50"
+              class="btn-primary"
             >
               {{ passwordLoading ? '修改中...' : '修改密码' }}
             </button>

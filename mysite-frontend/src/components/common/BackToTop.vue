@@ -26,7 +26,7 @@ onUnmounted(() => {
     <button
       v-if="visible"
       @click="scrollToTop"
-      class="fixed bottom-8 right-8 z-40 p-3 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-[var(--color-bg-card)] dark:text-[var(--color-dark-bg-card)] shadow-lg hover:opacity-80 transition-opacity"
+      class="fixed bottom-8 right-8 z-40 p-3 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
       aria-label="返回顶部"
     >
       <ArrowUp :size="18" />
