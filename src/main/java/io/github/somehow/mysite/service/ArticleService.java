@@ -9,6 +9,7 @@ import io.github.somehow.mysite.dto.resp.ArticlePageQueryRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleSelectRespDTO;
 
 import java.util.List;
+import java.util.Map;
 
 public interface ArticleService extends IService<ArticleDO> {
 
@@ -19,5 +20,6 @@ public interface ArticleService extends IService<ArticleDO> {
     IPage<ArticlePageQueryRespDTO> pageQueryFavoriteArticle(ArticleFavoritePageQueryReqDTO requestParam);
     ArticleSelectRespDTO selectOneArticle(Long id);
     void favoriteArticle(ArticleFavoriteReqDTO requestParam);
+    Map<String, Boolean> checkFavoriteStatus(String userId, List<String> articleIds);
     List<ArchiveRespDTO> getArchive();
 }

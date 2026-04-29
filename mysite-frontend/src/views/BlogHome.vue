@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getArticles } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { useSiteStore } from '@/stores/site'
+import { useUserStore } from '@/stores/user'
 import { ArrowUpDown, ArrowUp, ArrowDown, Eye, Clock, Tag, X, Loader2 } from 'lucide-vue-next'
 import ArticleList from '@/components/article/ArticleList.vue'
 import type { ArticleListItem, Pagination, Category } from '@/types'
@@ -14,6 +15,7 @@ type SortOrder = 'desc' | 'asc'
 const route = useRoute()
 const router = useRouter()
 const siteStore = useSiteStore()
+const userStore = useUserStore()
 
 const articles = ref<ArticleListItem[]>([])
 const pagination = ref<Pagination | null>(null)
@@ -206,6 +208,7 @@ onMounted(() => {
       :pagination="pagination"
       :loading="loading"
       :skeleton-count="5"
+      :show-favorite="userStore.isLoggedIn"
       @page-change="handlePageChange"
     />
   </div>

@@ -67,6 +67,9 @@
         <if test="userId != null">
             AND uaf.user_id = #{userId}
         </if>
+        <if test="keyword != null and keyword != ''">
+            AND a.title LIKE CONCAT('%', #{keyword}, '%')
+        </if>
         ORDER BY uaf.create_time DESC
     </select>
 </mapper>

@@ -52,6 +52,7 @@ export interface Article {
   authorName: string
   viewCount: number
   favoriteCount: number
+  isFavorited?: boolean
   tags: Tag[] | null
   updateTime: string
 }
@@ -67,6 +68,7 @@ export interface ArticleListItem {
   categorySlug: string | null
   viewCount: number
   favoriteCount: number
+  isFavorited?: boolean
   createTime: string
   updateTime: string
 }

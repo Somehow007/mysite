@@ -10,6 +10,9 @@ import lombok.EqualsAndHashCode;
 @Schema(description = "分页获取用户收藏文章请求体")
 public class ArticleFavoritePageQueryReqDTO extends Page {
 
-    @Schema(description = "用户Id", example = "1992826310106120192")
+    @Schema(hidden = true)
     private String userId;
+
+    @Schema(description = "搜索关键词")
+    private String keyword;
 }

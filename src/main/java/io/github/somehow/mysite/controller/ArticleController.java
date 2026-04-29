@@ -1,6 +1,7 @@
 package io.github.somehow.mysite.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import io.github.somehow.mysite.commons.context.UserContext;
 import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.commons.framework.web.Results;
 import io.github.somehow.mysite.dto.req.article.*;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -53,6 +55,8 @@ public class ArticleController {
     @Operation(summary = "分页获取收藏的文章")
     @GetMapping("/v1/articles/favorites")
     public Result<IPage<ArticlePageQueryRespDTO>> pageQueryFavoriteArticle(ArticleFavoritePageQueryReqDTO requestParam) {
+        String userId = UserContext.getUserId();
+        requestParam.setUserId(userId);
         return Results.success(articleService.pageQueryFavoriteArticle(requestParam));
     }
 
@@ -64,10 +68,19 @@ public class ArticleController {
 
     @Operation(summary = "收藏或取消收藏文章")
     @PostMapping("/v1/articles/{id}/favorite")
-    public Result<Void> favoriteArticle(@PathVariable Long id, @RequestBody ArticleFavoriteReqDTO requestParam) {
+    public Result<Void> favoriteArticle(@PathVariable Long id) {
+        ArticleFavoriteReqDTO requestParam = new ArticleFavoriteReqDTO();
         requestParam.setArticleId(id.toString());
+        requestParam.setUserId(UserContext.getUserId());
         articleService.favoriteArticle(requestParam);
         return Results.success();
+    }
+
+    @Operation(summary = "批量检查文章收藏状态")
+    @PostMapping("/v1/articles/favorite-check")
+    public Result<Map<String, Boolean>> checkFavoriteStatus(@RequestBody List<String> articleIds) {
+        String userId = UserContext.getUserId();
+        return Results.success(articleService.checkFavoriteStatus(userId, articleIds));
     }
 
     @Operation(summary = "归档列表（按年月分组）")

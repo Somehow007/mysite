@@ -1,39 +1,68 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import ArticleMeta from './ArticleMeta.vue'
+import FavoriteButton from './FavoriteButton.vue'
 import type { ArticleListItem } from '@/types'
 
-defineProps<{
+const props = defineProps<{
   article: ArticleListItem
+  showFavorite?: boolean
 }>()
+
+const emit = defineEmits<{
+  'favorite-toggle': [articleId: string, favorited: boolean]
+}>()
+
+const router = useRouter()
+
+function handleFavoriteToggle(favorited: boolean) {
+  emit('favorite-toggle', props.article.id, favorited)
+}
+
+function handleLoginRequired() {
+  router.push('/login')
+}
 </script>
 
 <template>
   <article class="group">
-    <RouterLink :to="`/post/${article.id}`" class="block">
-      <div
-        v-if="article.coverImage"
-        class="aspect-[2/1] rounded-lg overflow-hidden mb-4 bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]"
-      >
-        <img
-          :src="article.coverImage"
-          :alt="article.title"
-          class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
-          loading="lazy"
-        />
-      </div>
+    <div class="flex items-start justify-between gap-3">
+      <RouterLink :to="`/post/${article.id}`" class="flex-1 min-w-0">
+        <div
+          v-if="article.coverImage"
+          class="aspect-[2/1] rounded-lg overflow-hidden mb-4 bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]"
+        >
+          <img
+            :src="article.coverImage"
+            :alt="article.title"
+            class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            loading="lazy"
+          />
+        </div>
 
-      <h2 class="text-xl font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] group-hover:opacity-70 transition-opacity mb-2 leading-snug">
-        {{ article.title }}
-      </h2>
+        <h2 class="text-xl font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] group-hover:opacity-70 transition-opacity mb-2 leading-snug">
+          {{ article.title }}
+        </h2>
 
-      <p
-        v-if="article.summary"
-        class="text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] line-clamp-2 mb-3 leading-relaxed"
-      >
-        {{ article.summary }}
-      </p>
+        <p
+          v-if="article.summary"
+          class="text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] line-clamp-2 mb-3 leading-relaxed"
+        >
+          {{ article.summary }}
+        </p>
+      </RouterLink>
 
-      <ArticleMeta :article="article" show-category />
-    </RouterLink>
+      <FavoriteButton
+        v-if="showFavorite"
+        :article-id="article.id"
+        :initial-favorited="article.isFavorited"
+        :favorite-count="article.favoriteCount"
+        size="sm"
+        @toggle="handleFavoriteToggle"
+        @login-required="handleLoginRequired"
+      />
+    </div>
+
+    <ArticleMeta :article="article" show-category show-favorite />
   </article>
 </template>

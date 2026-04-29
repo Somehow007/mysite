@@ -22,4 +22,5 @@ public class ArticlePageQueryRespDTO {
     private String categorySlug;
     private java.util.Date createTime;
     private java.util.Date updateTime;
+    private Boolean isFavorited;
 }

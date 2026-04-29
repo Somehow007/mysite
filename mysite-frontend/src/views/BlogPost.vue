@@ -6,8 +6,10 @@ import { ArrowLeft, Calendar, Eye, Clock, Tag } from 'lucide-vue-next'
 import { getArticleById } from '@/api/article'
 import { formatDate, calculateReadingTime } from '@/utils/date'
 import { useScrollProgress } from '@/composables/useScrollProgress'
+import { useFavorite } from '@/composables/useFavorite'
 import ArticleContent from '@/components/article/ArticleContent.vue'
 import ArticleToc from '@/components/article/ArticleToc.vue'
+import FavoriteButton from '@/components/article/FavoriteButton.vue'
 import ArtalkComment from '@/components/comment/ArtalkComment.vue'
 import type { Article } from '@/types'
 import type { TocItem } from '@/composables/useMarkdown'
@@ -15,6 +17,7 @@ import type { TocItem } from '@/composables/useMarkdown'
 const route = useRoute()
 const router = useRouter()
 const { progress } = useScrollProgress()
+const { setFavoriteStatus } = useFavorite()
 
 const article = ref<Article | null>(null)
 const loading = ref(false)
@@ -42,11 +45,25 @@ function handleTocReady(items: TocItem[]) {
   tocItems.value = items
 }
 
+function handleFavoriteToggle(favorited: boolean) {
+  if (article.value) {
+    article.value.isFavorited = favorited
+    article.value.favoriteCount += favorited ? 1 : -1
+  }
+}
+
+function handleLoginRequired() {
+  router.push('/login')
+}
+
 async function fetchArticle(id: string) {
   loading.value = true
   error.value = false
   try {
     article.value = await getArticleById(id)
+    if (article.value && article.value.isFavorited !== undefined) {
+      setFavoriteStatus(id, article.value.isFavorited)
+    }
   } catch {
     error.value = true
     article.value = null
@@ -114,9 +131,20 @@ onMounted(() => {
               返回
             </button>
 
-            <h1 class="text-3xl sm:text-4xl font-bold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] leading-tight tracking-tight mb-4">
-              {{ article.title }}
-            </h1>
+            <div class="flex items-start justify-between gap-4 mb-4">
+              <h1 class="text-3xl sm:text-4xl font-bold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] leading-tight tracking-tight">
+                {{ article.title }}
+              </h1>
+              <FavoriteButton
+                :article-id="article.id"
+                :initial-favorited="article.isFavorited"
+                :favorite-count="article.favoriteCount"
+                size="lg"
+                show-count
+                @toggle="handleFavoriteToggle"
+                @login-required="handleLoginRequired"
+              />
+            </div>
 
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
               <span class="inline-flex items-center gap-1.5">
@@ -154,6 +182,19 @@ onMounted(() => {
           </header>
 
           <ArticleContent :content="article.content" @toc-ready="handleTocReady" />
+
+          <div class="mt-10 pt-6 border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)] flex items-center justify-center gap-3">
+            <span class="text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">觉得有用？收藏起来吧</span>
+            <FavoriteButton
+              :article-id="article.id"
+              :initial-favorited="article.isFavorited"
+              :favorite-count="article.favoriteCount"
+              size="md"
+              show-count
+              @toggle="handleFavoriteToggle"
+              @login-required="handleLoginRequired"
+            />
+          </div>
 
           <ArtalkComment
             :page-key="`/post/${article.id}`"

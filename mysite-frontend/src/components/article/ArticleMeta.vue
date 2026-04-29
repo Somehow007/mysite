@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { Calendar, Eye, Clock, Tag } from 'lucide-vue-next'
+import { Calendar, Eye, Clock, Tag, Heart } from 'lucide-vue-next'
 import { formatDate, calculateReadingTime } from '@/utils/date'
 import type { ArticleListItem } from '@/types'
 
 const props = defineProps<{
   article: ArticleListItem
   showCategory?: boolean
+  showFavorite?: boolean
 }>()
 
 const readingTime = calculateReadingTime(props.article.summary || '')
@@ -20,6 +21,10 @@ const readingTime = calculateReadingTime(props.article.summary || '')
     <span v-if="article.viewCount > 0" class="inline-flex items-center gap-1">
       <Eye :size="12" />
       <span>{{ article.viewCount }}</span>
+    </span>
+    <span v-if="showFavorite && article.favoriteCount > 0" class="inline-flex items-center gap-1" :class="article.isFavorited ? 'text-red-500 dark:text-red-400' : ''">
+      <Heart :size="12" :fill="article.isFavorited ? 'currentColor' : 'none'" :stroke-width="article.isFavorited ? 0 : 2" />
+      <span>{{ article.favoriteCount }}</span>
     </span>
     <span class="inline-flex items-center gap-1">
       <Clock :size="12" />

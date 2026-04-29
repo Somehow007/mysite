@@ -9,10 +9,12 @@ defineProps<{
   pagination: Pagination | null
   loading?: boolean
   skeletonCount?: number
+  showFavorite?: boolean
 }>()
 
 defineEmits<{
   'page-change': [page: number]
+  'favorite-toggle': [articleId: string, favorited: boolean]
 }>()
 </script>
 
@@ -27,7 +29,13 @@ defineEmits<{
     </div>
 
     <div v-else class="space-y-10">
-      <ArticleCard v-for="article in articles" :key="article.id" :article="article" />
+      <ArticleCard
+        v-for="article in articles"
+        :key="article.id"
+        :article="article"
+        :show-favorite="showFavorite"
+        @favorite-toggle="(...args: [string, boolean]) => $emit('favorite-toggle', ...args)"
+      />
     </div>
 
     <ArticlePagination

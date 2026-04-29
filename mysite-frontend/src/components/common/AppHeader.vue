@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { Menu, X, LogOut, PenSquare, LayoutDashboard, Settings, FolderTree, Users } from 'lucide-vue-next'
+import { Menu, X, LogOut, PenSquare, LayoutDashboard, Settings, FolderTree, Users, Heart } from 'lucide-vue-next'
 import ThemeToggle from './ThemeToggle.vue'
 import SearchDialog from './SearchDialog.vue'
 import { useSiteStore } from '@/stores/site'
@@ -142,6 +142,14 @@ async function handleLogout() {
                     仪表盘
                   </RouterLink>
                   <RouterLink
+                    to="/favorites"
+                    class="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+                    @click="closeUserMenu"
+                  >
+                    <Heart :size="14" />
+                    我的收藏
+                  </RouterLink>
+                  <RouterLink
                     to="/dashboard/posts/new"
                     class="flex items-center gap-2 px-4 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
                     @click="closeUserMenu"
@@ -236,6 +244,13 @@ async function handleLogout() {
               @click="closeMobileMenu"
             >
               仪表盘
+            </RouterLink>
+            <RouterLink
+              to="/favorites"
+              class="text-sm py-2 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]"
+              @click="closeMobileMenu"
+            >
+              我的收藏
             </RouterLink>
             <RouterLink
               to="/dashboard/posts/new"

@@ -64,11 +64,17 @@ export function favoriteArticle(id: string): Promise<void> {
 export function getFavoriteArticles(params?: {
   page?: number
   size?: number
+  keyword?: string
 }): Promise<PaginatedResponse<ArticleListItem>> {
   return getPaginated<ArticleListItem>('/v1/articles/favorites', {
     current: params?.page || 1,
     size: params?.size || 10,
+    keyword: params?.keyword,
   })
+}
+
+export function checkFavoriteStatus(articleIds: string[]): Promise<Record<string, boolean>> {
+  return post<Record<string, boolean>>('/v1/articles/favorite-check', articleIds)
 }
 
 export function getArchiveList(): Promise<unknown> {

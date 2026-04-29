@@ -154,7 +154,13 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
     @Override
     public IPage<ArticlePageQueryRespDTO> pageQueryFavoriteArticle(ArticleFavoritePageQueryReqDTO requestParam) {
-        return baseMapper.pageFavoriteArticleResults(requestParam);
+        IPage<ArticlePageQueryRespDTO> result = baseMapper.pageFavoriteArticleResults(requestParam);
+        if (result.getRecords() != null) {
+            for (ArticlePageQueryRespDTO dto : result.getRecords()) {
+                dto.setIsFavorited(true);
+            }
+        }
+        return result;
     }
 
     @Override
@@ -169,6 +175,17 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         baseMapper.incrementViewCount(id, 1);
 
         ArticleSelectRespDTO result = BeanUtil.toBean(articleDO, ArticleSelectRespDTO.class);
+
+        String currentUserId = UserContext.getUserId();
+        if (currentUserId != null) {
+            UserFavoriteArticleDO fav = userFavoriteArticleMapper.selectOne(Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
+                    .eq(UserFavoriteArticleDO::getArticleId, id)
+                    .eq(UserFavoriteArticleDO::getUserId, currentUserId)
+                    .eq(UserFavoriteArticleDO::getDelFlag, 0));
+            result.setIsFavorited(fav != null);
+        } else {
+            result.setIsFavorited(false);
+        }
 
         UserDO author = userMapper.selectById(articleDO.getAuthorId());
         if (author != null) {
@@ -234,6 +251,25 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                     .set(UserFavoriteArticleDO::getDelFlag, 1));
             articleMapper.decrementFavoriteCount(Long.parseLong(requestParam.getArticleId()), 1);
         }
+    }
+
+    @Override
+    public Map<String, Boolean> checkFavoriteStatus(String userId, List<String> articleIds) {
+        if (StrUtil.isBlank(userId) || CollectionUtils.isEmpty(articleIds)) {
+            return Map.of();
+        }
+        List<UserFavoriteArticleDO> favorites = userFavoriteArticleMapper.selectList(Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
+                .eq(UserFavoriteArticleDO::getUserId, userId)
+                .in(UserFavoriteArticleDO::getArticleId, articleIds)
+                .eq(UserFavoriteArticleDO::getDelFlag, 0));
+        Set<String> favoritedIds = favorites.stream()
+                .map(fav -> fav.getArticleId().toString())
+                .collect(Collectors.toSet());
+        Map<String, Boolean> result = new HashMap<>();
+        for (String articleId : articleIds) {
+            result.put(articleId, favoritedIds.contains(articleId));
+        }
+        return result;
     }
 
     @Override
