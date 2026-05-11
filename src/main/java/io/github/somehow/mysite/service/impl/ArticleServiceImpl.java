@@ -228,27 +228,25 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         Long articleId = Long.parseLong(requestParam.getArticleId());
         Long userId = Long.parseLong(requestParam.getUserId());
 
-        int updatedRows = userFavoriteArticleMapper.update(null,
-                Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
-                        .eq(UserFavoriteArticleDO::getArticleId, articleId)
-                        .eq(UserFavoriteArticleDO::getUserId, userId)
-                        .eq(UserFavoriteArticleDO::getDelFlag, 0)
-                        .set(UserFavoriteArticleDO::getDelFlag, 1));
+        UserFavoriteArticleDO existing = userFavoriteArticleMapper.selectOne(Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
+                .eq(UserFavoriteArticleDO::getArticleId, articleId)
+                .eq(UserFavoriteArticleDO::getUserId, userId));
 
-        if (updatedRows > 0) {
+        if (existing != null && existing.getDelFlag() == 0) {
+            userFavoriteArticleMapper.update(null,
+                    Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
+                            .eq(UserFavoriteArticleDO::getId, existing.getId())
+                            .set(UserFavoriteArticleDO::getDelFlag, 1));
             articleMapper.decrementFavoriteCount(articleId, 1);
             return;
         }
 
-        int restoredRows = userFavoriteArticleMapper.update(null,
-                Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
-                        .eq(UserFavoriteArticleDO::getArticleId, articleId)
-                        .eq(UserFavoriteArticleDO::getUserId, userId)
-                        .eq(UserFavoriteArticleDO::getDelFlag, 1)
-                        .set(UserFavoriteArticleDO::getDelFlag, 0)
-                        .set(UserFavoriteArticleDO::getUpdateTime, new Date()));
-
-        if (restoredRows > 0) {
+        if (existing != null && existing.getDelFlag() == 1) {
+            userFavoriteArticleMapper.update(null,
+                    Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
+                            .eq(UserFavoriteArticleDO::getId, existing.getId())
+                            .set(UserFavoriteArticleDO::getDelFlag, 0)
+                            .set(UserFavoriteArticleDO::getUpdateTime, new Date()));
             articleMapper.incrementFavoriteCount(articleId, 1);
             return;
         }
@@ -258,12 +256,8 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         record.setArticleId(articleId);
         record.setUserId(userId);
         record.setDelFlag(0);
-        try {
-            userFavoriteArticleMapper.insert(record);
-            articleMapper.incrementFavoriteCount(articleId, 1);
-        } catch (DuplicateKeyException e) {
-            articleMapper.incrementFavoriteCount(articleId, 1);
-        }
+        userFavoriteArticleMapper.insert(record);
+        articleMapper.incrementFavoriteCount(articleId, 1);
     }
 
     @Override
