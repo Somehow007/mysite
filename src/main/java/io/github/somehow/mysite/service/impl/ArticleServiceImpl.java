@@ -230,7 +230,8 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         UserFavoriteArticleDO existing = userFavoriteArticleMapper.selectOne(
                 Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
                         .eq(UserFavoriteArticleDO::getArticleId, articleId)
-                        .eq(UserFavoriteArticleDO::getUserId, userId));
+                        .eq(UserFavoriteArticleDO::getUserId, userId)
+                        .ignoreLogicDelete());
 
         if (existing == null) {
             UserFavoriteArticleDO record = new UserFavoriteArticleDO();
