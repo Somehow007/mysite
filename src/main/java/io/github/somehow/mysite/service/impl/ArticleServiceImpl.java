@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -228,10 +229,9 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         Long userId = Long.parseLong(requestParam.getUserId());
 
         UserFavoriteArticleDO existing = userFavoriteArticleMapper.selectOne(
-                Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
-                        .eq(UserFavoriteArticleDO::getArticleId, articleId)
-                        .eq(UserFavoriteArticleDO::getUserId, userId)
-                        .ignoreLogicDelete());
+                Wrappers.query(UserFavoriteArticleDO.class)
+                        .eq("article_id", articleId)
+                        .eq("user_id", userId));
 
         if (existing == null) {
             UserFavoriteArticleDO record = new UserFavoriteArticleDO();
