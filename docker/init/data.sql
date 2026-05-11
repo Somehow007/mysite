@@ -5,10 +5,10 @@
 USE mysite;
 
 -- ==============================================
--- 1. 管理员用户 (密码: admin123)
+-- 1. 管理员用户 (密码: 000000)
 -- ==============================================
 INSERT INTO `t_user` (`username`, `password`, `real_name`, `sex`, `email`, `phone_number`, `role`, `status`, `following_count`, `follower_count`)
-VALUES ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt6Z5EH', '管理员', 0, 'admin@mysite.com', '13800138000', 'DEVELOPER', 1, 0, 0)
+VALUES ('admin', '$2a$10$axBR06YqTi43c/ORWaL7KeqfIPLKa6gZsZ2.LCFtTkbZg6vtj/dDi', '管理员', 0, 'admin@mysite.com', '13800138000', 'DEVELOPER', 1, 0, 0)
 ON DUPLICATE KEY UPDATE `username` = `username`;
 
 -- ==============================================

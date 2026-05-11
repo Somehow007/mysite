@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { Heart, Loader2 } from 'lucide-vue-next'
 import { useFavorite } from '@/composables/useFavorite'
+import { useToast } from '@/composables/useToast'
 import { useUserStore } from '@/stores/user'
 
 const props = defineProps<{
@@ -19,6 +20,7 @@ const emit = defineEmits<{
 
 const userStore = useUserStore()
 const { isFavorited, setFavoriteStatus, toggleFavorite, isPending } = useFavorite()
+const toast = useToast()
 
 if (props.initialFavorited !== undefined) {
   setFavoriteStatus(props.articleId, props.initialFavorited)
@@ -56,6 +58,9 @@ async function handleToggle() {
 
   if (result.success) {
     emit('toggle', result.favorited)
+    toast.success(result.favorited ? '收藏成功' : '已取消收藏')
+  } else if (result.message) {
+    toast.error(result.message)
   }
 
   setTimeout(() => {

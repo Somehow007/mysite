@@ -5,16 +5,19 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import io.github.somehow.mysite.commons.context.UserContext;
 import io.github.somehow.mysite.config.ElasticsearchProperties;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.dao.entity.ArticleTagDO;
 import io.github.somehow.mysite.dao.entity.CategoryDO;
 import io.github.somehow.mysite.dao.entity.TagDO;
 import io.github.somehow.mysite.dao.entity.UserDO;
+import io.github.somehow.mysite.dao.entity.UserFavoriteArticleDO;
 import io.github.somehow.mysite.dao.mapper.ArticleMapper;
 import io.github.somehow.mysite.dao.mapper.ArticleTagMapper;
 import io.github.somehow.mysite.dao.mapper.CategoryMapper;
 import io.github.somehow.mysite.dao.mapper.TagMapper;
+import io.github.somehow.mysite.dao.mapper.UserFavoriteArticleMapper;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
 import io.github.somehow.mysite.dto.req.article.ArticlePageQueryReqDTO;
 import io.github.somehow.mysite.dto.resp.ArticlePageQueryRespDTO;
@@ -43,6 +46,7 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
     private final CategoryMapper categoryMapper;
     private final TagMapper tagMapper;
     private final ArticleTagMapper articleTagMapper;
+    private final UserFavoriteArticleMapper userFavoriteArticleMapper;
     private final ElasticsearchProperties elasticsearchProperties;
 
     @Override
@@ -176,6 +180,24 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
                     return dto;
                 })
                 .collect(Collectors.toList());
+
+        String currentUserId = UserContext.getUserId();
+        if (currentUserId != null && !records.isEmpty()) {
+            List<String> articleIdStrs = records.stream()
+                    .map(r -> r.getId().toString())
+                    .collect(Collectors.toList());
+            List<UserFavoriteArticleDO> favs = userFavoriteArticleMapper.selectList(
+                    Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
+                            .eq(UserFavoriteArticleDO::getUserId, currentUserId)
+                            .in(UserFavoriteArticleDO::getArticleId, articleIdStrs)
+                            .eq(UserFavoriteArticleDO::getDelFlag, 0));
+            Set<String> favoritedIds = favs.stream()
+                    .map(f -> f.getArticleId().toString())
+                    .collect(Collectors.toSet());
+            for (ArticlePageQueryRespDTO rec : records) {
+                rec.setIsFavorited(favoritedIds.contains(rec.getId().toString()));
+            }
+        }
 
         IPage<ArticlePageQueryRespDTO> result = new Page<>(articlePage.getCurrent(), articlePage.getSize(), articlePage.getTotal());
         result.setRecords(records);

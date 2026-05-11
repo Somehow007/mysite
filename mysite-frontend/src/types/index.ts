@@ -144,7 +144,7 @@ export interface ArchiveMonth {
 }
 
 export interface ArchiveArticle {
-  id: number
+  id: string
   title: string
   summary: string
   coverImage: string | null

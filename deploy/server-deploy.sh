@@ -78,7 +78,23 @@ deploy_backend() {
 
     sudo mkdir -p "$APP_DIR"
 
-    sudo cp "$PROJECT_DIR/target"/*.jar "$APP_JAR"
+    # 清理旧的JAR文件，只保留最新的一个
+    JAR_FILES=("$PROJECT_DIR/target"/*.jar)
+    if [ ${#JAR_FILES[@]} -eq 0 ]; then
+        echo -e "${RED}错误：没有找到 JAR 文件${NC}"
+        exit 1
+    fi
+    
+    # 获取最新的JAR文件（按修改时间排序）
+    LATEST_JAR=$(ls -t "$PROJECT_DIR/target"/*.jar | head -n 1)
+    echo "使用最新JAR: $(basename "$LATEST_JAR")"
+    
+    # 先备份旧的JAR
+    if [ -f "$APP_JAR" ]; then
+        sudo cp "$APP_JAR" "$APP_JAR.bak.$(date +%Y%m%d%H%M%S)"
+    fi
+    
+    sudo cp "$LATEST_JAR" "$APP_JAR"
 
     if [ -f "$PROJECT_DIR/deploy/config/application-production.yml" ]; then
         sudo cp "$PROJECT_DIR/deploy/config/application-production.yml" "$APP_DIR/"
@@ -100,30 +116,18 @@ deploy_backend() {
         echo -e "${GREEN}✓ 启动脚本已更新${NC}"
     fi
 
-    if [ -f "$PID_FILE" ]; then
-        PID=$(cat "$PID_FILE")
-        if ps -p $PID > /dev/null 2>&1; then
-            echo "停止旧的后端服务 (PID: $PID)..."
-            sudo kill $PID 2>/dev/null || true
-            sleep 5
-            if ps -p $PID > /dev/null 2>&1; then
-                echo "强制停止..."
-                sudo kill -9 $PID 2>/dev/null || true
-                sleep 2
-            fi
-        fi
-        sudo rm -f "$PID_FILE"
-    fi
-
+    # 确保使用 start.sh 重启服务
     if [ -f "$APP_START_SCRIPT" ]; then
         sudo chmod +x "$APP_START_SCRIPT"
-        echo "启动后端服务..."
-        sudo "$APP_START_SCRIPT" start
+        echo "重启后端服务..."
+        sudo "$APP_START_SCRIPT" restart
 
         sleep 5
 
         if [ -f "$PID_FILE" ] && ps -p $(cat "$PID_FILE") > /dev/null 2>&1; then
             echo -e "${GREEN}✓ 后端部署成功 (PID: $(cat $PID_FILE))${NC}"
+            # 显示JAR文件修改时间
+            echo -e "${GREEN}  JAR文件时间: $(ls -lh "$APP_JAR" | awk '{print $6, $7, $8}')${NC}"
         else
             echo -e "${YELLOW}⚠ 后端可能未正确启动，请检查日志: $APP_START_SCRIPT logs${NC}"
         fi
@@ -137,10 +141,17 @@ deploy_frontend() {
     echo -e "${YELLOW}[5/6] 部署前端...${NC}"
 
     sudo mkdir -p "$NGINX_WEB_ROOT"
+    
+    # 先清理旧的前端文件，防止旧代码残留
+    echo "清理旧的前端文件..."
+    sudo rm -rf "$NGINX_WEB_ROOT"/* "$NGINX_WEB_ROOT"/.??* 2>/dev/null || true
+    
     sudo cp -r "$PROJECT_DIR/mysite-frontend/dist/"* "$NGINX_WEB_ROOT/"
 
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓ 前端部署成功${NC}"
+        # 显示前端文件修改时间
+        echo -e "${GREEN}  前端文件时间: $(ls -lh "$NGINX_WEB_ROOT"/index.html 2>/dev/null | awk '{print $6, $7, $8}')${NC}"
     else
         echo -e "${RED}✗ 前端部署失败${NC}"
         exit 1

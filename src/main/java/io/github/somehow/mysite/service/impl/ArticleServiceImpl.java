@@ -222,34 +222,46 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     @Transactional
     public void favoriteArticle(ArticleFavoriteReqDTO requestParam) {
         if (StrUtil.isBlank(requestParam.getArticleId()) || StrUtil.isBlank(requestParam.getUserId())) {
-            throw new ClientException("收藏相关操作失败，未传入正确参数");
+            throw new ClientException("收藏操作失败，参数不完整");
         }
-        UserFavoriteArticleDO isExist = userFavoriteArticleMapper.selectOne(Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
-                .eq(UserFavoriteArticleDO::getArticleId, requestParam.getArticleId())
-                .eq(UserFavoriteArticleDO::getUserId, requestParam.getUserId()));
-        if (Objects.isNull(isExist)) {
-            UserFavoriteArticleDO userFavoriteArticleDO = BeanUtil.toBean(requestParam, UserFavoriteArticleDO.class);
-            userFavoriteArticleDO.setId(IdUtil.getSnowflakeNextId());
+        Long articleId = Long.parseLong(requestParam.getArticleId());
+        Long userId = Long.parseLong(requestParam.getUserId());
+
+        UserFavoriteArticleDO existing = userFavoriteArticleMapper.selectOne(
+                Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
+                        .eq(UserFavoriteArticleDO::getArticleId, articleId)
+                        .eq(UserFavoriteArticleDO::getUserId, userId));
+
+        if (existing == null) {
+            UserFavoriteArticleDO record = new UserFavoriteArticleDO();
+            record.setId(IdUtil.getSnowflakeNextId());
+            record.setArticleId(articleId);
+            record.setUserId(userId);
             try {
-                userFavoriteArticleMapper.insert(userFavoriteArticleDO);
-                articleMapper.incrementFavoriteCount(Long.parseLong(requestParam.getArticleId()), 1);
+                userFavoriteArticleMapper.insert(record);
             } catch (DuplicateKeyException e) {
-                throw new ClientException("已经收藏过了噢～");
+                throw new ClientException("已经收藏过了，请刷新页面后重试");
             }
-        } else if (isExist.getDelFlag() == 1) {
-            userFavoriteArticleMapper.update(Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
-                    .eq(UserFavoriteArticleDO::getArticleId, requestParam.getArticleId())
-                    .eq(UserFavoriteArticleDO::getUserId, requestParam.getUserId())
-                    .eq(UserFavoriteArticleDO::getDelFlag, 1)
-                    .set(UserFavoriteArticleDO::getDelFlag, 0));
-            articleMapper.incrementFavoriteCount(Long.parseLong(requestParam.getArticleId()), 1);
-        } else if (isExist.getDelFlag() == 0) {
-            userFavoriteArticleMapper.update(Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
-                    .eq(UserFavoriteArticleDO::getArticleId, requestParam.getArticleId())
-                    .eq(UserFavoriteArticleDO::getUserId, requestParam.getUserId())
-                    .eq(UserFavoriteArticleDO::getDelFlag, 0)
-                    .set(UserFavoriteArticleDO::getDelFlag, 1));
-            articleMapper.decrementFavoriteCount(Long.parseLong(requestParam.getArticleId()), 1);
+            articleMapper.incrementFavoriteCount(articleId, 1);
+        } else if (existing.getDelFlag() == 0) {
+            int rows = userFavoriteArticleMapper.update(
+                    Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
+                            .eq(UserFavoriteArticleDO::getId, existing.getId())
+                            .eq(UserFavoriteArticleDO::getDelFlag, 0)
+                            .set(UserFavoriteArticleDO::getDelFlag, 1));
+            if (rows > 0) {
+                articleMapper.decrementFavoriteCount(articleId, 1);
+            }
+        } else {
+            int rows = userFavoriteArticleMapper.update(
+                    Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
+                            .eq(UserFavoriteArticleDO::getId, existing.getId())
+                            .eq(UserFavoriteArticleDO::getDelFlag, 1)
+                            .set(UserFavoriteArticleDO::getDelFlag, 0)
+                            .set(UserFavoriteArticleDO::getCreateTime, new Date()));
+            if (rows > 0) {
+                articleMapper.incrementFavoriteCount(articleId, 1);
+            }
         }
     }
 
