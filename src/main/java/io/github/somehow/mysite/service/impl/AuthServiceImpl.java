@@ -112,11 +112,23 @@ public class AuthServiceImpl implements AuthService {
         UserDO userDO = BeanUtil.toBean(requestParam, UserDO.class);
         userDO.setId(IdUtil.getSnowflakeNextId());
         userDO.setPassword(passwordEncoder.encode(requestParam.getPassword()));
+        userDO.setDelFlag(0);
+        userDO.setFollowingCount(0);
+        userDO.setFollowerCount(0);
+        
         try {
             userMapper.insert(userDO);
             userIndexService.indexUser(userDO);
         } catch (DuplicateKeyException ex) {
-            throw new ClientException("注册失败，该用户名已创建");
+            String message = ex.getMessage();
+            if (message != null) {
+                if (message.contains("uk_username")) {
+                    throw new ClientException("注册失败，该用户名已存在");
+                } else if (message.contains("uk_phone_number")) {
+                    throw new ClientException("注册失败，该手机号已被注册");
+                }
+            }
+            throw new ClientException("注册失败，用户名或手机号已存在");
         }
     }
 }
