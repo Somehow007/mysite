@@ -228,10 +228,10 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         Long articleId = Long.parseLong(requestParam.getArticleId());
         Long userId = Long.parseLong(requestParam.getUserId());
 
-        UserFavoriteArticleDO existing = userFavoriteArticleMapper.selectOne(
-                Wrappers.query(UserFavoriteArticleDO.class)
-                        .eq("article_id", articleId)
-                        .eq("user_id", userId));
+        UserFavoriteArticleDO existing = userFavoriteArticleMapper.selectOne(Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
+                .eq(UserFavoriteArticleDO::getArticleId, articleId)
+                .eq(UserFavoriteArticleDO::getUserId, userId)
+                .eq(UserFavoriteArticleDO::getDelFlag, 0));
 
         if (existing == null) {
             UserFavoriteArticleDO record = new UserFavoriteArticleDO();
