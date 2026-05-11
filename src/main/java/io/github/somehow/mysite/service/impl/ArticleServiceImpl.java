@@ -228,33 +228,40 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         Long articleId = Long.parseLong(requestParam.getArticleId());
         Long userId = Long.parseLong(requestParam.getUserId());
 
-        UserFavoriteArticleDO existing = userFavoriteArticleMapper.selectOne(Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
-                .eq(UserFavoriteArticleDO::getArticleId, articleId)
-                .eq(UserFavoriteArticleDO::getUserId, userId));
+        int updatedRows = userFavoriteArticleMapper.update(null,
+                Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
+                        .eq(UserFavoriteArticleDO::getArticleId, articleId)
+                        .eq(UserFavoriteArticleDO::getUserId, userId)
+                        .eq(UserFavoriteArticleDO::getDelFlag, 0)
+                        .set(UserFavoriteArticleDO::getDelFlag, 1));
 
-        if (existing == null) {
-            UserFavoriteArticleDO record = new UserFavoriteArticleDO();
-            record.setId(IdUtil.getSnowflakeNextId());
-            record.setArticleId(articleId);
-            record.setUserId(userId);
-            record.setDelFlag(0);
-            userFavoriteArticleMapper.insert(record);
+        if (updatedRows > 0) {
+            articleMapper.decrementFavoriteCount(articleId, 1);
+            return;
+        }
+
+        int restoredRows = userFavoriteArticleMapper.update(null,
+                Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
+                        .eq(UserFavoriteArticleDO::getArticleId, articleId)
+                        .eq(UserFavoriteArticleDO::getUserId, userId)
+                        .eq(UserFavoriteArticleDO::getDelFlag, 1)
+                        .set(UserFavoriteArticleDO::getDelFlag, 0)
+                        .set(UserFavoriteArticleDO::getUpdateTime, new Date()));
+
+        if (restoredRows > 0) {
             articleMapper.incrementFavoriteCount(articleId, 1);
             return;
         }
 
-        if (existing.getDelFlag() == 0) {
-            userFavoriteArticleMapper.update(
-                    Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
-                            .eq(UserFavoriteArticleDO::getId, existing.getId())
-                            .set(UserFavoriteArticleDO::getDelFlag, 1));
-            articleMapper.decrementFavoriteCount(articleId, 1);
-        } else {
-            userFavoriteArticleMapper.update(
-                    Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
-                            .eq(UserFavoriteArticleDO::getId, existing.getId())
-                            .set(UserFavoriteArticleDO::getDelFlag, 0)
-                            .set(UserFavoriteArticleDO::getCreateTime, new Date()));
+        UserFavoriteArticleDO record = new UserFavoriteArticleDO();
+        record.setId(IdUtil.getSnowflakeNextId());
+        record.setArticleId(articleId);
+        record.setUserId(userId);
+        record.setDelFlag(0);
+        try {
+            userFavoriteArticleMapper.insert(record);
+            articleMapper.incrementFavoriteCount(articleId, 1);
+        } catch (DuplicateKeyException e) {
             articleMapper.incrementFavoriteCount(articleId, 1);
         }
     }
