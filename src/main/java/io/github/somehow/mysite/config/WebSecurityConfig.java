@@ -1,6 +1,7 @@
 package io.github.somehow.mysite.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.security.CustomUserDetailsService;
 import io.github.somehow.mysite.security.JwtAuthenticationFilter;
@@ -93,8 +94,8 @@ public class WebSecurityConfig {
                             response.setCharacterEncoding("UTF-8");
                             response.setStatus(401);
                             Result<Void> result = new Result<Void>()
-                                    .setCode("A000001")
-                                    .setMessage("未登录或Token已过期");
+                                    .setCode(ErrorCode.SECURITY_NOT_AUTHENTICATED.code())
+                                    .setMessage(ErrorCode.SECURITY_NOT_AUTHENTICATED.message());
                             objectMapper.writeValue(response.getWriter(), result);
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
@@ -102,8 +103,8 @@ public class WebSecurityConfig {
                             response.setCharacterEncoding("UTF-8");
                             response.setStatus(403);
                             Result<Void> result = new Result<Void>()
-                                    .setCode("A000003")
-                                    .setMessage("权限不足，无法访问该资源");
+                                    .setCode(ErrorCode.SECURITY_ACCESS_DENIED.code())
+                                    .setMessage(ErrorCode.SECURITY_ACCESS_DENIED.message());
                             objectMapper.writeValue(response.getWriter(), result);
                         }))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

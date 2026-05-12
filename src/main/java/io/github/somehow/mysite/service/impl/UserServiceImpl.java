@@ -9,6 +9,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.baomidou.mybatisplus.extension.toolkit.SqlHelper;
+import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.dao.entity.UserDO;
 import io.github.somehow.mysite.dao.entity.UserFollowDO;
@@ -24,7 +25,6 @@ import io.github.somehow.mysite.dto.resp.user.UserSelectRespDTO;
 import io.github.somehow.mysite.elasticsearch.service.UserIndexService;
 import io.github.somehow.mysite.service.UserService;
 import lombok.RequiredArgsConstructor;
-import com.alibaba.fastjson2.JSON;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -46,7 +46,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 .eq(UserDO::getId, Long.parseLong(id))
                 .eq(UserDO::getDelFlag, 0));
         if (Objects.isNull(userDO)) {
-            throw new ClientException("查询失败，请传入正确的用户");
+            throw new ClientException(ErrorCode.USER_QUERY_FAILED);
         }
         UserSelectRespDTO result = BeanUtil.toBean(userDO, UserSelectRespDTO.class);
         result.setFavorites(null);
@@ -58,7 +58,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     @Transactional
     public void updateUser(UserUpdateReqDTO requestParam) {
         if (StrUtil.isBlank(requestParam.getUserId())) {
-            throw new ClientException("更新失败，请传入正确的用户信息");
+            throw new ClientException(ErrorCode.USER_UPDATE_FAILED);
         }
         LambdaUpdateWrapper<UserDO> updateWrapper = Wrappers.lambdaUpdate(UserDO.class)
                 .eq(UserDO::getId, Long.parseLong(requestParam.getUserId()))
@@ -71,7 +71,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
         int infectRow = baseMapper.update(updateWrapper);
         if (!SqlHelper.retBool(infectRow)) {
-            throw new ClientException("更新失败，用户不存在");
+            throw new ClientException(ErrorCode.USER_NOT_FOUND);
         }
 
         UserDO updatedUser = baseMapper.selectById(Long.parseLong(requestParam.getUserId()));
@@ -85,15 +85,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     public void changePassword(Long userId, ChangePasswordReqDTO requestParam) {
         UserDO userDO = baseMapper.selectById(userId);
         if (Objects.isNull(userDO) || userDO.getDelFlag() == 1) {
-            throw new ClientException("用户不存在");
+            throw new ClientException(ErrorCode.USER_NOT_FOUND);
         }
         
         if (!passwordEncoder.matches(requestParam.getOldPassword(), userDO.getPassword())) {
-            throw new ClientException("旧密码错误");
+            throw new ClientException(ErrorCode.PASSWORD_OLD_INCORRECT);
         }
         
         if (passwordEncoder.matches(requestParam.getNewPassword(), userDO.getPassword())) {
-            throw new ClientException("新密码不能与旧密码相同");
+            throw new ClientException(ErrorCode.PASSWORD_SAME_AS_OLD);
         }
         
         LambdaUpdateWrapper<UserDO> updateWrapper = Wrappers.lambdaUpdate(UserDO.class)
@@ -103,17 +103,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         
         int affectRow = baseMapper.update(updateWrapper);
         if (!SqlHelper.retBool(affectRow)) {
-            throw new ClientException("修改密码失败");
+            throw new ClientException(ErrorCode.PASSWORD_CHANGE_FAILED);
         }
     }
 
     @Override
     public void followUser(UserFollowReqDTO requestParam) {
         if (StrUtil.isBlank(requestParam.getFollowerId()) || StrUtil.isBlank(requestParam.getFolloweeId())) {
-            throw new ClientException("关注失败，请正确传入参数: " + JSON.toJSONString(requestParam));
+            throw new ClientException(ErrorCode.USER_FOLLOW_PARAM_INVALID);
         }
         if (Objects.equals(requestParam.getFollowerId(), requestParam.getFolloweeId())) {
-            throw new ClientException("不能自己关注自己！");
+            throw new ClientException(ErrorCode.USER_CANNOT_FOLLOW_SELF);
         }
         UserFollowDO isExist = userFollowMapper.selectOne(Wrappers.lambdaQuery(UserFollowDO.class)
                 .eq(UserFollowDO::getFollowerId, requestParam.getFollowerId())
@@ -127,7 +127,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 userFollowMapper.incrementFollowCount(Long.parseLong(requestParam.getFollowerId()), Long.parseLong(requestParam.getFolloweeId()), 1);
                 return;
             } catch (DuplicateKeyException ex) {
-                throw new ClientException("重复关注！");
+                throw new ClientException(ErrorCode.USER_FOLLOW_DUPLICATE);
             }
         }
 

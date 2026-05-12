@@ -12,6 +12,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import io.github.somehow.mysite.commons.context.UserContext;
 import io.github.somehow.mysite.commons.enums.UserRole;
+import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.dao.entity.*;
 import io.github.somehow.mysite.dao.mapper.*;
@@ -50,16 +51,16 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     @Transactional
     public void createArticle(ArticleCreateReqDTO requestParam) {
         if (Objects.isNull(requestParam)) {
-            throw new ClientException("Parameter is required.");
+            throw new ClientException(ErrorCode.ARTICLE_PARAM_REQUIRED);
         }
         if (StrUtil.isBlank(requestParam.getAuthorId())) {
-            throw new ClientException("Author is required!");
+            throw new ClientException(ErrorCode.ARTICLE_AUTHOR_REQUIRED);
         }
         if (StrUtil.isBlank(requestParam.getTitle())) {
-            throw new ClientException("Title is required!");
+            throw new ClientException(ErrorCode.ARTICLE_TITLE_REQUIRED);
         }
         if (StrUtil.isBlank(requestParam.getContent())) {
-            throw new ClientException("Content is required!");
+            throw new ClientException(ErrorCode.ARTICLE_CONTENT_REQUIRED);
         }
 
         ArticleDO articleDO = BeanUtil.toBean(requestParam, ArticleDO.class);
@@ -91,7 +92,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     @Transactional
     public void updateArticle(ArticleUpdateReqDTO requestParam) {
         if (Objects.isNull(requestParam)) {
-            throw new ClientException("更新失败，未传递更新参数");
+            throw new ClientException(ErrorCode.ARTICLE_PARAM_REQUIRED);
         }
 
         checkArticleOwnership(requestParam.getId());
@@ -110,7 +111,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         }
         int rows = baseMapper.update(updateWrapper);
         if (rows <= 0) {
-            throw new ClientException("更新文章失败，文章不存在");
+            throw new ClientException(ErrorCode.ARTICLE_UPDATE_FAILED);
         }
 
         if (requestParam.getTagIds() != null) {
@@ -147,7 +148,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
         int rows = baseMapper.update(articleDO, updateWrapper);
         if (rows <= 0) {
-            throw new ClientException("删除文章失败，文章不存在");
+            throw new ClientException(ErrorCode.ARTICLE_DELETE_FAILED);
         }
 
         articleSearchService.deleteArticle(id);
@@ -176,7 +177,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                 .eq(ArticleDO::getDelFlag, 0);
         ArticleDO articleDO = baseMapper.selectOne(queryWrapper);
         if (Objects.isNull(articleDO)) {
-            throw new ClientException("获取文章信息失败，文章不存在");
+            throw new ClientException(ErrorCode.ARTICLE_NOT_FOUND);
         }
         baseMapper.incrementViewCount(id, 1);
 
@@ -228,14 +229,14 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     @Transactional
     public ArticleFavoriteRespDTO favoriteArticle(ArticleFavoriteReqDTO requestParam) {
         if (StrUtil.isBlank(requestParam.getArticleId()) || StrUtil.isBlank(requestParam.getUserId())) {
-            throw new ClientException("收藏操作失败，参数不完整");
+            throw new ClientException(ErrorCode.ARTICLE_FAVORITE_PARAM_INCOMPLETE);
         }
         Long articleId = Long.parseLong(requestParam.getArticleId());
         Long userId = Long.parseLong(requestParam.getUserId());
 
         ArticleDO article = articleMapper.selectById(articleId);
         if (article == null || article.getDelFlag() != 0) {
-            throw new ClientException("文章不存在");
+            throw new ClientException(ErrorCode.ARTICLE_NOT_FOUND);
         }
 
         UserFavoriteArticleDO existing = userFavoriteArticleMapper.selectByUserAndArticle(userId, articleId);
@@ -283,7 +284,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                     return ArticleFavoriteRespDTO.builder().favorited(true).favoriteCount(getFavoriteCount(articleId)).build();
                 }
             }
-            throw new ClientException("操作过于频繁，请稍后重试");
+            throw new ClientException(ErrorCode.OPERATION_TOO_FREQUENT);
         }
         return ArticleFavoriteRespDTO.builder().favorited(true).favoriteCount(getFavoriteCount(articleId)).build();
     }
@@ -378,18 +379,18 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
         String currentUserId = UserContext.getUserId();
         if (currentUserId == null) {
-            throw new ClientException("无法验证文章所有权，请重新登录");
+            throw new ClientException(ErrorCode.ARTICLE_OWNERSHIP_VERIFY_FAILED);
         }
 
         ArticleDO article = baseMapper.selectOne(Wrappers.lambdaQuery(ArticleDO.class)
                 .eq(ArticleDO::getId, articleId)
                 .eq(ArticleDO::getDelFlag, 0));
         if (article == null) {
-            throw new ClientException("文章不存在");
+            throw new ClientException(ErrorCode.ARTICLE_NOT_FOUND);
         }
 
         if (!currentUserId.equals(article.getAuthorId().toString())) {
-            throw new ClientException("权限不足，只能操作自己的文章");
+            throw new ClientException(ErrorCode.ARTICLE_PERMISSION_DENIED);
         }
     }
 }

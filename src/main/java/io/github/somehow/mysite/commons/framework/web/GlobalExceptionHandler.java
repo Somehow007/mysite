@@ -2,7 +2,7 @@ package io.github.somehow.mysite.commons.framework.web;
 
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.util.StrUtil;
-import io.github.somehow.mysite.commons.framework.errorcode.BaseErrorCode;
+import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.exception.AbstractException;
 import io.github.somehow.mysite.commons.framework.result.Result;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,16 +19,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import java.util.Optional;
 
-/**
- * 全局异常拦截器 | 拦截指定异常并通过优雅构建方式返回前端信息
- */
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /**
-     * 拦截参数验证异常
-     */
     @SneakyThrows
     @ExceptionHandler(value = MethodArgumentNotValidException.class)
     public Result validExceptionHandler(HttpServletRequest request, MethodArgumentNotValidException ex) {
@@ -38,12 +32,9 @@ public class GlobalExceptionHandler {
                 .map(FieldError::getDefaultMessage)
                 .orElse(StrUtil.EMPTY);
         log.error("[{}] {} [ex] {}", request.getMethod(), getUrl(request), exceptionStr);
-        return Results.failure(BaseErrorCode.CLIENT_ERROR.code(), exceptionStr);
+        return Results.failure(ErrorCode.PARAM_VALIDATION_ERROR.code(), exceptionStr);
     }
 
-    /**
-     * 拦截应用内抛出的异常
-     */
     @ExceptionHandler(value = {AbstractException.class})
     public Result abstractException(HttpServletRequest request, AbstractException ex) {
         if (ex.getCause() != null) {
@@ -60,18 +51,12 @@ public class GlobalExceptionHandler {
         return Results.failure(ex);
     }
 
-    /**
-     * 拦截登录失败异常（用户名或密码错误、用户不存在）
-     */
     @ExceptionHandler(value = {BadCredentialsException.class, UsernameNotFoundException.class})
     public Result loginExceptionHandler(HttpServletRequest request, Exception ex) {
         log.warn("[{}] {} 登录失败: {}", request.getMethod(), getUrl(request), ex.getMessage());
-        return Results.failure(BaseErrorCode.USER_LOGIN_ERROR.code(), BaseErrorCode.USER_LOGIN_ERROR.message());
+        return Results.failure(ErrorCode.USER_LOGIN_BAD_CREDENTIALS.code(), ErrorCode.USER_LOGIN_BAD_CREDENTIALS.message());
     }
 
-    /**
-     * 拦截未捕获的异常
-     */
     @ExceptionHandler(value = Throwable.class)
     public Result defaultErrorHandler(HttpServletRequest request, Throwable throwable) {
         log.error("[{}] {} ", request.getMethod(), getUrl(request), throwable);

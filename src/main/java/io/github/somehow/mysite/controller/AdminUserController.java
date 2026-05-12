@@ -3,6 +3,7 @@ package io.github.somehow.mysite.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.github.somehow.mysite.commons.context.UserContext;
 import io.github.somehow.mysite.commons.enums.UserRole;
+import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.commons.framework.web.Results;
@@ -46,7 +47,7 @@ public class AdminUserController {
                                        @Valid @RequestBody UserRoleUpdateReqDTO requestParam) {
         String operatorId = UserContext.getUserId();
         if (operatorId != null && Long.parseLong(operatorId) == id) {
-            throw new ClientException("不能修改自己的角色");
+            throw new ClientException(ErrorCode.ADMIN_CANNOT_MODIFY_OWN_ROLE);
         }
         adminUserService.updateUserRole(id, requestParam, operatorId);
         return Results.success();
@@ -58,7 +59,7 @@ public class AdminUserController {
                                          @Valid @RequestBody UserStatusUpdateReqDTO requestParam) {
         String operatorId = UserContext.getUserId();
         if (operatorId != null && Long.parseLong(operatorId) == id) {
-            throw new ClientException("不能修改自己的状态");
+            throw new ClientException(ErrorCode.ADMIN_CANNOT_MODIFY_OWN_STATUS);
         }
         adminUserService.updateUserStatus(id, requestParam, operatorId);
         return Results.success();
@@ -69,7 +70,7 @@ public class AdminUserController {
     public Result<Void> deleteUser(@PathVariable Long id) {
         String operatorId = UserContext.getUserId();
         if (operatorId != null && Long.parseLong(operatorId) == id) {
-            throw new ClientException("不能删除自己");
+            throw new ClientException(ErrorCode.ADMIN_CANNOT_DELETE_SELF);
         }
         adminUserService.deleteUser(id, operatorId);
         return Results.success();

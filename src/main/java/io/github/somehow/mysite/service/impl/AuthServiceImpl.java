@@ -3,6 +3,7 @@ package io.github.somehow.mysite.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
+import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.config.JwtProperties;
 import io.github.somehow.mysite.dao.entity.UserDO;
@@ -36,13 +37,13 @@ public class AuthServiceImpl implements AuthService {
     public LoginRespDTO login(LoginReqDTO requestParam) {
         UserDO userDO = userMapper.selectOneByUsername(requestParam.getUsername());
         if (Objects.isNull(userDO) || userDO.getDelFlag() == 1) {
-            throw new ClientException("用户名或密码错误");
+            throw new ClientException(ErrorCode.USER_LOGIN_BAD_CREDENTIALS);
         }
         if (!passwordEncoder.matches(requestParam.getPassword(), userDO.getPassword())) {
-            throw new ClientException("用户名或密码错误");
+            throw new ClientException(ErrorCode.USER_LOGIN_BAD_CREDENTIALS);
         }
         if (userDO.getStatus() != null && userDO.getStatus() == 0) {
-            throw new ClientException("账户已被禁用，请联系管理员");
+            throw new ClientException(ErrorCode.USER_ACCOUNT_DISABLED);
         }
 
         String accessToken = jwtUtil.generateAccessToken(userDO.getId(), userDO.getUsername(), userDO.getRole());
@@ -66,7 +67,7 @@ public class AuthServiceImpl implements AuthService {
     public LoginRespDTO refreshToken(RefreshTokenReqDTO requestParam) {
         String refreshToken = requestParam.getRefreshToken();
         if (!jwtUtil.validateToken(refreshToken) || !jwtUtil.isRefreshToken(refreshToken)) {
-            throw new ClientException("无效的刷新令牌");
+            throw new ClientException(ErrorCode.AUTH_REFRESH_TOKEN_INVALID);
         }
 
         Long userId = jwtUtil.getUserIdFromToken(refreshToken);
@@ -74,10 +75,10 @@ public class AuthServiceImpl implements AuthService {
 
         UserDO userDO = userMapper.selectById(userId);
         if (Objects.isNull(userDO) || userDO.getDelFlag() == 1) {
-            throw new ClientException("用户不存在");
+            throw new ClientException(ErrorCode.AUTH_USER_NOT_FOUND);
         }
         if (userDO.getStatus() != null && userDO.getStatus() == 0) {
-            throw new ClientException("账户已被禁用，请联系管理员");
+            throw new ClientException(ErrorCode.USER_ACCOUNT_DISABLED);
         }
 
         String newAccessToken = jwtUtil.generateAccessToken(userId, username, userDO.getRole());
@@ -97,16 +98,16 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public void register(RegisterReqDTO requestParam) {
         if (StrUtil.isBlank(requestParam.getUsername()) || StrUtil.isBlank(requestParam.getPassword())) {
-            throw new ClientException("注册失败，请检查您是否成功填写用户名或密码");
+            throw new ClientException(ErrorCode.USER_REGISTER_USERNAME_OR_PASSWORD_BLANK);
         }
         if (StrUtil.isBlank(requestParam.getPhoneNumber())) {
-            throw new ClientException("请填写您的手机号");
+            throw new ClientException(ErrorCode.USER_REGISTER_PHONE_BLANK);
         }
         if (StrUtil.isBlank(requestParam.getRealName())) {
-            throw new ClientException("请填写您的真实姓名");
+            throw new ClientException(ErrorCode.USER_REGISTER_REAL_NAME_BLANK);
         }
         if (StrUtil.isBlank(requestParam.getEmail())) {
-            throw new ClientException("请填写您的邮箱");
+            throw new ClientException(ErrorCode.USER_REGISTER_EMAIL_BLANK);
         }
 
         UserDO userDO = BeanUtil.toBean(requestParam, UserDO.class);
@@ -123,12 +124,12 @@ public class AuthServiceImpl implements AuthService {
             String message = ex.getMessage();
             if (message != null) {
                 if (message.contains("uk_username")) {
-                    throw new ClientException("注册失败，该用户名已存在");
+                    throw new ClientException(ErrorCode.USER_REGISTER_USERNAME_EXISTS);
                 } else if (message.contains("uk_phone_number")) {
-                    throw new ClientException("注册失败，该手机号已被注册");
+                    throw new ClientException(ErrorCode.USER_REGISTER_PHONE_EXISTS);
                 }
             }
-            throw new ClientException("注册失败，用户名或手机号已存在");
+            throw new ClientException(ErrorCode.USER_REGISTER_DUPLICATE);
         }
     }
 }

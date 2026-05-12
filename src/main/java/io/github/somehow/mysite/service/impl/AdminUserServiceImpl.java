@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.somehow.mysite.commons.enums.UserRole;
+import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.dao.entity.UserDO;
 import io.github.somehow.mysite.dao.entity.UserOperationLogDO;
@@ -56,7 +57,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .eq(UserDO::getId, id)
                 .eq(UserDO::getDelFlag, 0));
         if (userDO == null) {
-            throw new ClientException("用户不存在");
+            throw new ClientException(ErrorCode.ADMIN_USER_NOT_FOUND);
         }
         return toAdminUserRespDTO(userDO);
     }
@@ -70,7 +71,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         try {
             newRole = UserRole.valueOf(requestParam.getRole());
         } catch (IllegalArgumentException e) {
-            throw new ClientException("无效的角色类型: " + requestParam.getRole());
+            throw new ClientException(ErrorCode.ADMIN_INVALID_ROLE_TYPE);
         }
 
         String oldRole = userDO.getRole() != null ? userDO.getRole().name() : "USER";
@@ -88,7 +89,7 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         Integer newStatus = requestParam.getStatus();
         if (newStatus != 0 && newStatus != 1) {
-            throw new ClientException("无效的状态值，0=禁用 1=启用");
+            throw new ClientException(ErrorCode.ADMIN_INVALID_STATUS_VALUE);
         }
 
         Integer oldStatus = userDO.getStatus();
@@ -127,7 +128,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                 .eq(UserDO::getId, id)
                 .eq(UserDO::getDelFlag, 0));
         if (userDO == null) {
-            throw new ClientException("用户不存在");
+            throw new ClientException(ErrorCode.ADMIN_USER_NOT_FOUND);
         }
         return userDO;
     }

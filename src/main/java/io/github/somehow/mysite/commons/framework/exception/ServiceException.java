@@ -1,17 +1,14 @@
 package io.github.somehow.mysite.commons.framework.exception;
 
-import io.github.somehow.mysite.commons.framework.errorcode.BaseErrorCode;
+import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.errorcode.IErrorCode;
 
 import java.util.Optional;
 
-/**
- * 服务端运行异常
- */
 public class ServiceException extends AbstractException {
 
     public ServiceException(String message) {
-        this(message, null, BaseErrorCode.SERVICE_ERROR);
+        this(message, null, ErrorCode.SERVICE_ERROR);
     }
 
     public ServiceException(IErrorCode errorCode) {

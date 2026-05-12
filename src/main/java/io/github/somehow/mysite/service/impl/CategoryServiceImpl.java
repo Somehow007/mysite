@@ -5,6 +5,7 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.dao.entity.CategoryDO;
@@ -42,10 +43,10 @@ public class CategoryServiceImpl implements CategoryService {
                     .eq(CategoryDO::getId, requestParam.getParentId())
                     .eq(CategoryDO::getDelFlag, 0));
             if (Objects.isNull(parent)) {
-                throw new ClientException("父分类不存在");
+                throw new ClientException(ErrorCode.CATEGORY_PARENT_NOT_FOUND);
             }
             if (parent.getLevel() >= 3) {
-                throw new ClientException("分类层级不能超过三级");
+                throw new ClientException(ErrorCode.CATEGORY_LEVEL_EXCEEDED);
             }
         }
 
@@ -71,7 +72,7 @@ public class CategoryServiceImpl implements CategoryService {
             categoryDO.setPath(path);
             categoryMapper.updateById(categoryDO);
         } catch (DuplicateKeyException e) {
-            throw new ClientException("分类别名已存在: " + requestParam.getSlug());
+            throw new ClientException(ErrorCode.CATEGORY_SLUG_EXISTS);
         }
     }
 
@@ -83,27 +84,27 @@ public class CategoryServiceImpl implements CategoryService {
                 .eq(CategoryDO::getId, id)
                 .eq(CategoryDO::getDelFlag, 0));
         if (Objects.isNull(existing)) {
-            throw new ClientException("分类不存在");
+            throw new ClientException(ErrorCode.CATEGORY_NOT_FOUND);
         }
 
         if (requestParam.getParentId() != null && !requestParam.getParentId().equals(existing.getParentId())) {
             if (requestParam.getParentId().equals(id)) {
-                throw new ClientException("不能将自己设置为父分类");
+                throw new ClientException(ErrorCode.CATEGORY_CANNOT_SET_SELF_AS_PARENT);
             }
             
             CategoryDO parent = categoryMapper.selectOne(Wrappers.lambdaQuery(CategoryDO.class)
                     .eq(CategoryDO::getId, requestParam.getParentId())
                     .eq(CategoryDO::getDelFlag, 0));
             if (Objects.isNull(parent)) {
-                throw new ClientException("父分类不存在");
+                throw new ClientException(ErrorCode.CATEGORY_PARENT_NOT_FOUND);
             }
             
             if (parent.getLevel() >= 3) {
-                throw new ClientException("分类层级不能超过三级");
+                throw new ClientException(ErrorCode.CATEGORY_LEVEL_EXCEEDED);
             }
             
             if (hasChildren(id)) {
-                throw new ClientException("该分类下有子分类，不能修改父分类");
+                throw new ClientException(ErrorCode.CATEGORY_HAS_CHILDREN_CANNOT_CHANGE_PARENT);
             }
             
             existing.setParentId(requestParam.getParentId());
@@ -126,7 +127,7 @@ public class CategoryServiceImpl implements CategoryService {
         try {
             categoryMapper.updateById(existing);
         } catch (DuplicateKeyException e) {
-            throw new ClientException("分类别名已存在: " + requestParam.getSlug());
+            throw new ClientException(ErrorCode.CATEGORY_SLUG_EXISTS);
         }
     }
 
@@ -138,18 +139,18 @@ public class CategoryServiceImpl implements CategoryService {
                 .eq(CategoryDO::getId, id)
                 .eq(CategoryDO::getDelFlag, 0));
         if (Objects.isNull(category)) {
-            throw new ClientException("分类不存在");
+            throw new ClientException(ErrorCode.CATEGORY_NOT_FOUND);
         }
 
         if (hasChildren(id)) {
-            throw new ClientException("该分类下有子分类，无法删除");
+            throw new ClientException(ErrorCode.CATEGORY_HAS_CHILDREN_CANNOT_DELETE);
         }
 
         Long articleCount = articleMapper.selectCount(Wrappers.lambdaQuery(ArticleDO.class)
                 .eq(ArticleDO::getCategoryId, id)
                 .eq(ArticleDO::getDelFlag, 0));
         if (articleCount > 0) {
-            throw new ClientException("该分类下还有文章，无法删除");
+            throw new ClientException(ErrorCode.CATEGORY_HAS_ARTICLES_CANNOT_DELETE);
         }
 
         CategoryDO categoryDO = new CategoryDO();
@@ -182,7 +183,7 @@ public class CategoryServiceImpl implements CategoryService {
                 .eq(CategoryDO::getSlug, slug)
                 .eq(CategoryDO::getDelFlag, 0));
         if (Objects.isNull(categoryDO)) {
-            throw new ClientException("分类不存在: " + slug);
+            throw new ClientException(ErrorCode.CATEGORY_NOT_FOUND);
         }
         CategoryRespDTO dto = BeanUtil.toBean(categoryDO, CategoryRespDTO.class);
         dto.setArticleCount(articleMapper.selectCount(Wrappers.lambdaQuery(ArticleDO.class)
@@ -198,7 +199,7 @@ public class CategoryServiceImpl implements CategoryService {
                 .eq(CategoryDO::getId, id)
                 .eq(CategoryDO::getDelFlag, 0));
         if (Objects.isNull(categoryDO)) {
-            throw new ClientException("分类不存在");
+            throw new ClientException(ErrorCode.CATEGORY_NOT_FOUND);
         }
         CategoryRespDTO dto = BeanUtil.toBean(categoryDO, CategoryRespDTO.class);
         dto.setArticleCount(articleMapper.selectCount(Wrappers.lambdaQuery(ArticleDO.class)
@@ -247,7 +248,7 @@ public class CategoryServiceImpl implements CategoryService {
                 .eq(CategoryDO::getId, id)
                 .eq(CategoryDO::getDelFlag, 0));
         if (Objects.isNull(category)) {
-            throw new ClientException("分类不存在");
+            throw new ClientException(ErrorCode.CATEGORY_NOT_FOUND);
         }
 
         CategoryDO updateDO = new CategoryDO();
@@ -282,7 +283,7 @@ public class CategoryServiceImpl implements CategoryService {
                 .eq(CategoryDO::getId, requestParam.getId())
                 .eq(CategoryDO::getDelFlag, 0));
         if (Objects.isNull(category)) {
-            throw new ClientException("分类不存在");
+            throw new ClientException(ErrorCode.CATEGORY_NOT_FOUND);
         }
 
         CategoryDO updateDO = new CategoryDO();

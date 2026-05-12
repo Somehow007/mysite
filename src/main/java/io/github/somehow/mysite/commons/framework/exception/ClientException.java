@@ -1,11 +1,8 @@
 package io.github.somehow.mysite.commons.framework.exception;
 
-import io.github.somehow.mysite.commons.framework.errorcode.BaseErrorCode;
+import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.errorcode.IErrorCode;
 
-/**
- * 客户端异常
- */
 public class ClientException extends AbstractException {
 
     public ClientException(IErrorCode errorCode) {
@@ -13,7 +10,7 @@ public class ClientException extends AbstractException {
     }
 
     public ClientException(String message) {
-        this(message, null, BaseErrorCode.CLIENT_ERROR);
+        this(message, null, ErrorCode.CLIENT_ERROR);
     }
 
     public ClientException(String message, IErrorCode errorCode) {

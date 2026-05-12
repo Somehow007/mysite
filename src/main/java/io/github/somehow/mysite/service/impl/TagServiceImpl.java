@@ -3,6 +3,7 @@ package io.github.somehow.mysite.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.dao.entity.ArticleTagDO;
 import io.github.somehow.mysite.dao.entity.TagDO;
@@ -33,7 +34,7 @@ public class TagServiceImpl implements TagService {
         try {
             tagMapper.insert(tagDO);
         } catch (DuplicateKeyException e) {
-            throw new ClientException("标签别名已存在: " + requestParam.getSlug());
+            throw new ClientException(ErrorCode.TAG_SLUG_EXISTS);
         }
     }
 
@@ -43,7 +44,7 @@ public class TagServiceImpl implements TagService {
                 .eq(ArticleTagDO::getTagId, id)
                 .eq(ArticleTagDO::getDelFlag, 0));
         if (refCount > 0) {
-            throw new ClientException("该标签下还有文章关联，无法删除");
+            throw new ClientException(ErrorCode.TAG_HAS_ARTICLES_CANNOT_DELETE);
         }
 
         TagDO tagDO = new TagDO();
@@ -73,7 +74,7 @@ public class TagServiceImpl implements TagService {
                 .eq(TagDO::getSlug, slug)
                 .eq(TagDO::getDelFlag, 0));
         if (Objects.isNull(tagDO)) {
-            throw new ClientException("标签不存在: " + slug);
+            throw new ClientException(ErrorCode.TAG_NOT_FOUND);
         }
         TagRespDTO dto = BeanUtil.toBean(tagDO, TagRespDTO.class);
         dto.setArticleCount(articleTagMapper.selectCount(Wrappers.lambdaQuery(ArticleTagDO.class)
