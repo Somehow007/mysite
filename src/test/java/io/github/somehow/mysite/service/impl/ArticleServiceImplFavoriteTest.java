@@ -173,7 +173,7 @@ class ArticleServiceImplFavoriteTest {
     }
 
     @Test
-    void favoriteArticle_duplicateKey_throwWhenAlreadyActive() {
+    void favoriteArticle_duplicateKey_returnSuccessWhenAlreadyActive() {
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
         when(userFavoriteArticleMapper.insert(any(UserFavoriteArticleDO.class)))
                 .thenThrow(new DuplicateKeyException("Duplicate entry"));
@@ -183,7 +183,10 @@ class ArticleServiceImplFavoriteTest {
                 .thenReturn(null)
                 .thenReturn(duplicate);
 
-        assertThrows(ClientException.class, () -> articleService.favoriteArticle(favoriteReqDTO));
+        ArticleFavoriteRespDTO result = articleService.favoriteArticle(favoriteReqDTO);
+
+        assertTrue(result.getFavorited());
+        assertEquals(5, result.getFavoriteCount());
     }
 
     @Test
@@ -226,5 +229,36 @@ class ArticleServiceImplFavoriteTest {
             ArticleFavoriteRespDTO favoriteResult = articleService.favoriteArticle(favoriteReqDTO);
             assertTrue(favoriteResult.getFavorited());
         }
+    }
+
+    @Test
+    void favoriteArticle_fullCycle_favoriteCancelRefavorite() {
+        when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
+        when(userFavoriteArticleMapper.update(any(), any())).thenReturn(1);
+        when(articleMapper.decrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
+        when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
+
+        UserFavoriteArticleDO active1 = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 0);
+        UserFavoriteArticleDO inactive = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 1);
+        UserFavoriteArticleDO active2 = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 0);
+        UserFavoriteArticleDO inactive2 = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 1);
+
+        when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong()))
+                .thenReturn(active1)
+                .thenReturn(inactive)
+                .thenReturn(active2)
+                .thenReturn(inactive2);
+
+        ArticleFavoriteRespDTO cancelResult = articleService.favoriteArticle(favoriteReqDTO);
+        assertFalse(cancelResult.getFavorited());
+
+        ArticleFavoriteRespDTO refavoriteResult = articleService.favoriteArticle(favoriteReqDTO);
+        assertTrue(refavoriteResult.getFavorited());
+
+        ArticleFavoriteRespDTO cancelResult2 = articleService.favoriteArticle(favoriteReqDTO);
+        assertFalse(cancelResult2.getFavorited());
+
+        ArticleFavoriteRespDTO refavoriteResult2 = articleService.favoriteArticle(favoriteReqDTO);
+        assertTrue(refavoriteResult2.getFavorited());
     }
 }

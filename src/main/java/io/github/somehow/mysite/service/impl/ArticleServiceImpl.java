@@ -270,14 +270,18 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         } catch (DuplicateKeyException e) {
             log.info("Duplicate favorite request, userId: {}, articleId: {}", userId, articleId);
             UserFavoriteArticleDO duplicate = userFavoriteArticleMapper.selectByUserAndArticle(userId, articleId);
-            if (duplicate != null && duplicate.getDelFlag() == 1) {
-                userFavoriteArticleMapper.update(null,
-                        Wrappers.<UserFavoriteArticleDO>update()
-                                .eq("id", duplicate.getId())
-                                .set("del_flag", 0)
-                                .set("update_time", new Date()));
-                articleMapper.incrementFavoriteCount(articleId, 1);
-                return ArticleFavoriteRespDTO.builder().favorited(true).favoriteCount(getFavoriteCount(articleId)).build();
+            if (duplicate != null) {
+                if (duplicate.getDelFlag() == 1) {
+                    userFavoriteArticleMapper.update(null,
+                            Wrappers.<UserFavoriteArticleDO>update()
+                                    .eq("id", duplicate.getId())
+                                    .set("del_flag", 0)
+                                    .set("update_time", new Date()));
+                    articleMapper.incrementFavoriteCount(articleId, 1);
+                    return ArticleFavoriteRespDTO.builder().favorited(true).favoriteCount(getFavoriteCount(articleId)).build();
+                } else {
+                    return ArticleFavoriteRespDTO.builder().favorited(true).favoriteCount(getFavoriteCount(articleId)).build();
+                }
             }
             throw new ClientException("操作过于频繁，请稍后重试");
         }
