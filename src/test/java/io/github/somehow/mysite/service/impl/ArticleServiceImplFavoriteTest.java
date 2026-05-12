@@ -39,14 +39,17 @@ class ArticleServiceImplFavoriteTest {
     private ArticleFavoriteReqDTO favoriteReqDTO;
     private ArticleDO articleDO;
 
+    private static final Long ARTICLE_ID = 123456789L;
+    private static final Long USER_ID = 987654321L;
+
     @BeforeEach
     void setUp() {
         favoriteReqDTO = new ArticleFavoriteReqDTO();
-        favoriteReqDTO.setArticleId("123456789");
-        favoriteReqDTO.setUserId("987654321");
+        favoriteReqDTO.setArticleId(ARTICLE_ID.toString());
+        favoriteReqDTO.setUserId(USER_ID.toString());
 
         articleDO = new ArticleDO();
-        articleDO.setId(123456789L);
+        articleDO.setId(ARTICLE_ID);
         articleDO.setFavoriteCount(5);
         articleDO.setDelFlag(0);
     }
@@ -64,16 +67,16 @@ class ArticleServiceImplFavoriteTest {
 
     @Test
     void favoriteArticle_newFavorite_shouldInsert() {
-        when(userFavoriteArticleMapper.selectOne(any())).thenReturn(null);
+        when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong())).thenReturn(null);
         when(userFavoriteArticleMapper.insert(any(UserFavoriteArticleDO.class))).thenReturn(1);
         when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
-        when(articleMapper.selectById(123456789L)).thenReturn(articleDO);
+        when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
 
         ArticleFavoriteRespDTO result = articleService.favoriteArticle(favoriteReqDTO);
 
-        verify(userFavoriteArticleMapper).selectOne(any());
+        verify(userFavoriteArticleMapper).selectByUserAndArticle(anyLong(), anyLong());
         verify(userFavoriteArticleMapper).insert(any(UserFavoriteArticleDO.class));
-        verify(articleMapper).incrementFavoriteCount(123456789L, 1);
+        verify(articleMapper).incrementFavoriteCount(ARTICLE_ID, 1);
 
         assertTrue(result.getFavorited());
         assertEquals(5, result.getFavoriteCount());
@@ -81,17 +84,17 @@ class ArticleServiceImplFavoriteTest {
 
     @Test
     void favoriteArticle_existingFavorite_shouldCancel() {
-        UserFavoriteArticleDO existing = createFavoriteDO(1L, 123456789L, 987654321L, 0);
-        when(userFavoriteArticleMapper.selectOne(any())).thenReturn(existing);
+        UserFavoriteArticleDO existing = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 0);
+        when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong())).thenReturn(existing);
         when(userFavoriteArticleMapper.update(any(), any())).thenReturn(1);
         when(articleMapper.decrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
-        when(articleMapper.selectById(123456789L)).thenReturn(articleDO);
+        when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
 
         ArticleFavoriteRespDTO result = articleService.favoriteArticle(favoriteReqDTO);
 
-        verify(userFavoriteArticleMapper).selectOne(any());
+        verify(userFavoriteArticleMapper).selectByUserAndArticle(anyLong(), anyLong());
         verify(userFavoriteArticleMapper).update(any(), any());
-        verify(articleMapper).decrementFavoriteCount(123456789L, 1);
+        verify(articleMapper).decrementFavoriteCount(ARTICLE_ID, 1);
 
         assertFalse(result.getFavorited());
         assertEquals(5, result.getFavoriteCount());
@@ -99,17 +102,17 @@ class ArticleServiceImplFavoriteTest {
 
     @Test
     void favoriteArticle_canceledFavorite_shouldRestore() {
-        UserFavoriteArticleDO existing = createFavoriteDO(1L, 123456789L, 987654321L, 1);
-        when(userFavoriteArticleMapper.selectOne(any())).thenReturn(existing);
+        UserFavoriteArticleDO existing = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 1);
+        when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong())).thenReturn(existing);
         when(userFavoriteArticleMapper.update(any(), any())).thenReturn(1);
         when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
-        when(articleMapper.selectById(123456789L)).thenReturn(articleDO);
+        when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
 
         ArticleFavoriteRespDTO result = articleService.favoriteArticle(favoriteReqDTO);
 
-        verify(userFavoriteArticleMapper).selectOne(any());
+        verify(userFavoriteArticleMapper).selectByUserAndArticle(anyLong(), anyLong());
         verify(userFavoriteArticleMapper).update(any(), any());
-        verify(articleMapper).incrementFavoriteCount(123456789L, 1);
+        verify(articleMapper).incrementFavoriteCount(ARTICLE_ID, 1);
 
         assertTrue(result.getFavorited());
         assertEquals(5, result.getFavoriteCount());
@@ -125,45 +128,45 @@ class ArticleServiceImplFavoriteTest {
 
     @Test
     void favoriteArticle_nonExistentArticle_shouldThrowException() {
-        when(articleMapper.selectById(123456789L)).thenReturn(null);
+        when(articleMapper.selectById(ARTICLE_ID)).thenReturn(null);
 
         assertThrows(ClientException.class, () -> articleService.favoriteArticle(favoriteReqDTO));
 
-        verify(userFavoriteArticleMapper, never()).selectOne(any());
+        verify(userFavoriteArticleMapper, never()).selectByUserAndArticle(anyLong(), anyLong());
     }
 
     @Test
     void favoriteArticle_deletedArticle_shouldThrowException() {
         ArticleDO deletedArticle = new ArticleDO();
-        deletedArticle.setId(123456789L);
+        deletedArticle.setId(ARTICLE_ID);
         deletedArticle.setDelFlag(1);
-        when(articleMapper.selectById(123456789L)).thenReturn(deletedArticle);
+        when(articleMapper.selectById(ARTICLE_ID)).thenReturn(deletedArticle);
 
         assertThrows(ClientException.class, () -> articleService.favoriteArticle(favoriteReqDTO));
 
-        verify(userFavoriteArticleMapper, never()).selectOne(any());
+        verify(userFavoriteArticleMapper, never()).selectByUserAndArticle(anyLong(), anyLong());
     }
 
     @Test
     void favoriteArticle_duplicateKey_restoreDeletedRecord() {
-        when(userFavoriteArticleMapper.selectOne(any())).thenReturn(null);
+        when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong())).thenReturn(null);
         when(userFavoriteArticleMapper.insert(any(UserFavoriteArticleDO.class)))
                 .thenThrow(new DuplicateKeyException("Duplicate entry"));
 
-        UserFavoriteArticleDO duplicate = createFavoriteDO(1L, 123456789L, 987654321L, 1);
-        when(userFavoriteArticleMapper.selectOne(any()))
+        UserFavoriteArticleDO duplicate = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 1);
+        when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong()))
                 .thenReturn(null)
                 .thenReturn(duplicate);
         when(userFavoriteArticleMapper.update(any(), any())).thenReturn(1);
         when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
-        when(articleMapper.selectById(123456789L)).thenReturn(articleDO);
+        when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
 
         ArticleFavoriteRespDTO result = articleService.favoriteArticle(favoriteReqDTO);
 
-        verify(userFavoriteArticleMapper, times(2)).selectOne(any());
+        verify(userFavoriteArticleMapper, times(2)).selectByUserAndArticle(anyLong(), anyLong());
         verify(userFavoriteArticleMapper).insert(any(UserFavoriteArticleDO.class));
         verify(userFavoriteArticleMapper).update(any(), any());
-        verify(articleMapper).incrementFavoriteCount(123456789L, 1);
+        verify(articleMapper).incrementFavoriteCount(ARTICLE_ID, 1);
 
         assertTrue(result.getFavorited());
         assertEquals(5, result.getFavoriteCount());
@@ -171,15 +174,57 @@ class ArticleServiceImplFavoriteTest {
 
     @Test
     void favoriteArticle_duplicateKey_throwWhenAlreadyActive() {
-        when(articleMapper.selectById(123456789L)).thenReturn(articleDO);
+        when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
         when(userFavoriteArticleMapper.insert(any(UserFavoriteArticleDO.class)))
                 .thenThrow(new DuplicateKeyException("Duplicate entry"));
 
-        UserFavoriteArticleDO duplicate = createFavoriteDO(1L, 123456789L, 987654321L, 0);
-        when(userFavoriteArticleMapper.selectOne(any()))
+        UserFavoriteArticleDO duplicate = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 0);
+        when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong()))
                 .thenReturn(null)
                 .thenReturn(duplicate);
 
         assertThrows(ClientException.class, () -> articleService.favoriteArticle(favoriteReqDTO));
+    }
+
+    @Test
+    void favoriteArticle_cancelAndReFavorite_fullCycle() {
+        UserFavoriteArticleDO active = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 0);
+        when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong())).thenReturn(active);
+        when(userFavoriteArticleMapper.update(any(), any())).thenReturn(1);
+        when(articleMapper.decrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
+        when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
+
+        ArticleFavoriteRespDTO result1 = articleService.favoriteArticle(favoriteReqDTO);
+        assertFalse(result1.getFavorited());
+
+        UserFavoriteArticleDO inactive = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 1);
+        when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong())).thenReturn(inactive);
+        when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
+
+        ArticleFavoriteRespDTO result2 = articleService.favoriteArticle(favoriteReqDTO);
+        assertTrue(result2.getFavorited());
+    }
+
+    @Test
+    void favoriteArticle_rapidToggle_multipleTimes() {
+        when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
+        when(userFavoriteArticleMapper.update(any(), any())).thenReturn(1);
+        when(articleMapper.decrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
+        when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
+
+        for (int i = 0; i < 5; i++) {
+            UserFavoriteArticleDO active = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 0);
+            UserFavoriteArticleDO inactive = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 1);
+
+            when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong()))
+                    .thenReturn(active)
+                    .thenReturn(inactive);
+
+            ArticleFavoriteRespDTO cancelResult = articleService.favoriteArticle(favoriteReqDTO);
+            assertFalse(cancelResult.getFavorited());
+
+            ArticleFavoriteRespDTO favoriteResult = articleService.favoriteArticle(favoriteReqDTO);
+            assertTrue(favoriteResult.getFavorited());
+        }
     }
 }

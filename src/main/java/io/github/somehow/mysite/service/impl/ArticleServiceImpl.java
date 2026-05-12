@@ -238,9 +238,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             throw new ClientException("文章不存在");
         }
 
-        UserFavoriteArticleDO existing = userFavoriteArticleMapper.selectOne(Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
-                .eq(UserFavoriteArticleDO::getArticleId, articleId)
-                .eq(UserFavoriteArticleDO::getUserId, userId));
+        UserFavoriteArticleDO existing = userFavoriteArticleMapper.selectByUserAndArticle(userId, articleId);
 
         if (existing != null && existing.getDelFlag() == 0) {
             userFavoriteArticleMapper.update(null,
@@ -271,9 +269,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             articleMapper.incrementFavoriteCount(articleId, 1);
         } catch (DuplicateKeyException e) {
             log.info("Duplicate favorite request, userId: {}, articleId: {}", userId, articleId);
-            UserFavoriteArticleDO duplicate = userFavoriteArticleMapper.selectOne(Wrappers.<UserFavoriteArticleDO>query()
-                    .eq("article_id", articleId)
-                    .eq("user_id", userId));
+            UserFavoriteArticleDO duplicate = userFavoriteArticleMapper.selectByUserAndArticle(userId, articleId);
             if (duplicate != null && duplicate.getDelFlag() == 1) {
                 userFavoriteArticleMapper.update(null,
                         Wrappers.<UserFavoriteArticleDO>update()
