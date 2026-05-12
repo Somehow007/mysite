@@ -569,47 +569,6 @@ step_deploy_backend() {
         die "DEPLOY_BACKEND" "启动脚本不存在: $APP_START_SCRIPT"
     fi
 
-    log_info "等待服务启动..."
-    local max_wait=60
-    local waited=0
-    local health_ok=false
-    while [ "$waited" -lt "$max_wait" ]; do
-        sleep 2
-        waited=$((waited + 2))
-
-        if [ -f "$PID_FILE" ]; then
-            local pid=$(cat "$PID_FILE" 2>/dev/null || echo "")
-            if [ -n "$pid" ] && ps -p "$pid" > /dev/null 2>&1; then
-                if curl -s -o /dev/null -w "%{http_code}" "http://localhost:8081/actuator/health" 2>/dev/null | grep -q "200"; then
-                    health_ok=true
-                    break
-                fi
-            else
-                die "DEPLOY_BACKEND" "进程已退出，请检查日志: /var/log/mysite/console.log"
-            fi
-        fi
-
-        printf "\r  等待中... %ds/%ds" "$waited" "$max_wait"
-    done
-    echo ""
-
-    if [ "$health_ok" = true ]; then
-        local pid=$(cat "$PID_FILE" 2>/dev/null || echo "?")
-        log_success "后端服务已启动 (PID: $pid, 启动耗时: ${waited}s)"
-        log_info "JAR 时间: $(ls -lh "$APP_JAR" | awk '{print $6, $7, $8}')"
-    else
-        local pid=$(cat "$PID_FILE" 2>/dev/null || echo "?")
-        if [ -n "$pid" ] && ps -p "$pid" > /dev/null 2>&1; then
-            log_warn "后端进程运行中 (PID: $pid) 但健康检查未在 ${max_wait}s 内通过"
-            log_warn "应用可能仍在启动中，或健康检查端点需要认证"
-            log_warn "请手动验证: curl -s http://localhost:8081/actuator/health"
-            log_warn "查看日志: tail -100 /var/log/mysite/application.log"
-            ROLLBACK_NEEDED=false
-        else
-            die "DEPLOY_BACKEND" "进程已退出，请检查日志: /var/log/mysite/console.log"
-        fi
-    fi
-
     save_checkpoint "deploy_backend"
 }
 

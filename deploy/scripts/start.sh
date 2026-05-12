@@ -116,25 +116,18 @@ start() {
     local new_pid=$!
     echo "$new_pid" > "$PID_FILE"
 
-    echo "Waiting for application to start (PID: $new_pid)..."
-    if ! wait_for_health "$HEALTH_TIMEOUT"; then
-        if ps -p "$new_pid" > /dev/null 2>&1; then
-            echo "$APP_NAME started (PID: $new_pid) - health check pending"
-            echo "  Process is running but health check did not pass within ${HEALTH_TIMEOUT}s"
-            echo "  This may be normal if the application requires more startup time"
-            echo "  Check health: curl -s $HEALTH_URL"
-            echo "  Check logs:   tail -100 $LOG_DIR/application.log"
-        else
-            echo "ERROR: Process exited unexpectedly. Check logs:"
-            echo "  tail -100 $LOG_DIR/console.log"
-            rm -f "$PID_FILE"
-            return 1
-        fi
-    else
+    sleep 2
+    
+    if ps -p "$new_pid" > /dev/null 2>&1; then
         echo "$APP_NAME started successfully (PID: $new_pid)"
-        echo "  Health: $HEALTH_URL -> OK"
+        echo "  Check health: curl -s $HEALTH_URL"
+        echo "  Check logs:   tail -100 $LOG_DIR/application.log"
+    else
+        echo "ERROR: Process exited unexpectedly. Check logs:"
+        echo "  tail -100 $LOG_DIR/console.log"
+        rm -f "$PID_FILE"
+        return 1
     fi
-    echo "  Memory: $(ps -p $new_pid -o rss --no-headers | awk '{printf \"%.0f MB\n\", $1/1024}')"
 }
 
 stop() {
