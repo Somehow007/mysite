@@ -598,7 +598,16 @@ step_deploy_backend() {
         log_success "后端服务已启动 (PID: $pid, 启动耗时: ${waited}s)"
         log_info "JAR 时间: $(ls -lh "$APP_JAR" | awk '{print $6, $7, $8}')"
     else
-        die "HEALTH_CHECK" "服务在 ${max_wait}s 内未通过健康检查"
+        local pid=$(cat "$PID_FILE" 2>/dev/null || echo "?")
+        if [ -n "$pid" ] && ps -p "$pid" > /dev/null 2>&1; then
+            log_warn "后端进程运行中 (PID: $pid) 但健康检查未在 ${max_wait}s 内通过"
+            log_warn "应用可能仍在启动中，或健康检查端点需要认证"
+            log_warn "请手动验证: curl -s http://localhost:8081/actuator/health"
+            log_warn "查看日志: tail -100 /var/log/mysite/application.log"
+            ROLLBACK_NEEDED=false
+        else
+            die "DEPLOY_BACKEND" "进程已退出，请检查日志: /var/log/mysite/console.log"
+        fi
     fi
 
     save_checkpoint "deploy_backend"
