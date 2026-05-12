@@ -63,6 +63,7 @@ public class WebSecurityConfig {
                                 "/v1/tags/**",
                                 "/v1/search/**",
                                 "/v1/site/**",
+                                "/actuator/**",
                                 "/doc.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
