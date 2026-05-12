@@ -64,16 +64,16 @@ ON DUPLICATE KEY UPDATE `name` = `name`;
 -- ==============================================
 -- 5. 示例文章数据
 -- ==============================================
-INSERT INTO `t_article` (`title`, `content`, `summary`, `cover_image`, `category_id`, `author_id`, `published`, `view_count`, `favorite_count`, `del_flag`)
+INSERT INTO `t_article` (`title`, `content`, `summary`, `cover_image`, `category_id`, `author_id`, `published`, `view_count`, `favorite_count`, `reading_time`, `del_flag`)
 VALUES
-    ('欢迎使用 MySite 博客系统', '## 欢迎\n\n这是一篇关于 MySite 博客系统的介绍文章...\n\n## 功能特点\n\n- 支持 Markdown 编写\n- 分类和标签管理\n- 评论系统\n- 响应式设计', '这是一篇关于 MySite 博客系统的介绍文章，涵盖了系统的基本功能和使用方法。', 'https://picsum.photos/800/400?random=1', 1, 1, 1, 100, 5, 0),
-    ('Vue 3 Composition API 实战指南', '## 前言\n\nVue 3 引入了全新的 Composition API，让代码组织更加灵活...\n\n## setup 函数\n\nsetup 是组合式 API 的入口点...\n\n## ref 和 reactive\n\n这两个函数用于创建响应式数据...', '本文详细介绍 Vue 3 Composition API 的使用方法，包括 setup、ref、reactive 等核心概念。', 'https://picsum.photos/800/400?random=2', 3, 1, 1, 250, 15, 0),
-    ('Spring Boot 最佳实践', '## 为什么要最佳实践\n\n良好的实践可以提高代码质量和可维护性...\n\n## 项目结构\n\n推荐采用领域驱动设计的分层结构...\n\n## 配置管理\n\n使用 application.yml 进行配置管理...', '分享 Spring Boot 开发中的最佳实践，包括项目结构、配置管理、异常处理等方面。', 'https://picsum.photos/800/400?random=3', 4, 1, 1, 180, 12, 0),
-    ('MySQL 性能优化实战', '## 索引优化\n\n索引是提高查询性能的关键...\n\n## 慢查询分析\n\n使用 EXPLAIN 分析查询执行计划...\n\n## 分库分表\n\n当单表数据量过大时，考虑分库分表...', '本文分享 MySQL 性能优化的实战经验，包括索引优化、慢查询分析、分库分表等策略。', 'https://picsum.photos/800/400?random=4', 5, 1, 1, 150, 8, 0),
-    ('北京三日游攻略', '## 行程概览\n\nDay 1: 天安门 - 故宫 - 王府井\n\nDay 2: 长城 - 鸟巢\n\nDay 3: 颐和园 - 圆明园\n\n## 注意事项\n\n提前预约门票，建议住在地铁附近...', '分享一次北京三日游的完整攻略，包括景点推荐、美食推荐和出行建议。', 'https://picsum.photos/800/400?random=5', 6, 1, 1, 300, 25, 0),
-    ('成都美食探店合集', '## 火锅推荐\n\n- 小龙坎火锅\n- 大龙燚火锅\n\n## 小吃推荐\n\n- 串串香\n- 担担面\n- 钟水饺\n\n## 注意事项\n\n成都美食偏辣，提前准备好肠胃...', '整理了一份成都美食探店合集，涵盖了火锅、小吃、甜品等多种类型。', 'https://picsum.photos/800/400?random=6', 7, 1, 1, 200, 20, 0),
-    ('《百年孤独》读书笔记', '## 作品简介\n\n《百年孤独》是哥伦比亚作家加西亚·马尔克斯的代表作...\n\n## 主要人物\n\n- 何塞·阿尔卡蒂奥·布恩迪亚\n- 乌尔苏拉·伊格纳西娅\n\n## 经典语录\n\n> 多年以后，面对行刑队，奥雷里亚诺·布恩迪亚上校将会回想起父亲带他去见识冰块的那个遥远的下午。', '分享《百年孤独》的读书笔记和感悟，解读这部魔幻现实主义代表作。', 'https://picsum.photos/800/400?random=7', 8, 1, 1, 120, 10, 0),
-    ('Docker 容器化部署指南', '## 为什么使用 Docker\n\nDocker 可以实现环境一致性、隔离性...\n\n## 常用命令\n\n```bash\ndocker build -t myapp .\ndocker run -d -p 8080:8080 myapp\n```\n\n## Docker Compose\n\n使用 Docker Compose 管理多容器应用...', '详细介绍 Docker 的使用方法，包括镜像构建、容器运行、Docker Compose 等内容。', 'https://picsum.photos/800/400?random=8', 1, 1, 1, 220, 18, 0)
+    ('欢迎使用 MySite 博客系统', '## 欢迎\n\n这是一篇关于 MySite 博客系统的介绍文章...\n\n## 功能特点\n\n- 支持 Markdown 编写\n- 分类和标签管理\n- 评论系统\n- 响应式设计', '这是一篇关于 MySite 博客系统的介绍文章，涵盖了系统的基本功能和使用方法。', 'https://picsum.photos/800/400?random=1', 1, 1, 1, 100, 5, 1, 0),
+    ('Vue 3 Composition API 实战指南', '## 前言\n\nVue 3 引入了全新的 Composition API，让代码组织更加灵活...\n\n## setup 函数\n\nsetup 是组合式 API 的入口点...\n\n## ref 和 reactive\n\n这两个函数用于创建响应式数据...', '本文详细介绍 Vue 3 Composition API 的使用方法，包括 setup、ref、reactive 等核心概念。', 'https://picsum.photos/800/400?random=2', 3, 1, 1, 250, 15, 1, 0),
+    ('Spring Boot 最佳实践', '## 为什么要最佳实践\n\n良好的实践可以提高代码质量和可维护性...\n\n## 项目结构\n\n推荐采用领域驱动设计的分层结构...\n\n## 配置管理\n\n使用 application.yml 进行配置管理...', '分享 Spring Boot 开发中的最佳实践，包括项目结构、配置管理、异常处理等方面。', 'https://picsum.photos/800/400?random=3', 4, 1, 1, 180, 12, 1, 0),
+    ('MySQL 性能优化实战', '## 索引优化\n\n索引是提高查询性能的关键...\n\n## 慢查询分析\n\n使用 EXPLAIN 分析查询执行计划...\n\n## 分库分表\n\n当单表数据量过大时，考虑分库分表...', '本文分享 MySQL 性能优化的实战经验，包括索引优化、慢查询分析、分库分表等策略。', 'https://picsum.photos/800/400?random=4', 5, 1, 1, 150, 8, 1, 0),
+    ('北京三日游攻略', '## 行程概览\n\nDay 1: 天安门 - 故宫 - 王府井\n\nDay 2: 长城 - 鸟巢\n\nDay 3: 颐和园 - 圆明园\n\n## 注意事项\n\n提前预约门票，建议住在地铁附近...', '分享一次北京三日游的完整攻略，包括景点推荐、美食推荐和出行建议。', 'https://picsum.photos/800/400?random=5', 6, 1, 1, 300, 25, 1, 0),
+    ('成都美食探店合集', '## 火锅推荐\n\n- 小龙坎火锅\n- 大龙燚火锅\n\n## 小吃推荐\n\n- 串串香\n- 担担面\n- 钟水饺\n\n## 注意事项\n\n成都美食偏辣，提前准备好肠胃...', '整理了一份成都美食探店合集，涵盖了火锅、小吃、甜品等多种类型。', 'https://picsum.photos/800/400?random=6', 7, 1, 1, 200, 20, 1, 0),
+    ('《百年孤独》读书笔记', '## 作品简介\n\n《百年孤独》是哥伦比亚作家加西亚·马尔克斯的代表作...\n\n## 主要人物\n\n- 何塞·阿尔卡蒂奥·布恩迪亚\n- 乌尔苏拉·伊格纳西娅\n\n## 经典语录\n\n> 多年以后，面对行刑队，奥雷里亚诺·布恩迪亚上校将会回想起父亲带他去见识冰块的那个遥远的下午。', '分享《百年孤独》的读书笔记和感悟，解读这部魔幻现实主义代表作。', 'https://picsum.photos/800/400?random=7', 8, 1, 1, 120, 10, 1, 0),
+    ('Docker 容器化部署指南', '## 为什么使用 Docker\n\nDocker 可以实现环境一致性、隔离性...\n\n## 常用命令\n\n```bash\ndocker build -t myapp .\ndocker run -d -p 8080:8080 myapp\n```\n\n## Docker Compose\n\n使用 Docker Compose 管理多容器应用...', '详细介绍 Docker 的使用方法，包括镜像构建、容器运行、Docker Compose 等内容。', 'https://picsum.photos/800/400?random=8', 1, 1, 1, 220, 18, 1, 0)
 ON DUPLICATE KEY UPDATE `title` = `title`;
 
 -- ==============================================

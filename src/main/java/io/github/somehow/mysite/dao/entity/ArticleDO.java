@@ -26,4 +26,5 @@ public class ArticleDO extends BaseDO {
     private Integer published;
     private Integer viewCount;
     private Integer favoriteCount;
+    private Integer readingTime;
 }

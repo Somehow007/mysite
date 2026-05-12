@@ -9,7 +9,7 @@ const props = defineProps<{
   showFavorite?: boolean
 }>()
 
-const readingTime = calculateReadingTime(props.article.summary || '')
+const readingTime = props.article.readingTime ?? calculateReadingTime(props.article.summary || '')
 </script>
 
 <template>

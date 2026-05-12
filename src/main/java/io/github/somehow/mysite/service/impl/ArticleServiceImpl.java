@@ -19,6 +19,7 @@ import io.github.somehow.mysite.dto.req.article.*;
 import io.github.somehow.mysite.dto.resp.ArchiveRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticlePageQueryRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleSelectRespDTO;
+import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
 import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.ArticleService;
 import lombok.RequiredArgsConstructor;
@@ -69,6 +70,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         }
         articleDO.setViewCount(0);
         articleDO.setFavoriteCount(0);
+        articleDO.setReadingTime(calculateReadingTime(requestParam.getContent()));
         articleMapper.insert(articleDO);
 
         if (!CollectionUtils.isEmpty(requestParam.getTagIds())) {
@@ -103,6 +105,9 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                 .set(requestParam.getCategoryId() != null, ArticleDO::getCategoryId, requestParam.getCategoryId())
                 .set(!Objects.isNull(requestParam.getPublished()), ArticleDO::getPublished, requestParam.getPublished())
                 .eq(ArticleDO::getDelFlag, 0);
+        if (StrUtil.isNotBlank(requestParam.getContent())) {
+            updateWrapper.set(ArticleDO::getReadingTime, calculateReadingTime(requestParam.getContent()));
+        }
         int rows = baseMapper.update(updateWrapper);
         if (rows <= 0) {
             throw new ClientException("更新文章失败，文章不存在");
@@ -221,12 +226,17 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
     @Override
     @Transactional
-    public void favoriteArticle(ArticleFavoriteReqDTO requestParam) {
+    public ArticleFavoriteRespDTO favoriteArticle(ArticleFavoriteReqDTO requestParam) {
         if (StrUtil.isBlank(requestParam.getArticleId()) || StrUtil.isBlank(requestParam.getUserId())) {
             throw new ClientException("收藏操作失败，参数不完整");
         }
         Long articleId = Long.parseLong(requestParam.getArticleId());
         Long userId = Long.parseLong(requestParam.getUserId());
+
+        ArticleDO article = articleMapper.selectById(articleId);
+        if (article == null || article.getDelFlag() != 0) {
+            throw new ClientException("文章不存在");
+        }
 
         UserFavoriteArticleDO existing = userFavoriteArticleMapper.selectOne(Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
                 .eq(UserFavoriteArticleDO::getArticleId, articleId)
@@ -234,30 +244,48 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
         if (existing != null && existing.getDelFlag() == 0) {
             userFavoriteArticleMapper.update(null,
-                    Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
-                            .eq(UserFavoriteArticleDO::getId, existing.getId())
-                            .set(UserFavoriteArticleDO::getDelFlag, 1));
+                    Wrappers.<UserFavoriteArticleDO>update()
+                            .eq("id", existing.getId())
+                            .set("del_flag", 1));
             articleMapper.decrementFavoriteCount(articleId, 1);
-            return;
+            return ArticleFavoriteRespDTO.builder().favorited(false).favoriteCount(getFavoriteCount(articleId)).build();
         }
 
         if (existing != null && existing.getDelFlag() == 1) {
             userFavoriteArticleMapper.update(null,
-                    Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
-                            .eq(UserFavoriteArticleDO::getId, existing.getId())
-                            .set(UserFavoriteArticleDO::getDelFlag, 0)
-                            .set(UserFavoriteArticleDO::getUpdateTime, new Date()));
+                    Wrappers.<UserFavoriteArticleDO>update()
+                            .eq("id", existing.getId())
+                            .set("del_flag", 0)
+                            .set("update_time", new Date()));
             articleMapper.incrementFavoriteCount(articleId, 1);
-            return;
+            return ArticleFavoriteRespDTO.builder().favorited(true).favoriteCount(getFavoriteCount(articleId)).build();
         }
 
-        UserFavoriteArticleDO record = new UserFavoriteArticleDO();
-        record.setId(IdUtil.getSnowflakeNextId());
-        record.setArticleId(articleId);
-        record.setUserId(userId);
-        record.setDelFlag(0);
-        userFavoriteArticleMapper.insert(record);
-        articleMapper.incrementFavoriteCount(articleId, 1);
+        try {
+            UserFavoriteArticleDO record = new UserFavoriteArticleDO();
+            record.setId(IdUtil.getSnowflakeNextId());
+            record.setArticleId(articleId);
+            record.setUserId(userId);
+            record.setDelFlag(0);
+            userFavoriteArticleMapper.insert(record);
+            articleMapper.incrementFavoriteCount(articleId, 1);
+        } catch (DuplicateKeyException e) {
+            log.info("Duplicate favorite request, userId: {}, articleId: {}", userId, articleId);
+            UserFavoriteArticleDO duplicate = userFavoriteArticleMapper.selectOne(Wrappers.<UserFavoriteArticleDO>query()
+                    .eq("article_id", articleId)
+                    .eq("user_id", userId));
+            if (duplicate != null && duplicate.getDelFlag() == 1) {
+                userFavoriteArticleMapper.update(null,
+                        Wrappers.<UserFavoriteArticleDO>update()
+                                .eq("id", duplicate.getId())
+                                .set("del_flag", 0)
+                                .set("update_time", new Date()));
+                articleMapper.incrementFavoriteCount(articleId, 1);
+                return ArticleFavoriteRespDTO.builder().favorited(true).favoriteCount(getFavoriteCount(articleId)).build();
+            }
+            throw new ClientException("操作过于频繁，请稍后重试");
+        }
+        return ArticleFavoriteRespDTO.builder().favorited(true).favoriteCount(getFavoriteCount(articleId)).build();
     }
 
     @Override
@@ -326,6 +354,20 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                                 .collect(Collectors.toList()))
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    private Integer calculateReadingTime(String content) {
+        if (StrUtil.isBlank(content)) {
+            return 1;
+        }
+        int charCount = content.replaceAll("\\s+", "").length();
+        int minutes = (int) Math.ceil(charCount / 400.0);
+        return Math.max(minutes, 1);
+    }
+
+    private Integer getFavoriteCount(Long articleId) {
+        ArticleDO article = articleMapper.selectById(articleId);
+        return article != null ? article.getFavoriteCount() : 0;
     }
 
     private void checkArticleOwnership(Long articleId) {

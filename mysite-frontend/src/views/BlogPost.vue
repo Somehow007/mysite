@@ -25,7 +25,7 @@ const error = ref(false)
 const tocItems = ref<TocItem[]>([])
 
 const readingTime = computed(() =>
-  article.value ? calculateReadingTime(article.value.content || article.value.summary || '') : 0,
+  article.value?.readingTime ?? calculateReadingTime(article.value?.content || article.value?.summary || ''),
 )
 
 useHead(() => ({

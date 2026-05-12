@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS `t_article` (
     `published` TINYINT NOT NULL DEFAULT 0 COMMENT '是否发布 0:草稿 1:已发布',
     `view_count` INT DEFAULT 0 COMMENT '阅读量',
     `favorite_count` INT DEFAULT 0 COMMENT '收藏量',
+    `reading_time` INT DEFAULT 0 COMMENT '阅读时间（分钟）',
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `del_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '删除标识 0:未删除 1:已删除',

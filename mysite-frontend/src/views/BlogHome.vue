@@ -5,6 +5,7 @@ import { getArticles } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
+import { useFavorite } from '@/composables/useFavorite'
 import { ArrowUpDown, ArrowUp, ArrowDown, Eye, Clock, Tag, X, Loader2 } from 'lucide-vue-next'
 import ArticleList from '@/components/article/ArticleList.vue'
 import type { ArticleListItem, Pagination, Category } from '@/types'
@@ -16,6 +17,7 @@ const route = useRoute()
 const router = useRouter()
 const siteStore = useSiteStore()
 const userStore = useUserStore()
+const { setFavoriteStatus, setFavoriteCount } = useFavorite()
 
 const articles = ref<ArticleListItem[]>([])
 const pagination = ref<Pagination | null>(null)
@@ -107,6 +109,18 @@ async function fetchCategories() {
 
 function handlePageChange(page: number) {
   router.push(page === 1 ? '/' : `/page/${page}`)
+}
+
+function handleFavoriteToggle(articleId: string, favorited: boolean) {
+  const article = articles.value.find(a => a.id === articleId)
+  if (article) {
+    article.isFavorited = favorited
+    if (favorited) {
+      article.favoriteCount += 1
+    } else {
+      article.favoriteCount = Math.max(0, article.favoriteCount - 1)
+    }
+  }
 }
 
 watch(
@@ -210,6 +224,7 @@ onMounted(() => {
       :skeleton-count="5"
       :show-favorite="userStore.isLoggedIn"
       @page-change="handlePageChange"
+      @favorite-toggle="handleFavoriteToggle"
     />
   </div>
 </template>

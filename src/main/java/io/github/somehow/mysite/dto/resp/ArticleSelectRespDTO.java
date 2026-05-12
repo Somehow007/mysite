@@ -27,6 +27,7 @@ public class ArticleSelectRespDTO {
     private String authorName;
     private Integer viewCount;
     private Integer favoriteCount;
+    private Integer readingTime;
     private Boolean isFavorited;
     private Date updateTime;
     private List<TagInfo> tags;

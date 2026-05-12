@@ -8,6 +8,7 @@ import io.github.somehow.mysite.dto.req.article.*;
 import io.github.somehow.mysite.dto.resp.ArchiveRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticlePageQueryRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleSelectRespDTO;
+import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
 import io.github.somehow.mysite.service.ArticleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -68,12 +69,11 @@ public class ArticleController {
 
     @Operation(summary = "收藏或取消收藏文章")
     @PostMapping("/v1/articles/{id}/favorite")
-    public Result<Void> favoriteArticle(@PathVariable Long id) {
+    public Result<ArticleFavoriteRespDTO> favoriteArticle(@PathVariable Long id) {
         ArticleFavoriteReqDTO requestParam = new ArticleFavoriteReqDTO();
         requestParam.setArticleId(id.toString());
         requestParam.setUserId(UserContext.getUserId());
-        articleService.favoriteArticle(requestParam);
-        return Results.success();
+        return Results.success(articleService.favoriteArticle(requestParam));
     }
 
     @Operation(summary = "批量检查文章收藏状态")

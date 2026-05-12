@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Heart, Loader2 } from 'lucide-vue-next'
 import { useFavorite } from '@/composables/useFavorite'
 import { useToast } from '@/composables/useToast'
@@ -19,7 +19,7 @@ const emit = defineEmits<{
 }>()
 
 const userStore = useUserStore()
-const { isFavorited, setFavoriteStatus, toggleFavorite, isPending } = useFavorite()
+const { isFavorited, setFavoriteStatus, getFavoriteCount, setFavoriteCount, toggleFavorite, isPending } = useFavorite()
 const toast = useToast()
 
 if (props.initialFavorited !== undefined) {
@@ -28,6 +28,19 @@ if (props.initialFavorited !== undefined) {
 
 const favorited = computed(() => isFavorited(props.articleId))
 const pending = computed(() => isPending(props.articleId))
+
+const displayCount = ref(props.favoriteCount ?? 0)
+
+watch(() => props.favoriteCount, (val) => {
+  if (val !== undefined) {
+    displayCount.value = val
+  }
+})
+
+const cachedCount = getFavoriteCount(props.articleId)
+if (cachedCount !== undefined) {
+  displayCount.value = cachedCount
+}
 
 const animating = ref(false)
 
@@ -58,6 +71,10 @@ async function handleToggle() {
 
   if (result.success) {
     emit('toggle', result.favorited)
+    if (result.favoriteCount !== undefined) {
+      displayCount.value = result.favoriteCount
+      setFavoriteCount(props.articleId, result.favoriteCount)
+    }
     toast.success(result.favorited ? '收藏成功' : '已取消收藏')
   } else if (result.message) {
     toast.error(result.message)
@@ -97,7 +114,7 @@ async function handleToggle() {
       v-if="showCount && favoriteCount !== undefined"
       class="text-xs font-medium tabular-nums"
     >
-      {{ favoriteCount }}
+      {{ displayCount }}
     </span>
   </button>
 </template>

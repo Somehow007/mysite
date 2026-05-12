@@ -57,8 +57,13 @@ export function deleteArticle(id: string): Promise<void> {
   return del<void>(`/v1/articles/${id}`)
 }
 
-export function favoriteArticle(id: string): Promise<void> {
-  return post<void>(`/v1/articles/${id}/favorite`)
+export interface FavoriteResult {
+  favorited: boolean
+  favoriteCount: number
+}
+
+export function favoriteArticle(id: string): Promise<FavoriteResult> {
+  return post<FavoriteResult>(`/v1/articles/${id}/favorite`)
 }
 
 export function getFavoriteArticles(params?: {
