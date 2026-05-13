@@ -28,6 +28,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+import io.github.somehow.mysite.utils.ReadingTimeCalculator;
+
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -365,12 +367,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     }
 
     private Integer calculateReadingTime(String content) {
-        if (StrUtil.isBlank(content)) {
-            return 1;
-        }
-        int charCount = content.replaceAll("\\s+", "").length();
-        int minutes = (int) Math.ceil(charCount / 400.0);
-        return Math.max(minutes, 1);
+        return ReadingTimeCalculator.calculate(content);
     }
 
     private Integer getFavoriteCount(Long articleId) {
