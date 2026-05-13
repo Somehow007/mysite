@@ -11,7 +11,7 @@ const props = defineProps<{
 }>()
 
 const readingTime = computed(() =>
-  props.article.readingTime ?? calculateReadingTime(props.article.summary || '')
+  props.article.readingTime || calculateReadingTime(props.article.summary || '')
 )
 </script>
 

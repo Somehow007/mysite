@@ -217,6 +217,7 @@ public class ElasticsearchArticleSearchServiceImpl implements ArticleSearchServi
                     dto.setCoverImage(article.getCoverImage());
                     dto.setViewCount(article.getViewCount());
                     dto.setFavoriteCount(article.getFavoriteCount());
+                    dto.setReadingTime(article.getReadingTime());
                     dto.setAuthorId(article.getAuthorId());
                     dto.setCreateTime(article.getCreateTime());
                     dto.setUpdateTime(article.getUpdateTime());
