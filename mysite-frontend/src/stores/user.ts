@@ -57,6 +57,8 @@ export const useUserStore = defineStore('user', () => {
       removeItem('access_token')
       removeItem('refresh_token')
       removeItem('user_role')
+      const { useFavorite } = await import('@/composables/useFavorite')
+      useFavorite().clearCache()
     }
   }
 

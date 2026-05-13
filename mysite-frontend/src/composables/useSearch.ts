@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { useDebounceFn } from '@vueuse/core'
 import { searchArticles } from '@/api/article'
 import type { ArticleListItem } from '@/types'
 
@@ -18,7 +19,7 @@ export function useSearch() {
     results.value = []
   }
 
-  async function search(keyword?: string) {
+  async function _search(keyword?: string) {
     const q = keyword ?? query.value
     if (!q.trim()) {
       results.value = []
@@ -35,6 +36,8 @@ export function useSearch() {
       loading.value = false
     }
   }
+
+  const search = useDebounceFn(_search, 300)
 
   return {
     query,

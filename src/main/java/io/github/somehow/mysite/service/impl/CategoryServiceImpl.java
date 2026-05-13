@@ -4,6 +4,7 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
@@ -167,11 +168,11 @@ public class CategoryServiceImpl implements CategoryService {
                 .orderByAsc(CategoryDO::getSortOrder)
                 .orderByDesc(CategoryDO::getCreateTime));
 
+        Map<Long, Long> articleCountMap = batchCountArticles(categories);
+
         return categories.stream().map(cat -> {
             CategoryRespDTO dto = BeanUtil.toBean(cat, CategoryRespDTO.class);
-            dto.setArticleCount(articleMapper.selectCount(Wrappers.lambdaQuery(ArticleDO.class)
-                    .eq(ArticleDO::getCategoryId, cat.getId())
-                    .eq(ArticleDO::getDelFlag, 0)));
+            dto.setArticleCount(articleCountMap.getOrDefault(cat.getId(), 0L));
             return dto;
         }).collect(Collectors.toList());
     }
@@ -209,6 +210,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
+    @Cacheable(value = CACHE_NAME, key = "'query:' + #requestParam.hashCode()")
     public List<CategoryRespDTO> queryCategories(CategoryQueryReqDTO requestParam) {
         LambdaQueryWrapper<CategoryDO> wrapper = Wrappers.lambdaQuery(CategoryDO.class)
                 .eq(CategoryDO::getDelFlag, 0);
@@ -231,11 +233,11 @@ public class CategoryServiceImpl implements CategoryService {
 
         List<CategoryDO> categories = categoryMapper.selectList(wrapper);
 
+        Map<Long, Long> articleCountMap = batchCountArticles(categories);
+
         return categories.stream().map(cat -> {
             CategoryRespDTO dto = BeanUtil.toBean(cat, CategoryRespDTO.class);
-            dto.setArticleCount(articleMapper.selectCount(Wrappers.lambdaQuery(ArticleDO.class)
-                    .eq(ArticleDO::getCategoryId, cat.getId())
-                    .eq(ArticleDO::getDelFlag, 0)));
+            dto.setArticleCount(articleCountMap.getOrDefault(cat.getId(), 0L));
             return dto;
         }).collect(Collectors.toList());
     }
@@ -261,9 +263,16 @@ public class CategoryServiceImpl implements CategoryService {
     @Transactional(rollbackFor = Exception.class)
     @CacheEvict(value = {CACHE_NAME, CACHE_TREE_NAME}, allEntries = true)
     public void batchUpdateStatus(CategoryBatchStatusReqDTO requestParam) {
-        for (Long id : requestParam.getIds()) {
-            updateCategoryStatus(id, requestParam.getStatus());
+        List<Long> ids = requestParam.getIds();
+        Long existingCount = categoryMapper.selectCount(Wrappers.<CategoryDO>lambdaQuery()
+                .in(CategoryDO::getId, ids)
+                .eq(CategoryDO::getDelFlag, 0));
+        if (existingCount < ids.size()) {
+            throw new ClientException(ErrorCode.CATEGORY_NOT_FOUND);
         }
+        categoryMapper.update(null, Wrappers.<CategoryDO>lambdaUpdate()
+                .in(CategoryDO::getId, ids)
+                .set(CategoryDO::getStatus, requestParam.getStatus()));
     }
 
     @Override
@@ -300,6 +309,7 @@ public class CategoryServiceImpl implements CategoryService {
     }
 
     @Override
+    @Cacheable(value = CACHE_NAME, key = "'children:' + #parentId")
     public List<CategoryRespDTO> getChildrenByParentId(Long parentId) {
         List<CategoryDO> categories = categoryMapper.selectList(Wrappers.lambdaQuery(CategoryDO.class)
                 .eq(CategoryDO::getParentId, parentId)
@@ -307,13 +317,35 @@ public class CategoryServiceImpl implements CategoryService {
                 .orderByAsc(CategoryDO::getSortOrder)
                 .orderByDesc(CategoryDO::getCreateTime));
 
+        Map<Long, Long> articleCountMap = batchCountArticles(categories);
+
         return categories.stream().map(cat -> {
             CategoryRespDTO dto = BeanUtil.toBean(cat, CategoryRespDTO.class);
-            dto.setArticleCount(articleMapper.selectCount(Wrappers.lambdaQuery(ArticleDO.class)
-                    .eq(ArticleDO::getCategoryId, cat.getId())
-                    .eq(ArticleDO::getDelFlag, 0)));
+            dto.setArticleCount(articleCountMap.getOrDefault(cat.getId(), 0L));
             return dto;
         }).collect(Collectors.toList());
+    }
+
+    private Map<Long, Long> batchCountArticles(List<CategoryDO> categories) {
+        if (categories == null || categories.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Long> categoryIds = categories.stream()
+                .map(CategoryDO::getId)
+                .collect(Collectors.toList());
+        QueryWrapper<ArticleDO> wrapper = new QueryWrapper<>();
+        wrapper.select("category_id", "COUNT(*) AS cnt")
+                .eq("del_flag", 0)
+                .in("category_id", categoryIds)
+                .groupBy("category_id");
+        List<Map<String, Object>> counts = articleMapper.selectMaps(wrapper);
+        Map<Long, Long> result = new HashMap<>();
+        for (Map<String, Object> map : counts) {
+            Long categoryId = ((Number) map.get("category_id")).longValue();
+            Long count = ((Number) map.get("cnt")).longValue();
+            result.put(categoryId, count);
+        }
+        return result;
     }
 
     private String buildCategoryPath(Long categoryId, Long parentId) {

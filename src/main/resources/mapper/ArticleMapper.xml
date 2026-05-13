@@ -46,7 +46,7 @@
             AND a.title LIKE CONCAT('%', #{title}, '%')
         </if>
         <if test="authorName != null and authorName != ''">
-            AND u.name LIKE CONCAT('%', #{authorName}, '%')
+            AND u.username LIKE CONCAT('%', #{authorName}, '%')
         </if>
         ORDER BY a.create_time DESC
     </select>

@@ -8,16 +8,28 @@ defineProps<{
 
 const activeId = ref('')
 
+const headingElements = ref<HTMLElement[]>([])
+
+function updateHeadingElements() {
+  headingElements.value = Array.from(
+    document.querySelectorAll('.prose h1, .prose h2, .prose h3, .prose h4')
+  )
+}
+
+let rafId: number | null = null
 function handleScroll() {
-  const headings = document.querySelectorAll('.prose h1, .prose h2, .prose h3, .prose h4')
-  let currentId = ''
-  for (const heading of headings) {
-    const rect = heading.getBoundingClientRect()
-    if (rect.top <= 100) {
-      currentId = heading.id
+  if (rafId) return
+  rafId = requestAnimationFrame(() => {
+    rafId = null
+    let currentId = ''
+    for (const heading of headingElements.value) {
+      const rect = heading.getBoundingClientRect()
+      if (rect.top <= 100) {
+        currentId = heading.id
+      }
     }
-  }
-  activeId.value = currentId
+    activeId.value = currentId
+  })
 }
 
 function scrollTo(id: string) {
@@ -28,10 +40,15 @@ function scrollTo(id: string) {
 }
 
 onMounted(() => {
+  updateHeadingElements()
   window.addEventListener('scroll', handleScroll, { passive: true })
 })
 
 onUnmounted(() => {
+  if (rafId) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
   window.removeEventListener('scroll', handleScroll)
 })
 </script>

@@ -78,10 +78,6 @@ export function getFavoriteArticles(params?: {
   })
 }
 
-export function checkFavoriteStatus(articleIds: string[]): Promise<Record<string, boolean>> {
-  return post<Record<string, boolean>>('/v1/articles/favorite-check', articleIds)
-}
-
 export function getArchiveList(): Promise<unknown> {
   return get<unknown>('/v1/articles/archive')
 }

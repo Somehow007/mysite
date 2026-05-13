@@ -11,9 +11,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.Objects;
 
-/**
- * 加载用户认证和授权所需的信息
- */
 @Service
 @RequiredArgsConstructor
 public class CustomUserDetailsService implements UserDetailsService {

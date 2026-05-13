@@ -4,11 +4,9 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import io.github.somehow.mysite.commons.context.UserContext;
 import io.github.somehow.mysite.commons.enums.UserRole;
@@ -247,6 +245,8 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                             .eq("id", existing.getId())
                             .set("del_flag", 1));
             articleMapper.decrementFavoriteCount(articleId, 1);
+            log.debug("存在且已收藏过，数量-1");
+
             return ArticleFavoriteRespDTO.builder().favorited(false).favoriteCount(getFavoriteCount(articleId)).build();
         }
 
@@ -257,6 +257,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                             .set("del_flag", 0)
                             .set("update_time", new Date()));
             articleMapper.incrementFavoriteCount(articleId, 1);
+            log.debug("存在且已删除，数量+1");
             return ArticleFavoriteRespDTO.builder().favorited(true).favoriteCount(getFavoriteCount(articleId)).build();
         }
 
@@ -268,6 +269,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             record.setDelFlag(0);
             userFavoriteArticleMapper.insert(record);
             articleMapper.incrementFavoriteCount(articleId, 1);
+            log.debug("收藏成功，+1");
         } catch (DuplicateKeyException e) {
             log.info("Duplicate favorite request, userId: {}, articleId: {}", userId, articleId);
             UserFavoriteArticleDO duplicate = userFavoriteArticleMapper.selectByUserAndArticle(userId, articleId);
@@ -318,17 +320,22 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         SimpleDateFormat yearFmt = new SimpleDateFormat("yyyy");
         SimpleDateFormat monthFmt = new SimpleDateFormat("MM");
 
-        Map<Long, String> authorNameCache = new HashMap<>();
+        List<Long> authorIds = articles.stream()
+                .map(ArticleDO::getAuthorId)
+                .distinct()
+                .collect(Collectors.toList());
+        Map<Long, String> authorNameMap = new HashMap<>();
+        if (!authorIds.isEmpty()) {
+            userMapper.selectBatchIds(authorIds).forEach(user ->
+                    authorNameMap.put(user.getId(), user.getUsername()));
+        }
 
         Map<String, Map<String, List<ArchiveRespDTO.ArchiveArticle>>> grouped = new LinkedHashMap<>();
         for (ArticleDO article : articles) {
             String year = yearFmt.format(article.getCreateTime());
             String month = monthFmt.format(article.getCreateTime());
 
-            String authorName = authorNameCache.computeIfAbsent(article.getAuthorId(), aid -> {
-                UserDO user = userMapper.selectById(aid);
-                return user != null ? user.getUsername() : "";
-            });
+            String authorName = authorNameMap.getOrDefault(article.getAuthorId(), "");
 
             ArchiveRespDTO.ArchiveArticle aa = ArchiveRespDTO.ArchiveArticle.builder()
                     .id(article.getId())

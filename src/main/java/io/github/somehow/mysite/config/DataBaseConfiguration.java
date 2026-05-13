@@ -13,9 +13,6 @@ import java.util.Date;
 @Configuration
 public class DataBaseConfiguration {
 
-    /**
-     * MyBatis-Plus MySQL 分页插件
-     */
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {
         MybatisPlusInterceptor interceptor = new MybatisPlusInterceptor();
@@ -23,17 +20,11 @@ public class DataBaseConfiguration {
         return interceptor;
     }
 
-    /**
-     * Mybatis-Plus 源数据自动填充类
-     */
     @Bean
     public MyMetaObjectHandler myMetaObjectHandler() {
         return new MyMetaObjectHandler();
     }
 
-    /**
-     * 源数据自动填充类
-     */
     static class MyMetaObjectHandler implements MetaObjectHandler {
 
         @Override

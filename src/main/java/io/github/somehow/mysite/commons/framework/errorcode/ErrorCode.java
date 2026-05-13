@@ -2,15 +2,11 @@ package io.github.somehow.mysite.commons.framework.errorcode;
 
 public enum ErrorCode implements IErrorCode {
 
-    // ==================== A: 客户端错误 ====================
-
-    // ---------- A00: 通用客户端错误 ----------
     CLIENT_ERROR("A000001", "客户端请求错误"),
     PARAM_VALIDATION_ERROR("A000002", "参数校验失败"),
     PARAM_REQUIRED_MISSING("A000003", "必要参数缺失"),
     OPERATION_TOO_FREQUENT("A000004", "操作过于频繁，请稍后重试"),
 
-    // ---------- A01: 认证模块错误 ----------
     AUTH_ERROR("A010001", "认证模块错误"),
     USER_LOGIN_ERROR("A010100", "用户登录失败"),
     USER_LOGIN_BAD_CREDENTIALS("A010101", "用户名或密码错误"),
@@ -32,7 +28,6 @@ public enum ErrorCode implements IErrorCode {
     PASSWORD_SAME_AS_OLD("A010302", "新密码不能与旧密码相同"),
     PASSWORD_CHANGE_FAILED("A010303", "修改密码失败"),
 
-    // ---------- A02: 用户模块错误 ----------
     USER_ERROR("A020001", "用户模块错误"),
     USER_NOT_FOUND("A020100", "用户不存在"),
     USER_QUERY_FAILED("A020101", "查询失败，用户不存在"),
@@ -71,7 +66,6 @@ public enum ErrorCode implements IErrorCode {
     TAG_SLUG_EXISTS("A050101", "标签别名已存在"),
     TAG_HAS_ARTICLES_CANNOT_DELETE("A050102", "该标签下还有文章关联，无法删除"),
 
-    // ---------- A06: 管理模块错误 ----------
     ADMIN_ERROR("A060001", "管理模块错误"),
     ADMIN_USER_NOT_FOUND("A060100", "用户不存在"),
     ADMIN_INVALID_ROLE_TYPE("A060101", "无效的角色类型"),
@@ -80,7 +74,6 @@ public enum ErrorCode implements IErrorCode {
     ADMIN_CANNOT_MODIFY_OWN_STATUS("A060104", "不能修改自己的状态"),
     ADMIN_CANNOT_DELETE_SELF("A060105", "不能删除自己"),
 
-    // ---------- A07: 安全模块错误 ----------
     SECURITY_ERROR("A070001", "安全模块错误"),
     SECURITY_NOT_AUTHENTICATED("A070100", "未登录或Token已过期"),
     SECURITY_ACCESS_DENIED("A070101", "权限不足，无法访问该资源"),
@@ -89,7 +82,6 @@ public enum ErrorCode implements IErrorCode {
     SERVICE_ERROR("B000001", "系统执行出错"),
     SERVICE_TIMEOUT_ERROR("B000100", "系统执行超时"),
 
-    // ==================== C: 远程服务错误 ====================
     REMOTE_ERROR("C000001", "调用第三方服务出错");
 
     private final String code;

@@ -11,10 +11,11 @@ const apiClient: AxiosInstance = axios.create({
   },
 })
 
+const noAuthPaths = ['/v1/auth/login', '/v1/auth/register', '/v1/auth/refresh']
+
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = getItem<string>('access_token')
-    const noAuthPaths = ['/v1/auth/login', '/v1/auth/register', '/v1/auth/refresh']
     const isNoAuthPath = noAuthPaths.some(path => config.url?.includes(path))
     if (token && config.headers && !isNoAuthPath) {
       config.headers.Authorization = `Bearer ${token}`
@@ -36,7 +37,6 @@ apiClient.interceptors.response.use(
     return response
   },
   (error) => {
-    const noAuthPaths = ['/v1/auth/login', '/v1/auth/register', '/v1/auth/refresh']
     const isNoAuthPath = noAuthPaths.some(path => error.config?.url?.includes(path))
     if (error.response?.status === 401 && !isNoAuthPath) {
       removeItem('access_token')

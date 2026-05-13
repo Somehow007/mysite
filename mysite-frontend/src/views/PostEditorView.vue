@@ -143,8 +143,8 @@ function toggleMetaPanel() {
   showMetaPanel.value = !showMetaPanel.value
 }
 
-async function handleImageUpload(file: File) {
-  console.log('图片上传功能待实现:', file.name)
+async function handleImageUpload(_file: File) {
+  void _file
 }
 </script>
 

@@ -25,10 +25,6 @@ export function useFavorite() {
     return favoriteCountCache.value[articleId]
   }
 
-  function batchSetFavoriteStatus(statusMap: Record<string, boolean>) {
-    favoriteCache.value = { ...favoriteCache.value, ...statusMap }
-  }
-
   async function toggleFavorite(articleId: string): Promise<{ success: boolean; favorited: boolean; favoriteCount?: number; message?: string }> {
     if (!userStore.isLoggedIn) {
       return { success: false, favorited: false, message: '请先登录' }
@@ -74,7 +70,6 @@ export function useFavorite() {
     setFavoriteStatus,
     setFavoriteCount,
     getFavoriteCount,
-    batchSetFavoriteStatus,
     toggleFavorite,
     isPending,
     clearCache,

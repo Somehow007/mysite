@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { setRedirectUrl } from '@/utils/redirect'
+import { getItem } from '@/utils/storage'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -114,7 +115,7 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to, _from, next) => {
-  const token = localStorage.getItem('mysite_access_token')
+  const token = getItem<string>('access_token')
 
   if (to.meta.requiresAuth && !token) {
     setRedirectUrl(to.fullPath)
@@ -128,16 +129,11 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   if (to.meta.requiresDeveloper && token) {
-    const storedUser = localStorage.getItem('mysite_user_role')
-    if (storedUser) {
-      try {
-        const role = JSON.parse(storedUser)
-        if (role !== 'DEVELOPER') {
-          next({ name: 'dashboard' })
-          return
-        }
-      } catch {
-        // ignore parse error
+    const storedRole = getItem<string>('user_role')
+    if (storedRole) {
+      if (storedRole !== 'DEVELOPER') {
+        next({ name: 'dashboard' })
+        return
       }
     }
   }

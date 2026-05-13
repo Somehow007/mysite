@@ -8,9 +8,6 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * 设置文档 API Swagger 配置信息
- */
 @Slf4j
 @Configuration
 public class SwaggerConfiguration implements ApplicationRunner {

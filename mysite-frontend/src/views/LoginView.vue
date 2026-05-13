@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { RouterLink } from 'vue-router'
 import LoginForm from '@/components/auth/LoginForm.vue'
 import { useUserStore } from '@/stores/user'
 import { getRedirectUrl, getRedirectUrlFromQuery, setRedirectUrl, clearRedirectUrl } from '@/utils/redirect'

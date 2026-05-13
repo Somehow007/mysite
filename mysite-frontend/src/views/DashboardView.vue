@@ -14,7 +14,7 @@ useHead(() => ({
 
 const router = useRouter()
 const userStore = useUserStore()
-const { isDeveloper, canDeleteArticle } = usePermission()
+const { isDeveloper, canModifyArticle } = usePermission()
 
 const articles = ref<ArticleListItem[]>([])
 const pagination = ref<Pagination | null>(null)
@@ -54,14 +54,8 @@ async function handleDelete(id: string) {
   }
 }
 
-function canEdit(article: ArticleListItem): boolean {
-  if (isDeveloper.value) return true
-  return article.authorId === userStore.user?.id
-}
-
-function canDelete(article: ArticleListItem): boolean {
-  if (isDeveloper.value) return true
-  return article.authorId === userStore.user?.id
+function canModify(article: ArticleListItem): boolean {
+  return canModifyArticle(article.authorId)
 }
 
 onMounted(() => {
@@ -131,7 +125,7 @@ onMounted(() => {
             <Eye :size="14" />
           </button>
           <button
-            v-if="canEdit(article)"
+            v-if="canModify(article)"
             @click="router.push(`/dashboard/posts/${article.id}/edit`)"
             class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
             title="编辑"
@@ -139,7 +133,7 @@ onMounted(() => {
             <Edit :size="14" />
           </button>
           <button
-            v-if="canDelete(article)"
+            v-if="canModify(article)"
             @click="handleDelete(article.id)"
             :disabled="deleting === article.id"
             class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-all duration-200 disabled:opacity-50"

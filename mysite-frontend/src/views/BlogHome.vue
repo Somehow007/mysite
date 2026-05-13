@@ -6,7 +6,7 @@ import { getCategories } from '@/api/category'
 import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
 import { useFavorite } from '@/composables/useFavorite'
-import { ArrowUpDown, ArrowUp, ArrowDown, Eye, Clock, Tag, X, Loader2 } from 'lucide-vue-next'
+import { ArrowUpDown, ArrowUp, ArrowDown, Tag, X, Loader2 } from 'lucide-vue-next'
 import ArticleList from '@/components/article/ArticleList.vue'
 import type { ArticleListItem, Pagination, Category } from '@/types'
 
@@ -120,6 +120,8 @@ function handleFavoriteToggle(articleId: string, favorited: boolean) {
     } else {
       article.favoriteCount = Math.max(0, article.favoriteCount - 1)
     }
+    setFavoriteStatus(articleId, favorited)
+    setFavoriteCount(articleId, article.favoriteCount)
   }
 }
 

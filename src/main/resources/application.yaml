@@ -6,10 +6,22 @@ spring:
     url: jdbc:mysql://127.0.0.1:3306/mysite?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
     password: Sh20060401
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1200000
   data:
     redis:
       host: localhost
       port: 6379
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 4
+          min-idle: 1
+          max-wait: 2000ms
     elasticsearch:
       repositories:
         enabled: false

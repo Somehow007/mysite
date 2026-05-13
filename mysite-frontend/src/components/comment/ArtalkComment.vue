@@ -15,6 +15,7 @@ const wrapperRef = ref<HTMLElement | null>(null)
 const containerRef = ref<HTMLElement | null>(null)
 const loadError = ref(false)
 let artalkInstance: Artalk | null = null
+let observer: MutationObserver | null = null
 
 const isLoggedIn = computed(() => userStore.isLoggedIn)
 const showLoading = computed(() => userStore.loading && !userStore.user)
@@ -134,7 +135,7 @@ onMounted(async () => {
     initArtalk()
   }
 
-  const observer = new MutationObserver(() => {
+  observer = new MutationObserver(() => {
     if (artalkInstance) {
       artalkInstance.setDarkMode(document.documentElement.classList.contains('dark'))
     }
@@ -144,13 +145,13 @@ onMounted(async () => {
     attributes: true,
     attributeFilter: ['class'],
   })
-
-  onUnmounted(() => {
-    observer.disconnect()
-  })
 })
 
 onUnmounted(() => {
+  if (observer) {
+    observer.disconnect()
+    observer = null
+  }
   if (artalkInstance) {
     artalkInstance.destroy()
     artalkInstance = null

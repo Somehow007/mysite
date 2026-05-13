@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Calendar, Eye, Clock, Tag, Heart } from 'lucide-vue-next'
 import { formatDate, calculateReadingTime } from '@/utils/date'
 import type { ArticleListItem } from '@/types'
@@ -9,7 +10,9 @@ const props = defineProps<{
   showFavorite?: boolean
 }>()
 
-const readingTime = props.article.readingTime ?? calculateReadingTime(props.article.summary || '')
+const readingTime = computed(() =>
+  props.article.readingTime ?? calculateReadingTime(props.article.summary || '')
+)
 </script>
 
 <template>

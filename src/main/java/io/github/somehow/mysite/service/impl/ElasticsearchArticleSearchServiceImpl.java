@@ -14,7 +14,6 @@ import io.github.somehow.mysite.dao.entity.UserDO;
 import io.github.somehow.mysite.dao.entity.UserFavoriteArticleDO;
 import io.github.somehow.mysite.elasticsearch.repository.ArticleEsRepository;
 import io.github.somehow.mysite.dao.mapper.ArticleMapper;
-import io.github.somehow.mysite.dao.mapper.ArticleTagMapper;
 import io.github.somehow.mysite.dao.mapper.CategoryMapper;
 import io.github.somehow.mysite.dao.mapper.TagMapper;
 import io.github.somehow.mysite.dao.mapper.UserFavoriteArticleMapper;
@@ -48,7 +47,6 @@ public class ElasticsearchArticleSearchServiceImpl implements ArticleSearchServi
     private final UserMapper userMapper;
     private final CategoryMapper categoryMapper;
     private final TagMapper tagMapper;
-    private final ArticleTagMapper articleTagMapper;
     private final UserFavoriteArticleMapper userFavoriteArticleMapper;
     private final ElasticsearchProperties elasticsearchProperties;
 

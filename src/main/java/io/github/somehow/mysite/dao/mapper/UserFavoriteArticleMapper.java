@@ -5,9 +5,6 @@ import io.github.somehow.mysite.dao.entity.UserFavoriteArticleDO;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
-/**
- * 用户收藏文章持久层
- */
 public interface UserFavoriteArticleMapper extends BaseMapper<UserFavoriteArticleDO> {
 
     @Select("SELECT * FROM t_user_article_favorites WHERE user_id = #{userId} AND article_id = #{articleId}")

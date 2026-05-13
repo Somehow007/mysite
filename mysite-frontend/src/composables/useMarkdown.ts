@@ -23,7 +23,7 @@ renderer.heading = function ({ text, depth }) {
     .toLowerCase()
     .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
     .replace(/^-+|-+$/g, '')
-  return `<h${depth} id="${id}">${text}</h${depth}>`
+  return `<h${depth} id="${escapeHtml(id)}">${escapeHtml(rawText)}</h${depth}>`
 }
 
 renderer.code = function ({ text, lang }) {

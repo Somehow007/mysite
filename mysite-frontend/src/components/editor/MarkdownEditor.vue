@@ -14,7 +14,6 @@ const emit = defineEmits<{
 }>()
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
-const highlightRef = ref<HTMLDivElement | null>(null)
 const previewRef = ref<HTMLDivElement | null>(null)
 
 const content = ref(props.modelValue)
@@ -528,7 +527,6 @@ function getHighlightHtml(text: string): string {
       <div class="editor-pane flex-1 overflow-auto" :class="{ 'border-r border-[var(--color-border)] dark:border-[var(--color-dark-border)]': showPreview }">
         <div class="editor-wrapper">
           <div
-            ref="highlightRef"
             class="editor-highlight p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap pointer-events-none"
             v-html="getHighlightHtml(content)"
           />

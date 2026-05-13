@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
-import { RouterLink } from 'vue-router'
 import RegisterForm from '@/components/auth/RegisterForm.vue'
 
 const router = useRouter()

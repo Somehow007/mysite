@@ -13,10 +13,6 @@ export function logout(): Promise<void> {
   return post<void>('/v1/auth/logout')
 }
 
-export function refreshToken(token: string): Promise<AuthTokens> {
-  return post<AuthTokens>('/v1/auth/refresh', { refreshToken: token })
-}
-
 export function getCurrentUser(): Promise<User> {
   return get<User>('/v1/auth/me')
 }
