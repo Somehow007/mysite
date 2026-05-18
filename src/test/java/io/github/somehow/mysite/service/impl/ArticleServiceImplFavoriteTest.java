@@ -1,6 +1,5 @@
 package io.github.somehow.mysite.service.impl;
 
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.dao.entity.UserFavoriteArticleDO;
@@ -86,14 +85,14 @@ class ArticleServiceImplFavoriteTest {
     void favoriteArticle_existingFavorite_shouldCancel() {
         UserFavoriteArticleDO existing = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 0);
         when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong())).thenReturn(existing);
-        when(userFavoriteArticleMapper.update(any(), any())).thenReturn(1);
+        when(userFavoriteArticleMapper.softDeleteById(anyLong())).thenReturn(1);
         when(articleMapper.decrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
 
         ArticleFavoriteRespDTO result = articleService.favoriteArticle(favoriteReqDTO);
 
         verify(userFavoriteArticleMapper).selectByUserAndArticle(anyLong(), anyLong());
-        verify(userFavoriteArticleMapper).update(any(), any());
+        verify(userFavoriteArticleMapper).softDeleteById(1L);
         verify(articleMapper).decrementFavoriteCount(ARTICLE_ID, 1);
 
         assertFalse(result.getFavorited());
@@ -104,14 +103,14 @@ class ArticleServiceImplFavoriteTest {
     void favoriteArticle_canceledFavorite_shouldRestore() {
         UserFavoriteArticleDO existing = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 1);
         when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong())).thenReturn(existing);
-        when(userFavoriteArticleMapper.update(any(), any())).thenReturn(1);
+        when(userFavoriteArticleMapper.softRestoreById(anyLong())).thenReturn(1);
         when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
 
         ArticleFavoriteRespDTO result = articleService.favoriteArticle(favoriteReqDTO);
 
         verify(userFavoriteArticleMapper).selectByUserAndArticle(anyLong(), anyLong());
-        verify(userFavoriteArticleMapper).update(any(), any());
+        verify(userFavoriteArticleMapper).softRestoreById(1L);
         verify(articleMapper).incrementFavoriteCount(ARTICLE_ID, 1);
 
         assertTrue(result.getFavorited());
@@ -157,7 +156,7 @@ class ArticleServiceImplFavoriteTest {
         when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong()))
                 .thenReturn(null)
                 .thenReturn(duplicate);
-        when(userFavoriteArticleMapper.update(any(), any())).thenReturn(1);
+        when(userFavoriteArticleMapper.softRestoreById(anyLong())).thenReturn(1);
         when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
 
@@ -165,7 +164,7 @@ class ArticleServiceImplFavoriteTest {
 
         verify(userFavoriteArticleMapper, times(2)).selectByUserAndArticle(anyLong(), anyLong());
         verify(userFavoriteArticleMapper).insert(any(UserFavoriteArticleDO.class));
-        verify(userFavoriteArticleMapper).update(any(), any());
+        verify(userFavoriteArticleMapper).softRestoreById(1L);
         verify(articleMapper).incrementFavoriteCount(ARTICLE_ID, 1);
 
         assertTrue(result.getFavorited());
@@ -193,7 +192,7 @@ class ArticleServiceImplFavoriteTest {
     void favoriteArticle_cancelAndReFavorite_fullCycle() {
         UserFavoriteArticleDO active = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 0);
         when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong())).thenReturn(active);
-        when(userFavoriteArticleMapper.update(any(), any())).thenReturn(1);
+        when(userFavoriteArticleMapper.softDeleteById(anyLong())).thenReturn(1);
         when(articleMapper.decrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
 
@@ -202,6 +201,7 @@ class ArticleServiceImplFavoriteTest {
 
         UserFavoriteArticleDO inactive = createFavoriteDO(1L, ARTICLE_ID, USER_ID, 1);
         when(userFavoriteArticleMapper.selectByUserAndArticle(anyLong(), anyLong())).thenReturn(inactive);
+        when(userFavoriteArticleMapper.softRestoreById(anyLong())).thenReturn(1);
         when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
 
         ArticleFavoriteRespDTO result2 = articleService.favoriteArticle(favoriteReqDTO);
@@ -211,7 +211,8 @@ class ArticleServiceImplFavoriteTest {
     @Test
     void favoriteArticle_rapidToggle_multipleTimes() {
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
-        when(userFavoriteArticleMapper.update(any(), any())).thenReturn(1);
+        when(userFavoriteArticleMapper.softDeleteById(anyLong())).thenReturn(1);
+        when(userFavoriteArticleMapper.softRestoreById(anyLong())).thenReturn(1);
         when(articleMapper.decrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
         when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
 
@@ -234,7 +235,8 @@ class ArticleServiceImplFavoriteTest {
     @Test
     void favoriteArticle_fullCycle_favoriteCancelRefavorite() {
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
-        when(userFavoriteArticleMapper.update(any(), any())).thenReturn(1);
+        when(userFavoriteArticleMapper.softDeleteById(anyLong())).thenReturn(1);
+        when(userFavoriteArticleMapper.softRestoreById(anyLong())).thenReturn(1);
         when(articleMapper.decrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
         when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
 

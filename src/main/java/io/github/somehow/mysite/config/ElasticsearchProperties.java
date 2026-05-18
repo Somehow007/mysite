@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "elasticsearch")
 public class ElasticsearchProperties {
 
-    private boolean enabled = true;
+    private boolean enabled = false;
 
     private String[] uris = {"http://localhost:9200"};
 

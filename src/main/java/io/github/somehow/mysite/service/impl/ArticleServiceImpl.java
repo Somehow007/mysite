@@ -242,10 +242,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         UserFavoriteArticleDO existing = userFavoriteArticleMapper.selectByUserAndArticle(userId, articleId);
 
         if (existing != null && existing.getDelFlag() == 0) {
-            userFavoriteArticleMapper.update(null,
-                    Wrappers.<UserFavoriteArticleDO>update()
-                            .eq("id", existing.getId())
-                            .set("del_flag", 1));
+            userFavoriteArticleMapper.softDeleteById(existing.getId());
             articleMapper.decrementFavoriteCount(articleId, 1);
             log.debug("存在且已收藏过，数量-1");
 
@@ -253,11 +250,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         }
 
         if (existing != null && existing.getDelFlag() == 1) {
-            userFavoriteArticleMapper.update(null,
-                    Wrappers.<UserFavoriteArticleDO>update()
-                            .eq("id", existing.getId())
-                            .set("del_flag", 0)
-                            .set("update_time", new Date()));
+            userFavoriteArticleMapper.softRestoreById(existing.getId());
             articleMapper.incrementFavoriteCount(articleId, 1);
             log.debug("存在且已删除，数量+1");
             return ArticleFavoriteRespDTO.builder().favorited(true).favoriteCount(getFavoriteCount(articleId)).build();
@@ -277,11 +270,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             UserFavoriteArticleDO duplicate = userFavoriteArticleMapper.selectByUserAndArticle(userId, articleId);
             if (duplicate != null) {
                 if (duplicate.getDelFlag() == 1) {
-                    userFavoriteArticleMapper.update(null,
-                            Wrappers.<UserFavoriteArticleDO>update()
-                                    .eq("id", duplicate.getId())
-                                    .set("del_flag", 0)
-                                    .set("update_time", new Date()));
+                    userFavoriteArticleMapper.softRestoreById(duplicate.getId());
                     articleMapper.incrementFavoriteCount(articleId, 1);
                     return ArticleFavoriteRespDTO.builder().favorited(true).favoriteCount(getFavoriteCount(articleId)).build();
                 } else {
