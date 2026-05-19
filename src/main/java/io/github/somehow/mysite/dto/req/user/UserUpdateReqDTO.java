@@ -45,4 +45,7 @@ public class UserUpdateReqDTO {
      */
     @Schema(description = "手机号", example = "19732572071", requiredMode = Schema.RequiredMode.REQUIRED)
     private String phoneNumber;
+
+    @Schema(description = "头像URL")
+    private String avatar;
 }

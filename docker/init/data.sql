@@ -97,4 +97,6 @@ VALUES
     (8, 14)   -- Docker -> Git
 ON DUPLICATE KEY UPDATE `article_id` = `article_id`;
 
+ALTER TABLE `t_user` ADD COLUMN IF NOT EXISTS `avatar` VARCHAR(500) DEFAULT NULL COMMENT '头像URL' AFTER `follower_count`;
+
 SELECT '初始化数据插入完成' AS message;

@@ -320,11 +320,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
             log.warn("删除图片文件失败: {}", filePath, e);
         }
 
-        ImageDO updateDO = new ImageDO();
-        updateDO.setDelFlag(1);
-        int rows = baseMapper.update(updateDO, Wrappers.lambdaUpdate(ImageDO.class)
-                .eq(ImageDO::getId, id)
-                .eq(ImageDO::getDelFlag, 0));
+        int rows = baseMapper.deleteById(id);
         if (rows <= 0) {
             throw new ClientException(ErrorCode.IMAGE_DELETE_FAILED);
         }

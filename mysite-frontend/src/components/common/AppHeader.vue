@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { Menu, X, LogOut, PenSquare, LayoutDashboard, Settings, FolderTree, Users, Heart, ImageIcon } from 'lucide-vue-next'
+import { Menu, X, LogOut, PenSquare, LayoutDashboard, Settings, FolderTree, Users, Heart, ImageIcon, Camera, Loader2 } from 'lucide-vue-next'
 import ThemeToggle from './ThemeToggle.vue'
 import SearchDialog from './SearchDialog.vue'
 import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
 import { usePermission } from '@/composables/usePermission'
+import { uploadAvatar } from '@/api/user'
 
 const siteStore = useSiteStore()
 const userStore = useUserStore()
@@ -16,6 +17,7 @@ const route = useRoute()
 const mobileMenuOpen = ref(false)
 const scrolled = ref(false)
 const userMenuOpen = ref(false)
+const avatarUploading = ref(false)
 let menuCloseTimer: ReturnType<typeof setTimeout> | null = null
 
 function handleScroll() {
@@ -64,6 +66,22 @@ async function handleLogout() {
   await userStore.logout()
   userMenuOpen.value = false
   window.location.href = '/'
+}
+
+async function handleAvatarUpload(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) return
+  avatarUploading.value = true
+  try {
+    await uploadAvatar(file)
+  } catch {
+    // error handled by interceptor
+  } finally {
+    avatarUploading.value = false
+    input.value = ''
+  }
 }
 </script>
 
@@ -115,8 +133,9 @@ async function handleLogout() {
                 @click="toggleUserMenu"
                 class="flex items-center gap-2 px-2 py-1 rounded-md text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-all duration-200"
               >
-                <div class="w-7 h-7 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] flex items-center justify-center text-xs font-medium">
-                  {{ userStore.displayName?.charAt(0)?.toUpperCase() || 'U' }}
+                <div class="w-7 h-7 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] flex items-center justify-center text-xs font-medium overflow-hidden">
+                  <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" :alt="userStore.displayName" class="w-full h-full object-cover" />
+                  <span v-else>{{ userStore.displayName?.charAt(0)?.toUpperCase() || 'U' }}</span>
                 </div>
                 <span class="hidden lg:inline">{{ userStore.displayName }}</span>
               </button>
@@ -133,7 +152,18 @@ async function handleLogout() {
                   v-if="userMenuOpen"
                   class="absolute right-0 mt-2 w-52 bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] border border-[var(--color-border)] dark:border-[var(--color-dark-border)] rounded-xl shadow-lg py-1.5 z-50 card-shadow-hover"
                 >
-                  <div class="px-3 py-2 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)] mb-1">
+                  <div class="px-3 py-2 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)] mb-1 flex items-center gap-2.5">
+                    <div class="relative group">
+                      <div class="w-9 h-9 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] flex items-center justify-center text-sm font-medium overflow-hidden">
+                        <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" :alt="userStore.displayName" class="w-full h-full object-cover" />
+                        <span v-else>{{ userStore.displayName?.charAt(0)?.toUpperCase() || 'U' }}</span>
+                      </div>
+                      <label class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                        <Loader2 v-if="avatarUploading" :size="14" class="animate-spin text-white" />
+                        <Camera v-else :size="14" class="text-white" />
+                        <input type="file" accept="image/*" class="hidden" @change="handleAvatarUpload" :disabled="avatarUploading" />
+                      </label>
+                    </div>
                     <p class="text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">{{ userStore.displayName }}</p>
                   </div>
                   <RouterLink

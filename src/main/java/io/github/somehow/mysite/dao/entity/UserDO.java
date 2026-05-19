@@ -40,4 +40,6 @@ public class UserDO extends BaseDO {
     private Integer followingCount;
 
     private Integer followerCount;
+
+    private String avatar;
 }

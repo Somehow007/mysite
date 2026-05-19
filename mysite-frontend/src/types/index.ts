@@ -9,6 +9,7 @@ export interface User {
   role?: UserRole
   followingCount?: number
   followerCount?: number
+  avatar?: string
   favorites?: Record<string, unknown>[]
   histories?: Record<string, unknown>[]
 }

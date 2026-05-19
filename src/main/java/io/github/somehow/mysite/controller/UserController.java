@@ -3,7 +3,14 @@ package io.github.somehow.mysite.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.commons.framework.web.Results;
+import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
+import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.dto.req.user.UserFollowReqDTO;
+import io.github.somehow.mysite.dto.req.user.UserUpdateReqDTO;
+import io.github.somehow.mysite.service.ImageService;
+import io.github.somehow.mysite.dto.resp.ImageUploadRespDTO;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 import io.github.somehow.mysite.dto.req.user.UserPageQueryReqDTO;
 import io.github.somehow.mysite.dto.resp.user.UserPageQueryFollowRespDTO;
 import io.github.somehow.mysite.dto.resp.user.UserSearchRespDTO;
@@ -22,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final UserService userService;
+    private final ImageService imageService;
 
     @Operation(summary = "根据用户id获取用户具体信息")
     @GetMapping("/v1/users/{id}")
@@ -39,6 +47,21 @@ public class UserController {
         requestParam.setUserId(userDetails.getUserId().toString());
         userService.updateUser(requestParam);
         return Results.success();
+    }
+
+    @Operation(summary = "上传用户头像")
+    @PostMapping(value = "/v1/users/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<ImageUploadRespDTO> uploadAvatar(@AuthenticationPrincipal SecurityUserDetails userDetails,
+                                                    @RequestParam("file") MultipartFile file) {
+        if (userDetails == null) {
+            throw new ClientException(ErrorCode.SECURITY_NOT_AUTHENTICATED);
+        }
+        ImageUploadRespDTO result = imageService.uploadImage(file);
+        UserUpdateReqDTO updateReq = new UserUpdateReqDTO();
+        updateReq.setUserId(userDetails.getUserId().toString());
+        updateReq.setAvatar(result.getUrl());
+        userService.updateUser(updateReq);
+        return Results.success(result);
     }
 
     @Operation(summary = "关注或取消关注用户")

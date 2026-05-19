@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS `t_user` (
     `status` TINYINT NOT NULL DEFAULT 1 COMMENT '用户状态 0:禁用 1:启用',
     `following_count` INT DEFAULT 0 COMMENT '关注人数',
     `follower_count` INT DEFAULT 0 COMMENT '粉丝人数',
+    `avatar` VARCHAR(500) DEFAULT NULL COMMENT '头像URL',
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `del_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '删除标识 0:未删除 1:已删除',

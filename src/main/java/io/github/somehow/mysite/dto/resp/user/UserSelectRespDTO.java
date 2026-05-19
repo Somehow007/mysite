@@ -27,6 +27,8 @@ public class UserSelectRespDTO {
 
     private Integer followerCount;
 
+    private String avatar;
+
     private List<ArticlePageQueryRespDTO> favorites;
 
     private List<ArticlePageQueryRespDTO> histories;

@@ -67,7 +67,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 .set(StrUtil.isNotBlank(requestParam.getRealName()), UserDO::getRealName, requestParam.getRealName())
                 .set(StrUtil.isNotBlank(requestParam.getEmail()), UserDO::getEmail, requestParam.getEmail())
                 .set(StrUtil.isNotBlank(requestParam.getPhoneNumber()), UserDO::getPhoneNumber, requestParam.getPhoneNumber())
-                .set(StrUtil.isNotBlank(String.valueOf(requestParam.getSex())), UserDO::getSex, requestParam.getSex());
+                .set(StrUtil.isNotBlank(String.valueOf(requestParam.getSex())), UserDO::getSex, requestParam.getSex())
+            .set(StrUtil.isNotBlank(requestParam.getAvatar()), UserDO::getAvatar, requestParam.getAvatar());
 
         int infectRow = baseMapper.update(updateWrapper);
         if (!SqlHelper.retBool(infectRow)) {
