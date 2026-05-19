@@ -56,7 +56,7 @@ const shortcuts = computed(() => [
   { key: `${modKey.value}+I`, description: '斜体', syntax: '*文字*' },
   { key: `${modKey.value}+U`, description: '下划线', syntax: '<u>文字</u>' },
   { key: `${modKey.value}+K`, description: '插入链接', syntax: '[文字](URL)' },
-  { key: `${modKey.value}+Shift+K`, description: '插入代码块', syntax: '```语言\\n代码\\n```' },
+  { key: `${modKey.value}+Shift+K`, description: '插入代码块', syntax: '```lang\\n代码\\n```' },
   { key: `${modKey.value}+\``, description: '行内代码', syntax: '`代码`' },
   { key: `${modKey.value}+Shift+H`, description: '标题', syntax: '# 标题' },
   { key: `${modKey.value}+Shift+L`, description: '无序列表', syntax: '- 列表项' },
@@ -285,7 +285,7 @@ function handleInput(e: Event) {
   } else if (currentLine.match(/^>$/)) {
     showAutocompletePanel(['> 引用内容'])
   } else if (currentLine.match(/^`{1,2}$/)) {
-    showAutocompletePanel(['`行内代码`', '```代码块```'])
+    showAutocompletePanel(['`行内代码`', '```lang 代码块 ```'])
   } else if (currentLine.match(/^\[.*\]$/)) {
     showAutocompletePanel(['[链接文字](URL)', '![图片描述](图片URL)'])
   } else {
@@ -415,16 +415,23 @@ function insertCodeBlock() {
   const start = textareaRef.value.selectionStart
   const end = textareaRef.value.selectionEnd
   const value = textareaRef.value.value
-  const selectedText = value.substring(start, end) || '代码'
+  const selectedText = value.substring(start, end)
 
-  const codeBlock = `\`\`\`语言\n${selectedText}\n\`\`\``
-  const newText = value.substring(0, start) + codeBlock + value.substring(end)
-  content.value = newText
+  const langPlaceholder = 'lang'
+  const codeContent = selectedText || ''
+  const beforeCursor = value.substring(0, start)
+  const afterCursor = value.substring(end)
+
+  const needsLeadingNewline = beforeCursor.length > 0 && !beforeCursor.endsWith('\n')
+  const leadingNewline = needsLeadingNewline ? '\n' : ''
+
+  const codeBlock = `${leadingNewline}\`\`\`${langPlaceholder}\n${codeContent}\n\`\`\`\n`
+  content.value = beforeCursor + codeBlock + afterCursor
 
   nextTick(() => {
     if (!textareaRef.value) return
-    const langStartPos = start + 3
-    textareaRef.value.setSelectionRange(langStartPos, langStartPos + 2)
+    const langOffset = start + leadingNewline.length + 3
+    textareaRef.value.setSelectionRange(langOffset, langOffset + langPlaceholder.length)
     textareaRef.value.focus()
   })
 }
@@ -437,14 +444,18 @@ function insertHeading() {
 
   const lastNewLine = value.lastIndexOf('\n', start - 1)
   const lineStart = lastNewLine + 1
+  const currentLineText = value.substring(lineStart, start)
 
-  const headingMarkdown = '# '
-  const newText = value.substring(0, lineStart) + headingMarkdown + value.substring(lineStart)
+  const needsNewline = currentLineText.trim().length > 0
+  const prefix = needsNewline ? '\n# ' : '# '
+  const insertPos = needsNewline ? start : lineStart
+
+  const newText = value.substring(0, insertPos) + prefix + value.substring(insertPos)
   content.value = newText
 
   nextTick(() => {
     if (!textareaRef.value) return
-    textareaRef.value.setSelectionRange(lineStart + 2, lineStart + 2)
+    textareaRef.value.setSelectionRange(insertPos + prefix.length, insertPos + prefix.length)
     textareaRef.value.focus()
   })
 }
@@ -457,14 +468,19 @@ function insertList(prefix: string) {
 
   const lastNewLine = value.lastIndexOf('\n', start - 1)
   const lineStart = lastNewLine + 1
+  const currentLineText = value.substring(lineStart, start)
 
+  const needsNewline = currentLineText.trim().length > 0
   const listMarkdown = prefix + ' '
-  const newText = value.substring(0, lineStart) + listMarkdown + value.substring(lineStart)
+  const insertPrefix = needsNewline ? '\n' + listMarkdown : listMarkdown
+  const insertPos = needsNewline ? start : lineStart
+
+  const newText = value.substring(0, insertPos) + insertPrefix + value.substring(insertPos)
   content.value = newText
 
   nextTick(() => {
     if (!textareaRef.value) return
-    textareaRef.value.setSelectionRange(lineStart + listMarkdown.length, lineStart + listMarkdown.length)
+    textareaRef.value.setSelectionRange(insertPos + insertPrefix.length, insertPos + insertPrefix.length)
     textareaRef.value.focus()
   })
 }
@@ -477,14 +493,19 @@ function insertQuote() {
 
   const lastNewLine = value.lastIndexOf('\n', start - 1)
   const lineStart = lastNewLine + 1
+  const currentLineText = value.substring(lineStart, start)
 
+  const needsNewline = currentLineText.trim().length > 0
   const quoteMarkdown = '> '
-  const newText = value.substring(0, lineStart) + quoteMarkdown + value.substring(lineStart)
+  const insertPrefix = needsNewline ? '\n' + quoteMarkdown : quoteMarkdown
+  const insertPos = needsNewline ? start : lineStart
+
+  const newText = value.substring(0, insertPos) + insertPrefix + value.substring(insertPos)
   content.value = newText
 
   nextTick(() => {
     if (!textareaRef.value) return
-    textareaRef.value.setSelectionRange(lineStart + 2, lineStart + 2)
+    textareaRef.value.setSelectionRange(insertPos + insertPrefix.length, insertPos + insertPrefix.length)
     textareaRef.value.focus()
   })
 }
@@ -551,11 +572,11 @@ function getHighlightHtml(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+    .replace(/```(\w*)\n([\s\S]*?)```/g, '<span class="md-code-block">```$1\n$2```</span>')
     .replace(/^(#{1,6})\s+(.*)$/gm, '<span class="md-heading">$1 $2</span>')
     .replace(/\*\*([^*]+)\*\*/g, '<span class="md-bold">**$1**</span>')
     .replace(/\*([^*]+)\*/g, '<span class="md-italic">*$1*</span>')
     .replace(/`([^`]+)`/g, '<span class="md-code">`$1`</span>')
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<span class="md-code-block">```$1\n$2```</span>')
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<span class="md-link">[$1]($2)</span>')
     .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<span class="md-image">![$1]($2)</span>')
     .replace(/^[-*+]\s+/gm, '<span class="md-list">$&</span>')
