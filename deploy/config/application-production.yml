@@ -93,3 +93,13 @@ management:
   metrics:
     tags:
       application: mysite
+
+image:
+  upload:
+    base-path: /data/mysite/uploads/images
+    max-file-size: 5MB
+    allowed-types: image/jpeg,image/png,image/gif,image/webp,image/svg+xml
+    url-path: /uploads/images/
+    max-uploads-per-minute: 10
+    url-fetch-connect-timeout: 5000
+    url-fetch-read-timeout: 15000

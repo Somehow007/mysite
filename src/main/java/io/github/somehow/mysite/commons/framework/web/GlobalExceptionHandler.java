@@ -16,6 +16,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
 
 import java.util.Optional;
 
@@ -55,6 +57,18 @@ public class GlobalExceptionHandler {
     public Result loginExceptionHandler(HttpServletRequest request, Exception ex) {
         log.warn("[{}] {} 登录失败: {}", request.getMethod(), getUrl(request), ex.getMessage());
         return Results.failure(ErrorCode.USER_LOGIN_BAD_CREDENTIALS.code(), ErrorCode.USER_LOGIN_BAD_CREDENTIALS.message());
+    }
+
+    @ExceptionHandler(value = MaxUploadSizeExceededException.class)
+    public Result maxUploadSizeExceptionHandler(HttpServletRequest request, MaxUploadSizeExceededException ex) {
+        log.warn("[{}] {} 文件大小超限: {}", request.getMethod(), getUrl(request), ex.getMessage());
+        return Results.failure(ErrorCode.IMAGE_FILE_TOO_LARGE.code(), ErrorCode.IMAGE_FILE_TOO_LARGE.message());
+    }
+
+    @ExceptionHandler(value = MultipartException.class)
+    public Result multipartExceptionHandler(HttpServletRequest request, MultipartException ex) {
+        log.warn("[{}] {} multipart请求异常: {}", request.getMethod(), getUrl(request), ex.getMessage());
+        return Results.failure(ErrorCode.IMAGE_UPLOAD_FAILED.code(), "请使用multipart/form-data格式上传文件");
     }
 
     @ExceptionHandler(value = Throwable.class)

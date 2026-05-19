@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue'
 import { useMarkdown } from '@/composables/useMarkdown'
-import { Image as ImageIcon, HelpCircle, X, Bold, Italic, Link, Code, List, Quote, Heading } from 'lucide-vue-next'
+import { uploadImage, uploadImageByUrl } from '@/api/image'
+import { useToast } from '@/composables/useToast'
+import { Image as ImageIcon, HelpCircle, X, Bold, Italic, Link, Code, List, Quote, Heading, LinkIcon, Loader2 } from 'lucide-vue-next'
 
 const props = defineProps<{
   modelValue: string
@@ -10,7 +12,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
-  'image-upload': [file: File]
 }>()
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
@@ -24,7 +25,14 @@ const autocompleteItems = ref<string[]>([])
 const autocompletePosition = ref({ top: 0, left: 0 })
 const selectedIndex = ref(0)
 
+const showUrlDialog = ref(false)
+const imageUrl = ref('')
+const urlUploading = ref(false)
+
+const uploadingFiles = ref<Map<string, { name: string; progress: number }>>(new Map())
+
 const { renderedHtml, render, applyHighlighting, rendering } = useMarkdown()
+const toast = useToast()
 
 const isMac = computed(() => {
   if (typeof navigator === 'undefined') return false
@@ -32,6 +40,8 @@ const isMac = computed(() => {
 })
 
 const modKey = computed(() => isMac.value ? 'Cmd' : 'Ctrl')
+
+const isUploading = computed(() => uploadingFiles.value.size > 0 || urlUploading.value)
 
 const shortcuts = computed(() => [
   { key: `${modKey.value}+Z`, description: '撤销', syntax: '撤销上一步操作' },
@@ -74,6 +84,9 @@ onMounted(() => {
   if (textareaRef.value) {
     textareaRef.value.addEventListener('keydown', handleKeyDown)
     textareaRef.value.addEventListener('input', handleInput)
+    textareaRef.value.addEventListener('paste', handlePaste)
+    textareaRef.value.addEventListener('drop', handleDrop)
+    textareaRef.value.addEventListener('dragover', handleDragOver)
   }
   updatePreview()
 })
@@ -82,6 +95,9 @@ onUnmounted(() => {
   if (textareaRef.value) {
     textareaRef.value.removeEventListener('keydown', handleKeyDown)
     textareaRef.value.removeEventListener('input', handleInput)
+    textareaRef.value.removeEventListener('paste', handlePaste)
+    textareaRef.value.removeEventListener('drop', handleDrop)
+    textareaRef.value.removeEventListener('dragover', handleDragOver)
   }
 })
 
@@ -127,7 +143,7 @@ function handleKeyDown(e: KeyboardEvent) {
       case 'i':
         if (e.shiftKey) {
           e.preventDefault()
-          insertImage()
+          handleImageUpload()
         } else {
           e.preventDefault()
           insertMarkdown('*', '*', '斜体文本')
@@ -187,6 +203,42 @@ function handleKeyDown(e: KeyboardEvent) {
   }
 }
 
+function handleDragOver(e: DragEvent) {
+  if (e.dataTransfer?.types.includes('Files')) {
+    e.preventDefault()
+  }
+}
+
+function handleDrop(e: DragEvent) {
+  const files = e.dataTransfer?.files
+  if (files && files.length > 0) {
+    e.preventDefault()
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      if (file && file.type.startsWith('image/')) {
+        doUploadFile(file)
+      }
+    }
+  }
+}
+
+function handlePaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (item && item.type.startsWith('image/')) {
+      e.preventDefault()
+      const file = item.getAsFile()
+      if (file) {
+        doUploadFile(file)
+      }
+      return
+    }
+  }
+}
+
 function removeIndent() {
   if (!textareaRef.value) return
 
@@ -199,16 +251,21 @@ function removeIndent() {
 
   if (lineContent.startsWith('    ')) {
     const newText = value.substring(0, lineStart) + lineContent.substring(4) + value.substring(start)
-    textareaRef.value.value = newText
     content.value = newText
-    textareaRef.value.setSelectionRange(start - 4, start - 4)
+    nextTick(() => {
+      if (!textareaRef.value) return
+      textareaRef.value.setSelectionRange(start - 4, start - 4)
+      textareaRef.value.focus()
+    })
   } else if (lineContent.startsWith('\t')) {
     const newText = value.substring(0, lineStart) + lineContent.substring(1) + value.substring(start)
-    textareaRef.value.value = newText
     content.value = newText
-    textareaRef.value.setSelectionRange(start - 1, start - 1)
+    nextTick(() => {
+      if (!textareaRef.value) return
+      textareaRef.value.setSelectionRange(start - 1, start - 1)
+      textareaRef.value.focus()
+    })
   }
-  textareaRef.value.focus()
 }
 
 function handleInput(e: Event) {
@@ -265,12 +322,15 @@ function applyAutocomplete() {
   const beforeLine = value.substring(0, lastNewLine + 1)
   const afterCursor = value.substring(cursorPos)
 
-  textareaRef.value.value = beforeLine + selected + '\n' + afterCursor
-  content.value = textareaRef.value.value
+  const newText = beforeLine + selected + '\n' + afterCursor
+  content.value = newText
 
   const newPos = beforeLine.length + (selected?.length || 0) + 1
-  textareaRef.value.setSelectionRange(newPos, newPos)
-  textareaRef.value.focus()
+  nextTick(() => {
+    if (!textareaRef.value) return
+    textareaRef.value.setSelectionRange(newPos, newPos)
+    textareaRef.value.focus()
+  })
 
   showAutocomplete.value = false
 }
@@ -284,12 +344,14 @@ function insertMarkdown(before: string, after: string, placeholder: string) {
   const selectedText = value.substring(start, end) || placeholder
 
   const newText = value.substring(0, start) + before + selectedText + after + value.substring(end)
-  textareaRef.value.value = newText
   content.value = newText
 
-  const newCursorPos = start + before.length + selectedText.length
-  textareaRef.value.setSelectionRange(start + before.length, newCursorPos)
-  textareaRef.value.focus()
+  nextTick(() => {
+    if (!textareaRef.value) return
+    const newCursorPos = start + before.length + selectedText.length
+    textareaRef.value.setSelectionRange(start + before.length, newCursorPos)
+    textareaRef.value.focus()
+  })
 }
 
 function insertText(text: string) {
@@ -300,11 +362,13 @@ function insertText(text: string) {
   const value = textareaRef.value.value
 
   const newText = value.substring(0, start) + text + value.substring(end)
-  textareaRef.value.value = newText
   content.value = newText
 
-  textareaRef.value.setSelectionRange(start + text.length, start + text.length)
-  textareaRef.value.focus()
+  nextTick(() => {
+    if (!textareaRef.value) return
+    textareaRef.value.setSelectionRange(start + text.length, start + text.length)
+    textareaRef.value.focus()
+  })
 }
 
 function insertLink() {
@@ -317,28 +381,32 @@ function insertLink() {
 
   const linkMarkdown = `[${selectedText}](URL)`
   const newText = value.substring(0, start) + linkMarkdown + value.substring(end)
-  textareaRef.value.value = newText
   content.value = newText
 
-  const urlStartPos = start + selectedText.length + 3
-  textareaRef.value.setSelectionRange(urlStartPos, urlStartPos + 3)
-  textareaRef.value.focus()
+  nextTick(() => {
+    if (!textareaRef.value) return
+    const urlStartPos = start + selectedText.length + 3
+    textareaRef.value.setSelectionRange(urlStartPos, urlStartPos + 3)
+    textareaRef.value.focus()
+  })
 }
 
-function insertImage() {
+function insertImageMarkdown(url: string, alt?: string) {
   if (!textareaRef.value) return
 
   const start = textareaRef.value.selectionStart
   const value = textareaRef.value.value
+  const imageMarkdown = `![${alt || '图片'}](${url})`
 
-  const imageMarkdown = `![图片描述](图片URL)`
   const newText = value.substring(0, start) + imageMarkdown + value.substring(start)
-  textareaRef.value.value = newText
   content.value = newText
 
-  const descStartPos = start + 2
-  textareaRef.value.setSelectionRange(descStartPos, descStartPos + 4)
-  textareaRef.value.focus()
+  nextTick(() => {
+    if (!textareaRef.value) return
+    const newPos = start + imageMarkdown.length
+    textareaRef.value.setSelectionRange(newPos, newPos)
+    textareaRef.value.focus()
+  })
 }
 
 function insertCodeBlock() {
@@ -351,12 +419,14 @@ function insertCodeBlock() {
 
   const codeBlock = `\`\`\`语言\n${selectedText}\n\`\`\``
   const newText = value.substring(0, start) + codeBlock + value.substring(end)
-  textareaRef.value.value = newText
   content.value = newText
 
-  const langStartPos = start + 3
-  textareaRef.value.setSelectionRange(langStartPos, langStartPos + 2)
-  textareaRef.value.focus()
+  nextTick(() => {
+    if (!textareaRef.value) return
+    const langStartPos = start + 3
+    textareaRef.value.setSelectionRange(langStartPos, langStartPos + 2)
+    textareaRef.value.focus()
+  })
 }
 
 function insertHeading() {
@@ -370,11 +440,13 @@ function insertHeading() {
 
   const headingMarkdown = '# '
   const newText = value.substring(0, lineStart) + headingMarkdown + value.substring(lineStart)
-  textareaRef.value.value = newText
   content.value = newText
 
-  textareaRef.value.setSelectionRange(lineStart + 2, lineStart + 2)
-  textareaRef.value.focus()
+  nextTick(() => {
+    if (!textareaRef.value) return
+    textareaRef.value.setSelectionRange(lineStart + 2, lineStart + 2)
+    textareaRef.value.focus()
+  })
 }
 
 function insertList(prefix: string) {
@@ -388,11 +460,13 @@ function insertList(prefix: string) {
 
   const listMarkdown = prefix + ' '
   const newText = value.substring(0, lineStart) + listMarkdown + value.substring(lineStart)
-  textareaRef.value.value = newText
   content.value = newText
 
-  textareaRef.value.setSelectionRange(lineStart + listMarkdown.length, lineStart + listMarkdown.length)
-  textareaRef.value.focus()
+  nextTick(() => {
+    if (!textareaRef.value) return
+    textareaRef.value.setSelectionRange(lineStart + listMarkdown.length, lineStart + listMarkdown.length)
+    textareaRef.value.focus()
+  })
 }
 
 function insertQuote() {
@@ -406,25 +480,70 @@ function insertQuote() {
 
   const quoteMarkdown = '> '
   const newText = value.substring(0, lineStart) + quoteMarkdown + value.substring(lineStart)
-  textareaRef.value.value = newText
   content.value = newText
 
-  textareaRef.value.setSelectionRange(lineStart + 2, lineStart + 2)
-  textareaRef.value.focus()
+  nextTick(() => {
+    if (!textareaRef.value) return
+    textareaRef.value.setSelectionRange(lineStart + 2, lineStart + 2)
+    textareaRef.value.focus()
+  })
 }
 
 function handleImageUpload() {
   const input = document.createElement('input')
   input.type = 'file'
-  input.accept = 'image/*'
+  input.accept = 'image/jpeg,image/png,image/gif,image/webp,image/svg+xml'
+  input.multiple = true
   input.onchange = (e: Event) => {
     const target = e.target as HTMLInputElement
-    const file = target.files?.[0]
-    if (file) {
-      emit('image-upload', file)
+    const files = target.files
+    if (files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        if (file) {
+          doUploadFile(file)
+        }
+      }
     }
   }
   input.click()
+}
+
+async function doUploadFile(file: File) {
+  const fileId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
+  uploadingFiles.value.set(fileId, { name: file.name, progress: 0 })
+
+  try {
+    const result = await uploadImage(file)
+    insertImageMarkdown(result.url, result.originalName)
+  } catch (e) {
+    console.error('图片上传失败:', e)
+    toast.error('图片上传失败：' + (e instanceof Error ? e.message : '未知错误'))
+  } finally {
+    uploadingFiles.value.delete(fileId)
+  }
+}
+
+function openUrlDialog() {
+  imageUrl.value = ''
+  showUrlDialog.value = true
+}
+
+async function handleUrlUpload() {
+  if (!imageUrl.value.trim()) return
+
+  urlUploading.value = true
+  try {
+    const result = await uploadImageByUrl(imageUrl.value.trim())
+    insertImageMarkdown(result.url, result.originalName)
+    showUrlDialog.value = false
+    imageUrl.value = ''
+  } catch (e) {
+    console.error('URL图片上传失败:', e)
+    toast.error('URL图片上传失败：' + (e instanceof Error ? e.message : '未知错误'))
+  } finally {
+    urlUploading.value = false
+  }
 }
 
 function getHighlightHtml(text: string): string {
@@ -502,11 +621,22 @@ function getHighlightHtml(text: string): string {
       <button
         @click="handleImageUpload"
         class="p-1.5 rounded hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
-        :title="`插入图片 (${modKey}+Shift+I)`"
+        :title="`上传图片 (${modKey}+Shift+I)`"
       >
         <ImageIcon :size="16" />
       </button>
+      <button
+        @click="openUrlDialog"
+        class="p-1.5 rounded hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+        title="通过URL插入图片"
+      >
+        <LinkIcon :size="16" />
+      </button>
       <div class="flex-1" />
+      <div v-if="isUploading" class="flex items-center gap-1.5 text-xs text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">
+        <Loader2 :size="12" class="animate-spin" />
+        <span>上传中...</span>
+      </div>
       <button
         @click="showPreview = !showPreview"
         class="px-3 py-1.5 text-sm rounded border border-[var(--color-border)] dark:border-[var(--color-dark-border)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
@@ -568,6 +698,60 @@ function getHighlightHtml(text: string): string {
         @click="selectedIndex = index; applyAutocomplete()"
       >
         {{ item }}
+      </div>
+    </div>
+
+    <div
+      v-if="showUrlDialog"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click="showUrlDialog = false"
+    >
+      <div
+        class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-lg shadow-xl w-full max-w-md mx-4"
+        @click.stop
+      >
+        <div class="flex items-center justify-between p-4 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
+          <h3 class="text-lg font-semibold">通过URL插入图片</h3>
+          <button
+            @click="showUrlDialog = false"
+            class="p-1 rounded hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+          >
+            <X :size="18" />
+          </button>
+        </div>
+        <div class="p-4 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+              图片URL
+            </label>
+            <input
+              v-model="imageUrl"
+              type="url"
+              placeholder="https://example.com/image.jpg"
+              class="input-base"
+              @keydown.enter="handleUrlUpload"
+            />
+          </div>
+          <p class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+            图片将从该URL下载并保存到服务器，避免外链失效。
+          </p>
+          <div class="flex justify-end gap-3">
+            <button
+              @click="showUrlDialog = false"
+              class="btn-secondary"
+            >
+              取消
+            </button>
+            <button
+              @click="handleUrlUpload"
+              :disabled="!imageUrl.trim() || urlUploading"
+              class="btn-primary disabled:opacity-50"
+            >
+              <Loader2 v-if="urlUploading" :size="14" class="animate-spin" />
+              插入
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 

@@ -6,9 +6,6 @@ import type { ApiResponse } from '@/types'
 const apiClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
   timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 })
 
 const noAuthPaths = ['/v1/auth/login', '/v1/auth/register', '/v1/auth/refresh']
@@ -19,6 +16,9 @@ apiClient.interceptors.request.use(
     const isNoAuthPath = noAuthPaths.some(path => config.url?.includes(path))
     if (token && config.headers && !isNoAuthPath) {
       config.headers.Authorization = `Bearer ${token}`
+    }
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type']
     }
     return config
   },

@@ -163,3 +163,29 @@ CREATE TABLE IF NOT EXISTS `t_user_operation_log` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户操作日志表';
 
 SELECT '表结构创建完成' AS message;
+
+-- ==============================================
+-- 9. 图片表 (t_image)
+-- ==============================================
+CREATE TABLE IF NOT EXISTS `t_image` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `original_name` VARCHAR(255) NOT NULL COMMENT '原始文件名',
+    `stored_name` VARCHAR(255) NOT NULL COMMENT '存储文件名',
+    `file_path` VARCHAR(500) NOT NULL COMMENT '文件相对路径',
+    `url` VARCHAR(500) NOT NULL COMMENT '访问URL',
+    `file_size` BIGINT NOT NULL COMMENT '文件大小(字节)',
+    `content_type` VARCHAR(100) NOT NULL COMMENT 'MIME类型',
+    `width` INT DEFAULT NULL COMMENT '图片宽度',
+    `height` INT DEFAULT NULL COMMENT '图片高度',
+    `source_type` TINYINT NOT NULL DEFAULT 0 COMMENT '来源 0:本地上传 1:URL拉取',
+    `source_url` VARCHAR(500) DEFAULT NULL COMMENT '原始URL(source_type=1时)',
+    `uploader_id` BIGINT NOT NULL COMMENT '上传者ID',
+    `article_count` INT NOT NULL DEFAULT 0 COMMENT '引用文章数',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '删除标识 0:未删除 1:已删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_uploader_id` (`uploader_id`),
+    KEY `idx_create_time` (`create_time`),
+    KEY `idx_source_type` (`source_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='图片表';

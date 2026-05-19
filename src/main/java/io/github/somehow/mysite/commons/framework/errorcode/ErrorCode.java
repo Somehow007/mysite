@@ -78,6 +78,22 @@ public enum ErrorCode implements IErrorCode {
     SECURITY_NOT_AUTHENTICATED("A070100", "未登录或Token已过期"),
     SECURITY_ACCESS_DENIED("A070101", "权限不足，无法访问该资源"),
 
+    // ---------- A08: 图片模块错误 ----------
+    IMAGE_ERROR("A080001", "图片模块错误"),
+    IMAGE_UPLOAD_FAILED("A080100", "图片上传失败"),
+    IMAGE_FILE_TOO_LARGE("A080101", "图片文件大小超出限制"),
+    IMAGE_TYPE_NOT_ALLOWED("A080102", "不支持的图片类型"),
+    IMAGE_FILE_INVALID("A080103", "图片文件内容无效"),
+    IMAGE_NOT_FOUND("A080104", "图片不存在"),
+    IMAGE_DELETE_FAILED("A080105", "图片删除失败"),
+    IMAGE_URL_INVALID("A080200", "图片URL格式无效"),
+    IMAGE_URL_UNREACHABLE("A080201", "图片URL不可访问"),
+    IMAGE_URL_NOT_IMAGE("A080202", "URL指向的不是图片文件"),
+    IMAGE_URL_TOO_LARGE("A080203", "远程图片文件大小超出限制"),
+    IMAGE_URL_FETCH_FAILED("A080204", "远程图片拉取失败"),
+    IMAGE_SSRF_BLOCKED("A080205", "不允许访问内网地址"),
+    IMAGE_UPLOAD_RATE_LIMITED("A080300", "上传频率过高，请稍后再试"),
+
     // ==================== B: 服务端错误 ====================
     SERVICE_ERROR("B000001", "系统执行出错"),
     SERVICE_TIMEOUT_ERROR("B000100", "系统执行超时"),

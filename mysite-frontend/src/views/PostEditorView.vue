@@ -142,10 +142,6 @@ function toggleTag(tagId: string) {
 function toggleMetaPanel() {
   showMetaPanel.value = !showMetaPanel.value
 }
-
-async function handleImageUpload(_file: File) {
-  void _file
-}
 </script>
 
 <template>
@@ -221,7 +217,6 @@ async function handleImageUpload(_file: File) {
           <MarkdownEditor
             v-model="content"
             placeholder="用 Markdown 写文章..."
-            @image-upload="handleImageUpload"
           />
         </div>
       </div>
