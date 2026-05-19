@@ -10,6 +10,7 @@ APP_DIR="/opt/mysite"
 APP_JAR="$APP_DIR/mysite.jar"
 APP_START_SCRIPT="$APP_DIR/start.sh"
 NGINX_WEB_ROOT="/var/www/mysite"
+UPLOAD_DIR="/data/mysite/uploads"
 DEPLOY_LOG_DIR="/var/log/mysite/deploy"
 
 DEPLOY_LOG=""
@@ -137,42 +138,118 @@ step_deploy_frontend() {
     log_success "前端部署成功 ($(find "$NGINX_WEB_ROOT" -type f | wc -l) 个文件)"
 }
 
+step_setup_upload_dir() {
+    log_step "设置上传目录"
+
+    log_info "创建上传目录: $UPLOAD_DIR/images"
+    sudo mkdir -p "$UPLOAD_DIR/images"
+
+    log_info "修复已有上传文件的所有者（root -> www-data）"
+    sudo chown -R www-data:www-data "$UPLOAD_DIR"
+
+    log_info "设置目录权限: 755"
+    sudo chmod -R 755 "$UPLOAD_DIR"
+
+    log_info "验证目录结构:"
+    ls -la "$UPLOAD_DIR/" 2>&1 | tee -a "$DEPLOY_LOG"
+    if [ -d "$UPLOAD_DIR/images" ]; then
+        ls -la "$UPLOAD_DIR/images/" 2>&1 | tee -a "$DEPLOY_LOG"
+    fi
+
+    log_success "上传目录设置完成: $UPLOAD_DIR"
+}
+
 step_sync_nginx() {
     log_step "同步 Nginx 配置"
+
+    log_info "禁用 Nginx 默认站点（避免冲突）"
+    if [ -L "/etc/nginx/sites-enabled/default" ] || [ -f "/etc/nginx/sites-enabled/default" ]; then
+        sudo rm -f /etc/nginx/sites-enabled/default
+        log_success "已禁用默认站点: /etc/nginx/sites-enabled/default"
+    else
+        log_info "默认站点已禁用，无需操作"
+    fi
+
+    log_info "同步 mysite.conf"
     local project_conf="$PROJECT_DIR/deploy/nginx/mysite.conf"
     local sites_available="/etc/nginx/sites-available/mysite.conf"
     local sites_enabled="/etc/nginx/sites-enabled/mysite.conf"
-    
-    if [ -f "$project_conf" ]; then
-        sudo cp "$project_conf" "$sites_available"
-        sudo ln -sf "$sites_available" "$sites_enabled" 2>/dev/null || true
-        log_success "Nginx 配置已同步"
-    else
+
+    if [ ! -f "$project_conf" ]; then
         die "未找到项目 Nginx 配置文件: $project_conf"
     fi
-    
+
+    sudo cp "$project_conf" "$sites_available"
+    sudo ln -sf "$sites_available" "$sites_enabled"
+    log_success "Nginx 配置已同步到 $sites_available"
+
+    log_info "验证 /uploads/ location 配置:"
+    if grep -q "location.*uploads" "$sites_available"; then
+        grep -A 5 "location.*uploads" "$sites_available" | tee -a "$DEPLOY_LOG"
+        log_success "/uploads/ location 配置存在"
+    else
+        die "Nginx 配置中缺少 /uploads/ location 块"
+    fi
+
+    log_info "测试 Nginx 配置"
     sudo nginx -t 2>&1 | tee -a "$DEPLOY_LOG" || die "Nginx 配置测试失败"
+
+    log_info "重启 Nginx"
     sudo systemctl restart nginx || die "Nginx 重启失败"
     log_success "Nginx 已重启"
+
+    log_info "验证 Nginx 实际加载的配置:"
+    nginx -T 2>&1 | grep -A 5 "location.*uploads" | tee -a "$DEPLOY_LOG"
 }
 
-step_setup_upload_dir() {
-    log_step "设置上传目录权限"
-    local upload_dir="/data/mysite/uploads"
-    local images_dir="$upload_dir/images"
-    
-    log_info "创建上传目录: $images_dir"
-    sudo mkdir -p "$images_dir"
-    
-    log_info "设置所有者: www-data:www-data"
-    sudo chown -R www-data:www-data "$upload_dir"
-    
-    log_info "设置权限: 755"
-    sudo chmod -R 755 "$upload_dir"
-    
-    log_info "验证目录结构"
-    ls -la "$upload_dir/"
-    log_success "上传目录权限设置完成: $upload_dir"
+step_verify() {
+    log_step "部署验证"
+
+    log_info "1. 检查后端服务"
+    if curl -sf http://localhost:8081/actuator/health > /dev/null 2>&1; then
+        log_success "后端服务健康"
+    else
+        log_warn "后端健康检查未通过（可能还在启动中）"
+    fi
+
+    log_info "2. 检查 Nginx 代理"
+    local http_code
+    http_code=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8080/ 2>/dev/null || echo "000")
+    if [ "$http_code" = "200" ]; then
+        log_success "Nginx 前端代理正常 (HTTP $http_code)"
+    else
+        log_warn "Nginx 前端代理返回 HTTP $http_code"
+    fi
+
+    log_info "3. 检查上传目录可访问性"
+    local upload_code
+    upload_code=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8080/uploads/images/ 2>/dev/null || echo "000")
+    if [ "$upload_code" = "403" ] || [ "$upload_code" = "404" ]; then
+        log_success "上传目录 Nginx 路由正常 (HTTP $upload_code，目录不可列举是预期行为)"
+    else
+        log_warn "上传目录 Nginx 路由返回 HTTP $upload_code（期望 403/404）"
+    fi
+
+    log_info "4. 检查已上传文件"
+    local uploaded_files
+    uploaded_files=$(find "$UPLOAD_DIR/images" -type f 2>/dev/null | head -3)
+    if [ -n "$uploaded_files" ]; then
+        log_info "已上传文件示例:"
+        echo "$uploaded_files" | tee -a "$DEPLOY_LOG"
+        local sample_file
+        sample_file=$(echo "$uploaded_files" | head -1)
+        local sample_url="/uploads/images/$(echo "$sample_file" | sed "s|$UPLOAD_DIR/images/||")"
+        local file_code
+        file_code=$(curl -sf -o /dev/null -w "%{http_code}" "http://localhost:8080$sample_url" 2>/dev/null || echo "000")
+        if [ "$file_code" = "200" ]; then
+            log_success "图片文件可访问: $sample_url (HTTP $file_code)"
+        else
+            log_error "图片文件不可访问: $sample_url (HTTP $file_code)"
+            log_error "请检查 Nginx 配置和文件权限"
+        fi
+    else
+        log_info "暂无已上传文件，跳过文件访问验证"
+    fi
 }
 
 main() {
@@ -192,6 +269,7 @@ main() {
     step_deploy_frontend
     step_setup_upload_dir
     step_sync_nginx
+    step_verify
 
     echo ""
     log_success "部署完成！"
