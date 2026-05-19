@@ -142,23 +142,37 @@ step_sync_nginx() {
     local project_conf="$PROJECT_DIR/deploy/nginx/mysite.conf"
     local sites_available="/etc/nginx/sites-available/mysite.conf"
     local sites_enabled="/etc/nginx/sites-enabled/mysite.conf"
+    
     if [ -f "$project_conf" ]; then
-        if [ -f "$sites_available" ]; then
-            if ! diff -q "$project_conf" "$sites_available" > /dev/null 2>&1; then
-                sudo cp "$project_conf" "$sites_available"
-                log_success "Nginx 配置已更新"
-            else
-                log_info "Nginx 配置无变更"
-            fi
-        else
-            sudo cp "$project_conf" "$sites_available"
-            sudo ln -sf "$sites_available" "$sites_enabled" 2>/dev/null || true
-            log_success "Nginx 配置已安装"
-        fi
+        sudo cp "$project_conf" "$sites_available"
+        sudo ln -sf "$sites_available" "$sites_enabled" 2>/dev/null || true
+        log_success "Nginx 配置已同步"
+    else
+        die "未找到项目 Nginx 配置文件: $project_conf"
     fi
+    
     sudo nginx -t 2>&1 | tee -a "$DEPLOY_LOG" || die "Nginx 配置测试失败"
-    sudo systemctl reload nginx || sudo systemctl restart nginx || die "Nginx 重载失败"
-    log_success "Nginx 已重载"
+    sudo systemctl restart nginx || die "Nginx 重启失败"
+    log_success "Nginx 已重启"
+}
+
+step_setup_upload_dir() {
+    log_step "设置上传目录权限"
+    local upload_dir="/data/mysite/uploads"
+    local images_dir="$upload_dir/images"
+    
+    log_info "创建上传目录: $images_dir"
+    sudo mkdir -p "$images_dir"
+    
+    log_info "设置所有者: www-data:www-data"
+    sudo chown -R www-data:www-data "$upload_dir"
+    
+    log_info "设置权限: 755"
+    sudo chmod -R 755 "$upload_dir"
+    
+    log_info "验证目录结构"
+    ls -la "$upload_dir/"
+    log_success "上传目录权限设置完成: $upload_dir"
 }
 
 main() {
@@ -176,6 +190,7 @@ main() {
     step_deploy_backend
     step_start_service
     step_deploy_frontend
+    step_setup_upload_dir
     step_sync_nginx
 
     echo ""
