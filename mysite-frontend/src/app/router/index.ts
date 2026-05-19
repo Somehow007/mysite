@@ -95,6 +95,12 @@ const router = createRouter({
           meta: { requiresDeveloper: true },
         },
         {
+          path: 'images',
+          name: 'images',
+          component: () => import('@/views/ImageManagerView.vue'),
+          meta: { requiresDeveloper: true },
+        },
+        {
           path: 'users',
           name: 'users',
           component: () => import('@/views/UserManageView.vue'),

@@ -1,4 +1,5 @@
 import apiClient from './client'
+import { getPaginated } from './client'
 import type { ApiResponse } from '@/types'
 
 export interface ImageUploadResult {
@@ -9,6 +10,27 @@ export interface ImageUploadResult {
   contentType: string
   width: number | null
   height: number | null
+}
+
+export interface ImageItem {
+  id: string
+  originalName: string
+  url: string
+  fileSize: number
+  contentType: string
+  width: number | null
+  height: number | null
+  sourceType: number
+  sourceUrl: string | null
+  uploaderId: string
+  createTime: string
+}
+
+export interface ImageListParams {
+  current?: number
+  size?: number
+  keyword?: string
+  sourceType?: number
 }
 
 export function uploadImage(file: File): Promise<ImageUploadResult> {
@@ -25,6 +47,10 @@ export function uploadImageByUrl(url: string): Promise<ImageUploadResult> {
     timeout: 30000,
   })
   return response.then(res => res.data.data as ImageUploadResult)
+}
+
+export function getImages(params: ImageListParams = {}) {
+  return getPaginated<ImageItem>('/v1/images', params as Record<string, unknown>)
 }
 
 export function deleteImage(id: string): Promise<void> {

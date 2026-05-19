@@ -1,8 +1,11 @@
 package io.github.somehow.mysite.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.commons.framework.web.Results;
+import io.github.somehow.mysite.dto.req.image.ImagePageQueryReqDTO;
 import io.github.somehow.mysite.dto.req.image.ImageUrlUploadReqDTO;
+import io.github.somehow.mysite.dto.resp.ImagePageQueryRespDTO;
 import io.github.somehow.mysite.dto.resp.ImageUploadRespDTO;
 import io.github.somehow.mysite.service.ImageService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +21,12 @@ import org.springframework.web.multipart.MultipartFile;
 public class ImageController {
 
     private final ImageService imageService;
+
+    @Operation(summary = "分页查询图片列表")
+    @GetMapping("/v1/images")
+    public Result<IPage<ImagePageQueryRespDTO>> pageQueryImages(ImagePageQueryReqDTO requestParam) {
+        return Results.success(imageService.pageQueryImages(requestParam));
+    }
 
     @Operation(summary = "本地上传图片")
     @PostMapping(value = "/v1/images/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

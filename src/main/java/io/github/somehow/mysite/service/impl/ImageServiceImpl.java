@@ -5,6 +5,7 @@ import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import io.github.somehow.mysite.commons.context.UserContext;
 import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
@@ -12,6 +13,8 @@ import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.config.ImageUploadConfig;
 import io.github.somehow.mysite.dao.entity.ImageDO;
 import io.github.somehow.mysite.dao.mapper.ImageMapper;
+import io.github.somehow.mysite.dto.req.image.ImagePageQueryReqDTO;
+import io.github.somehow.mysite.dto.resp.ImagePageQueryRespDTO;
 import io.github.somehow.mysite.dto.resp.ImageUploadRespDTO;
 import io.github.somehow.mysite.service.ImageService;
 import lombok.RequiredArgsConstructor;
@@ -291,6 +294,11 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
         baseMapper.insert(imageDO);
 
         return buildUploadResp(imageDO);
+    }
+
+    @Override
+    public IPage<ImagePageQueryRespDTO> pageQueryImages(ImagePageQueryReqDTO requestParam) {
+        return baseMapper.pageQueryImages(requestParam);
     }
 
     @Override
