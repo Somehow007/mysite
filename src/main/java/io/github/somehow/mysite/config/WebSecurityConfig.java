@@ -19,6 +19,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
@@ -63,13 +64,15 @@ public class WebSecurityConfig {
                                 "/v1/tags/**",
                                 "/v1/search/**",
                                 "/v1/site/**",
-                                "/uploads/**",
                                 "/actuator/**",
                                 "/doc.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
                                 "/webjars/**",
                                 "/favicon.ico"
+                        ).permitAll()
+                        .requestMatchers(
+                                AntPathRequestMatcher.antMatcher("/uploads/**")
                         ).permitAll()
                         .requestMatchers(
                                 "/v1/categories/*/children"

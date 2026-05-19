@@ -162,13 +162,11 @@ step_setup_upload_dir() {
 step_sync_nginx() {
     log_step "同步 Nginx 配置"
 
-    log_info "禁用 Nginx 默认站点（避免冲突）"
-    if [ -L "/etc/nginx/sites-enabled/default" ] || [ -f "/etc/nginx/sites-enabled/default" ]; then
-        sudo rm -f /etc/nginx/sites-enabled/default
-        log_success "已禁用默认站点: /etc/nginx/sites-enabled/default"
-    else
-        log_info "默认站点已禁用，无需操作"
-    fi
+    log_info "清理冲突配置（默认站点 + 旧 mysite 配置）"
+    sudo rm -f /etc/nginx/sites-enabled/default
+    sudo rm -f /etc/nginx/sites-enabled/mysite
+    sudo rm -f /etc/nginx/sites-available/mysite
+    log_success "已清理冲突配置"
 
     log_info "同步 mysite.conf"
     local project_conf="$PROJECT_DIR/deploy/nginx/mysite.conf"
@@ -190,6 +188,9 @@ step_sync_nginx() {
     else
         die "Nginx 配置中缺少 /uploads/ location 块"
     fi
+
+    log_info "验证 sites-enabled 目录:"
+    ls -la /etc/nginx/sites-enabled/ 2>&1 | tee -a "$DEPLOY_LOG"
 
     log_info "测试 Nginx 配置"
     sudo nginx -t 2>&1 | tee -a "$DEPLOY_LOG" || die "Nginx 配置测试失败"
