@@ -203,6 +203,40 @@ step_sync_nginx() {
     nginx -T 2>&1 | grep -A 5 "location.*uploads" | tee -a "$DEPLOY_LOG"
 }
 
+step_sync_artalk() {
+    log_step "同步 Artalk 配置"
+
+    local artalk_conf="$PROJECT_DIR/docker/artalk.yml"
+    local docker_artalk_conf="$PROJECT_DIR/docker/artalk.yml"
+
+    if [ ! -f "$artalk_conf" ]; then
+        log_warn "未找到 Artalk 配置文件: $artalk_conf，跳过"
+        return 0
+    fi
+
+    log_info "同步 artalk.yml 到 Docker 挂载路径"
+    cp "$artalk_conf" "$docker_artalk_conf"
+    log_success "artalk.yml 已同步"
+
+    log_info "重启 Artalk 容器以加载新配置"
+    if docker ps --format '{{.Names}}' | grep -q 'mysite-artalk'; then
+        docker restart mysite-artalk 2>&1 | tee -a "$DEPLOY_LOG"
+        log_success "Artalk 容器已重启"
+    else
+        log_warn "未找到 mysite-artalk 容器，请手动启动"
+    fi
+
+    log_info "验证 Artalk 服务"
+    sleep 3
+    local artalk_code
+    artalk_code=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:23366/api/v2/stat 2>/dev/null || echo "000")
+    if [ "$artalk_code" = "200" ]; then
+        log_success "Artalk 服务正常 (HTTP $artalk_code)"
+    else
+        log_warn "Artalk 服务返回 HTTP $artalk_code"
+    fi
+}
+
 step_verify() {
     log_step "部署验证"
 
@@ -270,6 +304,7 @@ main() {
     step_deploy_frontend
     step_setup_upload_dir
     step_sync_nginx
+    step_sync_artalk
     step_verify
 
     echo ""

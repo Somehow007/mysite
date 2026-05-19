@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { Menu, X, LogOut, PenSquare, LayoutDashboard, Settings, FolderTree, Users, Heart } from 'lucide-vue-next'
+import { Menu, X, LogOut, PenSquare, LayoutDashboard, Settings, FolderTree, Users, Heart, ImageIcon } from 'lucide-vue-next'
 import ThemeToggle from './ThemeToggle.vue'
 import SearchDialog from './SearchDialog.vue'
 import { useSiteStore } from '@/stores/site'
@@ -162,6 +162,15 @@ async function handleLogout() {
                   </RouterLink>
                   <RouterLink
                     v-if="isDeveloper"
+                    to="/dashboard/images"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
+                    @click="closeUserMenu"
+                  >
+                    <ImageIcon :size="15" />
+                    图片管理
+                  </RouterLink>
+                  <RouterLink
+                    v-if="isDeveloper"
                     to="/dashboard/categories"
                     class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
@@ -263,6 +272,14 @@ async function handleLogout() {
               @click="closeMobileMenu"
             >
               写文章
+            </RouterLink>
+            <RouterLink
+              v-if="isDeveloper"
+              to="/dashboard/images"
+              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
+              @click="closeMobileMenu"
+            >
+              图片管理
             </RouterLink>
             <RouterLink
               v-if="isDeveloper"

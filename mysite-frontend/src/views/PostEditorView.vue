@@ -2,10 +2,11 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle } from 'lucide-vue-next'
+import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X } from 'lucide-vue-next'
 import { createArticle, updateArticle, getArticleById } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { getTags } from '@/api/tag'
+import { uploadImage } from '@/api/image'
 import { useUserStore } from '@/stores/user'
 import MarkdownEditor from '@/components/editor/MarkdownEditor.vue'
 import type { Category, Tag } from '@/types'
@@ -36,6 +37,7 @@ const error = ref('')
 
 const showMetaPanel = ref(false)
 const showSummaryHint = ref(false)
+const coverUploading = ref(false)
 
 onMounted(async () => {
   loading.value = true
@@ -141,6 +143,27 @@ function toggleTag(tagId: string) {
 
 function toggleMetaPanel() {
   showMetaPanel.value = !showMetaPanel.value
+}
+
+async function handleCoverUpload(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) return
+  coverUploading.value = true
+  try {
+    const result = await uploadImage(file)
+    coverImage.value = result.url
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : '封面上传失败'
+  } finally {
+    coverUploading.value = false
+    input.value = ''
+  }
+}
+
+function removeCover() {
+  coverImage.value = ''
 }
 </script>
 
@@ -284,10 +307,24 @@ function toggleMetaPanel() {
             <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
               封面图片
             </label>
+            <div v-if="coverImage" class="relative group mb-2">
+              <img :src="coverImage" alt="封面预览" class="w-full aspect-[2/1] object-cover rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)]" />
+              <button @click="removeCover" class="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity" title="移除封面">
+                <X :size="14" />
+              </button>
+            </div>
+            <div class="flex gap-2 mb-2">
+              <label class="btn-secondary cursor-pointer text-xs flex items-center gap-1.5">
+                <Loader2 v-if="coverUploading" :size="12" class="animate-spin" />
+                <span v-else>📁</span>
+                {{ coverUploading ? '上传中...' : '本地上传' }}
+                <input type="file" accept="image/*" class="hidden" @change="handleCoverUpload" :disabled="coverUploading" />
+              </label>
+            </div>
             <input
               v-model="coverImage"
               type="text"
-              placeholder="图片URL（可选）"
+              placeholder="或输入图片URL"
               class="input-base"
             />
           </div>

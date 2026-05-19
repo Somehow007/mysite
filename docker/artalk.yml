@@ -11,14 +11,20 @@ site_default: "MySite博客"
 sites:
   - name: "MySite博客"
     urls:
+      - "http://124.222.65.169:8080"
       - "http://localhost:5173"
       - "http://localhost:8081"
 
 trusted_domains:
+  - "124.222.65.169"
+  - "124.222.65.169:8080"
   - "localhost"
   - "localhost:5173"
   - "localhost:8081"
   - "127.0.0.1"
+
+http:
+  proxy_header: X-Forwarded-For
 
 admin_users:
   - name: admin
