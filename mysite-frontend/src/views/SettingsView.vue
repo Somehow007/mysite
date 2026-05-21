@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useUserStore } from '@/stores/user'
 import { changePassword } from '@/api/auth'
-import { Eye, EyeOff, User, Lock, Mail } from 'lucide-vue-next'
+import { Eye, EyeOff, User, Lock, Mail, Phone, UserCircle } from 'lucide-vue-next'
 import type { ChangePasswordRequest } from '@/types'
 
 useHead(() => ({
@@ -117,24 +117,30 @@ async function handleChangePassword() {
             <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
               昵称
             </label>
-            <input
-              v-model="profileForm.username"
-              type="text"
-              class="input-base"
-              placeholder="输入昵称"
-            />
+            <div class="relative">
+              <UserCircle :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
+              <input
+                v-model="profileForm.username"
+                type="text"
+                class="input-base pl-10"
+                placeholder="输入昵称"
+              />
+            </div>
           </div>
 
           <div>
             <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
               真实姓名
             </label>
-            <input
-              v-model="profileForm.realName"
-              type="text"
-              class="input-base"
-              placeholder="输入真实姓名"
-            />
+            <div class="relative">
+              <User :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
+              <input
+                v-model="profileForm.realName"
+                type="text"
+                class="input-base pl-10"
+                placeholder="输入真实姓名"
+              />
+            </div>
           </div>
 
           <div>
@@ -142,12 +148,27 @@ async function handleChangePassword() {
               邮箱
             </label>
             <div class="relative">
-              <Mail :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]" />
+              <Mail :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
               <input
                 v-model="profileForm.email"
                 type="email"
                 class="input-base pl-10"
                 placeholder="输入邮箱"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
+              手机号
+            </label>
+            <div class="relative">
+              <Phone :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
+              <input
+                v-model="profileForm.phoneNumber"
+                type="tel"
+                class="input-base pl-10"
+                placeholder="输入手机号"
               />
             </div>
           </div>
@@ -194,10 +215,11 @@ async function handleChangePassword() {
               旧密码
             </label>
             <div class="relative">
+              <Lock :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
               <input
                 v-model="passwordForm.oldPassword"
                 :type="showOldPassword ? 'text' : 'password'"
-                class="input-base pr-10"
+                class="input-base pl-10 pr-10"
                 placeholder="输入旧密码"
               />
               <button
@@ -216,10 +238,11 @@ async function handleChangePassword() {
               新密码
             </label>
             <div class="relative">
+              <Lock :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
               <input
                 v-model="passwordForm.newPassword"
                 :type="showNewPassword ? 'text' : 'password'"
-                class="input-base pr-10"
+                class="input-base pl-10 pr-10"
                 placeholder="输入新密码"
               />
               <button
@@ -238,10 +261,11 @@ async function handleChangePassword() {
               确认新密码
             </label>
             <div class="relative">
+              <Lock :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
               <input
                 v-model="confirmPassword"
                 :type="showConfirmPassword ? 'text' : 'password'"
-                class="input-base pr-10"
+                class="input-base pl-10 pr-10"
                 placeholder="再次输入新密码"
               />
               <button
