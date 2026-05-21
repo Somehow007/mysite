@@ -139,6 +139,45 @@
   }
 }
 
+@layer components {
+  .input-base {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-border);
+    background-color: var(--color-bg-card);
+    color: var(--color-text-heading);
+    transition: all 200ms var(--ease-smooth);
+    outline: none;
+  }
+
+  .input-base::placeholder {
+    color: var(--color-text-muted);
+    opacity: 0.7;
+  }
+
+  .input-base:focus {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+  }
+
+  .dark .input-base {
+    border-color: var(--color-dark-border);
+    background-color: var(--color-dark-bg-card);
+    color: var(--color-dark-text-heading);
+  }
+
+  .dark .input-base::placeholder {
+    color: var(--color-dark-text-muted);
+  }
+
+  .dark .input-base:focus {
+    border-color: var(--color-dark-accent);
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
+  }
+}
+
 @layer utilities {
   .card-shadow {
     box-shadow: 0 1px 3px var(--color-shadow), 0 1px 2px var(--color-shadow);
@@ -235,42 +274,5 @@
   .dark .btn-secondary:hover {
     background-color: var(--color-dark-bg-code);
     border-color: var(--color-dark-text-muted);
-  }
-
-  .input-base {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    font-size: 0.875rem;
-    border-radius: 0.5rem;
-    border: 1px solid var(--color-border);
-    background-color: var(--color-bg-card);
-    color: var(--color-text-heading);
-    transition: all 200ms var(--ease-smooth);
-    outline: none;
-  }
-
-  .input-base::placeholder {
-    color: var(--color-text-muted);
-    opacity: 0.7;
-  }
-
-  .input-base:focus {
-    border-color: var(--color-accent);
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-  }
-
-  .dark .input-base {
-    border-color: var(--color-dark-border);
-    background-color: var(--color-dark-bg-card);
-    color: var(--color-dark-text-heading);
-  }
-
-  .dark .input-base::placeholder {
-    color: var(--color-dark-text-muted);
-  }
-
-  .dark .input-base:focus {
-    border-color: var(--color-dark-accent);
-    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
   }
 }

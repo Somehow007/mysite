@@ -3,8 +3,9 @@ import { ref, onMounted } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useUserStore } from '@/stores/user'
 import { changePassword } from '@/api/auth'
-import { Eye, EyeOff, User, Lock, Mail, Phone, UserCircle } from 'lucide-vue-next'
+import { Eye, EyeOff, User, Lock, Mail, Phone, UserCircle, Camera, Loader2 } from 'lucide-vue-next'
 import type { ChangePasswordRequest } from '@/types'
+import { uploadAvatar } from '@/api/user'
 
 useHead(() => ({
   title: '个人设置 - MySite',
@@ -37,6 +38,7 @@ const passwordError = ref('')
 const showOldPassword = ref(false)
 const showNewPassword = ref(false)
 const showConfirmPassword = ref(false)
+const avatarUploading = ref(false)
 
 onMounted(() => {
   if (userStore.user) {
@@ -97,6 +99,23 @@ async function handleChangePassword() {
     passwordLoading.value = false
   }
 }
+
+async function handleAvatarUpload(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  if (!file.type.startsWith('image/')) return
+  avatarUploading.value = true
+  try {
+    await uploadAvatar(file)
+    profileMessage.value = '头像更新成功'
+  } catch {
+    profileError.value = '头像上传失败，请重试'
+  } finally {
+    avatarUploading.value = false
+    input.value = ''
+  }
+}
 </script>
 
 <template>
@@ -113,6 +132,29 @@ async function handleChangePassword() {
         </h2>
 
         <form @submit.prevent="handleUpdateProfile" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
+              头像
+            </label>
+            <div class="flex items-center gap-4">
+              <div class="relative group shrink-0">
+                <div class="w-20 h-20 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] flex items-center justify-center text-2xl font-medium overflow-hidden">
+                  <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" :alt="userStore.displayName" class="w-full h-full object-cover" />
+                  <span v-else>{{ userStore.displayName?.charAt(0)?.toUpperCase() || 'U' }}</span>
+                </div>
+                <label class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  <Loader2 v-if="avatarUploading" :size="20" class="animate-spin text-white" />
+                  <Camera v-else :size="20" class="text-white" />
+                  <input type="file" accept="image/*" class="hidden" @change="handleAvatarUpload" :disabled="avatarUploading" />
+                </label>
+              </div>
+              <div class="text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+                <p>点击头像更换</p>
+                <p class="mt-1">支持 JPG、PNG 格式</p>
+              </div>
+            </div>
+          </div>
+
           <div>
             <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
               昵称
