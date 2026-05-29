@@ -11,11 +11,11 @@ fi
 if ! command -v cwebp &> /dev/null; then
     echo "cwebp 未安装，正在安装..."
     if command -v apt-get &> /dev/null; then
-        apt-get update && apt-get install -y webp
+        sudo apt-get update && sudo apt-get install -y webp
     elif command -v yum &> /dev/null; then
-        yum install -y libwebp-tools
+        sudo yum install -y libwebp-tools
     elif command -v apk &> /dev/null; then
-        apk add webp
+        sudo apk add webp
     else
         echo "无法自动安装 cwebp，请手动安装: https://developers.google.com/speed/webp/docs/precompiled"
         exit 1
@@ -27,7 +27,7 @@ CONVERTED=0
 SKIPPED=0
 FAILED=0
 
-find "$IMAGE_DIR" -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" \) | while read -r img; do
+while IFS= read -r img; do
     TOTAL=$((TOTAL + 1))
     webp_path="${img%.*}.webp"
 
@@ -37,8 +37,8 @@ find "$IMAGE_DIR" -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o
     fi
 
     if cwebp -quiet -q 80 "$img" -o "$webp_path" 2>/dev/null; then
-        orig_size=$(stat -f%z "$img" 2>/dev/null || stat -c%s "$img" 2>/dev/null)
-        webp_size=$(stat -f%z "$webp_path" 2>/dev/null || stat -c%s "$webp_path" 2>/dev/null)
+        orig_size=$(stat -c%s "$img" 2>/dev/null || stat -f%z "$img" 2>/dev/null)
+        webp_size=$(stat -c%s "$webp_path" 2>/dev/null || stat -f%z "$webp_path" 2>/dev/null)
         ratio=$((100 - webp_size * 100 / orig_size))
         echo "✓ $(basename "$img") → $(basename "$webp_path") (${orig_size}B → ${webp_size}B, -${ratio}%)"
         CONVERTED=$((CONVERTED + 1))
@@ -47,7 +47,7 @@ find "$IMAGE_DIR" -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o
         rm -f "$webp_path"
         FAILED=$((FAILED + 1))
     fi
-done
+done < <(find "$IMAGE_DIR" -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.gif" \))
 
 echo ""
 echo "批量转换完成: 共 ${TOTAL} 个文件, 转换 ${CONVERTED}, 跳过 ${SKIPPED}, 失败 ${FAILED}"
