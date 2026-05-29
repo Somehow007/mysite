@@ -57,8 +57,10 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
 
         Page<ArticleDO> page = new Page<>(requestParam.getCurrent(), requestParam.getSize());
         LambdaQueryWrapper<ArticleDO> queryWrapper = Wrappers.<ArticleDO>lambdaQuery()
-                .eq(ArticleDO::getDelFlag, 0)
-                .eq(ArticleDO::getPublished, 1);
+                .eq(ArticleDO::getDelFlag, 0);
+        if (requestParam.getPublished() != null) {
+            queryWrapper.eq(ArticleDO::getPublished, requestParam.getPublished());
+        }
 
         String keyword = requestParam.getKeyword();
         String searchType = StrUtil.blankToDefault(requestParam.getSearchType(), "title");
@@ -159,6 +161,7 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
                     dto.setViewCount(article.getViewCount());
                     dto.setFavoriteCount(article.getFavoriteCount());
                     dto.setReadingTime(article.getReadingTime());
+                    dto.setPublished(article.getPublished());
                     dto.setAuthorId(article.getAuthorId());
                     dto.setCreateTime(article.getCreateTime());
                     dto.setUpdateTime(article.getUpdateTime());

@@ -71,6 +71,7 @@ export interface ArticleListItem {
   viewCount: number
   favoriteCount: number
   readingTime?: number
+  published?: number
   isFavorited?: boolean
   createTime: string
   updateTime: string

@@ -30,6 +30,7 @@ export function getArticles(params?: {
   searchType?: string
   categorySlug?: string
   tagSlug?: string
+  published?: number | null
 }): Promise<PaginatedResponse<ArticleListItem>> {
   return getPaginated<ArticleListItem>('/v1/articles', {
     current: params?.page || 1,
@@ -38,6 +39,7 @@ export function getArticles(params?: {
     searchType: params?.searchType,
     categorySlug: params?.categorySlug,
     tagSlug: params?.tagSlug,
+    published: params?.published,
   })
 }
 

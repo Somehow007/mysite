@@ -118,6 +118,62 @@
     border-radius: 8px;
     max-width: 100%;
     margin: 1.5em 0;
+    transition: opacity 400ms ease-out, filter 400ms ease-out;
+  }
+
+  .prose .img-wrapper {
+    display: block;
+    margin: 1.5em 0;
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    background-color: var(--color-bg-code);
+  }
+
+  .dark .prose .img-wrapper {
+    background-color: var(--color-dark-bg-code);
+  }
+
+  .prose .img-wrapper img {
+    margin: 0;
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .prose .img-wrapper img.img-loading {
+    opacity: 0;
+    min-height: 200px;
+    filter: blur(10px);
+  }
+
+  .prose .img-wrapper img.img-loaded {
+    opacity: 1;
+    filter: blur(0);
+  }
+
+  .prose .img-wrapper img.img-error {
+    opacity: 1;
+    filter: none;
+    min-height: auto;
+    aspect-ratio: 16/9;
+    object-fit: contain;
+    padding: 2rem;
+  }
+
+  .prose .img-wrapper[data-error="true"]::after {
+    content: '图片加载失败';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    font-family: var(--font-sans);
+  }
+
+  .dark .prose .img-wrapper[data-error="true"]::after {
+    color: var(--color-dark-text-muted);
   }
 
   .prose a {

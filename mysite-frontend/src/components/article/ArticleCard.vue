@@ -2,11 +2,13 @@
 import { useRouter } from 'vue-router'
 import ArticleMeta from './ArticleMeta.vue'
 import FavoriteButton from './FavoriteButton.vue'
+import OptimizedImage from '@/components/common/OptimizedImage.vue'
 import type { ArticleListItem } from '@/types'
 
 const props = defineProps<{
   article: ArticleListItem
   showFavorite?: boolean
+  priority?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -30,13 +32,14 @@ function handleLoginRequired() {
       <RouterLink :to="`/post/${article.id}`" class="flex-1 min-w-0">
         <div
           v-if="article.coverImage"
-          class="aspect-[2/1] rounded-xl overflow-hidden mb-4 bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]"
+          class="aspect-[2/1] rounded-xl overflow-hidden mb-4"
         >
-          <img
+          <OptimizedImage
             :src="article.coverImage"
             :alt="article.title"
-            class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-            loading="lazy"
+            :fetch-priority="priority ? 'high' : 'auto'"
+            :lazy="!priority"
+            class="w-full h-full transition-transform duration-500 group-hover:scale-[1.03]"
           />
         </div>
 

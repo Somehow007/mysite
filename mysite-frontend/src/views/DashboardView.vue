@@ -6,6 +6,7 @@ import { FileText, Plus, Trash2, Edit, Eye } from 'lucide-vue-next'
 import { getArticles, deleteArticle } from '@/api/article'
 import { useUserStore } from '@/stores/user'
 import { usePermission } from '@/composables/usePermission'
+import { useToast } from '@/composables/useToast'
 import type { ArticleListItem, Pagination } from '@/types'
 
 useHead(() => ({
@@ -15,6 +16,7 @@ useHead(() => ({
 const router = useRouter()
 const userStore = useUserStore()
 const { isDeveloper, canModifyArticle } = usePermission()
+const toast = useToast()
 
 const articles = ref<ArticleListItem[]>([])
 const pagination = ref<Pagination | null>(null)
@@ -24,7 +26,7 @@ const deleting = ref<string | null>(null)
 async function fetchArticles(page = 1) {
   loading.value = true
   try {
-    const res = await getArticles({ page, size: 20 })
+    const res = await getArticles({ page, size: 20, published: null })
     if (isDeveloper.value) {
       articles.value = res.list
     } else {
@@ -45,10 +47,11 @@ async function handleDelete(id: string) {
   deleting.value = id
   try {
     await deleteArticle(id)
+    toast.success('文章已删除')
     await fetchArticles(pagination.value?.page || 1)
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : '删除失败'
-    alert(msg)
+    toast.error(msg)
   } finally {
     deleting.value = null
   }
@@ -105,6 +108,9 @@ onMounted(() => {
             {{ article.title }}
           </h3>
           <div class="flex items-center gap-3 mt-1 text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+            <span v-if="article.published === 0" class="px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400">
+              草稿
+            </span>
             <span v-if="article.categoryName" class="px-1.5 py-0.5 rounded bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]">
               {{ article.categoryName }}
             </span>

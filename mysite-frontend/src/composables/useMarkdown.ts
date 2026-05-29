@@ -31,6 +31,12 @@ renderer.code = function ({ text, lang }) {
   return `<pre><code class="language-${language}" data-language="${language}">${escapeHtml(text)}</code></pre>`
 }
 
+renderer.image = function ({ href, title }) {
+  const src = escapeHtml(href || '')
+  const alt = escapeHtml(title || '')
+  return `<span class="img-wrapper"><img src="${src}" alt="${alt}" loading="lazy" decoding="async" /></span>`
+}
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')

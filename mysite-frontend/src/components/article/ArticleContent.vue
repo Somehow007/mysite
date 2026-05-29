@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
 import { useMarkdown } from '@/composables/useMarkdown'
+import { useImageOptimizer } from '@/composables/useImageOptimizer'
 import type { TocItem } from '@/composables/useMarkdown'
 
 const props = defineProps<{
@@ -13,6 +14,7 @@ const emit = defineEmits<{
 
 const contentRef = ref<HTMLElement | null>(null)
 const { renderedHtml, render, applyHighlighting, rendering, toc } = useMarkdown()
+const { processContainer } = useImageOptimizer(contentRef)
 
 watch(
   () => props.content,
@@ -22,6 +24,7 @@ watch(
       emit('toc-ready', toc.value)
       await nextTick()
       if (contentRef.value) {
+        processContainer(contentRef.value)
         await applyHighlighting(contentRef.value)
       }
     }

@@ -53,8 +53,10 @@ public class WebSecurityConfig {
                                 "/v1/auth/register",
                                 "/v1/auth/refresh",
                                 "/v1/articles",
-                                "/v1/articles/archive",
-                                "/v1/articles/{id:\\d+}"
+                                "/v1/articles/archive"
+                        ).permitAll()
+                        .requestMatchers(
+                                AntPathRequestMatcher.antMatcher("GET /v1/articles/{id:\\d+}")
                         ).permitAll()
                         .requestMatchers(
                                 "/v1/categories/query",

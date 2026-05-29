@@ -26,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.URI;
@@ -62,6 +63,8 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
             "image/webp", ".webp",
             "image/svg+xml", ".svg"
     );
+
+    private static final float WEBP_QUALITY = 0.8f;
 
     @Override
     public ImageUploadRespDTO uploadImage(MultipartFile file) {
@@ -116,6 +119,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
                 if (image != null) {
                     width = image.getWidth();
                     height = image.getHeight();
+                    generateWebpCopy(image, filePath);
                 }
             } catch (IOException e) {
                 log.warn("读取图片尺寸失败: {}", filePath, e);
@@ -264,6 +268,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
                 if (image != null) {
                     width = image.getWidth();
                     height = image.getHeight();
+                    generateWebpCopy(image, filePath);
                 }
             } catch (IOException e) {
                 log.warn("读取远程图片尺寸失败", e);
@@ -320,10 +325,67 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
             log.warn("删除图片文件失败: {}", filePath, e);
         }
 
+        Path webpPath = resolveWebpPath(filePath);
+        try {
+            Files.deleteIfExists(webpPath);
+        } catch (IOException e) {
+            log.warn("删除WebP副本失败: {}", webpPath, e);
+        }
+
         int rows = baseMapper.deleteById(id);
         if (rows <= 0) {
             throw new ClientException(ErrorCode.IMAGE_DELETE_FAILED);
         }
+    }
+
+    private void generateWebpCopy(BufferedImage image, Path originalPath) {
+        String originalName = originalPath.getFileName().toString();
+        if (originalName.endsWith(".webp") || originalName.endsWith(".svg")) {
+            return;
+        }
+
+        String webpName = originalName.replaceAll("\\.(png|jpg|jpeg|gif)$", ".webp");
+        Path webpPath = originalPath.resolveSibling(webpName);
+
+        if (Files.exists(webpPath)) {
+            return;
+        }
+
+        try {
+            BufferedImage rgbImage = image;
+            if (image.getType() != BufferedImage.TYPE_INT_RGB) {
+                rgbImage = new BufferedImage(image.getWidth(), image.getHeight(), BufferedImage.TYPE_INT_RGB);
+                rgbImage.createGraphics().drawImage(image, 0, 0, null);
+                rgbImage.createGraphics().dispose();
+            }
+
+            File webpFile = webpPath.toFile();
+            boolean written = ImageIO.write(rgbImage, "webp", webpFile);
+            if (written) {
+                long originalSize = Files.size(originalPath);
+                long webpSize = Files.size(webpPath);
+                log.info("生成WebP副本: {} (原始: {}KB, WebP: {}KB, 压缩率: {}%)",
+                        webpName,
+                        originalSize / 1024,
+                        webpSize / 1024,
+                        (100 - webpSize * 100 / originalSize));
+            } else {
+                Files.deleteIfExists(webpPath);
+                log.debug("WebP编码器不可用，跳过WebP生成: {}", webpName);
+            }
+        } catch (IOException e) {
+            log.warn("生成WebP副本失败: {}", webpName, e);
+            try {
+                Files.deleteIfExists(webpPath);
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    private Path resolveWebpPath(Path originalPath) {
+        String originalName = originalPath.getFileName().toString();
+        String webpName = originalName.replaceAll("\\.(png|jpg|jpeg|gif)$", ".webp");
+        return originalPath.resolveSibling(webpName);
     }
 
     private void checkUploadRateLimit() {

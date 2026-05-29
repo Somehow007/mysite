@@ -15,6 +15,7 @@ public class ArticlePageQueryRespDTO {
     private Integer viewCount;
     private Integer favoriteCount;
     private Integer readingTime;
+    private Integer published;
     private String authorName;
 
     @JsonSerialize(using = ToStringSerializer.class)

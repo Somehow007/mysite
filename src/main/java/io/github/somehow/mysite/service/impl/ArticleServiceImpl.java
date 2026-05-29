@@ -137,6 +137,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     }
 
     @Override
+    @Transactional
     public void deleteArticle(Long id) {
         checkArticleOwnership(id);
 
@@ -150,6 +151,14 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         if (rows <= 0) {
             throw new ClientException(ErrorCode.ARTICLE_DELETE_FAILED);
         }
+
+        articleTagMapper.delete(Wrappers.lambdaQuery(ArticleTagDO.class)
+                .eq(ArticleTagDO::getArticleId, id));
+
+        userFavoriteArticleMapper.update(null, Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
+                .eq(UserFavoriteArticleDO::getArticleId, id)
+                .eq(UserFavoriteArticleDO::getDelFlag, 0)
+                .set(UserFavoriteArticleDO::getDelFlag, 1));
 
         articleSearchService.deleteArticle(id);
     }

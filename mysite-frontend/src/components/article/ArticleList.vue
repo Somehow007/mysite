@@ -30,10 +30,11 @@ defineEmits<{
 
     <div v-else class="space-y-10">
       <ArticleCard
-        v-for="article in articles"
+        v-for="(article, index) in articles"
         :key="article.id"
         :article="article"
         :show-favorite="showFavorite"
+        :priority="index < 2"
         @favorite-toggle="(...args: [string, boolean]) => $emit('favorite-toggle', ...args)"
       />
     </div>

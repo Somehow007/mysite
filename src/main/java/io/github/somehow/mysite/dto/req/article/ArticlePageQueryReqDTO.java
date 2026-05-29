@@ -21,4 +21,7 @@ public class ArticlePageQueryReqDTO extends Page {
 
     @Schema(description = "标签slug，用于按标签过滤文章")
     private String tagSlug;
+
+    @Schema(description = "发布状态: 1-已发布, 0-草稿, null-全部")
+    private Integer published;
 }
