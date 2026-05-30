@@ -143,11 +143,10 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
         LambdaUpdateWrapper<ArticleDO> updateWrapper = Wrappers.lambdaUpdate(ArticleDO.class)
                 .eq(ArticleDO::getId, id)
-                .eq(ArticleDO::getDelFlag, 0);
-        ArticleDO articleDO = new ArticleDO();
-        articleDO.setDelFlag(1);
+                .eq(ArticleDO::getDelFlag, 0)
+                .set(ArticleDO::getDelFlag, 1);
 
-        int rows = baseMapper.update(articleDO, updateWrapper);
+        int rows = baseMapper.update(null, updateWrapper);
         if (rows <= 0) {
             throw new ClientException(ErrorCode.ARTICLE_DELETE_FAILED);
         }
@@ -369,7 +368,9 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     }
 
     private Integer getFavoriteCount(Long articleId) {
-        ArticleDO article = articleMapper.selectById(articleId);
+        ArticleDO article = articleMapper.selectOne(Wrappers.lambdaQuery(ArticleDO.class)
+                .eq(ArticleDO::getId, articleId)
+                .eq(ArticleDO::getDelFlag, 0));
         return article != null ? article.getFavoriteCount() : 0;
     }
 
