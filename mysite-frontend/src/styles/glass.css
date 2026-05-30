@@ -4,7 +4,6 @@
     backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
     border: 1px solid var(--glass-border);
-    border-top-color: color-mix(in srgb, var(--glass-border) 140%, white);
     box-shadow: var(--glass-shadow);
     contain: layout style paint;
   }
@@ -14,7 +13,6 @@
     backdrop-filter: blur(calc(var(--glass-blur) * 0.6)) saturate(var(--glass-saturate));
     -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 0.6)) saturate(var(--glass-saturate));
     border: 1px solid var(--glass-border);
-    border-top-color: color-mix(in srgb, var(--glass-border) 140%, white);
     contain: layout style paint;
   }
 
@@ -23,7 +21,6 @@
     backdrop-filter: blur(calc(var(--glass-blur) * 1.5)) saturate(var(--glass-saturate));
     -webkit-backdrop-filter: blur(calc(var(--glass-blur) * 1.5)) saturate(var(--glass-saturate));
     border: 1px solid var(--glass-border);
-    border-top-color: color-mix(in srgb, var(--glass-border) 140%, white);
     box-shadow: var(--glass-shadow);
     contain: layout style paint;
   }
