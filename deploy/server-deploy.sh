@@ -73,7 +73,7 @@ step_build_frontend() {
     export NVM_DIR="$HOME/.nvm"
     if [ -s "$NVM_DIR/nvm.sh" ]; then
         . "$NVM_DIR/nvm.sh"
-        nvm use 22 2>/dev/null || nvm install 22
+        nvm use 22 || true
     else
         log_warn "nvm 未找到，使用系统默认 Node: $(node -v 2>/dev/null || echo '未安装')"
     fi
