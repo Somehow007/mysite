@@ -71,8 +71,13 @@ step_build_frontend() {
     log_step "构建前端"
     cd "$PROJECT_DIR/mysite-frontend"
     export NVM_DIR="$HOME/.nvm"
-    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
-    nvm use 22 2>/dev/null || nvm install 22
+    if [ -s "$NVM_DIR/nvm.sh" ]; then
+        . "$NVM_DIR/nvm.sh"
+        nvm use 22 2>/dev/null || nvm install 22
+    else
+        log_warn "nvm 未找到，使用系统默认 Node: $(node -v 2>/dev/null || echo '未安装')"
+    fi
+    log_info "当前 Node 版本: $(node -v)"
     if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ] 2>/dev/null; then
         log_info "安装前端依赖..."
         npm install 2>&1 | tee -a "$DEPLOY_LOG" || die "前端依赖安装失败"
