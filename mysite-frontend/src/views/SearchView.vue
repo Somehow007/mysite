@@ -53,21 +53,21 @@ watch(
 
 <template>
   <div>
-    <section class="mb-10 pb-8 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
+    <section class="mb-10 pb-8 border-b border-border">
       <div class="flex items-center gap-3 mb-2">
-        <SearchIcon :size="28" class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]" />
-        <h1 class="text-3xl sm:text-4xl font-bold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] tracking-tight">
+        <SearchIcon :size="28" class="text-accent" />
+        <h1 class="text-3xl sm:text-4xl font-bold text-text-primary tracking-tight">
           搜索结果
         </h1>
       </div>
-      <p v-if="keyword" class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+      <p v-if="keyword" class="text-text-muted">
         关键词：「{{ keyword }}」
       </p>
     </section>
 
     <div v-if="!loading && articles.length === 0 && keyword" class="py-16 text-center">
-      <SearchIcon :size="48" class="mx-auto mb-4 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] opacity-30" />
-      <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+      <SearchIcon :size="48" class="mx-auto mb-4 text-text-muted opacity-30" />
+      <p class="text-text-muted">
         没有找到与「{{ keyword }}」相关的文章
       </p>
     </div>

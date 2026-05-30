@@ -1,0 +1,23 @@
+[data-theme="warm-sunset"] {
+  --bg-primary: #FFF8F0;
+  --bg-secondary: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --bg-code: #FFF0E8;
+  --bg-accent: rgba(245, 198, 68, 0.10);
+  --text-primary: #2D1B00;
+  --text-secondary: #5C4030;
+  --text-muted: #9C8070;
+  --text-inverse: #FFFFFF;
+  --accent: #C06A30;
+  --accent-hover: #A05520;
+  --accent-subtle: rgba(192, 106, 48, 0.11);
+  --border: #F0D8C8;
+  --border-subtle: #F8E8D8;
+  --shadow-color: rgba(232, 138, 90, 0.06);
+  --shadow-color-md: rgba(232, 138, 90, 0.12);
+  --glass-bg: rgba(255, 255, 255, 0.70);
+  --glass-border: rgba(192, 106, 48, 0.15);
+  --glass-blur: 20px;
+  --glass-saturate: 1.8;
+  --glass-shadow: 0 4px 16px rgba(232, 138, 90, 0.06), 0 12px 40px rgba(232, 138, 90, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(192, 106, 48, 0.08);
+}

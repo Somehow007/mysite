@@ -55,10 +55,10 @@ onUnmounted(() => {
 
 <template>
   <nav v-if="items.length > 0" class="toc hidden lg:block">
-    <h4 class="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] mb-3">
+    <h4 class="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3">
       目录
     </h4>
-    <ul class="space-y-0.5 text-sm border-l border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
+    <ul class="space-y-0.5 text-sm border-l border-border">
       <li
         v-for="item in items"
         :key="item.id"
@@ -69,8 +69,8 @@ onUnmounted(() => {
           class="block w-full text-left py-1.5 pl-3 transition-all duration-200 border-l-2 -ml-px text-[13px] leading-snug"
           :class="[
             activeId === item.id
-              ? 'border-[var(--color-accent)] dark:border-[var(--color-dark-accent)] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] font-medium'
-              : 'border-transparent text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-body)] dark:hover:text-[var(--color-dark-text-body)] hover:border-[var(--color-border)] dark:hover:border-[var(--color-dark-border)]'
+              ? 'border-accent text-accent font-medium'
+              : 'border-transparent text-text-muted hover:text-text-secondary hover:border-border'
           ]"
         >
           {{ item.text }}

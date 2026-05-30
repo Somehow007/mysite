@@ -50,7 +50,7 @@ onUnmounted(() => {
 <template>
   <button
     @click="openAndFocus"
-    class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-all duration-200"
+    class="p-2 rounded-lg text-text-muted hover:text-accent hover:bg-accent-subtle transition-all duration-200"
     aria-label="搜索"
   >
     <Search :size="18" />
@@ -67,32 +67,32 @@ onUnmounted(() => {
           @click="close"
         />
         <div
-          class="relative w-full max-w-lg mx-4 bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-2xl shadow-2xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] overflow-hidden animate-scale-in"
+          class="relative w-full max-w-lg mx-4 glass glass-lg rounded-2xl overflow-hidden animate-scale-in"
         >
-          <div class="flex items-center gap-3 px-4 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
-            <Search :size="18" class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] shrink-0" />
+          <div class="flex items-center gap-3 px-4 border-b border-border">
+            <Search :size="18" class="text-text-muted shrink-0" />
             <input
               ref="inputRef"
               v-model="query"
               type="text"
               placeholder="搜索文章..."
-              class="flex-1 py-4 bg-transparent text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] outline-none text-sm"
+              class="flex-1 py-4 bg-transparent text-text-primary placeholder:text-text-muted outline-none text-sm"
               @input="handleInput"
             />
             <button
               @click="close"
-              class="p-1 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-body)] dark:hover:text-[var(--color-dark-text-body)] transition-colors"
+              class="p-1 text-text-muted hover:text-text-secondary transition-colors"
             >
               <X :size="16" />
             </button>
           </div>
 
           <div class="max-h-80 overflow-y-auto">
-            <div v-if="loading" class="px-4 py-8 text-center text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+            <div v-if="loading" class="px-4 py-8 text-center text-sm text-text-muted">
               搜索中...
             </div>
 
-            <div v-else-if="query && results.length === 0" class="px-4 py-8 text-center text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+            <div v-else-if="query && results.length === 0" class="px-4 py-8 text-center text-sm text-text-muted">
               未找到相关文章
             </div>
 
@@ -101,32 +101,32 @@ onUnmounted(() => {
                 v-for="article in results"
                 :key="article.id"
                 @click="goToResult(article.id)"
-                class="w-full text-left px-4 py-3 hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-colors duration-150 flex items-center justify-between gap-3"
+                class="w-full text-left px-4 py-3 hover:bg-accent-subtle transition-colors duration-150 flex items-center justify-between gap-3"
               >
                 <div class="min-w-0">
-                  <p class="text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] truncate">
+                  <p class="text-sm font-medium text-text-primary truncate">
                     {{ article.title }}
                   </p>
-                  <p v-if="article.summary" class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] truncate mt-0.5">
+                  <p v-if="article.summary" class="text-xs text-text-muted truncate mt-0.5">
                     {{ article.summary }}
                   </p>
                 </div>
-                <CornerDownLeft :size="14" class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] shrink-0" />
+                <CornerDownLeft :size="14" class="text-text-muted shrink-0" />
               </button>
             </div>
 
-            <div v-else class="px-4 py-6 text-center text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+            <div v-else class="px-4 py-6 text-center text-sm text-text-muted">
               输入关键词搜索文章
             </div>
           </div>
 
-          <div class="px-4 py-2.5 border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)] flex items-center gap-4 text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+          <div class="px-4 py-2.5 border-t border-border flex items-center gap-4 text-xs text-text-muted">
             <span class="flex items-center gap-1">
-              <kbd class="px-1.5 py-0.5 rounded bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[10px] font-medium">ESC</kbd>
+              <kbd class="px-1.5 py-0.5 rounded bg-bg-code text-[10px] font-medium">ESC</kbd>
               关闭
             </span>
             <span class="flex items-center gap-1">
-              <kbd class="px-1.5 py-0.5 rounded bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[10px] font-medium">↵</kbd>
+              <kbd class="px-1.5 py-0.5 rounded bg-bg-code text-[10px] font-medium">↵</kbd>
               打开
             </span>
           </div>

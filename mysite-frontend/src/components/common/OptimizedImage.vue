@@ -58,11 +58,7 @@ function onError() {
   position: relative;
   overflow: hidden;
   border-radius: inherit;
-  background-color: var(--color-bg-code);
-}
-
-.dark .optimized-img {
-  background-color: var(--color-dark-bg-code);
+  background-color: var(--bg-code);
 }
 
 .optimized-img__placeholder {
@@ -76,22 +72,12 @@ function onError() {
   height: 100%;
   background: linear-gradient(
     90deg,
-    var(--color-bg-code) 25%,
-    var(--color-border-subtle) 50%,
-    var(--color-bg-code) 75%
+    var(--bg-code) 25%,
+    var(--border-subtle) 50%,
+    var(--bg-code) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
-}
-
-.dark .optimized-img__shimmer {
-  background: linear-gradient(
-    90deg,
-    var(--color-dark-bg-code) 25%,
-    var(--color-dark-border) 50%,
-    var(--color-dark-bg-code) 75%
-  );
-  background-size: 200% 100%;
 }
 
 @keyframes shimmer {
@@ -125,12 +111,8 @@ function onError() {
   width: 100%;
   height: 100%;
   min-height: 120px;
-  color: var(--color-text-muted);
+  color: var(--text-muted);
   font-size: 0.75rem;
-}
-
-.dark .optimized-img__error {
-  color: var(--color-dark-text-muted);
 }
 
 .optimized-img__error svg {

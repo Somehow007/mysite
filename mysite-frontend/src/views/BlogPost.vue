@@ -90,7 +90,7 @@ onMounted(() => {
   <div class="relative">
     <div
       v-if="progress > 0"
-      class="fixed top-0 left-0 h-[2px] bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] z-50 transition-[width] duration-150"
+      class="fixed top-0 left-0 h-[2px] bg-accent z-50 transition-[width] duration-150"
       :style="{ width: `${progress * 100}%` }"
     />
 
@@ -110,7 +110,7 @@ onMounted(() => {
     </div>
 
     <div v-else-if="error" class="py-16 text-center">
-      <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] mb-4">文章加载失败</p>
+      <p class="text-text-muted mb-4">文章加载失败</p>
       <button
         @click="router.push('/')"
         class="btn-primary"
@@ -125,14 +125,14 @@ onMounted(() => {
           <header class="mb-10">
             <button
               @click="router.back()"
-              class="inline-flex items-center gap-1.5 text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-200 mb-6 group"
+              class="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-accent transition-colors duration-200 mb-6 group"
             >
               <ArrowLeft :size="14" class="group-hover:-translate-x-0.5 transition-transform duration-200" />
               返回
             </button>
 
             <div class="flex items-start justify-between gap-4 mb-4">
-              <h1 class="text-3xl sm:text-4xl font-bold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] leading-tight tracking-tight">
+              <h1 class="text-3xl sm:text-4xl font-bold text-text-primary leading-tight tracking-tight">
                 {{ article.title }}
               </h1>
               <FavoriteButton
@@ -146,7 +146,7 @@ onMounted(() => {
               />
             </div>
 
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-text-muted">
               <span class="inline-flex items-center gap-1.5">
                 <Calendar :size="14" />
                 <time :datetime="article.updateTime">{{ formatDate(article.updateTime) }}</time>
@@ -162,7 +162,7 @@ onMounted(() => {
               <RouterLink
                 v-if="article.categorySlug"
                 :to="`/category/${article.categorySlug}`"
-                class="inline-flex items-center gap-1.5 hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-200"
+                class="inline-flex items-center gap-1.5 hover:text-accent transition-colors duration-200"
               >
                 <Tag :size="14" />
                 <span>{{ article.categoryName }}</span>
@@ -174,7 +174,7 @@ onMounted(() => {
                 v-for="tag in article.tags"
                 :key="tag.id"
                 :to="`/tag/${tag.slug}`"
-                class="text-xs px-2.5 py-1 rounded-full border border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:border-[var(--color-accent)] dark:hover:border-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-all duration-200"
+                class="text-xs px-2.5 py-1 rounded-full border border-border text-text-muted hover:text-accent hover:border-accent hover:bg-accent-subtle transition-all duration-200"
               >
                 #{{ tag.name }}
               </RouterLink>
@@ -183,8 +183,8 @@ onMounted(() => {
 
           <ArticleContent :content="article.content" @toc-ready="handleTocReady" />
 
-          <div class="mt-10 pt-6 border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)] flex items-center justify-center gap-3">
-            <span class="text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">觉得有用？收藏起来吧</span>
+          <div class="mt-10 pt-6 border-t border-border flex items-center justify-center gap-3">
+            <span class="text-sm text-text-muted">觉得有用？收藏起来吧</span>
             <FavoriteButton
               :article-id="article.id"
               :initial-favorited="article.isFavorited"

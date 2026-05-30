@@ -16,7 +16,7 @@ defineEmits<{
     <button
       :disabled="current <= 1"
       @click="$emit('change', current - 1)"
-      class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
+      class="p-2 rounded-lg text-text-muted hover:bg-accent-subtle hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
       aria-label="上一页"
     >
       <ChevronLeft :size="18" />
@@ -29,15 +29,15 @@ defineEmits<{
         class="min-w-[36px] h-9 px-2 rounded-lg text-sm transition-all duration-200"
         :class="[
           page === current
-            ? 'bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] font-medium shadow-sm'
-            : 'text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)]'
+            ? 'bg-accent text-text-inverse font-medium shadow-sm'
+            : 'text-text-secondary hover:bg-accent-subtle hover:text-accent'
         ]"
       >
         {{ page }}
       </button>
       <span
         v-else-if="Math.abs(page - current) === 2"
-        class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] text-sm px-1"
+        class="text-text-muted text-sm px-1"
       >
         ...
       </span>
@@ -46,7 +46,7 @@ defineEmits<{
     <button
       :disabled="current >= total"
       @click="$emit('change', current + 1)"
-      class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
+      class="p-2 rounded-lg text-text-muted hover:bg-accent-subtle hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-200"
       aria-label="下一页"
     >
       <ChevronRight :size="18" />

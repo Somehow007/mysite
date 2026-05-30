@@ -19,7 +19,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 @EnableWebSecurity
@@ -56,13 +56,18 @@ public class WebSecurityConfig {
                                 "/v1/articles/archive"
                         ).permitAll()
                         .requestMatchers(
-                                AntPathRequestMatcher.antMatcher("GET /v1/articles/{id:\\d+}")
+                                HttpMethod.GET,
+                                "/v1/articles/{id}"
                         ).permitAll()
                         .requestMatchers(
+                                HttpMethod.GET,
+                                "/v1/categories",
                                 "/v1/categories/query",
                                 "/v1/categories/tree",
                                 "/v1/categories/id/*",
-                                "/v1/categories/*",
+                                "/v1/categories/{slug}"
+                        ).permitAll()
+                        .requestMatchers(
                                 "/v1/tags/**",
                                 "/v1/search/**",
                                 "/v1/site/**",
@@ -74,13 +79,19 @@ public class WebSecurityConfig {
                                 "/favicon.ico"
                         ).permitAll()
                         .requestMatchers(
-                                AntPathRequestMatcher.antMatcher("/uploads/**")
+                                "/uploads/**"
                         ).permitAll()
                         .requestMatchers(
                                 "/v1/categories/*/children"
                         ).authenticated()
                         .requestMatchers(
-                                "/v1/categories"
+                                HttpMethod.POST, "/v1/categories"
+                        ).hasRole("DEVELOPER")
+                        .requestMatchers(
+                                HttpMethod.PUT, "/v1/categories/{id}"
+                        ).hasRole("DEVELOPER")
+                        .requestMatchers(
+                                HttpMethod.DELETE, "/v1/categories/{id}"
                         ).hasRole("DEVELOPER")
                         .requestMatchers(
                                 "/v1/categories/batch/**"

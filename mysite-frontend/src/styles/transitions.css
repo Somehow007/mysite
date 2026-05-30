@@ -73,22 +73,12 @@
   .skeleton {
     background: linear-gradient(
       90deg,
-      var(--color-bg-code) 25%,
-      var(--color-bg-card) 50%,
-      var(--color-bg-code) 75%
+      var(--bg-code) 25%,
+      var(--bg-secondary) 50%,
+      var(--bg-code) 75%
     );
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
-  }
-
-  .dark .skeleton {
-    background: linear-gradient(
-      90deg,
-      var(--color-dark-bg-code) 25%,
-      var(--color-dark-bg-card) 50%,
-      var(--color-dark-bg-code) 75%
-    );
-    background-size: 200% 100%;
   }
 
   @keyframes scale-in {
@@ -104,5 +94,20 @@
 
   .animate-scale-in {
     animation: scale-in 200ms var(--ease-out);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active,
+  .fade-enter-active,
+  .fade-leave-active,
+  .slide-up-enter-active,
+  .slide-up-leave-active {
+    transition: none !important;
+  }
+
+  .skeleton {
+    animation: none !important;
   }
 }

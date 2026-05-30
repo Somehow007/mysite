@@ -149,14 +149,14 @@ function closeLogs() {
 
 function getRoleBadgeClass(role: string) {
   return role === 'DEVELOPER'
-    ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300'
-    : 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+    ? 'bg-amber-100 text-amber-700'
+    : 'bg-blue-100 text-blue-700'
 }
 
 function getStatusBadgeClass(status: number) {
   return status === 1
-    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-    : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+    ? 'bg-green-100 text-green-700'
+    : 'bg-red-100 text-red-700'
 }
 
 function getOperationTypeLabel(type: string) {
@@ -176,7 +176,7 @@ onMounted(() => {
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">
+      <h1 class="text-2xl font-bold text-text-primary">
         用户管理
       </h1>
       <button
@@ -190,12 +190,12 @@ onMounted(() => {
 
     <div class="mb-4 flex gap-2">
       <div class="relative flex-1 max-w-md">
-        <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]" />
+        <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
           v-model="keyword"
           type="text"
           placeholder="搜索用户名、姓名、邮箱或手机号..."
-          class="w-full pl-9 pr-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] dark:focus:ring-[var(--color-dark-accent)] focus:border-transparent text-sm"
+          class="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-sm"
           @keyup.enter="handleSearch"
         />
       </div>
@@ -208,38 +208,38 @@ onMounted(() => {
     </div>
 
     <div v-if="userLoading" class="flex justify-center py-12">
-      <Loader2 :size="24" class="animate-spin text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]" />
+      <Loader2 :size="24" class="animate-spin text-text-muted" />
     </div>
 
-    <div v-else-if="users.length === 0" class="text-center py-12 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+    <div v-else-if="users.length === 0" class="text-center py-12 text-text-muted">
       暂无用户数据
     </div>
 
-    <div v-else class="overflow-x-auto rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
+    <div v-else class="overflow-x-auto rounded-lg border border-border">
       <table class="w-full text-sm">
         <thead>
-          <tr class="bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]">
-            <th class="text-left px-4 py-3 font-medium text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">用户</th>
-            <th class="text-left px-4 py-3 font-medium text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">邮箱</th>
-            <th class="text-left px-4 py-3 font-medium text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">手机号</th>
-            <th class="text-center px-4 py-3 font-medium text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">角色</th>
-            <th class="text-center px-4 py-3 font-medium text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">状态</th>
-            <th class="text-left px-4 py-3 font-medium text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">注册时间</th>
-            <th class="text-center px-4 py-3 font-medium text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">操作</th>
+          <tr class="bg-bg-code">
+            <th class="text-left px-4 py-3 font-medium text-text-muted">用户</th>
+            <th class="text-left px-4 py-3 font-medium text-text-muted">邮箱</th>
+            <th class="text-left px-4 py-3 font-medium text-text-muted">手机号</th>
+            <th class="text-center px-4 py-3 font-medium text-text-muted">角色</th>
+            <th class="text-center px-4 py-3 font-medium text-text-muted">状态</th>
+            <th class="text-left px-4 py-3 font-medium text-text-muted">注册时间</th>
+            <th class="text-center px-4 py-3 font-medium text-text-muted">操作</th>
           </tr>
         </thead>
         <tbody>
           <tr
             v-for="user in users"
             :key="user.id"
-            class="border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+            class="border-t border-border hover:bg-bg-code transition-colors"
           >
             <td class="px-4 py-3">
-              <div class="font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">{{ user.username }}</div>
-              <div class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">{{ user.realName }}</div>
+              <div class="font-medium text-text-primary">{{ user.username }}</div>
+              <div class="text-xs text-text-muted">{{ user.realName }}</div>
             </td>
-            <td class="px-4 py-3 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]">{{ user.email || '-' }}</td>
-            <td class="px-4 py-3 text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]">{{ user.phoneNumber || '-' }}</td>
+            <td class="px-4 py-3 text-text-secondary">{{ user.email || '-' }}</td>
+            <td class="px-4 py-3 text-text-secondary">{{ user.phoneNumber || '-' }}</td>
             <td class="px-4 py-3 text-center">
               <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" :class="getRoleBadgeClass(user.role)">
                 <ShieldCheck v-if="user.role === 'DEVELOPER'" :size="10" />
@@ -252,7 +252,7 @@ onMounted(() => {
                 {{ user.status === 1 ? '启用' : '禁用' }}
               </span>
             </td>
-            <td class="px-4 py-3 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] text-xs">
+            <td class="px-4 py-3 text-text-muted text-xs">
               {{ formatDate(user.createTime) }}
             </td>
             <td class="px-4 py-3">
@@ -260,7 +260,7 @@ onMounted(() => {
                 <button
                   @click="handleRoleChange(user)"
                   :disabled="updatingUserId === user.id"
-                  class="p-1.5 rounded text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors disabled:opacity-50"
+                  class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors disabled:opacity-50"
                   title="切换角色"
                 >
                   <UserCog :size="14" />
@@ -268,14 +268,14 @@ onMounted(() => {
                 <button
                   @click="handleStatusToggle(user)"
                   :disabled="updatingUserId === user.id"
-                  class="p-1.5 rounded text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors disabled:opacity-50"
+                  class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors disabled:opacity-50"
                   :title="user.status === 1 ? '禁用用户' : '启用用户'"
                 >
                   <Shield :size="14" />
                 </button>
                 <button
                   @click="viewUserLogs(Number(user.id))"
-                  class="p-1.5 rounded text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors"
+                  class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors"
                   title="查看操作日志"
                 >
                   <Eye :size="14" />
@@ -283,7 +283,7 @@ onMounted(() => {
                 <button
                   @click="handleDelete(user)"
                   :disabled="updatingUserId === user.id"
-                  class="p-1.5 rounded text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 transition-colors disabled:opacity-50"
+                  class="p-1.5 rounded text-text-muted hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-50"
                   title="删除用户"
                 >
                   <Trash2 :size="14" />
@@ -299,17 +299,17 @@ onMounted(() => {
       <button
         @click="fetchUsers((userPage?.current || 1) - 1)"
         :disabled="!userPage?.current || userPage.current <= 1"
-        class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors disabled:opacity-50"
+        class="p-2 rounded-lg text-text-muted hover:bg-bg-code transition-colors disabled:opacity-50"
       >
         <ChevronLeft :size="16" />
       </button>
-      <span class="text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]">
+      <span class="text-sm text-text-secondary">
         {{ userPage.current }} / {{ userPage.pages }}
       </span>
       <button
         @click="fetchUsers((userPage?.current || 1) + 1)"
         :disabled="!userPage?.current || userPage.current >= userPage.pages"
-        class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors disabled:opacity-50"
+        class="p-2 rounded-lg text-text-muted hover:bg-bg-code transition-colors disabled:opacity-50"
       >
         <ChevronRight :size="16" />
       </button>
@@ -317,11 +317,11 @@ onMounted(() => {
 
     <Teleport to="body">
       <div v-if="confirmDialog.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="confirmDialog.show = false">
-        <div class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-2xl shadow-2xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6 w-full max-w-md mx-4 animate-scale-in">
-          <h3 class="text-lg font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-2">
+        <div class="glass glass-lg rounded-2xl p-6 w-full max-w-md mx-4 animate-scale-in">
+          <h3 class="text-lg font-semibold text-text-primary mb-2">
             {{ confirmDialog.title }}
           </h3>
-          <p class="text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-6">
+          <p class="text-sm text-text-secondary mb-6">
             {{ confirmDialog.message }}
           </p>
           <div class="flex justify-end gap-3">
@@ -344,21 +344,21 @@ onMounted(() => {
 
     <Teleport to="body">
       <div v-if="showLogs" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="closeLogs">
-        <div class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-2xl shadow-2xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto animate-scale-in">
+        <div class="glass glass-lg rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto animate-scale-in">
           <div class="flex items-center justify-between mb-4">
-            <h3 class="text-lg font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">
+            <h3 class="text-lg font-semibold text-text-primary">
               操作日志
             </h3>
-            <button @click="closeLogs" class="p-1 rounded hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors">
-              <X :size="18" class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]" />
+            <button @click="closeLogs" class="p-1 rounded hover:bg-bg-code transition-colors">
+              <X :size="18" class="text-text-muted" />
             </button>
           </div>
 
           <div v-if="logLoading" class="flex justify-center py-8">
-            <Loader2 :size="20" class="animate-spin text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]" />
+            <Loader2 :size="20" class="animate-spin text-text-muted" />
           </div>
 
-          <div v-else-if="logs.length === 0" class="text-center py-8 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+          <div v-else-if="logs.length === 0" class="text-center py-8 text-text-muted">
             暂无操作日志
           </div>
 
@@ -366,21 +366,21 @@ onMounted(() => {
             <div
               v-for="log in logs"
               :key="log.id"
-              class="flex items-start gap-3 p-3 rounded-lg bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]"
+              class="flex items-start gap-3 p-3 rounded-lg bg-bg-code"
             >
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-1">
-                  <span class="text-xs font-medium px-1.5 py-0.5 rounded bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">
+                  <span class="text-xs font-medium px-1.5 py-0.5 rounded bg-bg-secondary text-text-primary">
                     {{ getOperationTypeLabel(log.operationType) }}
                   </span>
-                  <span class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+                  <span class="text-xs text-text-muted">
                     {{ formatDate(log.createTime) }}
                   </span>
                 </div>
-                <p class="text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]">
+                <p class="text-sm text-text-secondary">
                   {{ log.detail }}
                 </p>
-                <p class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] mt-1">
+                <p class="text-xs text-text-muted mt-1">
                   操作者: {{ log.operatorName }} → 目标: {{ log.targetUserName }}
                 </p>
               </div>
@@ -391,17 +391,17 @@ onMounted(() => {
             <button
               @click="fetchLogs((logPage?.current || 1) - 1)"
               :disabled="!logPage?.current || logPage.current <= 1"
-              class="p-1.5 rounded text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors disabled:opacity-50"
+              class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors disabled:opacity-50"
             >
               <ChevronLeft :size="14" />
             </button>
-            <span class="text-xs text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)]">
+            <span class="text-xs text-text-secondary">
               {{ logPage.current }} / {{ logPage.pages }}
             </span>
             <button
               @click="fetchLogs((logPage?.current || 1) + 1)"
               :disabled="!logPage?.current || logPage.current >= logPage.pages"
-              class="p-1.5 rounded text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors disabled:opacity-50"
+              class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors disabled:opacity-50"
             >
               <ChevronRight :size="14" />
             </button>

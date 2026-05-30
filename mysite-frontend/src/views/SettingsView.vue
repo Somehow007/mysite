@@ -120,25 +120,25 @@ async function handleAvatarUpload(e: Event) {
 
 <template>
   <div class="max-w-2xl">
-    <h1 class="text-2xl font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-8">
+    <h1 class="text-2xl font-semibold text-text-primary mb-8">
       个人设置
     </h1>
 
     <div class="space-y-8">
-      <section class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6 card-shadow">
-        <h2 class="text-lg font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-6 flex items-center gap-2">
-          <User :size="20" class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]" />
+      <section class="glass glass-sm rounded-xl p-6">
+        <h2 class="text-lg font-medium text-text-primary mb-6 flex items-center gap-2">
+          <User :size="20" class="text-accent" />
           个人资料
         </h2>
 
         <form @submit.prevent="handleUpdateProfile" class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
+            <label class="block text-sm font-medium text-text-secondary mb-1.5">
               头像
             </label>
             <div class="flex items-center gap-4">
               <div class="relative group shrink-0">
-                <div class="w-20 h-20 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] flex items-center justify-center text-2xl font-medium overflow-hidden">
+                <div class="w-20 h-20 rounded-full bg-accent text-text-inverse flex items-center justify-center text-2xl font-medium overflow-hidden">
                   <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" :alt="userStore.displayName" class="w-full h-full object-cover" />
                   <span v-else>{{ userStore.displayName?.charAt(0)?.toUpperCase() || 'U' }}</span>
                 </div>
@@ -148,7 +148,7 @@ async function handleAvatarUpload(e: Event) {
                   <input type="file" accept="image/*" class="hidden" @change="handleAvatarUpload" :disabled="avatarUploading" />
                 </label>
               </div>
-              <div class="text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+              <div class="text-sm text-text-muted">
                 <p>点击头像更换</p>
                 <p class="mt-1">支持 JPG、PNG 格式</p>
               </div>
@@ -156,11 +156,11 @@ async function handleAvatarUpload(e: Event) {
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
+            <label class="block text-sm font-medium text-text-secondary mb-1.5">
               昵称
             </label>
             <div class="relative">
-              <UserCircle :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
+              <UserCircle :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
               <input
                 v-model="profileForm.username"
                 type="text"
@@ -171,11 +171,11 @@ async function handleAvatarUpload(e: Event) {
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
+            <label class="block text-sm font-medium text-text-secondary mb-1.5">
               真实姓名
             </label>
             <div class="relative">
-              <User :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
+              <User :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
               <input
                 v-model="profileForm.realName"
                 type="text"
@@ -186,11 +186,11 @@ async function handleAvatarUpload(e: Event) {
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
+            <label class="block text-sm font-medium text-text-secondary mb-1.5">
               邮箱
             </label>
             <div class="relative">
-              <Mail :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
+              <Mail :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
               <input
                 v-model="profileForm.email"
                 type="email"
@@ -201,11 +201,11 @@ async function handleAvatarUpload(e: Event) {
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
+            <label class="block text-sm font-medium text-text-secondary mb-1.5">
               手机号
             </label>
             <div class="relative">
-              <Phone :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
+              <Phone :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
               <input
                 v-model="profileForm.phoneNumber"
                 type="tel"
@@ -216,7 +216,7 @@ async function handleAvatarUpload(e: Event) {
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
+            <label class="block text-sm font-medium text-text-secondary mb-1.5">
               性别
             </label>
             <select v-model="profileForm.sex" class="input-base">
@@ -226,10 +226,10 @@ async function handleAvatarUpload(e: Event) {
             </select>
           </div>
 
-          <div v-if="profileMessage" class="text-sm text-green-600 dark:text-green-400 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/20">
+          <div v-if="profileMessage" class="text-sm text-green-600 px-3 py-2 rounded-lg bg-green-50">
             {{ profileMessage }}
           </div>
-          <div v-if="profileError" class="text-sm text-red-500 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20">
+          <div v-if="profileError" class="text-sm text-red-500 px-3 py-2 rounded-lg bg-red-50">
             {{ profileError }}
           </div>
 
@@ -245,19 +245,19 @@ async function handleAvatarUpload(e: Event) {
         </form>
       </section>
 
-      <section class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6 card-shadow">
-        <h2 class="text-lg font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-6 flex items-center gap-2">
-          <Lock :size="20" class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]" />
+      <section class="glass glass-sm rounded-xl p-6">
+        <h2 class="text-lg font-medium text-text-primary mb-6 flex items-center gap-2">
+          <Lock :size="20" class="text-accent" />
           修改密码
         </h2>
 
         <form @submit.prevent="handleChangePassword" class="space-y-4">
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
+            <label class="block text-sm font-medium text-text-secondary mb-1.5">
               旧密码
             </label>
             <div class="relative">
-              <Lock :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
+              <Lock :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
               <input
                 v-model="passwordForm.oldPassword"
                 :type="showOldPassword ? 'text' : 'password'"
@@ -267,7 +267,7 @@ async function handleAvatarUpload(e: Event) {
               <button
                 type="button"
                 @click="showOldPassword = !showOldPassword"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-body)] dark:hover:text-[var(--color-dark-text-body)] transition-colors"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition-colors"
               >
                 <Eye v-if="!showOldPassword" :size="16" />
                 <EyeOff v-else :size="16" />
@@ -276,11 +276,11 @@ async function handleAvatarUpload(e: Event) {
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
+            <label class="block text-sm font-medium text-text-secondary mb-1.5">
               新密码
             </label>
             <div class="relative">
-              <Lock :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
+              <Lock :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
               <input
                 v-model="passwordForm.newPassword"
                 :type="showNewPassword ? 'text' : 'password'"
@@ -290,7 +290,7 @@ async function handleAvatarUpload(e: Event) {
               <button
                 type="button"
                 @click="showNewPassword = !showNewPassword"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-body)] dark:hover:text-[var(--color-dark-text-body)] transition-colors"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition-colors"
               >
                 <Eye v-if="!showNewPassword" :size="16" />
                 <EyeOff v-else :size="16" />
@@ -299,11 +299,11 @@ async function handleAvatarUpload(e: Event) {
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] mb-1.5">
+            <label class="block text-sm font-medium text-text-secondary mb-1.5">
               确认新密码
             </label>
             <div class="relative">
-              <Lock :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] pointer-events-none" />
+              <Lock :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
               <input
                 v-model="confirmPassword"
                 :type="showConfirmPassword ? 'text' : 'password'"
@@ -313,7 +313,7 @@ async function handleAvatarUpload(e: Event) {
               <button
                 type="button"
                 @click="showConfirmPassword = !showConfirmPassword"
-                class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-body)] dark:hover:text-[var(--color-dark-text-body)] transition-colors"
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition-colors"
               >
                 <Eye v-if="!showConfirmPassword" :size="16" />
                 <EyeOff v-else :size="16" />
@@ -321,10 +321,10 @@ async function handleAvatarUpload(e: Event) {
             </div>
           </div>
 
-          <div v-if="passwordMessage" class="text-sm text-green-600 dark:text-green-400 px-3 py-2 rounded-lg bg-green-50 dark:bg-green-900/20">
+          <div v-if="passwordMessage" class="text-sm text-green-600 px-3 py-2 rounded-lg bg-green-50">
             {{ passwordMessage }}
           </div>
-          <div v-if="passwordError" class="text-sm text-red-500 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20">
+          <div v-if="passwordError" class="text-sm text-red-500 px-3 py-2 rounded-lg bg-red-50">
             {{ passwordError }}
           </div>
 

@@ -39,12 +39,12 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-56')
 <template>
   <aside
     :class="sidebarWidth"
-    class="min-h-screen border-r border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] transition-all duration-300 var(--ease-out) relative flex flex-col"
+    class="min-h-screen border-r border-border glass glass-sm transition-all duration-300 var(--ease-out) relative flex flex-col"
     :aria-expanded="!isCollapsed"
   >
     <button
       @click="toggleSidebar"
-      class="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] border border-[var(--color-border)] dark:border-[var(--color-dark-border)] flex items-center justify-center hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:border-[var(--color-accent)] dark:hover:border-[var(--color-dark-accent)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]"
+      class="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full bg-bg-secondary border border-border flex items-center justify-center hover:bg-accent-subtle hover:border-accent hover:text-accent transition-all duration-200 text-text-muted"
       :aria-label="isCollapsed ? '展开侧边栏' : '收起侧边栏'"
       :title="isCollapsed ? '展开侧边栏' : '收起侧边栏'"
     >
@@ -55,7 +55,7 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-56')
     <div class="p-5 overflow-hidden">
       <RouterLink
         to="/"
-        class="text-lg font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] whitespace-nowrap hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-200"
+        class="text-lg font-semibold text-text-primary whitespace-nowrap hover:text-accent transition-colors duration-200"
         :class="{ 'opacity-0': isCollapsed }"
       >
         {{ isCollapsed ? 'M' : 'MySite' }}
@@ -70,8 +70,8 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-56')
         class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200 whitespace-nowrap"
         :class="[
           route.path === item.path
-            ? 'bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] font-medium'
-            : 'text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)]'
+            ? 'bg-accent-subtle text-accent font-medium'
+            : 'text-text-secondary hover:bg-bg-code hover:text-accent'
         ]"
         :title="isCollapsed ? item.label : ''"
       >
@@ -83,7 +83,7 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-56')
     <div class="mt-auto pt-4 px-2 overflow-hidden">
       <button
         @click="handleLogout"
-        class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500 dark:hover:text-red-400 transition-all duration-200 w-full whitespace-nowrap"
+        class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-text-secondary hover:bg-red-50 hover:text-red-500 transition-all duration-200 w-full whitespace-nowrap"
         :title="isCollapsed ? '退出登录' : ''"
       >
         <LogOut :size="16" class="flex-shrink-0" />

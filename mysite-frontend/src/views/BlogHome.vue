@@ -142,18 +142,18 @@ onMounted(() => {
 
 <template>
   <div>
-    <section class="mb-12 pb-10 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
-      <h1 class="text-4xl font-bold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-3 tracking-tight">
+    <section class="mb-12 pb-10 border-b border-border">
+      <h1 class="text-4xl font-bold text-text-primary mb-3 tracking-tight">
         {{ siteStore.site.title }}
       </h1>
-      <p class="text-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] leading-relaxed max-w-xl">
+      <p class="text-lg text-text-muted leading-relaxed max-w-xl">
         {{ siteStore.site.description }}
       </p>
     </section>
 
     <section class="mb-8 space-y-4">
       <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-medium text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] mr-1 flex items-center gap-1">
+        <span class="text-xs font-medium text-text-muted mr-1 flex items-center gap-1">
           <ArrowUpDown :size="12" />
           排序
         </span>
@@ -163,8 +163,8 @@ onMounted(() => {
           @click="setSort(opt.field, opt.order)"
           class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200"
           :class="isSortActive(opt.field, opt.order)
-            ? 'bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] shadow-sm'
-            : 'bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)]'"
+            ? 'bg-accent text-text-inverse shadow-sm'
+            : 'bg-bg-code text-text-muted hover:text-accent hover:bg-accent-subtle'"
         >
           <component :is="opt.icon" :size="10" />
           {{ opt.label }}
@@ -172,18 +172,18 @@ onMounted(() => {
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-medium text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] mr-1 flex items-center gap-1">
+        <span class="text-xs font-medium text-text-muted mr-1 flex items-center gap-1">
           <Tag :size="12" />
           分类
         </span>
-        <Loader2 v-if="categoriesLoading" :size="14" class="animate-spin text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]" />
+        <Loader2 v-if="categoriesLoading" :size="14" class="animate-spin text-text-muted" />
         <template v-else>
           <button
             @click="selectCategory(null)"
             class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200"
             :class="!selectedCategorySlug
-              ? 'bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] shadow-sm'
-              : 'bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)]'"
+              ? 'bg-accent text-text-inverse shadow-sm'
+              : 'bg-bg-code text-text-muted hover:text-accent hover:bg-accent-subtle'"
           >
             全部
           </button>
@@ -193,8 +193,8 @@ onMounted(() => {
             @click="selectCategory(cat.slug)"
             class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200"
             :class="selectedCategorySlug === cat.slug
-              ? 'bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] shadow-sm'
-              : 'bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)]'"
+              ? 'bg-accent text-text-inverse shadow-sm'
+              : 'bg-bg-code text-text-muted hover:text-accent hover:bg-accent-subtle'"
           >
             {{ cat.name }}
             <span v-if="cat.articleCount" class="opacity-60">{{ cat.articleCount }}</span>
@@ -204,15 +204,15 @@ onMounted(() => {
 
       <div
         v-if="selectedCategoryName"
-        class="flex items-center gap-2 text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]"
+        class="flex items-center gap-2 text-xs text-text-muted"
       >
         <span>当前筛选：</span>
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] font-medium">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-subtle text-accent font-medium">
           {{ selectedCategoryName }}
         </span>
         <button
           @click="clearCategory"
-          class="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-[var(--color-border)] dark:hover:bg-[var(--color-dark-border)] transition-colors"
+          class="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-border transition-colors"
         >
           <X :size="10" />
         </button>

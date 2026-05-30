@@ -43,16 +43,10 @@
     padding: 0.5rem 1rem;
     font-family: var(--font-sans);
     font-size: 0.75rem;
-    color: var(--color-text-muted);
-    background-color: var(--color-bg-code);
-    border-bottom: 1px solid var(--color-border);
+    color: var(--text-muted);
+    background-color: var(--bg-code);
+    border-bottom: 1px solid var(--border);
     border-radius: 8px 8px 0 0;
-  }
-
-  .dark .code-block-header {
-    color: var(--color-dark-text-muted);
-    background-color: var(--color-dark-bg-code);
-    border-bottom-color: var(--color-dark-border);
   }
 
   .code-block-wrapper pre.shiki {

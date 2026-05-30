@@ -53,11 +53,11 @@ onMounted(() => {
 
 <template>
   <div>
-    <section class="mb-10 pb-8 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
-      <h1 class="text-3xl sm:text-4xl font-bold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] tracking-tight">
+    <section class="mb-10 pb-8 border-b border-border">
+      <h1 class="text-3xl sm:text-4xl font-bold text-text-primary tracking-tight">
         #{{ tagSlug || '标签' }}
       </h1>
-      <p class="mt-2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+      <p class="mt-2 text-text-muted">
         该标签下的所有文章
       </p>
     </section>

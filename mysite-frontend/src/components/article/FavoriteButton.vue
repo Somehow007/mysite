@@ -89,12 +89,12 @@ async function handleToggle() {
 <template>
   <button
     @click="handleToggle"
-    class="inline-flex items-center gap-1.5 rounded-full transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] dark:focus-visible:ring-[var(--color-dark-accent)] focus-visible:ring-offset-2"
+    class="inline-flex items-center gap-1.5 rounded-full transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
     :class="[
       sizeClass,
       favorited
-        ? 'text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300'
-        : 'text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-red-500 dark:hover:text-red-400',
+        ? 'text-red-500 hover:text-red-600'
+        : 'text-text-muted hover:text-red-500',
       pending ? 'cursor-wait' : 'cursor-pointer'
     ]"
     :disabled="pending"

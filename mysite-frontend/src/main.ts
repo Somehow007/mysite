@@ -1,4 +1,5 @@
 import '@/styles/main.css'
+import '@/styles/glass.css'
 import '@/styles/transitions.css'
 import '@/styles/typography.css'
 import '@/styles/code.css'

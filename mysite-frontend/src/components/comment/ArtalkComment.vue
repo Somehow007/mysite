@@ -162,19 +162,19 @@ onUnmounted(() => {
 <template>
   <div
     ref="wrapperRef"
-    class="artalk-custom mt-12 pt-8 border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)]"
+    class="artalk-custom mt-12 pt-8 border-t border-border"
   >
     <div v-if="showLoading" class="flex items-center justify-center py-8 gap-2">
-      <div class="w-4 h-4 border-2 border-[var(--color-accent)] dark:border-[var(--color-dark-accent)] border-t-transparent rounded-full animate-spin" />
-      <span class="text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">评论加载中...</span>
+      <div class="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+      <span class="text-sm text-text-muted">评论加载中...</span>
     </div>
     <div v-else-if="loadError" class="text-center py-8">
-      <p class="text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+      <p class="text-sm text-text-muted">
         评论服务暂不可用
       </p>
       <button
         @click="initArtalk"
-        class="mt-2 text-xs text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] hover:opacity-70 transition-opacity"
+        class="mt-2 text-xs text-accent hover:opacity-70 transition-opacity"
       >
         点击重试
       </button>

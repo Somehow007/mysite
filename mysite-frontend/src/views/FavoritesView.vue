@@ -80,14 +80,14 @@ onMounted(() => {
 
 <template>
   <div>
-    <section class="mb-10 pb-8 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
+    <section class="mb-10 pb-8 border-b border-border">
       <div class="flex items-center gap-3 mb-4">
-        <Heart :size="28" fill="currentColor" stroke-width="0" class="text-red-500 dark:text-red-400" />
-        <h1 class="text-3xl sm:text-4xl font-bold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] tracking-tight">
+        <Heart :size="28" fill="currentColor" stroke-width="0" class="text-red-500" />
+        <h1 class="text-3xl sm:text-4xl font-bold text-text-primary tracking-tight">
           我的收藏
         </h1>
       </div>
-      <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+      <p class="text-text-muted">
         你收藏的所有文章都在这里
       </p>
     </section>
@@ -95,7 +95,7 @@ onMounted(() => {
     <section class="mb-8">
       <form @submit.prevent="handleSearch" class="flex gap-2 max-w-md">
         <div class="relative flex-1">
-          <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]" />
+          <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
             v-model="searchInput"
             type="text"
@@ -106,7 +106,7 @@ onMounted(() => {
             v-if="searchInput"
             type="button"
             @click="clearSearch"
-            class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:text-[var(--color-text-heading)] dark:hover:text-[var(--color-dark-text-heading)] transition-colors"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
           >
             <X :size="14" />
           </button>
@@ -121,15 +121,15 @@ onMounted(() => {
 
       <div
         v-if="searchKeyword"
-        class="flex items-center gap-2 mt-3 text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]"
+        class="flex items-center gap-2 mt-3 text-xs text-text-muted"
       >
         <span>搜索：</span>
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] font-medium">
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-subtle text-accent font-medium">
           {{ searchKeyword }}
         </span>
         <button
           @click="clearSearch"
-          class="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-[var(--color-border)] dark:hover:bg-[var(--color-dark-border)] transition-colors"
+          class="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-border transition-colors"
         >
           <X :size="10" />
         </button>
@@ -137,22 +137,22 @@ onMounted(() => {
     </section>
 
     <div v-if="!loading && articles.length === 0 && !searchKeyword" class="py-20 text-center">
-      <Heart :size="48" class="mx-auto mb-4 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] opacity-30" />
-      <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] mb-2">还没有收藏任何文章</p>
-      <p class="text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] opacity-60">
+      <Heart :size="48" class="mx-auto mb-4 text-text-muted opacity-30" />
+      <p class="text-text-muted mb-2">还没有收藏任何文章</p>
+      <p class="text-sm text-text-muted opacity-60">
         浏览文章时点击 ❤️ 即可收藏
       </p>
       <button
         @click="router.push('/')"
-        class="mt-4 text-sm text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] hover:opacity-80 transition-opacity font-medium"
+        class="mt-4 text-sm text-accent hover:opacity-80 transition-opacity font-medium"
       >
         去看看文章
       </button>
     </div>
 
     <div v-else-if="!loading && articles.length === 0 && searchKeyword" class="py-16 text-center">
-      <Search :size="40" class="mx-auto mb-4 text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] opacity-30" />
-      <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">没有找到匹配「{{ searchKeyword }}」的收藏文章</p>
+      <Search :size="40" class="mx-auto mb-4 text-text-muted opacity-30" />
+      <p class="text-text-muted">没有找到匹配「{{ searchKeyword }}」的收藏文章</p>
     </div>
 
     <ArticleList

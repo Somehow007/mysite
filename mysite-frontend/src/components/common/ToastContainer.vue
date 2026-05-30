@@ -15,11 +15,11 @@ function icon(type: 'success' | 'error' | 'info') {
 function bgClass(type: 'success' | 'error' | 'info') {
   switch (type) {
     case 'success':
-      return 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200'
+      return 'bg-green-50 border-green-200 text-green-800'
     case 'error':
-      return 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200'
+      return 'bg-red-50 border-red-200 text-red-800'
     default:
-      return 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200'
+      return 'bg-blue-50 border-blue-200 text-blue-800'
   }
 }
 </script>
@@ -31,7 +31,7 @@ function bgClass(type: 'success' | 'error' | 'info') {
         <div
           v-for="toast in toasts"
           :key="toast.id"
-          class="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-lg border shadow-lg backdrop-blur-sm"
+          class="pointer-events-auto glass glass-sm flex items-start gap-3 px-4 py-3 rounded-lg"
           :class="bgClass(toast.type)"
         >
           <component :is="icon(toast.type)" :size="18" class="shrink-0 mt-0.5" />

@@ -102,28 +102,28 @@ onMounted(() => {
 <template>
   <div>
     <div class="flex items-center justify-between mb-8">
-      <h1 class="text-2xl font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">
+      <h1 class="text-2xl font-semibold text-text-primary">
         图片管理
       </h1>
-      <span class="text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+      <span class="text-sm text-text-muted">
         共 {{ total }} 张图片
       </span>
     </div>
 
     <div class="flex items-center gap-3 mb-6">
       <div class="relative flex-1 max-w-sm">
-        <Search :size="14" class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
+        <Search :size="14" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
           v-model="keyword"
           type="text"
           placeholder="搜索文件名..."
-          class="w-full pl-9 pr-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text)] dark:text-[var(--color-dark-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)] text-sm"
+          class="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent text-sm"
           @keydown.enter="handleSearch"
         />
       </div>
       <select
         v-model="sourceType"
-        class="px-3 py-2 rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] text-[var(--color-text)] dark:text-[var(--color-dark-text)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]"
+        class="px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         @change="handleSourceTypeChange"
       >
         <option v-for="opt in sourceTypeOptions" :key="String(opt.value)" :value="opt.value">{{ opt.label }}</option>
@@ -135,12 +135,12 @@ onMounted(() => {
     </div>
 
     <div v-if="loading" class="flex justify-center py-12">
-      <Loader2 :size="24" class="animate-spin text-[var(--color-text-muted)]" />
+      <Loader2 :size="24" class="animate-spin text-text-muted" />
     </div>
 
     <div v-else-if="images.length === 0" class="py-16 text-center">
-      <ImageIcon :size="48" class="mx-auto mb-4 text-[var(--color-text-muted)]" />
-      <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] mb-4">还没有图片，写文章时可以上传图片</p>
+      <ImageIcon :size="48" class="mx-auto mb-4 text-text-muted" />
+      <p class="text-text-muted mb-4">还没有图片，写文章时可以上传图片</p>
     </div>
 
     <div v-else>
@@ -148,9 +148,9 @@ onMounted(() => {
         <div
           v-for="image in images"
           :key="image.id"
-          class="group relative rounded-xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] overflow-hidden hover:border-[var(--color-accent)]/30 card-shadow hover:card-shadow-hover transition-all duration-200"
+          class="group relative rounded-xl glass glass-sm glass-hover overflow-hidden hover:border-accent/30 transition-all duration-200"
         >
-          <div class="aspect-square bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)] flex items-center justify-center overflow-hidden">
+          <div class="aspect-square bg-bg-code flex items-center justify-center overflow-hidden">
             <img
               :src="image.url"
               :alt="image.originalName"
@@ -159,19 +159,19 @@ onMounted(() => {
             />
           </div>
           <div class="p-2">
-            <p class="text-xs font-medium truncate text-[var(--color-text)] dark:text-[var(--color-dark-text)]" :title="image.originalName">
+            <p class="text-xs font-medium truncate text-text-secondary" :title="image.originalName">
               {{ image.originalName }}
             </p>
             <div class="flex items-center justify-between mt-1">
-              <span class="text-[10px] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+              <span class="text-[10px] text-text-muted">
                 {{ formatFileSize(image.fileSize) }} · {{ contentTypeLabel(image.contentType) }}
               </span>
               <span
                 :class="[
                   'px-1.5 py-0.5 text-[10px] rounded',
                   image.sourceType === 0
-                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                    : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-purple-100 text-purple-700'
                 ]"
               >
                 {{ image.sourceType === 0 ? '本地' : 'URL' }}
@@ -202,17 +202,17 @@ onMounted(() => {
         <button
           @click="fetchImages(currentPage - 1)"
           :disabled="currentPage <= 1"
-          class="p-2 rounded-lg text-[var(--color-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] disabled:opacity-50 transition-colors"
+          class="p-2 rounded-lg text-text-muted hover:bg-bg-code disabled:opacity-50 transition-colors"
         >
           <ChevronLeft :size="16" />
         </button>
-        <span class="text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+        <span class="text-sm text-text-muted">
           {{ currentPage }} / {{ totalPages }}
         </span>
         <button
           @click="fetchImages(currentPage + 1)"
           :disabled="currentPage >= totalPages"
-          class="p-2 rounded-lg text-[var(--color-text-muted)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] disabled:opacity-50 transition-colors"
+          class="p-2 rounded-lg text-text-muted hover:bg-bg-code disabled:opacity-50 transition-colors"
         >
           <ChevronRight :size="16" />
         </button>
@@ -225,9 +225,9 @@ onMounted(() => {
         class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
         @click.self="confirmDialog.show = false"
       >
-        <div class="bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] rounded-2xl shadow-2xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] p-6 w-full max-w-md mx-4 animate-scale-in">
-          <h3 class="text-lg font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-2">确认删除</h3>
-          <p class="text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] mb-6">
+        <div class="glass glass-lg rounded-2xl p-6 w-full max-w-md mx-4 animate-scale-in">
+          <h3 class="text-lg font-semibold text-text-primary mb-2">确认删除</h3>
+          <p class="text-sm text-text-muted mb-6">
             确定要删除图片「{{ confirmDialog.image?.originalName }}」吗？此操作不可撤销。
           </p>
           <div class="flex justify-end gap-3">

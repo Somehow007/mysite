@@ -1,0 +1,23 @@
+[data-theme="ocean-breeze"] {
+  --bg-primary: #F0FFFE;
+  --bg-secondary: #FFFFFF;
+  --bg-elevated: #FFFFFF;
+  --bg-code: #E8FAFA;
+  --bg-accent: rgba(1, 184, 194, 0.08);
+  --text-primary: #0A2E30;
+  --text-secondary: #2D4A4C;
+  --text-muted: #5F8A8C;
+  --text-inverse: #FFFFFF;
+  --accent: #008A92;
+  --accent-hover: #006D73;
+  --accent-subtle: rgba(0, 138, 146, 0.11);
+  --border: #C4ECEE;
+  --border-subtle: #E0F5F5;
+  --shadow-color: rgba(1, 184, 194, 0.06);
+  --shadow-color-md: rgba(1, 184, 194, 0.12);
+  --glass-bg: rgba(255, 255, 255, 0.70);
+  --glass-border: rgba(0, 138, 146, 0.15);
+  --glass-blur: 20px;
+  --glass-saturate: 1.8;
+  --glass-shadow: 0 4px 16px rgba(1, 184, 194, 0.06), 0 12px 40px rgba(1, 184, 194, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(0, 138, 146, 0.08);
+}

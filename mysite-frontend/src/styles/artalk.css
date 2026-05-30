@@ -1,18 +1,18 @@
 @layer components {
   .artalk-custom {
-    --at-color-font: var(--color-text-body);
-    --at-color-deep: var(--color-text-heading);
-    --at-color-sub: var(--color-text-muted);
-    --at-color-grey: var(--color-text-muted);
-    --at-color-meta: var(--color-text-muted);
-    --at-color-border: var(--color-border);
-    --at-color-light: var(--color-accent);
-    --at-color-bg: var(--color-bg-card);
+    --at-color-font: var(--text-secondary);
+    --at-color-deep: var(--text-primary);
+    --at-color-sub: var(--text-muted);
+    --at-color-grey: var(--text-muted);
+    --at-color-meta: var(--text-muted);
+    --at-color-border: var(--border);
+    --at-color-light: var(--accent);
+    --at-color-bg: var(--bg-secondary);
     --at-color-bg-transl: rgba(255, 255, 255, 0.94);
-    --at-color-bg-grey: var(--color-bg-code);
+    --at-color-bg-grey: var(--bg-code);
     --at-color-bg-grey-transl: rgba(245, 245, 245, 0.75);
     --at-color-bg-light: rgba(24, 24, 27, 0.06);
-    --at-color-main: var(--color-accent);
+    --at-color-main: var(--accent);
     --at-color-red: #dc2626;
     --at-color-pink: #e11d48;
     --at-color-yellow: #d97706;
@@ -23,44 +23,15 @@
     position: relative;
   }
 
-  .dark .artalk-custom {
-    --at-color-font: var(--color-dark-text-body);
-    --at-color-deep: var(--color-dark-text-heading);
-    --at-color-sub: var(--color-dark-text-muted);
-    --at-color-grey: var(--color-dark-text-muted);
-    --at-color-meta: var(--color-dark-text-muted);
-    --at-color-border: var(--color-dark-border);
-    --at-color-light: var(--color-dark-accent);
-    --at-color-bg: var(--color-dark-bg-card);
-    --at-color-bg-transl: rgba(24, 24, 27, 0.94);
-    --at-color-bg-grey: var(--color-dark-bg-code);
-    --at-color-bg-grey-transl: rgba(9, 9, 11, 0.95);
-    --at-color-bg-light: rgba(250, 250, 250, 0.06);
-    --at-color-main: var(--color-dark-accent);
-    --at-color-red: #ef4444;
-    --at-color-pink: #f43f5e;
-    --at-color-yellow: #f59e0b;
-    --at-color-green: #22c55e;
-    --at-color-gradient: linear-gradient(180deg, transparent, rgba(24, 24, 27));
-  }
-
   .artalk-custom .atk-header {
-    border-bottom: 1px solid var(--color-border);
+    border-bottom: 1px solid var(--border);
     font-size: 0.875rem;
     font-weight: 500;
     letter-spacing: 0.02em;
   }
 
-  .dark .artalk-custom .atk-header {
-    border-bottom-color: var(--color-dark-border);
-  }
-
   .artalk-custom .atk-comment-wrap {
-    border-bottom-color: var(--color-border);
-  }
-
-  .dark .artalk-custom .atk-comment-wrap {
-    border-bottom-color: var(--color-dark-border);
+    border-bottom-color: var(--border);
   }
 
   .artalk-custom .atk-avatar img {
@@ -114,21 +85,13 @@
 
   .artalk-custom .atk-editor {
     border-radius: 8px;
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--border);
     overflow: hidden;
     transition: border-color 150ms ease;
   }
 
-  .dark .artalk-custom .atk-editor {
-    border-color: var(--color-dark-border);
-  }
-
   .artalk-custom .atk-editor:focus-within {
-    border-color: var(--color-accent);
-  }
-
-  .dark .artalk-custom .atk-editor:focus-within {
-    border-color: var(--color-dark-accent);
+    border-color: var(--accent);
   }
 
   .artalk-custom .atk-editor .atk-textarea {
@@ -140,12 +103,7 @@
   }
 
   .artalk-custom .atk-editor .atk-textarea::placeholder {
-    color: var(--color-text-muted);
-    opacity: 0.6;
-  }
-
-  .dark .artalk-custom .atk-editor .atk-textarea::placeholder {
-    color: var(--color-dark-text-muted);
+    color: var(--text-muted);
     opacity: 0.6;
   }
 
@@ -175,11 +133,7 @@
   }
 
   .artalk-custom .atk-list-footer {
-    border-top-color: var(--color-border);
-  }
-
-  .dark .artalk-custom .atk-list-footer {
-    border-top-color: var(--color-dark-border);
+    border-top-color: var(--border);
   }
 
   .artalk-custom .atk-pagination-item {
@@ -258,29 +212,18 @@
     border: 0;
   }
 
-
-
   .artalk-login-overlay {
-    border: 1px dashed var(--color-border);
+    border: 1px dashed var(--border);
     border-radius: 8px;
     padding: 2.5rem 2rem;
     margin-bottom: 1.5rem;
-    background: var(--color-bg-primary);
+    background: var(--bg-primary);
     transition: border-color 150ms ease;
     position: relative;
   }
 
-  .dark .artalk-login-overlay {
-    border-color: var(--color-dark-border);
-    background: var(--color-dark-bg-primary);
-  }
-
   .artalk-login-overlay:hover {
-    border-color: var(--color-accent);
-  }
-
-  .dark .artalk-login-overlay:hover {
-    border-color: var(--color-dark-accent);
+    border-color: var(--accent);
   }
 
   .artalk-login-overlay-content {
@@ -293,22 +236,14 @@
   .artalk-login-icon {
     width: 2.5rem;
     height: 2.5rem;
-    color: var(--color-text-muted);
+    color: var(--text-muted);
     margin-bottom: 0.25rem;
-  }
-
-  .dark .artalk-login-icon {
-    color: var(--color-dark-text-muted);
   }
 
   .artalk-login-text {
     font-size: 0.9375rem;
-    color: var(--color-text-body);
+    color: var(--text-secondary);
     font-weight: 500;
-  }
-
-  .dark .artalk-login-text {
-    color: var(--color-dark-text-body);
   }
 
   .artalk-login-btn {
@@ -320,16 +255,11 @@
     border-radius: 6px;
     font-size: 0.875rem;
     font-weight: 500;
-    background: var(--color-accent);
-    color: var(--color-bg-card);
+    background: var(--accent);
+    color: var(--bg-secondary);
     cursor: pointer;
     transition: opacity 150ms ease, transform 150ms ease;
     border: none;
-  }
-
-  .dark .artalk-login-btn {
-    background: var(--color-dark-accent);
-    color: var(--color-dark-bg-card);
   }
 
   .artalk-login-btn:hover {

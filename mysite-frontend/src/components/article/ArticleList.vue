@@ -25,7 +25,7 @@ defineEmits<{
     </div>
 
     <div v-else-if="articles.length === 0" class="py-16 text-center">
-      <p class="text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">暂无文章</p>
+      <p class="text-text-muted">暂无文章</p>
     </div>
 
     <div v-else class="space-y-10">

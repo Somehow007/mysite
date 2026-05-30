@@ -17,13 +17,13 @@ function handleLoginClick() {
 
 <template>
   <div class="flex flex-col items-center justify-center py-12 px-4 text-center">
-    <div class="w-14 h-14 rounded-full bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)] flex items-center justify-center mb-4">
-      <LogIn :size="24" class="text-[var(--color-accent)] dark:text-[var(--color-dark-accent)]" />
+    <div class="w-14 h-14 rounded-full bg-accent-subtle flex items-center justify-center mb-4">
+      <LogIn :size="24" class="text-accent" />
     </div>
-    <p class="text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] font-medium mb-2">
+    <p class="text-text-primary font-medium mb-2">
       需要登录才能{{ actionText }}
     </p>
-    <p class="text-sm text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] mb-6 max-w-xs">
+    <p class="text-sm text-text-muted mb-6 max-w-xs">
       登录后即可享受完整功能，包括发布文章、评论互动等
     </p>
     <RouterLink

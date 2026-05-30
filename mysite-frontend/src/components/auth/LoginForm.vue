@@ -45,12 +45,12 @@ async function handleSubmit() {
 
 <template>
   <form @submit.prevent="handleSubmit" class="space-y-5">
-    <div v-if="error" class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
+    <div v-if="error" class="p-3 rounded-lg bg-red-50 text-red-600 text-sm">
       {{ error }}
     </div>
 
     <div>
-      <label for="login-username" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+      <label for="login-username" class="block text-sm font-medium text-text-primary mb-1.5">
         用户名
       </label>
       <input
@@ -65,7 +65,7 @@ async function handleSubmit() {
     </div>
 
     <div>
-      <label for="login-password" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+      <label for="login-password" class="block text-sm font-medium text-text-primary mb-1.5">
         密码
       </label>
       <input

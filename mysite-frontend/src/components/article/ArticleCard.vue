@@ -43,13 +43,13 @@ function handleLoginRequired() {
           />
         </div>
 
-        <h2 class="text-xl font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] group-hover:text-[var(--color-accent)] dark:group-hover:text-[var(--color-dark-accent)] transition-colors duration-200 mb-2 leading-snug">
+        <h2 class="text-xl font-semibold text-text-primary group-hover:text-accent transition-colors duration-200 mb-2 leading-snug">
           {{ article.title }}
         </h2>
 
         <p
           v-if="article.summary"
-          class="text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] line-clamp-2 mb-3 leading-relaxed"
+          class="text-sm text-text-secondary line-clamp-2 mb-3 leading-relaxed"
         >
           {{ article.summary }}
         </p>

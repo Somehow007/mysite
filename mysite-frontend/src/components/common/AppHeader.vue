@@ -77,7 +77,6 @@ async function handleAvatarUpload(e: Event) {
   try {
     await uploadAvatar(file)
   } catch {
-    // error handled by interceptor
   } finally {
     avatarUploading.value = false
     input.value = ''
@@ -90,14 +89,14 @@ async function handleAvatarUpload(e: Event) {
     class="sticky top-0 z-50 transition-all duration-300"
     :class="[
       scrolled
-        ? 'bg-[var(--color-bg-card)]/85 dark:bg-[var(--color-dark-bg-card)]/85 backdrop-blur-xl border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)] shadow-sm'
+        ? 'glass glass-sm border-b border-border'
         : 'bg-transparent'
     ]"
   >
     <div class="max-w-[1080px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
       <RouterLink
         to="/"
-        class="text-lg font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-200"
+        class="text-lg font-semibold text-text-primary hover:text-accent transition-colors duration-200"
         @click="closeMobileMenu"
       >
         {{ siteStore.site.title }}
@@ -108,20 +107,20 @@ async function handleAvatarUpload(e: Event) {
           v-for="item in siteStore.site.navigation"
           :key="item.path"
           :to="item.path"
-          class="px-3 py-1.5 rounded-md text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-all duration-200"
-          :class="{ 'font-medium text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)]': route.path === item.path }"
+          class="px-3 py-1.5 rounded-md text-sm text-text-secondary hover:text-accent hover:bg-accent-subtle transition-all duration-200"
+          :class="{ 'font-medium text-accent bg-accent-subtle': route.path === item.path }"
         >
           {{ item.label }}
         </RouterLink>
 
-        <div class="flex items-center gap-1 ml-3 pl-3 border-l border-[var(--color-border)] dark:border-[var(--color-dark-border)]">
+        <div class="flex items-center gap-1 ml-3 pl-3 border-l border-border">
           <SearchDialog />
           <ThemeToggle />
 
           <template v-if="!userStore.isLoggedIn">
             <RouterLink
               to="/login"
-              class="ml-1 px-3 py-1.5 rounded-md text-sm font-medium text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-all duration-200"
+              class="ml-1 px-3 py-1.5 rounded-md text-sm font-medium text-accent hover:bg-accent-subtle transition-all duration-200"
             >
               登录
             </RouterLink>
@@ -131,9 +130,9 @@ async function handleAvatarUpload(e: Event) {
             <div class="relative" @mouseenter="handleMenuEnter" @mouseleave="handleMenuLeave">
               <button
                 @click="toggleUserMenu"
-                class="flex items-center gap-2 px-2 py-1 rounded-md text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-all duration-200"
+                class="flex items-center gap-2 px-2 py-1 rounded-md text-sm text-text-secondary hover:bg-bg-code transition-all duration-200"
               >
-                <div class="w-7 h-7 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] flex items-center justify-center text-xs font-medium overflow-hidden">
+                <div class="w-7 h-7 rounded-full bg-accent text-text-inverse flex items-center justify-center text-xs font-medium overflow-hidden">
                   <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" :alt="userStore.displayName" class="w-full h-full object-cover" />
                   <span v-else>{{ userStore.displayName?.charAt(0)?.toUpperCase() || 'U' }}</span>
                 </div>
@@ -150,11 +149,11 @@ async function handleAvatarUpload(e: Event) {
               >
                 <div
                   v-if="userMenuOpen"
-                  class="absolute right-0 mt-2 w-52 bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] border border-[var(--color-border)] dark:border-[var(--color-dark-border)] rounded-xl shadow-lg py-1.5 z-50 card-shadow-hover"
+                  class="absolute right-0 mt-2 w-52 glass glass-sm rounded-xl py-1.5 z-50"
                 >
-                  <div class="px-3 py-2 border-b border-[var(--color-border)] dark:border-[var(--color-dark-border)] mb-1 flex items-center gap-2.5">
+                  <div class="px-3 py-2 border-b border-border mb-1 flex items-center gap-2.5">
                     <div class="relative group">
-                      <div class="w-9 h-9 rounded-full bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)] flex items-center justify-center text-sm font-medium overflow-hidden">
+                      <div class="w-9 h-9 rounded-full bg-accent text-text-inverse flex items-center justify-center text-sm font-medium overflow-hidden">
                         <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" :alt="userStore.displayName" class="w-full h-full object-cover" />
                         <span v-else>{{ userStore.displayName?.charAt(0)?.toUpperCase() || 'U' }}</span>
                       </div>
@@ -164,11 +163,11 @@ async function handleAvatarUpload(e: Event) {
                         <input type="file" accept="image/*" class="hidden" @change="handleAvatarUpload" :disabled="avatarUploading" />
                       </label>
                     </div>
-                    <p class="text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">{{ userStore.displayName }}</p>
+                    <p class="text-sm font-medium text-text-primary">{{ userStore.displayName }}</p>
                   </div>
                   <RouterLink
                     to="/dashboard"
-                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:bg-accent-subtle hover:text-accent transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
                     <LayoutDashboard :size="15" />
@@ -176,7 +175,7 @@ async function handleAvatarUpload(e: Event) {
                   </RouterLink>
                   <RouterLink
                     to="/favorites"
-                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:bg-accent-subtle hover:text-accent transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
                     <Heart :size="15" />
@@ -184,7 +183,7 @@ async function handleAvatarUpload(e: Event) {
                   </RouterLink>
                   <RouterLink
                     to="/dashboard/posts/new"
-                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:bg-accent-subtle hover:text-accent transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
                     <PenSquare :size="15" />
@@ -193,7 +192,7 @@ async function handleAvatarUpload(e: Event) {
                   <RouterLink
                     v-if="isDeveloper"
                     to="/dashboard/images"
-                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:bg-accent-subtle hover:text-accent transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
                     <ImageIcon :size="15" />
@@ -202,7 +201,7 @@ async function handleAvatarUpload(e: Event) {
                   <RouterLink
                     v-if="isDeveloper"
                     to="/dashboard/categories"
-                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:bg-accent-subtle hover:text-accent transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
                     <FolderTree :size="15" />
@@ -211,7 +210,7 @@ async function handleAvatarUpload(e: Event) {
                   <RouterLink
                     v-if="isDeveloper"
                     to="/dashboard/users"
-                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:bg-accent-subtle hover:text-accent transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
                     <Users :size="15" />
@@ -219,16 +218,16 @@ async function handleAvatarUpload(e: Event) {
                   </RouterLink>
                   <RouterLink
                     to="/dashboard/settings"
-                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-colors duration-150 mx-1 rounded-md"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-text-secondary hover:bg-accent-subtle hover:text-accent transition-colors duration-150 mx-1 rounded-md"
                     @click="closeUserMenu"
                   >
                     <Settings :size="15" />
                     个人设置
                   </RouterLink>
-                  <hr class="my-1.5 border-[var(--color-border)] dark:border-[var(--color-dark-border)]" />
+                  <hr class="my-1.5 border-border" />
                   <button
                     @click="handleLogout"
-                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-150 w-full text-left mx-1 rounded-md"
+                    class="flex items-center gap-2.5 px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors duration-150 w-full text-left mx-1 rounded-md"
                   >
                     <LogOut :size="15" />
                     退出登录
@@ -244,7 +243,7 @@ async function handleAvatarUpload(e: Event) {
         <SearchDialog />
         <ThemeToggle />
         <button
-          class="p-2 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-bg-code)] dark:hover:bg-[var(--color-dark-bg-code)] transition-colors duration-200"
+          class="p-2 rounded-lg text-text-secondary hover:bg-bg-code transition-colors duration-200"
           @click="toggleMobileMenu"
           :aria-label="mobileMenuOpen ? '关闭菜单' : '打开菜单'"
         >
@@ -257,15 +256,15 @@ async function handleAvatarUpload(e: Event) {
     <transition name="slide-up">
       <div
         v-if="mobileMenuOpen"
-        class="md:hidden border-t border-[var(--color-border)] dark:border-[var(--color-dark-border)] bg-[var(--color-bg-card)]/95 dark:bg-[var(--color-dark-bg-card)]/95 backdrop-blur-xl px-6 py-4"
+        class="md:hidden border-t border-border glass glass-sm px-6 py-4"
       >
         <nav class="flex flex-col gap-1">
           <RouterLink
             v-for="item in siteStore.site.navigation"
             :key="item.path"
             :to="item.path"
-            class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
-            :class="{ 'font-medium text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)]': route.path === item.path }"
+            class="text-sm py-2.5 px-3 rounded-lg text-text-secondary hover:bg-accent-subtle hover:text-accent transition-all duration-200"
+            :class="{ 'font-medium text-accent bg-accent-subtle': route.path === item.path }"
             @click="closeMobileMenu"
           >
             {{ item.label }}
@@ -274,31 +273,31 @@ async function handleAvatarUpload(e: Event) {
           <template v-if="!userStore.isLoggedIn">
             <RouterLink
               to="/login"
-              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] font-medium hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] transition-all duration-200"
+              class="text-sm py-2.5 px-3 rounded-lg text-accent font-medium hover:bg-accent-subtle transition-all duration-200"
               @click="closeMobileMenu"
             >
               登录
             </RouterLink>
           </template>
           <template v-else>
-            <div class="h-px bg-[var(--color-border)] dark:bg-[var(--color-dark-border)] my-2" />
+            <div class="h-px bg-border my-2" />
             <RouterLink
               to="/dashboard"
-              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
+              class="text-sm py-2.5 px-3 rounded-lg text-text-secondary hover:bg-accent-subtle hover:text-accent transition-all duration-200"
               @click="closeMobileMenu"
             >
               仪表盘
             </RouterLink>
             <RouterLink
               to="/favorites"
-              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
+              class="text-sm py-2.5 px-3 rounded-lg text-text-secondary hover:bg-accent-subtle hover:text-accent transition-all duration-200"
               @click="closeMobileMenu"
             >
               我的收藏
             </RouterLink>
             <RouterLink
               to="/dashboard/posts/new"
-              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
+              class="text-sm py-2.5 px-3 rounded-lg text-text-secondary hover:bg-accent-subtle hover:text-accent transition-all duration-200"
               @click="closeMobileMenu"
             >
               写文章
@@ -306,7 +305,7 @@ async function handleAvatarUpload(e: Event) {
             <RouterLink
               v-if="isDeveloper"
               to="/dashboard/images"
-              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
+              class="text-sm py-2.5 px-3 rounded-lg text-text-secondary hover:bg-accent-subtle hover:text-accent transition-all duration-200"
               @click="closeMobileMenu"
             >
               图片管理
@@ -314,7 +313,7 @@ async function handleAvatarUpload(e: Event) {
             <RouterLink
               v-if="isDeveloper"
               to="/dashboard/categories"
-              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
+              class="text-sm py-2.5 px-3 rounded-lg text-text-secondary hover:bg-accent-subtle hover:text-accent transition-all duration-200"
               @click="closeMobileMenu"
             >
               分类管理
@@ -322,21 +321,21 @@ async function handleAvatarUpload(e: Event) {
             <RouterLink
               v-if="isDeveloper"
               to="/dashboard/users"
-              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
+              class="text-sm py-2.5 px-3 rounded-lg text-text-secondary hover:bg-accent-subtle hover:text-accent transition-all duration-200"
               @click="closeMobileMenu"
             >
               用户管理
             </RouterLink>
             <RouterLink
               to="/dashboard/settings"
-              class="text-sm py-2.5 px-3 rounded-lg text-[var(--color-text-body)] dark:text-[var(--color-dark-text-body)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200"
+              class="text-sm py-2.5 px-3 rounded-lg text-text-secondary hover:bg-accent-subtle hover:text-accent transition-all duration-200"
               @click="closeMobileMenu"
             >
               个人设置
             </RouterLink>
             <button
               @click="handleLogout"
-              class="text-sm py-2.5 px-3 rounded-lg text-left text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200"
+              class="text-sm py-2.5 px-3 rounded-lg text-left text-red-500 hover:bg-red-50 transition-colors duration-200"
             >
               退出登录
             </button>

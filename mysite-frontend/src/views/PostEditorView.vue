@@ -173,11 +173,11 @@ function removeCover() {
       <div class="flex items-center gap-4">
         <button
           @click="router.back()"
-          class="p-2 rounded-lg text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:bg-[var(--color-accent-light)] dark:hover:bg-[var(--color-dark-accent-light)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)] transition-all duration-200 group"
+          class="p-2 rounded-lg text-text-muted hover:bg-accent-subtle hover:text-accent transition-all duration-200 group"
         >
           <ArrowLeft :size="18" class="group-hover:-translate-x-0.5 transition-transform duration-200" />
         </button>
-        <h1 class="text-2xl font-semibold text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)]">
+        <h1 class="text-2xl font-semibold text-text-primary">
           {{ pageTitle }}
         </h1>
       </div>
@@ -186,7 +186,7 @@ function removeCover() {
         <button
           @click="toggleMetaPanel"
           class="btn-secondary"
-          :class="{ 'bg-[var(--color-accent-light)] dark:bg-[var(--color-dark-accent-light)] text-[var(--color-accent)] dark:text-[var(--color-dark-accent)] border-[var(--color-accent)]/30 dark:border-[var(--color-dark-accent)]/30': showMetaPanel }"
+          :class="{ 'bg-accent-subtle text-accent border-accent/30': showMetaPanel }"
           :aria-expanded="showMetaPanel"
           :aria-label="showMetaPanel ? '收起文章信息面板' : '展开文章信息面板'"
         >
@@ -218,12 +218,12 @@ function removeCover() {
       </div>
     </div>
 
-    <div v-if="error" class="mb-6 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm flex items-center gap-2">
+    <div v-if="error" class="mb-6 p-3 rounded-lg bg-red-50 text-red-600 text-sm flex items-center gap-2">
       <AlertCircle :size="16" />
       {{ error }}
     </div>
 
-    <div v-if="loading" class="py-16 text-center text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+    <div v-if="loading" class="py-16 text-center text-text-muted">
       加载中...
     </div>
 
@@ -233,10 +233,10 @@ function removeCover() {
           v-model="title"
           type="text"
           placeholder="文章标题..."
-          class="w-full px-0 py-3 text-2xl font-semibold bg-transparent border-none outline-none text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] placeholder:text-[var(--color-text-muted)] dark:placeholder:text-[var(--color-dark-text-muted)]"
+          class="w-full px-0 py-3 text-2xl font-semibold bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted"
         />
 
-        <div class="h-[calc(100vh-280px)] min-h-[500px] rounded-xl border border-[var(--color-border)] dark:border-[var(--color-dark-border)] overflow-hidden bg-[var(--color-bg-card)] dark:bg-[var(--color-dark-bg-card)] card-shadow">
+        <div class="h-[calc(100vh-280px)] min-h-[500px] rounded-xl border border-border overflow-hidden bg-bg-secondary card-shadow">
           <MarkdownEditor
             v-model="content"
             placeholder="用 Markdown 写文章..."
@@ -256,7 +256,7 @@ function removeCover() {
           aria-label="文章元数据"
         >
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+            <label class="block text-sm font-medium text-text-primary mb-1.5">
               摘要
               <span v-if="showSummaryHint" class="text-red-500 ml-1">*</span>
             </label>
@@ -270,7 +270,7 @@ function removeCover() {
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+            <label class="block text-sm font-medium text-text-primary mb-1.5">
               分类
             </label>
             <select v-model="categoryId" class="input-base">
@@ -282,7 +282,7 @@ function removeCover() {
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+            <label class="block text-sm font-medium text-text-primary mb-1.5">
               标签
             </label>
             <div class="flex flex-wrap gap-2">
@@ -292,23 +292,23 @@ function removeCover() {
                 @click="toggleTag(tag.id)"
                 class="text-xs px-2.5 py-1 rounded-full border transition-all duration-200"
                 :class="selectedTagIds.includes(tag.id)
-                  ? 'border-[var(--color-accent)] dark:border-[var(--color-dark-accent)] bg-[var(--color-accent)] dark:bg-[var(--color-dark-accent)] text-white dark:text-[var(--color-dark-bg-primary)]'
-                  : 'border-[var(--color-border)] dark:border-[var(--color-dark-border)] text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] hover:border-[var(--color-accent)] dark:hover:border-[var(--color-dark-accent)] hover:text-[var(--color-accent)] dark:hover:text-[var(--color-dark-accent)]'"
+                  ? 'border-accent bg-accent text-text-inverse'
+                  : 'border-border text-text-muted hover:border-accent hover:text-accent'"
               >
                 #{{ tag.name }}
               </button>
-              <span v-if="tags.length === 0" class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+              <span v-if="tags.length === 0" class="text-xs text-text-muted">
                 暂无标签
               </span>
             </div>
           </div>
 
           <div>
-            <label class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+            <label class="block text-sm font-medium text-text-primary mb-1.5">
               封面图片
             </label>
             <div v-if="coverImage" class="relative group mb-2">
-              <img :src="coverImage" alt="封面预览" class="w-full aspect-[2/1] object-cover rounded-lg border border-[var(--color-border)] dark:border-[var(--color-dark-border)]" />
+              <img :src="coverImage" alt="封面预览" class="w-full aspect-[2/1] object-cover rounded-lg border border-border" />
               <button @click="removeCover" class="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity" title="移除封面">
                 <X :size="14" />
               </button>
@@ -329,11 +329,11 @@ function removeCover() {
             />
           </div>
 
-          <div class="p-4 rounded-lg bg-[var(--color-bg-code)] dark:bg-[var(--color-dark-bg-code)]">
-            <p class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] leading-relaxed mb-2">
+          <div class="p-4 rounded-lg bg-bg-code">
+            <p class="text-xs text-text-muted leading-relaxed mb-2">
               编辑器支持丰富的Markdown快捷键，点击工具栏的 <strong>?</strong> 按钮查看所有快捷键。
             </p>
-            <p class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)] leading-relaxed">
+            <p class="text-xs text-text-muted leading-relaxed">
               支持实时预览、语法高亮和自动补全功能。
             </p>
           </div>

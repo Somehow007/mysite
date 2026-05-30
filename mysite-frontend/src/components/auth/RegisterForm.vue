@@ -103,16 +103,16 @@ async function handleSubmit() {
 
 <template>
   <form @submit.prevent="handleSubmit" class="space-y-5">
-    <div v-if="error" class="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
+    <div v-if="error" class="p-3 rounded-lg bg-red-50 text-red-600 text-sm">
       {{ error }}
     </div>
 
-    <p class="text-xs text-[var(--color-text-muted)] dark:text-[var(--color-dark-text-muted)]">
+    <p class="text-xs text-text-muted">
       <span class="text-red-500">*</span> 表示必填项
     </p>
 
     <div>
-      <label for="reg-username" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+      <label for="reg-username" class="block text-sm font-medium text-text-primary mb-1.5">
         用户名 <span class="text-red-500">*</span>
       </label>
       <input
@@ -127,7 +127,7 @@ async function handleSubmit() {
     </div>
 
     <div>
-      <label for="reg-email" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+      <label for="reg-email" class="block text-sm font-medium text-text-primary mb-1.5">
         邮箱 <span class="text-red-500">*</span>
       </label>
       <input
@@ -138,16 +138,16 @@ async function handleSubmit() {
         required
         @blur="handleEmailBlur"
         class="input-base"
-        :class="{ 'border-red-400 dark:border-red-500 focus:ring-red-400 dark:focus:ring-red-500': isFieldInvalid('email') }"
+        :class="{ 'border-red-400 focus:ring-red-400': isFieldInvalid('email') }"
         placeholder="请输入邮箱"
       />
-      <p v-if="getFieldError('email')" class="mt-1 text-xs text-red-500 dark:text-red-400">
+      <p v-if="getFieldError('email')" class="mt-1 text-xs text-red-500">
         {{ getFieldError('email') }}
       </p>
     </div>
 
     <div>
-      <label for="reg-realname" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+      <label for="reg-realname" class="block text-sm font-medium text-text-primary mb-1.5">
         真实姓名 <span class="text-red-500">*</span>
       </label>
       <input
@@ -162,7 +162,7 @@ async function handleSubmit() {
     </div>
 
     <div>
-      <label for="reg-phone" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+      <label for="reg-phone" class="block text-sm font-medium text-text-primary mb-1.5">
         手机号 <span class="text-red-500">*</span>
       </label>
       <input
@@ -174,17 +174,17 @@ async function handleSubmit() {
         @blur="handlePhoneBlur"
         @input="handlePhoneInput"
         class="input-base"
-        :class="{ 'border-red-400 dark:border-red-500 focus:ring-red-400 dark:focus:ring-red-500': isFieldInvalid('phoneNumber') }"
+        :class="{ 'border-red-400 focus:ring-red-400': isFieldInvalid('phoneNumber') }"
         placeholder="请输入手机号"
         maxlength="11"
       />
-      <p v-if="getFieldError('phoneNumber')" class="mt-1 text-xs text-red-500 dark:text-red-400">
+      <p v-if="getFieldError('phoneNumber')" class="mt-1 text-xs text-red-500">
         {{ getFieldError('phoneNumber') }}
       </p>
     </div>
 
     <div>
-      <label for="reg-password" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+      <label for="reg-password" class="block text-sm font-medium text-text-primary mb-1.5">
         密码 <span class="text-red-500">*</span>
       </label>
       <input
@@ -194,16 +194,16 @@ async function handleSubmit() {
         autocomplete="new-password"
         required
         class="input-base"
-        :class="{ 'border-red-400 dark:border-red-500 focus:ring-red-400 dark:focus:ring-red-500': isFieldInvalid('password') }"
+        :class="{ 'border-red-400 focus:ring-red-400': isFieldInvalid('password') }"
         placeholder="至少 6 位"
       />
-      <p v-if="getFieldError('password')" class="mt-1 text-xs text-red-500 dark:text-red-400">
+      <p v-if="getFieldError('password')" class="mt-1 text-xs text-red-500">
         {{ getFieldError('password') }}
       </p>
     </div>
 
     <div>
-      <label for="reg-confirm" class="block text-sm font-medium text-[var(--color-text-heading)] dark:text-[var(--color-dark-text-heading)] mb-1.5">
+      <label for="reg-confirm" class="block text-sm font-medium text-text-primary mb-1.5">
         确认密码 <span class="text-red-500">*</span>
       </label>
       <input
@@ -214,10 +214,10 @@ async function handleSubmit() {
         required
         @blur="handleConfirmBlur"
         class="input-base"
-        :class="{ 'border-red-400 dark:border-red-500 focus:ring-red-400 dark:focus:ring-red-500': isFieldInvalid('confirmPassword') }"
+        :class="{ 'border-red-400 focus:ring-red-400': isFieldInvalid('confirmPassword') }"
         placeholder="再次输入密码"
       />
-      <p v-if="getFieldError('confirmPassword')" class="mt-1 text-xs text-red-500 dark:text-red-400">
+      <p v-if="getFieldError('confirmPassword')" class="mt-1 text-xs text-red-500">
         {{ getFieldError('confirmPassword') }}
       </p>
     </div>

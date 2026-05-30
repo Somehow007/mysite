@@ -9,11 +9,6 @@
     <meta name="theme-color" content="#09090B" media="(prefers-color-scheme: dark)">
     <meta name="format-detection" content="telephone=no">
     <title>MySite</title>
-    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
-    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600&display=swap" rel="stylesheet">
     <style>
       @font-face {
         font-family: 'Inter Fallback';
@@ -23,6 +18,9 @@
     </style>
   </head>
   <body>
+    <script>
+      ;(function(){var t=localStorage.getItem('mysite_theme_v2')||'classic-light';document.documentElement.setAttribute('data-theme',t);var d=t.includes('dark')||t==='aurora';document.documentElement.classList.toggle('dark',d);document.documentElement.style.colorScheme=d?'dark':'light'})()
+    </script>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
