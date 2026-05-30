@@ -1,9 +1,50 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick, computed, markRaw } from 'vue'
+import { useDebounceFn } from '@vueuse/core'
 import { useMarkdown } from '@/composables/useMarkdown'
 import { uploadImage, uploadImageByUrl } from '@/api/image'
 import { useToast } from '@/composables/useToast'
 import { Image as ImageIcon, HelpCircle, X, Bold, Italic, Link, Code, List, Quote, Heading, LinkIcon, Loader2 } from 'lucide-vue-next'
+
+interface HistoryEntry {
+  content: string
+  selectionStart: number
+  selectionEnd: number
+}
+
+class UndoManager {
+  private undoStack: HistoryEntry[] = []
+  private redoStack: HistoryEntry[] = []
+  private maxSize = 100
+
+  push(entry: HistoryEntry) {
+    if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1]!.content === entry.content) return
+    this.undoStack.push({ ...entry })
+    this.redoStack = []
+    if (this.undoStack.length > this.maxSize) this.undoStack.shift()
+  }
+
+  undo(current: HistoryEntry): HistoryEntry | null {
+    if (this.undoStack.length <= 1) return null
+    this.redoStack.push({ ...current })
+    return this.undoStack.pop()!
+  }
+
+  redo(current: HistoryEntry): HistoryEntry | null {
+    if (this.redoStack.length === 0) return null
+    const entry = this.redoStack.pop()!
+    this.undoStack.push({ ...current })
+    return entry
+  }
+
+  canUndo() { return this.undoStack.length > 1 }
+  canRedo() { return this.redoStack.length > 0 }
+
+  reset(entry: HistoryEntry) {
+    this.undoStack = [{ ...entry }]
+    this.redoStack = []
+  }
+}
 
 const props = defineProps<{
   modelValue: string
@@ -12,6 +53,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
+  'save': []
 }>()
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
@@ -30,6 +72,15 @@ const imageUrl = ref('')
 const urlUploading = ref(false)
 
 const uploadingFiles = ref<Map<string, { name: string; progress: number }>>(new Map())
+
+const isRestoring = ref(false)
+const cursorLine = ref(1)
+const cursorCol = ref(1)
+const wordCount = ref(0)
+const charCount = ref(0)
+const lineCount = ref(0)
+
+const undoManager = markRaw(new UndoManager())
 
 const { renderedHtml, render, applyHighlighting, rendering } = useMarkdown()
 const toast = useToast()
@@ -70,15 +121,36 @@ const shortcuts = computed(() => [
 watch(
   () => props.modelValue,
   (newVal) => {
-    content.value = newVal
-    updatePreview()
+    if (newVal !== content.value) {
+      content.value = newVal
+      updateCounts(newVal)
+    }
   },
 )
 
 watch(content, (newVal) => {
-  emit('update:modelValue', newVal)
-  updatePreview()
+  if (!isRestoring.value) {
+    emit('update:modelValue', newVal)
+    debouncedPushUndo()
+  }
+  updateCounts(newVal)
+  debouncedUpdatePreview()
 })
+
+watch(showPreview, (newVal) => {
+  if (newVal) updatePreview()
+})
+
+const debouncedUpdatePreview = useDebounceFn(updatePreview, 300)
+
+const debouncedPushUndo = useDebounceFn(() => {
+  if (!textareaRef.value || isRestoring.value) return
+  undoManager.push({
+    content: content.value,
+    selectionStart: textareaRef.value.selectionStart,
+    selectionEnd: textareaRef.value.selectionEnd,
+  })
+}, 400)
 
 onMounted(() => {
   if (textareaRef.value) {
@@ -87,7 +159,17 @@ onMounted(() => {
     textareaRef.value.addEventListener('paste', handlePaste)
     textareaRef.value.addEventListener('drop', handleDrop)
     textareaRef.value.addEventListener('dragover', handleDragOver)
+    textareaRef.value.addEventListener('scroll', handleEditorScroll, { passive: true })
+    textareaRef.value.addEventListener('click', updateCursorPosition)
+    textareaRef.value.addEventListener('keyup', updateCursorPosition)
   }
+  updateCounts(content.value)
+  updateCursorPosition()
+  undoManager.reset({
+    content: content.value,
+    selectionStart: 0,
+    selectionEnd: 0,
+  })
   updatePreview()
 })
 
@@ -98,6 +180,9 @@ onUnmounted(() => {
     textareaRef.value.removeEventListener('paste', handlePaste)
     textareaRef.value.removeEventListener('drop', handleDrop)
     textareaRef.value.removeEventListener('dragover', handleDragOver)
+    textareaRef.value.removeEventListener('scroll', handleEditorScroll)
+    textareaRef.value.removeEventListener('click', updateCursorPosition)
+    textareaRef.value.removeEventListener('keyup', updateCursorPosition)
   }
 })
 
@@ -108,6 +193,91 @@ async function updatePreview() {
     if (previewRef.value) {
       await applyHighlighting(previewRef.value)
     }
+  } else if (!content.value) {
+    await render('')
+  }
+}
+
+function updateCounts(text: string) {
+  charCount.value = text.length
+  lineCount.value = text.split('\n').length
+  const words = text.trim().split(/\s+/).filter(Boolean)
+  wordCount.value = words.length
+}
+
+function updateCursorPosition() {
+  if (!textareaRef.value) return
+  const pos = textareaRef.value.selectionStart
+  const text = content.value.substring(0, pos)
+  const lines = text.split('\n')
+  cursorLine.value = lines.length
+  cursorCol.value = (lines[lines.length - 1] ?? '').length + 1
+}
+
+let scrollRafId = 0
+
+function handleEditorScroll() {
+  if (scrollRafId) return
+  scrollRafId = requestAnimationFrame(() => {
+    scrollRafId = 0
+    if (!textareaRef.value || !showPreview.value || !previewRef.value) return
+    const ratio = textareaRef.value.scrollTop / (textareaRef.value.scrollHeight - textareaRef.value.clientHeight || 1)
+    previewRef.value.scrollTop = ratio * (previewRef.value.scrollHeight - previewRef.value.clientHeight)
+  })
+}
+
+function pushUndoNow() {
+  if (!textareaRef.value || isRestoring.value) return
+  undoManager.push({
+    content: content.value,
+    selectionStart: textareaRef.value.selectionStart,
+    selectionEnd: textareaRef.value.selectionEnd,
+  })
+}
+
+function performUndo() {
+  if (!textareaRef.value || !undoManager.canUndo()) return
+  showAutocomplete.value = false
+  const entry = undoManager.undo({
+    content: content.value,
+    selectionStart: textareaRef.value.selectionStart,
+    selectionEnd: textareaRef.value.selectionEnd,
+  })
+  if (entry) {
+    isRestoring.value = true
+    content.value = entry.content
+    emit('update:modelValue', entry.content)
+    nextTick(() => {
+      if (textareaRef.value) {
+        textareaRef.value.setSelectionRange(entry.selectionStart, entry.selectionEnd)
+        textareaRef.value.focus()
+      }
+      isRestoring.value = false
+      updateCursorPosition()
+    })
+  }
+}
+
+function performRedo() {
+  if (!textareaRef.value || !undoManager.canRedo()) return
+  showAutocomplete.value = false
+  const entry = undoManager.redo({
+    content: content.value,
+    selectionStart: textareaRef.value.selectionStart,
+    selectionEnd: textareaRef.value.selectionEnd,
+  })
+  if (entry) {
+    isRestoring.value = true
+    content.value = entry.content
+    emit('update:modelValue', entry.content)
+    nextTick(() => {
+      if (textareaRef.value) {
+        textareaRef.value.setSelectionRange(entry.selectionStart, entry.selectionEnd)
+        textareaRef.value.focus()
+      }
+      isRestoring.value = false
+      updateCursorPosition()
+    })
   }
 }
 
@@ -135,6 +305,27 @@ function handleKeyDown(e: KeyboardEvent) {
   }
 
   if (e.ctrlKey || e.metaKey) {
+    if (!e.shiftKey && e.key.toLowerCase() === 'z') {
+      e.preventDefault()
+      performUndo()
+      return
+    }
+    if (e.shiftKey && e.key.toLowerCase() === 'z') {
+      e.preventDefault()
+      performRedo()
+      return
+    }
+    if (e.key.toLowerCase() === 'y') {
+      e.preventDefault()
+      performRedo()
+      return
+    }
+    if (e.key.toLowerCase() === 's') {
+      e.preventDefault()
+      emit('save')
+      return
+    }
+
     switch (e.key.toLowerCase()) {
       case 'b':
         e.preventDefault()
@@ -223,6 +414,8 @@ function handleDrop(e: DragEvent) {
 }
 
 function handlePaste(e: ClipboardEvent) {
+  pushUndoNow()
+
   const items = e.clipboardData?.items
   if (!items) return
 
@@ -241,6 +434,7 @@ function handlePaste(e: ClipboardEvent) {
 
 function removeIndent() {
   if (!textareaRef.value) return
+  pushUndoNow()
 
   const start = textareaRef.value.selectionStart
   const value = textareaRef.value.value
@@ -300,19 +494,32 @@ function showAutocompletePanel(items: string[]) {
   selectedIndex.value = 0
   showAutocomplete.value = true
 
-  const rect = textareaRef.value.getBoundingClientRect()
-  const lineHeight = parseInt(getComputedStyle(textareaRef.value).lineHeight)
-  const lines = textareaRef.value.value.substring(0, textareaRef.value.selectionStart).split('\n')
+  const textarea = textareaRef.value
+  const rect = textarea.getBoundingClientRect()
+  const style = getComputedStyle(textarea)
+  const lineHeight = parseFloat(style.lineHeight) || 20
+  const paddingTop = parseFloat(style.paddingTop) || 0
+  const paddingLeft = parseFloat(style.paddingLeft) || 0
+
+  const textBeforeCursor = textarea.value.substring(0, textarea.selectionStart)
+  const lines = textBeforeCursor.split('\n')
   const currentLineIndex = lines.length - 1
+  const currentCol = (lines[lines.length - 1] ?? '').length
+
+  const charWidth = parseFloat(style.fontSize) * 0.6
+
+  const top = rect.top + paddingTop + (currentLineIndex + 1) * lineHeight - textarea.scrollTop
+  const left = rect.left + paddingLeft + currentCol * charWidth - textarea.scrollLeft
 
   autocompletePosition.value = {
-    top: rect.top + (currentLineIndex + 1) * lineHeight,
-    left: rect.left + 20,
+    top: Math.max(top, rect.top + paddingTop),
+    left: Math.min(Math.max(left, rect.left + paddingLeft), rect.right - 220),
   }
 }
 
 function applyAutocomplete() {
   if (!textareaRef.value || selectedIndex.value >= autocompleteItems.value.length) return
+  pushUndoNow()
 
   const selected = autocompleteItems.value[selectedIndex.value]
   const cursorPos = textareaRef.value.selectionStart
@@ -337,6 +544,7 @@ function applyAutocomplete() {
 
 function insertMarkdown(before: string, after: string, placeholder: string) {
   if (!textareaRef.value) return
+  pushUndoNow()
 
   const start = textareaRef.value.selectionStart
   const end = textareaRef.value.selectionEnd
@@ -356,6 +564,7 @@ function insertMarkdown(before: string, after: string, placeholder: string) {
 
 function insertText(text: string) {
   if (!textareaRef.value) return
+  pushUndoNow()
 
   const start = textareaRef.value.selectionStart
   const end = textareaRef.value.selectionEnd
@@ -373,6 +582,7 @@ function insertText(text: string) {
 
 function insertLink() {
   if (!textareaRef.value) return
+  pushUndoNow()
 
   const start = textareaRef.value.selectionStart
   const end = textareaRef.value.selectionEnd
@@ -393,6 +603,7 @@ function insertLink() {
 
 function insertImageMarkdown(url: string, alt?: string) {
   if (!textareaRef.value) return
+  pushUndoNow()
 
   const start = textareaRef.value.selectionStart
   const value = textareaRef.value.value
@@ -411,6 +622,7 @@ function insertImageMarkdown(url: string, alt?: string) {
 
 function insertCodeBlock() {
   if (!textareaRef.value) return
+  pushUndoNow()
 
   const start = textareaRef.value.selectionStart
   const end = textareaRef.value.selectionEnd
@@ -438,6 +650,7 @@ function insertCodeBlock() {
 
 function insertHeading() {
   if (!textareaRef.value) return
+  pushUndoNow()
 
   const start = textareaRef.value.selectionStart
   const value = textareaRef.value.value
@@ -462,6 +675,7 @@ function insertHeading() {
 
 function insertList(prefix: string) {
   if (!textareaRef.value) return
+  pushUndoNow()
 
   const start = textareaRef.value.selectionStart
   const value = textareaRef.value.value
@@ -487,6 +701,7 @@ function insertList(prefix: string) {
 
 function insertQuote() {
   if (!textareaRef.value) return
+  pushUndoNow()
 
   const start = textareaRef.value.selectionStart
   const value = textareaRef.value.value
@@ -566,129 +781,108 @@ async function handleUrlUpload() {
     urlUploading.value = false
   }
 }
-
-function getHighlightHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<span class="md-code-block">```$1\n$2```</span>')
-    .replace(/^(#{1,6})\s+(.*)$/gm, '<span class="md-heading">$1 $2</span>')
-    .replace(/\*\*([^*]+)\*\*/g, '<span class="md-bold">**$1**</span>')
-    .replace(/\*([^*]+)\*/g, '<span class="md-italic">*$1*</span>')
-    .replace(/`([^`]+)`/g, '<span class="md-code">`$1`</span>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<span class="md-link">[$1]($2)</span>')
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<span class="md-image">![$1]($2)</span>')
-    .replace(/^[-*+]\s+/gm, '<span class="md-list">$&</span>')
-    .replace(/^\d+\.\s+/gm, '<span class="md-list">$&</span>')
-    .replace(/^>\s+/gm, '<span class="md-quote">$&</span>')
-    .replace(/\n/g, '<br>')
-}
 </script>
 
 <template>
   <div class="markdown-editor h-full flex flex-col">
-    <div class="editor-toolbar glass glass-sm flex items-center gap-2 p-2 border-b border-border">
+    <div class="editor-toolbar glass glass-sm flex items-center gap-1 p-1.5 border-b border-border overflow-x-auto">
       <button
         @click="insertMarkdown('**', '**', '粗体文本')"
-        class="p-1.5 rounded hover:bg-bg-code transition-colors"
+        class="toolbar-btn"
         :title="`加粗 (${modKey}+B)`"
       >
-        <Bold :size="16" />
+        <Bold :size="15" />
       </button>
       <button
         @click="insertMarkdown('*', '*', '斜体文本')"
-        class="p-1.5 rounded hover:bg-bg-code transition-colors"
+        class="toolbar-btn"
         :title="`斜体 (${modKey}+I)`"
       >
-        <Italic :size="16" />
+        <Italic :size="15" />
       </button>
       <button
         @click="insertLink"
-        class="p-1.5 rounded hover:bg-bg-code transition-colors"
+        class="toolbar-btn"
         :title="`插入链接 (${modKey}+K)`"
       >
-        <Link :size="16" />
+        <Link :size="15" />
       </button>
       <button
         @click="insertCodeBlock"
-        class="p-1.5 rounded hover:bg-bg-code transition-colors"
+        class="toolbar-btn"
         :title="`代码块 (${modKey}+Shift+K)`"
       >
-        <Code :size="16" />
+        <Code :size="15" />
       </button>
       <button
         @click="insertHeading"
-        class="p-1.5 rounded hover:bg-bg-code transition-colors"
+        class="toolbar-btn"
         :title="`标题 (${modKey}+Shift+H)`"
       >
-        <Heading :size="16" />
+        <Heading :size="15" />
       </button>
       <button
         @click="insertList('-')"
-        class="p-1.5 rounded hover:bg-bg-code transition-colors"
+        class="toolbar-btn"
         :title="`无序列表 (${modKey}+Shift+L)`"
       >
-        <List :size="16" />
+        <List :size="15" />
       </button>
       <button
         @click="insertQuote"
-        class="p-1.5 rounded hover:bg-bg-code transition-colors"
+        class="toolbar-btn"
         :title="`引用 (${modKey}+Shift+Q)`"
       >
-        <Quote :size="16" />
+        <Quote :size="15" />
       </button>
-      <div class="w-px h-5 bg-border mx-1" />
+      <div class="w-px h-4 bg-border mx-0.5 flex-shrink-0" />
       <button
         @click="handleImageUpload"
-        class="p-1.5 rounded hover:bg-bg-code transition-colors"
+        class="toolbar-btn"
         :title="`上传图片 (${modKey}+Shift+I)`"
       >
-        <ImageIcon :size="16" />
+        <ImageIcon :size="15" />
       </button>
       <button
         @click="openUrlDialog"
-        class="p-1.5 rounded hover:bg-bg-code transition-colors"
+        class="toolbar-btn"
         title="通过URL插入图片"
       >
-        <LinkIcon :size="16" />
+        <LinkIcon :size="15" />
       </button>
-      <div class="flex-1" />
-      <div v-if="isUploading" class="flex items-center gap-1.5 text-xs text-accent">
+      <div class="flex-1 min-w-4" />
+      <div v-if="isUploading" class="flex items-center gap-1.5 text-xs text-accent flex-shrink-0">
         <Loader2 :size="12" class="animate-spin" />
         <span>上传中...</span>
       </div>
       <button
         @click="showPreview = !showPreview"
-        class="px-3 py-1.5 text-sm rounded border border-border hover:bg-bg-code transition-colors"
+        class="toolbar-btn text-xs px-2 gap-1"
         :class="{ 'bg-bg-code': showPreview }"
       >
-        {{ showPreview ? '隐藏预览' : '显示预览' }}
+        预览
       </button>
       <button
         @click="showShortcuts = true"
-        class="p-1.5 rounded hover:bg-bg-code transition-colors"
+        class="toolbar-btn"
         title="快捷键帮助"
       >
-        <HelpCircle :size="16" />
+        <HelpCircle :size="15" />
       </button>
     </div>
 
     <div class="editor-content flex-1 flex min-h-0">
-      <div class="editor-pane flex-1 overflow-auto" :class="{ 'border-r border-border': showPreview }">
-        <div class="editor-wrapper">
-          <div
-            class="editor-highlight p-3 font-mono text-sm leading-relaxed whitespace-pre-wrap pointer-events-none"
-            v-html="getHighlightHtml(content)"
-          />
-          <textarea
-            ref="textareaRef"
-            v-model="content"
-            :placeholder="placeholder"
-            class="editor-textarea p-3 font-mono text-sm leading-relaxed resize-none outline-none"
-            spellcheck="false"
-          />
-        </div>
+      <div class="editor-pane flex-1" :class="{ 'border-r border-border': showPreview }">
+        <textarea
+          ref="textareaRef"
+          v-model="content"
+          :placeholder="placeholder"
+          class="editor-textarea"
+          spellcheck="false"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+        />
       </div>
 
       <div v-if="showPreview" class="preview-pane flex-1 overflow-auto bg-bg-secondary">
@@ -706,6 +900,13 @@ function getHighlightHtml(text: string): string {
       </div>
     </div>
 
+    <div class="editor-status-bar flex items-center gap-4 px-3 py-1 text-xs text-text-muted border-t border-border bg-bg-secondary/50 select-none flex-shrink-0">
+      <span>{{ wordCount }} 字</span>
+      <span>{{ charCount }} 字符</span>
+      <span>{{ lineCount }} 行</span>
+      <span class="ml-auto">行 {{ cursorLine }}, 列 {{ cursorCol }}</span>
+    </div>
+
     <div
       v-if="showAutocomplete && autocompleteItems.length > 0"
       class="autocomplete-panel fixed glass glass-sm rounded-lg overflow-hidden z-50"
@@ -714,7 +915,7 @@ function getHighlightHtml(text: string): string {
       <div
         v-for="(item, index) in autocompleteItems"
         :key="index"
-        class="px-3 py-2 text-sm cursor-pointer hover:bg-bg-code"
+        class="px-3 py-1.5 text-sm cursor-pointer hover:bg-bg-code transition-colors"
         :class="{ 'bg-bg-code': index === selectedIndex }"
         @click="selectedIndex = index; applyAutocomplete()"
       >
@@ -829,79 +1030,58 @@ function getHighlightHtml(text: string): string {
 .editor-pane {
   position: relative;
   background: var(--bg-secondary);
-  overflow: auto;
-}
-
-.editor-wrapper {
-  display: grid;
-  grid-template-areas: 'editor';
-  min-height: 100%;
-}
-
-.editor-highlight {
-  grid-area: editor;
-  overflow: visible;
+  overflow: hidden;
 }
 
 .editor-textarea {
-  grid-area: editor;
-  width: 100%;
-  min-height: 100%;
-  box-sizing: border-box;
-  background: transparent;
-  color: transparent;
-  caret-color: var(--text-secondary);
-}
-
-:deep(.md-heading) {
-  color: #0550ae;
-  font-weight: 600;
-}
-
-:deep(.md-bold) {
-  color: #953800;
-  font-weight: 700;
-}
-
-:deep(.md-italic) {
-  color: #6639ba;
-  font-style: italic;
-}
-
-:deep(.md-code) {
-  background-color: rgba(175, 184, 193, 0.2);
-  color: #24292f;
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, monospace;
-}
-
-:deep(.md-code-block) {
-  color: #0550ae;
-  background-color: rgba(175, 184, 193, 0.2);
-  padding: 0.2em;
-  border-radius: 3px;
   display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0.75rem;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  tab-size: 4;
+  -moz-tab-size: 4;
+  box-sizing: border-box;
 }
 
-:deep(.md-link) {
-  color: #0969da;
-  text-decoration: underline;
+.editor-textarea::placeholder {
+  color: var(--text-muted);
+  opacity: 0.6;
 }
 
-:deep(.md-image) {
-  color: #1a7f37;
-  font-weight: 500;
+.editor-textarea::selection {
+  background-color: rgba(59, 130, 246, 0.25);
 }
 
-:deep(.md-list) {
-  color: #8250df;
-  font-weight: 500;
+.editor-textarea::-moz-selection {
+  background-color: rgba(59, 130, 246, 0.25);
 }
 
-:deep(.md-quote) {
-  color: #57606a;
-  font-style: italic;
+.toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  border-radius: 4px;
+  color: var(--text-secondary);
+  transition: background-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.toolbar-btn:hover {
+  background-color: var(--bg-code);
+  color: var(--text-primary);
+}
+
+.editor-status-bar {
+  font-variant-numeric: tabular-nums;
 }
 
 .autocomplete-panel {
@@ -911,5 +1091,13 @@ function getHighlightHtml(text: string): string {
 
 .prose {
   color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .editor-status-bar {
+    gap: 0.5rem;
+    font-size: 0.65rem;
+    padding: 0.125rem 0.5rem;
+  }
 }
 </style>

@@ -240,6 +240,7 @@ function removeCover() {
           <MarkdownEditor
             v-model="content"
             placeholder="用 Markdown 写文章..."
+            @save="handleSave(false)"
           />
         </div>
       </div>
