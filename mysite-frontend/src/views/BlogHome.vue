@@ -48,7 +48,7 @@ function isSortActive(field: SortField, order: SortOrder) {
 function setSort(field: SortField, order: SortOrder) {
   sortField.value = field
   sortOrder.value = order
-  applySort()
+  fetchArticles(1)
 }
 
 function selectCategory(slug: string | null) {
@@ -61,33 +61,22 @@ function clearCategory() {
   fetchArticles(1)
 }
 
-function applySort() {
-  const sorted = [...articles.value]
-  sorted.sort((a, b) => {
-    let cmp = 0
-    if (sortField.value === 'viewCount') {
-      cmp = a.viewCount - b.viewCount
-    } else {
-      const timeA = new Date(a.createTime).getTime()
-      const timeB = new Date(b.createTime).getTime()
-      cmp = timeA - timeB
-    }
-    return sortOrder.value === 'asc' ? cmp : -cmp
-  })
-  articles.value = sorted
-}
-
 async function fetchArticles(page = 1) {
   loading.value = true
   try {
-    const params: { page: number; size: number; categorySlug?: string } = { page, size: 10 }
+    const params: { page: number; size: number; categorySlug?: string; sortField?: string; sortOrder?: string } = { page, size: 10 }
     if (selectedCategorySlug.value) {
       params.categorySlug = selectedCategorySlug.value
+    }
+    if (sortField.value) {
+      params.sortField = sortField.value
+    }
+    if (sortOrder.value) {
+      params.sortOrder = sortOrder.value
     }
     const res = await getArticles(params)
     articles.value = res.list
     pagination.value = res.pagination
-    applySort()
   } catch {
     articles.value = []
     pagination.value = null

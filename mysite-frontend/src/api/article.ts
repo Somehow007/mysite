@@ -31,6 +31,8 @@ export function getArticles(params?: {
   categorySlug?: string
   tagSlug?: string
   published?: number | null
+  sortField?: string
+  sortOrder?: string
 }): Promise<PaginatedResponse<ArticleListItem>> {
   return getPaginated<ArticleListItem>('/v1/articles', {
     current: params?.page || 1,
@@ -40,6 +42,8 @@ export function getArticles(params?: {
     categorySlug: params?.categorySlug,
     tagSlug: params?.tagSlug,
     published: params?.published,
+    sortField: params?.sortField,
+    sortOrder: params?.sortOrder,
   })
 }
 

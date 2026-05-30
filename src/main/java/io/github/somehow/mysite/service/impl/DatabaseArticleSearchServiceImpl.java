@@ -116,7 +116,25 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
             }
         }
 
-        queryWrapper.orderByDesc(ArticleDO::getCreateTime);
+        String sortField = StrUtil.blankToDefault(requestParam.getSortField(), "createTime");
+        String sortOrder = StrUtil.blankToDefault(requestParam.getSortOrder(), "desc");
+
+        switch (sortField) {
+            case "viewCount":
+                if ("asc".equalsIgnoreCase(sortOrder)) {
+                    queryWrapper.orderByAsc(ArticleDO::getViewCount);
+                } else {
+                    queryWrapper.orderByDesc(ArticleDO::getViewCount);
+                }
+                break;
+            default:
+                if ("asc".equalsIgnoreCase(sortOrder)) {
+                    queryWrapper.orderByAsc(ArticleDO::getCreateTime);
+                } else {
+                    queryWrapper.orderByDesc(ArticleDO::getCreateTime);
+                }
+                break;
+        }
 
         Page<ArticleDO> articlePage = articleMapper.selectPage(page, queryWrapper);
 

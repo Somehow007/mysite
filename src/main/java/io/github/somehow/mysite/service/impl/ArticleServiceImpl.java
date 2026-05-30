@@ -141,12 +141,10 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     public void deleteArticle(Long id) {
         checkArticleOwnership(id);
 
-        LambdaUpdateWrapper<ArticleDO> updateWrapper = Wrappers.lambdaUpdate(ArticleDO.class)
-                .eq(ArticleDO::getId, id)
-                .eq(ArticleDO::getDelFlag, 0)
-                .set(ArticleDO::getDelFlag, 1);
+        LambdaQueryWrapper<ArticleDO> deleteWrapper = Wrappers.lambdaQuery(ArticleDO.class)
+                .eq(ArticleDO::getId, id);
 
-        int rows = baseMapper.update(null, updateWrapper);
+        int rows = baseMapper.delete(deleteWrapper);
         if (rows <= 0) {
             throw new ClientException(ErrorCode.ARTICLE_DELETE_FAILED);
         }
@@ -154,10 +152,8 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         articleTagMapper.delete(Wrappers.lambdaQuery(ArticleTagDO.class)
                 .eq(ArticleTagDO::getArticleId, id));
 
-        userFavoriteArticleMapper.update(null, Wrappers.lambdaUpdate(UserFavoriteArticleDO.class)
-                .eq(UserFavoriteArticleDO::getArticleId, id)
-                .eq(UserFavoriteArticleDO::getDelFlag, 0)
-                .set(UserFavoriteArticleDO::getDelFlag, 1));
+        userFavoriteArticleMapper.delete(Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
+                .eq(UserFavoriteArticleDO::getArticleId, id));
 
         articleSearchService.deleteArticle(id);
     }
