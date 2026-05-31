@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { FileText, PenSquare, FolderTree, Users, Settings, LogOut, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-vue-next'
+import { FileText, PenSquare, FolderTree, Users, Settings, LogOut, ChevronLeft, ChevronRight, Image as ImageIcon, Tags } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { usePermission } from '@/composables/usePermission'
 
@@ -15,6 +15,7 @@ const allNavItems = [
   { label: '文章管理', path: '/dashboard', icon: FileText, requireDeveloper: false },
   { label: '写文章', path: '/dashboard/posts/new', icon: PenSquare, requireDeveloper: false },
   { label: '分类管理', path: '/dashboard/categories', icon: FolderTree, requireDeveloper: true },
+  { label: '标签管理', path: '/dashboard/tags', icon: Tags, requireDeveloper: true },
   { label: '图片管理', path: '/dashboard/images', icon: ImageIcon, requireDeveloper: true },
   { label: '用户管理', path: '/dashboard/users', icon: Users, requireDeveloper: true },
   { label: '设置', path: '/dashboard/settings', icon: Settings, requireDeveloper: false },
@@ -39,19 +40,9 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-56')
 <template>
   <aside
     :class="sidebarWidth"
-    class="min-h-screen border-r border-border glass glass-sm transition-all duration-300 var(--ease-out) relative flex flex-col"
+    class="min-h-screen border-r border-border glass glass-sm transition-all duration-300 var(--ease-out) relative flex flex-col overflow-visible"
     :aria-expanded="!isCollapsed"
   >
-    <button
-      @click="toggleSidebar"
-      class="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full bg-bg-secondary border border-border flex items-center justify-center hover:bg-accent-subtle hover:border-accent hover:text-accent transition-all duration-200 text-text-muted"
-      :aria-label="isCollapsed ? '展开侧边栏' : '收起侧边栏'"
-      :title="isCollapsed ? '展开侧边栏' : '收起侧边栏'"
-    >
-      <ChevronRight v-if="isCollapsed" :size="12" />
-      <ChevronLeft v-else :size="12" />
-    </button>
-
     <div class="p-5 overflow-hidden">
       <RouterLink
         to="/"
@@ -90,5 +81,21 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-56')
         <span :class="{ 'hidden': isCollapsed }">退出登录</span>
       </button>
     </div>
+
+    <button
+      @click="toggleSidebar"
+      class="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full bg-bg-secondary border border-border flex items-center justify-center hover:bg-accent-subtle hover:border-accent hover:text-accent transition-all duration-200 text-text-muted"
+      :aria-label="isCollapsed ? '展开侧边栏' : '收起侧边栏'"
+      :title="isCollapsed ? '展开侧边栏' : '收起侧边栏'"
+    >
+      <ChevronRight v-if="isCollapsed" :size="12" />
+      <ChevronLeft v-else :size="12" />
+    </button>
   </aside>
 </template>
+
+<style scoped>
+aside {
+  contain: layout style !important;
+}
+</style>

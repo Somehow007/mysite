@@ -1,4 +1,4 @@
-import { get, getPaginated, post, del } from './client'
+import { get, getPaginated, post, put, del } from './client'
 import type { Tag, PaginatedResponse, ArticleListItem } from '@/types'
 
 export function getTags(): Promise<Tag[]> {
@@ -22,6 +22,10 @@ export function getTagArticles(slug: string, params?: {
 
 export function createTag(data: Partial<Tag>): Promise<Tag> {
   return post<Tag>('/v1/tags', data)
+}
+
+export function updateTag(id: string, data: Partial<Tag>): Promise<void> {
+  return put<void>(`/v1/tags/${id}`, data)
 }
 
 export function deleteTag(id: string): Promise<void> {

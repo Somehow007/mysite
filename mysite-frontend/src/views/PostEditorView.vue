@@ -2,12 +2,13 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X } from 'lucide-vue-next'
+import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X, Plus, Search, TrendingUp } from 'lucide-vue-next'
 import { createArticle, updateArticle, getArticleById } from '@/api/article'
 import { getCategories } from '@/api/category'
-import { getTags } from '@/api/tag'
+import { getTags, createTag } from '@/api/tag'
 import { uploadImage } from '@/api/image'
 import { useUserStore } from '@/stores/user'
+import { useToast } from '@/composables/useToast'
 import MarkdownEditor from '@/components/editor/MarkdownEditor.vue'
 import type { Category, Tag } from '@/types'
 
@@ -38,6 +39,27 @@ const error = ref('')
 const showMetaPanel = ref(false)
 const showSummaryHint = ref(false)
 const coverUploading = ref(false)
+
+const tagSearchQuery = ref('')
+const newTagName = ref('')
+const newTagSlug = ref('')
+const creatingTag = ref(false)
+const toast = useToast()
+
+const filteredTags = computed(() => {
+  if (!tagSearchQuery.value.trim()) return tags.value
+  const q = tagSearchQuery.value.trim().toLowerCase()
+  return tags.value.filter(
+    t => t.name.toLowerCase().includes(q) || t.slug.toLowerCase().includes(q)
+  )
+})
+
+const hotTags = computed(() =>
+  [...tags.value]
+    .filter(t => (t.articleCount ?? 0) > 0)
+    .sort((a, b) => (b.articleCount ?? 0) - (a.articleCount ?? 0))
+    .slice(0, 5)
+)
 
 onMounted(async () => {
   loading.value = true
@@ -138,6 +160,40 @@ function toggleTag(tagId: string) {
     selectedTagIds.value.splice(idx, 1)
   } else {
     selectedTagIds.value.push(tagId)
+  }
+}
+
+async function handleCreateTag() {
+  if (!newTagName.value.trim()) {
+    toast.error('请输入标签名称')
+    return
+  }
+  const slug = newTagSlug.value.trim() || newTagName.value.trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\u4e00-\u9fa5-]/g, '')
+
+  if (!slug) {
+    toast.error('请输入标签别名')
+    return
+  }
+
+  creatingTag.value = true
+  try {
+    const created = await createTag({
+      name: newTagName.value.trim(),
+      slug,
+    })
+    tags.value.push(created)
+    selectedTagIds.value.push(created.id)
+    newTagName.value = ''
+    newTagSlug.value = ''
+    toast.success('标签已创建')
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '创建标签失败'
+    toast.error(msg)
+  } finally {
+    creatingTag.value = false
   }
 }
 
@@ -286,9 +342,53 @@ function removeCover() {
             <label class="block text-sm font-medium text-text-primary mb-1.5">
               标签
             </label>
-            <div class="flex flex-wrap gap-2">
+
+            <div v-if="selectedTagIds.length > 0" class="flex flex-wrap gap-1.5 mb-3">
+              <span
+                v-for="tagId in selectedTagIds"
+                :key="tagId"
+                class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border border-accent bg-accent text-text-inverse"
+              >
+                #{{ tags.find(t => t.id === tagId)?.name || tagId }}
+                <button @click="toggleTag(tagId)" class="hover:opacity-70 transition-opacity">
+                  <X :size="10" />
+                </button>
+              </span>
+            </div>
+
+            <div v-if="hotTags.length > 0" class="mb-3">
+              <div class="flex items-center gap-1.5 mb-1.5">
+                <TrendingUp :size="12" class="text-accent" />
+                <span class="text-xs text-text-muted">热门标签</span>
+              </div>
+              <div class="flex flex-wrap gap-1.5">
+                <button
+                  v-for="tag in hotTags"
+                  :key="'hot-' + tag.id"
+                  @click="toggleTag(tag.id)"
+                  class="text-xs px-2 py-1 rounded-full border transition-all duration-200"
+                  :class="selectedTagIds.includes(tag.id)
+                    ? 'border-accent bg-accent text-text-inverse'
+                    : 'border-accent/30 bg-accent-subtle text-accent hover:border-accent hover:bg-accent hover:text-text-inverse'"
+                >
+                  #{{ tag.name }}
+                </button>
+              </div>
+            </div>
+
+            <div class="relative mb-2">
+              <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+              <input
+                v-model="tagSearchQuery"
+                type="text"
+                placeholder="搜索标签..."
+                class="input-base pl-8 text-xs"
+              />
+            </div>
+
+            <div class="flex flex-wrap gap-1.5 mb-3 max-h-32 overflow-y-auto">
               <button
-                v-for="tag in tags"
+                v-for="tag in filteredTags"
                 :key="tag.id"
                 @click="toggleTag(tag.id)"
                 class="text-xs px-2.5 py-1 rounded-full border transition-all duration-200"
@@ -298,9 +398,38 @@ function removeCover() {
               >
                 #{{ tag.name }}
               </button>
-              <span v-if="tags.length === 0" class="text-xs text-text-muted">
-                暂无标签
+              <span v-if="filteredTags.length === 0" class="text-xs text-text-muted">
+                {{ tagSearchQuery ? '没有匹配的标签' : '暂无标签' }}
               </span>
+            </div>
+
+            <div class="border-t border-border pt-3">
+              <p class="text-xs text-text-muted mb-2">创建新标签</p>
+              <div class="flex gap-2">
+                <input
+                  v-model="newTagName"
+                  type="text"
+                  placeholder="标签名称"
+                  class="input-base text-xs flex-1"
+                  @keydown.enter="handleCreateTag"
+                />
+                <input
+                  v-model="newTagSlug"
+                  type="text"
+                  placeholder="别名(可选)"
+                  class="input-base text-xs w-24"
+                  @keydown.enter="handleCreateTag"
+                />
+                <button
+                  @click="handleCreateTag"
+                  :disabled="creatingTag || !newTagName.trim()"
+                  class="p-2 rounded-lg border border-border text-text-muted hover:bg-accent-subtle hover:text-accent hover:border-accent transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="创建标签"
+                >
+                  <Loader2 v-if="creatingTag" :size="14" class="animate-spin" />
+                  <Plus v-else :size="14" />
+                </button>
+              </div>
             </div>
           </div>
 

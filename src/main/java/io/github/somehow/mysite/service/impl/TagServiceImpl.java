@@ -10,6 +10,7 @@ import io.github.somehow.mysite.dao.entity.TagDO;
 import io.github.somehow.mysite.dao.mapper.ArticleTagMapper;
 import io.github.somehow.mysite.dao.mapper.TagMapper;
 import io.github.somehow.mysite.dto.req.tag.TagCreateReqDTO;
+import io.github.somehow.mysite.dto.req.tag.TagUpdateReqDTO;
 import io.github.somehow.mysite.dto.resp.tag.TagRespDTO;
 import io.github.somehow.mysite.service.TagService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,35 @@ public class TagServiceImpl implements TagService {
         tagDO.setId(IdUtil.getSnowflakeNextId());
         try {
             tagMapper.insert(tagDO);
+        } catch (DuplicateKeyException e) {
+            throw new ClientException(ErrorCode.TAG_SLUG_EXISTS);
+        }
+    }
+
+    @Override
+    public void updateTag(Long id, TagUpdateReqDTO requestParam) {
+        TagDO existing = tagMapper.selectOne(Wrappers.lambdaQuery(TagDO.class)
+                .eq(TagDO::getId, id)
+                .eq(TagDO::getDelFlag, 0));
+        if (Objects.isNull(existing)) {
+            throw new ClientException(ErrorCode.TAG_NOT_FOUND);
+        }
+
+        if (!existing.getSlug().equals(requestParam.getSlug())) {
+            TagDO slugCheck = tagMapper.selectOne(Wrappers.lambdaQuery(TagDO.class)
+                    .eq(TagDO::getSlug, requestParam.getSlug())
+                    .eq(TagDO::getDelFlag, 0));
+            if (Objects.nonNull(slugCheck)) {
+                throw new ClientException(ErrorCode.TAG_SLUG_EXISTS);
+            }
+        }
+
+        TagDO tagDO = new TagDO();
+        tagDO.setId(id);
+        tagDO.setName(requestParam.getName());
+        tagDO.setSlug(requestParam.getSlug());
+        try {
+            tagMapper.updateById(tagDO);
         } catch (DuplicateKeyException e) {
             throw new ClientException(ErrorCode.TAG_SLUG_EXISTS);
         }

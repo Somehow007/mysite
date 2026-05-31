@@ -3,6 +3,7 @@ package io.github.somehow.mysite.controller;
 import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.commons.framework.web.Results;
 import io.github.somehow.mysite.dto.req.tag.TagCreateReqDTO;
+import io.github.somehow.mysite.dto.req.tag.TagUpdateReqDTO;
 import io.github.somehow.mysite.dto.resp.tag.TagRespDTO;
 import io.github.somehow.mysite.service.TagService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,6 +37,13 @@ public class TagController {
     @PostMapping("/v1/tags")
     public Result<Void> createTag(@Valid @RequestBody TagCreateReqDTO requestParam) {
         tagService.createTag(requestParam);
+        return Results.success();
+    }
+
+    @Operation(summary = "更新标签")
+    @PutMapping("/v1/tags/{id}")
+    public Result<Void> updateTag(@PathVariable Long id, @Valid @RequestBody TagUpdateReqDTO requestParam) {
+        tagService.updateTag(id, requestParam);
         return Results.success();
     }
 
