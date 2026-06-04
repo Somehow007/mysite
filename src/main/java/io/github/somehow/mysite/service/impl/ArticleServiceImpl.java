@@ -118,8 +118,9 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         }
 
         if (requestParam.getTagIds() != null) {
-            articleTagMapper.delete(Wrappers.lambdaQuery(ArticleTagDO.class)
-                    .eq(ArticleTagDO::getArticleId, requestParam.getId()));
+            // 关联表使用物理删除，避免唯一索引(article_id, tag_id)冲突
+            // MyBatis-Plus逻辑删除会导致旧记录仍在表中，再次插入相同组合违反唯一约束
+            articleTagMapper.physicalDeleteByArticleId(requestParam.getId());
             for (Long tagId : requestParam.getTagIds()) {
                 ArticleTagDO at = ArticleTagDO.builder()
                         .id(IdUtil.getSnowflakeNextId())
@@ -153,8 +154,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             throw new ClientException(ErrorCode.ARTICLE_DELETE_FAILED);
         }
 
-        articleTagMapper.delete(Wrappers.lambdaQuery(ArticleTagDO.class)
-                .eq(ArticleTagDO::getArticleId, id));
+        articleTagMapper.physicalDeleteByArticleId(id);
 
         userFavoriteArticleMapper.delete(Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
                 .eq(UserFavoriteArticleDO::getArticleId, id));
