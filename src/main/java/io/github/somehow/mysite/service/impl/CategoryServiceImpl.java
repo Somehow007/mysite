@@ -371,6 +371,12 @@ public class CategoryServiceImpl implements CategoryService {
         return count > 0;
     }
 
+    @Override
+    @CacheEvict(value = {CACHE_NAME, CACHE_TREE_NAME}, allEntries = true)
+    public void evictCategoryCache() {
+        // 清除分类缓存，由文章变更时调用
+    }
+
     private List<CategoryRespDTO> buildCategoryTree(List<CategoryRespDTO> allCategories, Long parentId) {
         List<CategoryRespDTO> tree = new ArrayList<>();
         

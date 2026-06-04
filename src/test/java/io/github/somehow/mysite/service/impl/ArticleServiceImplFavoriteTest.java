@@ -7,6 +7,7 @@ import io.github.somehow.mysite.dao.mapper.ArticleMapper;
 import io.github.somehow.mysite.dao.mapper.UserFavoriteArticleMapper;
 import io.github.somehow.mysite.dto.req.article.ArticleFavoriteReqDTO;
 import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
+import io.github.somehow.mysite.service.CategoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -31,6 +32,9 @@ class ArticleServiceImplFavoriteTest {
 
     @Mock
     private ArticleMapper articleMapper;
+
+    @Mock
+    private CategoryService categoryService;
 
     @InjectMocks
     private ArticleServiceImpl articleService;

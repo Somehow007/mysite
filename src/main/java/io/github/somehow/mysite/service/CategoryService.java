@@ -32,4 +32,6 @@ public interface CategoryService {
     List<CategoryRespDTO> getCategoryTree();
 
     List<CategoryRespDTO> getChildrenByParentId(Long parentId);
+
+    void evictCategoryCache();
 }

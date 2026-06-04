@@ -33,11 +33,25 @@ export interface ImageListParams {
   sourceType?: number
 }
 
-export function uploadImage(file: File): Promise<ImageUploadResult> {
+export const MAX_IMAGE_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+
+export function uploadImage(
+  file: File,
+  onUploadProgress?: (progressEvent: { loaded: number; total?: number; progress: number }) => void,
+): Promise<ImageUploadResult> {
   const formData = new FormData()
   formData.append('file', file)
   const response = apiClient.post<ApiResponse<ImageUploadResult>>('/v1/images/upload', formData, {
     timeout: 30000,
+    onUploadProgress: (progressEvent) => {
+      if (onUploadProgress && progressEvent.total) {
+        onUploadProgress({
+          loaded: progressEvent.loaded,
+          total: progressEvent.total,
+          progress: Math.round((progressEvent.loaded * 100) / progressEvent.total),
+        })
+      }
+    },
   })
   return response.then(res => res.data.data as ImageUploadResult)
 }

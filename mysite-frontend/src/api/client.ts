@@ -57,6 +57,9 @@ apiClient.interceptors.response.use(
       const message = error.response?.data?.message || '权限不足，无法访问该资源'
       return Promise.reject(new Error(message))
     }
+    if (error.response?.status === 413) {
+      return Promise.reject(new Error('文件大小超出限制'))
+    }
     const message = error.response?.data?.message || error.message || '网络错误'
     return Promise.reject(new Error(message))
   },

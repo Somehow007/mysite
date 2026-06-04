@@ -11,6 +11,7 @@ import io.github.somehow.mysite.dao.mapper.ArticleMapper;
 import io.github.somehow.mysite.dao.mapper.ArticleTagMapper;
 import io.github.somehow.mysite.dao.mapper.UserFavoriteArticleMapper;
 import io.github.somehow.mysite.service.ArticleSearchService;
+import io.github.somehow.mysite.service.CategoryService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,9 @@ class ArticleServiceImplDeleteTest {
 
     @Mock
     private ArticleSearchService articleSearchService;
+
+    @Mock
+    private CategoryService categoryService;
 
     @InjectMocks
     private ArticleServiceImpl articleService;

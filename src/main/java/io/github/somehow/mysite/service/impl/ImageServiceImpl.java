@@ -75,7 +75,10 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
         }
 
         if (file.getSize() > imageUploadConfig.getMaxFileSizeBytes()) {
-            throw new ClientException(ErrorCode.IMAGE_FILE_TOO_LARGE);
+            long maxSizeMB = imageUploadConfig.getMaxFileSizeBytes() / (1024 * 1024);
+            long fileSizeMB = file.getSize() / (1024 * 1024);
+            throw new ClientException(ErrorCode.IMAGE_FILE_TOO_LARGE.code(), 
+                    String.format("图片文件过大（当前: %dMB，限制: %dMB）", fileSizeMB, maxSizeMB));
         }
 
         String contentType = file.getContentType();
@@ -83,7 +86,15 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
             throw new ClientException(ErrorCode.IMAGE_TYPE_NOT_ALLOWED);
         }
 
-        validateMagicNumber(file, contentType);
+        byte[] fileBytes;
+        try {
+            fileBytes = file.getBytes();
+        } catch (IOException e) {
+            log.error("读取图片文件失败", e);
+            throw new ClientException(ErrorCode.IMAGE_UPLOAD_FAILED);
+        }
+
+        validateMagicNumberFromBytes(fileBytes, contentType);
 
         String extension = EXTENSION_MAP.getOrDefault(contentType, ".jpg");
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM"));
@@ -103,7 +114,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
 
         Path filePath = dirPath.resolve(storedName);
         try {
-            Files.copy(file.getInputStream(), filePath);
+            Files.write(filePath, fileBytes);
         } catch (IOException e) {
             log.error("保存图片文件失败: {}", filePath, e);
             throw new ClientException(ErrorCode.IMAGE_UPLOAD_FAILED);
@@ -115,7 +126,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
 
         if (!"image/svg+xml".equals(contentType)) {
             try {
-                BufferedImage image = ImageIO.read(filePath.toFile());
+                BufferedImage image = ImageIO.read(new ByteArrayInputStream(fileBytes));
                 if (image != null) {
                     width = image.getWidth();
                     height = image.getHeight();
@@ -404,39 +415,25 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
         }
     }
 
-    private void validateMagicNumber(MultipartFile file, String contentType) {
-        if ("image/webp".equals(contentType) || "image/svg+xml".equals(contentType)) {
-            return;
-        }
-
-        byte[] magic = MAGIC_NUMBERS.get(contentType);
-        if (magic == null) {
-            return;
-        }
-
-        try {
-            byte[] header = new byte[magic.length];
-            try (var is = file.getInputStream()) {
-                int read = is.read(header);
-                if (read < magic.length) {
-                    throw new ClientException(ErrorCode.IMAGE_FILE_INVALID);
-                }
-            }
-            for (int i = 0; i < magic.length; i++) {
-                if (header[i] != magic[i]) {
-                    throw new ClientException(ErrorCode.IMAGE_FILE_INVALID);
-                }
-            }
-        } catch (ClientException e) {
-            throw e;
-        } catch (IOException e) {
-            log.error("读取图片文件头失败", e);
-            throw new ClientException(ErrorCode.IMAGE_FILE_INVALID);
-        }
-    }
-
     private void validateMagicNumberFromBytes(byte[] data, String contentType) {
-        if ("image/webp".equals(contentType) || "image/svg+xml".equals(contentType)) {
+        if ("image/svg+xml".equals(contentType)) {
+            return;
+        }
+
+        if ("image/webp".equals(contentType)) {
+            if (data.length < 12) {
+                throw new ClientException(ErrorCode.IMAGE_FILE_INVALID);
+            }
+            byte[] riffHeader = new byte[]{0x52, 0x49, 0x46, 0x46};
+            byte[] webpHeader = new byte[]{0x57, 0x45, 0x42, 0x50};
+            for (int i = 0; i < 4; i++) {
+                if (data[i] != riffHeader[i]) {
+                    throw new ClientException(ErrorCode.IMAGE_FILE_INVALID);
+                }
+                if (data[i + 8] != webpHeader[i]) {
+                    throw new ClientException(ErrorCode.IMAGE_FILE_INVALID);
+                }
+            }
             return;
         }
 

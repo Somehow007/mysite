@@ -21,6 +21,7 @@ import io.github.somehow.mysite.dto.resp.ArticleSelectRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
 import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.ArticleService;
+import io.github.somehow.mysite.service.CategoryService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -44,6 +45,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     private final UserMapper userMapper;
     private final UserFavoriteArticleMapper userFavoriteArticleMapper;
     private final CategoryMapper categoryMapper;
+    private final CategoryService categoryService;
     private final TagMapper tagMapper;
     private final ArticleTagMapper articleTagMapper;
 
@@ -86,6 +88,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         }
 
         articleSearchService.indexArticle(articleDO);
+        categoryService.evictCategoryCache();
     }
 
     @Override
@@ -134,6 +137,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         if (updatedArticle != null) {
             articleSearchService.updateArticle(updatedArticle);
         }
+        categoryService.evictCategoryCache();
     }
 
     @Override
@@ -156,6 +160,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                 .eq(UserFavoriteArticleDO::getArticleId, id));
 
         articleSearchService.deleteArticle(id);
+        categoryService.evictCategoryCache();
     }
 
     @Override

@@ -2,7 +2,7 @@
 import { ref, watch, onMounted, onUnmounted, nextTick, computed, markRaw } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { useMarkdown } from '@/composables/useMarkdown'
-import { uploadImage, uploadImageByUrl } from '@/api/image'
+import { uploadImage, uploadImageByUrl, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useToast } from '@/composables/useToast'
 import { Image as ImageIcon, HelpCircle, X, Bold, Italic, Link, Code, List, Quote, Heading, LinkIcon, Loader2 } from 'lucide-vue-next'
 
@@ -93,6 +93,17 @@ const isMac = computed(() => {
 const modKey = computed(() => isMac.value ? 'Cmd' : 'Ctrl')
 
 const isUploading = computed(() => uploadingFiles.value.size > 0 || urlUploading.value)
+
+const uploadingProgress = computed(() => {
+  if (uploadingFiles.value.size === 0) return 0
+  let total = 0
+  let count = 0
+  uploadingFiles.value.forEach((file) => {
+    total += file.progress
+    count++
+  })
+  return count > 0 ? Math.round(total / count) : 0
+})
 
 const shortcuts = computed(() => [
   { key: `${modKey.value}+Z`, description: '撤销', syntax: '撤销上一步操作' },
@@ -746,15 +757,28 @@ function handleImageUpload() {
 }
 
 async function doUploadFile(file: File) {
+  // 文件大小预检
+  if (file.size > MAX_IMAGE_FILE_SIZE) {
+    toast.error(`图片 "${file.name}" 超过大小限制（最大 5MB）`)
+    return
+  }
+
   const fileId = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
   uploadingFiles.value.set(fileId, { name: file.name, progress: 0 })
 
   try {
-    const result = await uploadImage(file)
+    const result = await uploadImage(file, (progressEvent) => {
+      uploadingFiles.value.set(fileId, { name: file.name, progress: progressEvent.progress })
+    })
     insertImageMarkdown(result.url, result.originalName)
   } catch (e) {
     console.error('图片上传失败:', e)
-    toast.error('图片上传失败：' + (e instanceof Error ? e.message : '未知错误'))
+    const errorMessage = e instanceof Error ? e.message : '未知错误'
+    if (errorMessage.includes('413') || errorMessage.includes('大小超出限制') || errorMessage.includes('too large')) {
+      toast.error('图片文件过大，请压缩后重试（最大 5MB）')
+    } else {
+      toast.error('图片上传失败：' + errorMessage)
+    }
   } finally {
     uploadingFiles.value.delete(fileId)
   }
@@ -853,7 +877,7 @@ async function handleUrlUpload() {
       <div class="flex-1 min-w-4" />
       <div v-if="isUploading" class="flex items-center gap-1.5 text-xs text-accent flex-shrink-0">
         <Loader2 :size="12" class="animate-spin" />
-        <span>上传中...</span>
+        <span>上传中 {{ uploadingProgress }}%</span>
       </div>
       <button
         @click="showPreview = !showPreview"

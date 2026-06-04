@@ -6,7 +6,7 @@ import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X, Plus,
 import { createArticle, updateArticle, getArticleById } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { getTags, createTag } from '@/api/tag'
-import { uploadImage } from '@/api/image'
+import { uploadImage, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useUserStore } from '@/stores/user'
 import { useToast } from '@/composables/useToast'
 import MarkdownEditor from '@/components/editor/MarkdownEditor.vue'
@@ -15,6 +15,7 @@ import type { Category, Tag } from '@/types'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const toast = useToast()
 
 const isEdit = computed(() => !!route.params.id)
 const pageTitle = computed(() => isEdit.value ? '编辑文章' : '写文章')
@@ -206,12 +207,32 @@ async function handleCoverUpload(e: Event) {
   const file = input.files?.[0]
   if (!file) return
   if (!file.type.startsWith('image/')) return
+  
+  if (file.size > MAX_IMAGE_FILE_SIZE) {
+    const maxSizeMB = MAX_IMAGE_FILE_SIZE / (1024 * 1024)
+    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2)
+    toast.error(`图片文件过大（当前: ${fileSizeMB}MB，限制: ${maxSizeMB}MB）`)
+    return
+  }
+  
   coverUploading.value = true
   try {
-    const result = await uploadImage(file)
+    const result = await uploadImage(file, (progressEvent) => {
+      if (progressEvent.total) {
+        const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+        console.log(`上传进度: ${progress}%`)
+      }
+    })
     coverImage.value = result.url
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '封面上传失败'
+    const errorMessage = err instanceof Error ? err.message : '封面上传失败'
+    if (errorMessage.includes('413') || errorMessage.includes('过大')) {
+      const maxSizeMB = MAX_IMAGE_FILE_SIZE / (1024 * 1024)
+      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2)
+      error.value = `图片文件过大（当前: ${fileSizeMB}MB，限制: ${maxSizeMB}MB）`
+    } else {
+      error.value = errorMessage
+    }
   } finally {
     coverUploading.value = false
     input.value = ''
