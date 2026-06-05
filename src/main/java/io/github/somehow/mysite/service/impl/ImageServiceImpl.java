@@ -77,8 +77,9 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
         if (file.getSize() > imageUploadConfig.getMaxFileSizeBytes()) {
             long maxSizeMB = imageUploadConfig.getMaxFileSizeBytes() / (1024 * 1024);
             long fileSizeMB = file.getSize() / (1024 * 1024);
-            throw new ClientException(ErrorCode.IMAGE_FILE_TOO_LARGE.code(), 
-                    String.format("图片文件过大（当前: %dMB，限制: %dMB）", fileSizeMB, maxSizeMB));
+            throw new ClientException(
+                    String.format("图片文件过大（当前: %dMB，限制: %dMB）", fileSizeMB, maxSizeMB),
+                    ErrorCode.IMAGE_FILE_TOO_LARGE);
         }
 
         String contentType = file.getContentType();
