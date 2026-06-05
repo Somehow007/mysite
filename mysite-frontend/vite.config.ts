@@ -16,6 +16,21 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          'markdown': ['marked', 'highlight.js'],
+          'ui-vendor': ['@vueuse/core'],
+        },
+      },
+    },
+    minify: 'esbuild',
+    target: 'es2020',
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 500,
+  },
   server: {
     proxy: {
       '/v1': {

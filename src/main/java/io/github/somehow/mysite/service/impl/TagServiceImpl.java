@@ -1,6 +1,7 @@
 package io.github.somehow.mysite.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.IdUtil;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
@@ -18,6 +19,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -89,11 +91,12 @@ public class TagServiceImpl implements TagService {
                 .eq(TagDO::getDelFlag, 0)
                 .orderByDesc(TagDO::getCreateTime));
 
+        Map<Long, Long> articleCountMap = batchCountArticlesByTagIds(
+                tags.stream().map(TagDO::getId).collect(Collectors.toList()));
+
         return tags.stream().map(tag -> {
             TagRespDTO dto = BeanUtil.toBean(tag, TagRespDTO.class);
-            dto.setArticleCount(articleTagMapper.selectCount(Wrappers.lambdaQuery(ArticleTagDO.class)
-                    .eq(ArticleTagDO::getTagId, tag.getId())
-                    .eq(ArticleTagDO::getDelFlag, 0)));
+            dto.setArticleCount(articleCountMap.getOrDefault(tag.getId(), 0L));
             return dto;
         }).collect(Collectors.toList());
     }
@@ -107,9 +110,24 @@ public class TagServiceImpl implements TagService {
             throw new ClientException(ErrorCode.TAG_NOT_FOUND);
         }
         TagRespDTO dto = BeanUtil.toBean(tagDO, TagRespDTO.class);
-        dto.setArticleCount(articleTagMapper.selectCount(Wrappers.lambdaQuery(ArticleTagDO.class)
-                .eq(ArticleTagDO::getTagId, tagDO.getId())
-                .eq(ArticleTagDO::getDelFlag, 0)));
+        Map<Long, Long> articleCountMap = batchCountArticlesByTagIds(List.of(tagDO.getId()));
+        dto.setArticleCount(articleCountMap.getOrDefault(tagDO.getId(), 0L));
         return dto;
+    }
+
+    private Map<Long, Long> batchCountArticlesByTagIds(List<Long> tagIds) {
+        if (CollUtil.isEmpty(tagIds)) {
+            return Map.of();
+        }
+        List<Map<String, Object>> counts = articleTagMapper.selectMaps(
+                Wrappers.<ArticleTagDO>query()
+                        .select("tag_id AS tagId", "COUNT(*) AS cnt")
+                        .eq("del_flag", 0)
+                        .in("tag_id", tagIds)
+                        .groupBy("tag_id"));
+        return counts.stream().collect(Collectors.toMap(
+                m -> ((Number) m.get("tagId")).longValue(),
+                m -> ((Number) m.get("cnt")).longValue()
+        ));
     }
 }

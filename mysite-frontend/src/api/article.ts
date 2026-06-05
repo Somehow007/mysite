@@ -6,7 +6,7 @@ export interface CreateArticleRequest {
   content: string
   authorId: string
   summary?: string
-  coverImage?: string
+  coverImage?: string | null
   categoryId?: string
   tagIds?: string[]
   published?: number
@@ -17,7 +17,7 @@ export interface UpdateArticleRequest {
   title?: string
   content?: string
   summary?: string
-  coverImage?: string
+  coverImage?: string | null
   categoryId?: string
   tagIds?: string[]
   published?: number

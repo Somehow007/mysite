@@ -4,9 +4,14 @@ import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.dao.entity.UserFavoriteArticleDO;
 import io.github.somehow.mysite.dao.mapper.ArticleMapper;
+import io.github.somehow.mysite.dao.mapper.ArticleTagMapper;
+import io.github.somehow.mysite.dao.mapper.CategoryMapper;
+import io.github.somehow.mysite.dao.mapper.TagMapper;
 import io.github.somehow.mysite.dao.mapper.UserFavoriteArticleMapper;
+import io.github.somehow.mysite.dao.mapper.UserMapper;
 import io.github.somehow.mysite.dto.req.article.ArticleFavoriteReqDTO;
 import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
+import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.CategoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,6 +40,21 @@ class ArticleServiceImplFavoriteTest {
 
     @Mock
     private CategoryService categoryService;
+
+    @Mock
+    private ArticleTagMapper articleTagMapper;
+
+    @Mock
+    private CategoryMapper categoryMapper;
+
+    @Mock
+    private TagMapper tagMapper;
+
+    @Mock
+    private UserMapper userMapper;
+
+    @Mock
+    private ArticleSearchService articleSearchService;
 
     @InjectMocks
     private ArticleServiceImpl articleService;
@@ -74,6 +94,7 @@ class ArticleServiceImplFavoriteTest {
         when(userFavoriteArticleMapper.insert(any(UserFavoriteArticleDO.class))).thenReturn(1);
         when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
+        when(articleMapper.selectOne(any())).thenReturn(articleDO);
 
         ArticleFavoriteRespDTO result = articleService.favoriteArticle(favoriteReqDTO);
 
@@ -92,6 +113,7 @@ class ArticleServiceImplFavoriteTest {
         when(userFavoriteArticleMapper.softDeleteById(anyLong())).thenReturn(1);
         when(articleMapper.decrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
+        when(articleMapper.selectOne(any())).thenReturn(articleDO);
 
         ArticleFavoriteRespDTO result = articleService.favoriteArticle(favoriteReqDTO);
 
@@ -110,6 +132,7 @@ class ArticleServiceImplFavoriteTest {
         when(userFavoriteArticleMapper.softRestoreById(anyLong())).thenReturn(1);
         when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
+        when(articleMapper.selectOne(any())).thenReturn(articleDO);
 
         ArticleFavoriteRespDTO result = articleService.favoriteArticle(favoriteReqDTO);
 
@@ -163,6 +186,7 @@ class ArticleServiceImplFavoriteTest {
         when(userFavoriteArticleMapper.softRestoreById(anyLong())).thenReturn(1);
         when(articleMapper.incrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
+        when(articleMapper.selectOne(any())).thenReturn(articleDO);
 
         ArticleFavoriteRespDTO result = articleService.favoriteArticle(favoriteReqDTO);
 
@@ -178,6 +202,7 @@ class ArticleServiceImplFavoriteTest {
     @Test
     void favoriteArticle_duplicateKey_returnSuccessWhenAlreadyActive() {
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
+        when(articleMapper.selectOne(any())).thenReturn(articleDO);
         when(userFavoriteArticleMapper.insert(any(UserFavoriteArticleDO.class)))
                 .thenThrow(new DuplicateKeyException("Duplicate entry"));
 
@@ -199,6 +224,7 @@ class ArticleServiceImplFavoriteTest {
         when(userFavoriteArticleMapper.softDeleteById(anyLong())).thenReturn(1);
         when(articleMapper.decrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
+        when(articleMapper.selectOne(any())).thenReturn(articleDO);
 
         ArticleFavoriteRespDTO result1 = articleService.favoriteArticle(favoriteReqDTO);
         assertFalse(result1.getFavorited());
@@ -215,6 +241,7 @@ class ArticleServiceImplFavoriteTest {
     @Test
     void favoriteArticle_rapidToggle_multipleTimes() {
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
+        when(articleMapper.selectOne(any())).thenReturn(articleDO);
         when(userFavoriteArticleMapper.softDeleteById(anyLong())).thenReturn(1);
         when(userFavoriteArticleMapper.softRestoreById(anyLong())).thenReturn(1);
         when(articleMapper.decrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);
@@ -239,6 +266,7 @@ class ArticleServiceImplFavoriteTest {
     @Test
     void favoriteArticle_fullCycle_favoriteCancelRefavorite() {
         when(articleMapper.selectById(ARTICLE_ID)).thenReturn(articleDO);
+        when(articleMapper.selectOne(any())).thenReturn(articleDO);
         when(userFavoriteArticleMapper.softDeleteById(anyLong())).thenReturn(1);
         when(userFavoriteArticleMapper.softRestoreById(anyLong())).thenReturn(1);
         when(articleMapper.decrementFavoriteCount(anyLong(), anyInt())).thenReturn(1);

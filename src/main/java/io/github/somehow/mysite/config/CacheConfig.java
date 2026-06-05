@@ -10,6 +10,7 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
+import org.springframework.scheduling.annotation.EnableAsync;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -17,6 +18,7 @@ import java.util.Map;
 
 @Configuration
 @EnableCaching
+@EnableAsync
 public class CacheConfig {
 
     @Bean
@@ -31,6 +33,7 @@ public class CacheConfig {
         
         cacheConfigurations.put("categories", defaultConfig.entryTtl(Duration.ofHours(2)));
         cacheConfigurations.put("category_tree", defaultConfig.entryTtl(Duration.ofHours(1)));
+        cacheConfigurations.put("article_detail", defaultConfig.entryTtl(Duration.ofMinutes(30)));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)
