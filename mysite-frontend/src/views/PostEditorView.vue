@@ -45,7 +45,6 @@ const tagSearchQuery = ref('')
 const newTagName = ref('')
 const newTagSlug = ref('')
 const creatingTag = ref(false)
-const toast = useToast()
 
 const filteredTags = computed(() => {
   if (!tagSearchQuery.value.trim()) return tags.value
