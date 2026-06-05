@@ -21,7 +21,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           'vue-vendor': ['vue', 'vue-router', 'pinia'],
-          'markdown': ['marked', 'highlight.js'],
+          'markdown': ['marked', 'shiki'],
           'ui-vendor': ['@vueuse/core'],
         },
       },
