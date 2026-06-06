@@ -20,4 +20,22 @@
   --glass-blur: 20px;
   --glass-saturate: 1.8;
   --glass-shadow: 0 4px 16px rgba(1, 184, 194, 0.06), 0 12px 40px rgba(1, 184, 194, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.25), inset 0 -1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(0, 138, 146, 0.08);
+  --code-bg: #E8FAFA;
+  --code-header-bg: #D8F4F4;
+  --code-border: #C4ECEE;
+  --code-line-highlight: rgba(0, 138, 146, 0.06);
+  --code-line-number: #7CB5B8;
+  --code-token-keyword: #0E7490;
+  --code-token-string: #047857;
+  --code-token-function: #0891B2;
+  --code-token-number: #B45309;
+  --code-token-comment: #5F8A8C;
+  --code-token-operator: #B45309;
+  --code-token-variable: #DC2626;
+  --code-token-type: #7C3AED;
+  --code-token-property: #008A92;
+  --code-token-tag: #0891B2;
+  --code-token-attr: #047857;
+  --code-token-punctuation: #5F8A8C;
+  --code-token-plain: #2D4A4C;
 }

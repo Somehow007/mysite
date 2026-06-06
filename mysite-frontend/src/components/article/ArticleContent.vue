@@ -16,6 +16,59 @@ const contentRef = ref<HTMLElement | null>(null)
 const { renderedHtml, render, applyHighlighting, rendering, toc } = useMarkdown()
 const { processContainer } = useImageOptimizer(contentRef)
 
+function enhanceCodeBlocks(container: HTMLElement) {
+  const pres = container.querySelectorAll('pre code[data-language]')
+  for (const code of pres) {
+    const lang = code.getAttribute('data-language') || ''
+    if (!lang) continue
+
+    const pre = code.parentElement
+    if (!pre) continue
+
+    // Skip if already wrapped
+    if (pre.parentElement?.classList.contains('code-block-wrapper')) continue
+
+    const wrapper = document.createElement('div')
+    wrapper.className = 'code-block-wrapper'
+
+    const header = document.createElement('div')
+    header.className = 'code-block-header'
+
+    const langLabel = document.createElement('span')
+    langLabel.className = 'code-block-lang'
+    langLabel.setAttribute('data-lang', lang)
+    langLabel.textContent = lang
+
+    const copyBtn = document.createElement('button')
+    copyBtn.className = 'code-block-copy'
+    copyBtn.textContent = '复制'
+    copyBtn.addEventListener('click', async () => {
+      const text = code.textContent || ''
+      try {
+        await navigator.clipboard.writeText(text)
+        copyBtn.textContent = '已复制'
+        copyBtn.classList.add('copied')
+        setTimeout(() => {
+          copyBtn.textContent = '复制'
+          copyBtn.classList.remove('copied')
+        }, 2000)
+      } catch {
+        copyBtn.textContent = '复制失败'
+        setTimeout(() => {
+          copyBtn.textContent = '复制'
+        }, 2000)
+      }
+    })
+
+    header.appendChild(langLabel)
+    header.appendChild(copyBtn)
+
+    pre.parentNode?.insertBefore(wrapper, pre)
+    wrapper.appendChild(header)
+    wrapper.appendChild(pre)
+  }
+}
+
 watch(
   () => props.content,
   async (newContent) => {
@@ -26,6 +79,7 @@ watch(
       if (contentRef.value) {
         processContainer(contentRef.value)
         await applyHighlighting(contentRef.value)
+        enhanceCodeBlocks(contentRef.value)
       }
     }
   },
