@@ -34,6 +34,7 @@ public class CacheConfig {
         cacheConfigurations.put("categories", defaultConfig.entryTtl(Duration.ofHours(2)));
         cacheConfigurations.put("category_tree", defaultConfig.entryTtl(Duration.ofHours(1)));
         cacheConfigurations.put("article_detail", defaultConfig.entryTtl(Duration.ofMinutes(30)));
+        cacheConfigurations.put("tags", defaultConfig.entryTtl(Duration.ofHours(1)));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

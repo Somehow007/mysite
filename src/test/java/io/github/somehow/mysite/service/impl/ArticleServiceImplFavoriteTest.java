@@ -13,6 +13,7 @@ import io.github.somehow.mysite.dto.req.article.ArticleFavoriteReqDTO;
 import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
 import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.CategoryService;
+import io.github.somehow.mysite.service.TagService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -40,6 +41,9 @@ class ArticleServiceImplFavoriteTest {
 
     @Mock
     private CategoryService categoryService;
+
+    @Mock
+    private TagService tagService;
 
     @Mock
     private ArticleTagMapper articleTagMapper;

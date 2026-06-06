@@ -22,6 +22,7 @@ import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
 import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.ArticleService;
 import io.github.somehow.mysite.service.CategoryService;
+import io.github.somehow.mysite.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -49,6 +50,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     private final UserFavoriteArticleMapper userFavoriteArticleMapper;
     private final CategoryMapper categoryMapper;
     private final CategoryService categoryService;
+    private final TagService tagService;
     private final TagMapper tagMapper;
     private final ArticleTagMapper articleTagMapper;
 
@@ -71,6 +73,9 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         ArticleDO articleDO = BeanUtil.toBean(requestParam, ArticleDO.class);
         articleDO.setId(IdUtil.getSnowflakeNextId());
         articleDO.setAuthorId(Long.parseLong(requestParam.getAuthorId()));
+        if (StrUtil.isBlank(articleDO.getCoverImage())) {
+            articleDO.setCoverImage(null);
+        }
         if (articleDO.getPublished() == null) {
             articleDO.setPublished(1);
         }
@@ -92,6 +97,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
         articleSearchService.indexArticle(articleDO);
         categoryService.evictCategoryCache();
+        tagService.evictTagCache();
     }
 
     @Override
@@ -145,6 +151,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             articleSearchService.updateArticle(updatedArticle);
         }
         categoryService.evictCategoryCache();
+        tagService.evictTagCache();
     }
 
     @Override
@@ -168,6 +175,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
         articleSearchService.deleteArticle(id);
         categoryService.evictCategoryCache();
+        tagService.evictTagCache();
     }
 
     @Override

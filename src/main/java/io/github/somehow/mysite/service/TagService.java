@@ -17,4 +17,6 @@ public interface TagService {
     List<TagRespDTO> listTags();
 
     TagRespDTO getTagBySlug(String slug);
+
+    void evictTagCache();
 }

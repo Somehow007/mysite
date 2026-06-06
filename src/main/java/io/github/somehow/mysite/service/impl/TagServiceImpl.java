@@ -15,6 +15,8 @@ import io.github.somehow.mysite.dto.req.tag.TagUpdateReqDTO;
 import io.github.somehow.mysite.dto.resp.tag.TagRespDTO;
 import io.github.somehow.mysite.service.TagService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
@@ -31,6 +33,7 @@ public class TagServiceImpl implements TagService {
     private final ArticleTagMapper articleTagMapper;
 
     @Override
+    @CacheEvict(value = "tags", allEntries = true)
     public void createTag(TagCreateReqDTO requestParam) {
         TagDO tagDO = BeanUtil.toBean(requestParam, TagDO.class);
         tagDO.setId(IdUtil.getSnowflakeNextId());
@@ -42,6 +45,7 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
+    @CacheEvict(value = "tags", allEntries = true)
     public void updateTag(Long id, TagUpdateReqDTO requestParam) {
         TagDO existing = tagMapper.selectOne(Wrappers.lambdaQuery(TagDO.class)
                 .eq(TagDO::getId, id)
@@ -71,6 +75,7 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
+    @CacheEvict(value = "tags", allEntries = true)
     public void deleteTag(Long id) {
         Long refCount = articleTagMapper.selectCount(Wrappers.lambdaQuery(ArticleTagDO.class)
                 .eq(ArticleTagDO::getTagId, id)
@@ -86,6 +91,7 @@ public class TagServiceImpl implements TagService {
     }
 
     @Override
+    @Cacheable(value = "tags", key = "'all'")
     public List<TagRespDTO> listTags() {
         List<TagDO> tags = tagMapper.selectList(Wrappers.lambdaQuery(TagDO.class)
                 .eq(TagDO::getDelFlag, 0)
@@ -129,5 +135,11 @@ public class TagServiceImpl implements TagService {
                 m -> ((Number) m.get("tagId")).longValue(),
                 m -> ((Number) m.get("cnt")).longValue()
         ));
+    }
+
+    @Override
+    @CacheEvict(value = "tags", allEntries = true)
+    public void evictTagCache() {
+        // 清除标签缓存，由文章变更时调用
     }
 }
