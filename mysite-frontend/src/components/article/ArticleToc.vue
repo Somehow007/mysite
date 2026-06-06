@@ -166,13 +166,13 @@ onUnmounted(() => {
     v-if="items.length > 0"
     ref="tocNavRef"
     aria-label="文章目录"
-    class="toc hidden lg:flex flex-col"
+    class="toc hidden lg:flex flex-col h-full min-h-0"
   >
     <h4 class="text-xs font-semibold uppercase tracking-wider text-text-muted mb-3 px-1 shrink-0">
       目录
     </h4>
     <ul
-      class="space-y-0.5 text-sm border-l border-border overflow-y-auto flex-1 scrollbar-thin pr-1"
+      class="space-y-0.5 text-sm border-l border-border overflow-y-auto flex-1 min-h-0 scrollbar-thin pr-1"
       role="list"
     >
       <li

@@ -120,7 +120,7 @@ onMounted(() => {
     </div>
 
     <template v-else-if="article">
-      <div class="flex gap-12">
+      <div class="flex gap-12 items-start">
         <article class="flex-1 min-w-0 max-w-[720px] mx-auto">
           <header class="mb-10">
             <button
@@ -202,10 +202,8 @@ onMounted(() => {
           />
         </article>
 
-        <aside class="hidden lg:block w-56 shrink-0">
-          <div class="sticky top-20 h-[calc(100vh-6rem)]">
-            <ArticleToc :items="tocItems" />
-          </div>
+        <aside class="hidden lg:block w-56 shrink-0 sticky top-20 h-[calc(100vh-6rem)]">
+          <ArticleToc :items="tocItems" />
         </aside>
       </div>
     </template>
