@@ -203,7 +203,7 @@ onMounted(() => {
         </article>
 
         <aside class="hidden lg:block w-56 shrink-0">
-          <div class="sticky top-24">
+          <div class="sticky top-20 h-[calc(100vh-6rem)]">
             <ArticleToc :items="tocItems" />
           </div>
         </aside>
