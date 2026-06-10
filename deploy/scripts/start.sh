@@ -21,7 +21,7 @@ load_env() {
 
 load_env
 
-JAVA_OPTS="-Xms512m -Xmx768m"
+JAVA_OPTS="-Xms256m -Xmx512m"
 JAVA_OPTS="$JAVA_OPTS -XX:+UseG1GC"
 JAVA_OPTS="$JAVA_OPTS -XX:MaxGCPauseMillis=200"
 JAVA_OPTS="$JAVA_OPTS -XX:InitiatingHeapOccupancyPercent=45"
