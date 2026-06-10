@@ -190,3 +190,50 @@ CREATE TABLE IF NOT EXISTS `t_image` (
     KEY `idx_create_time` (`create_time`),
     KEY `idx_source_type` (`source_type`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='图片表';
+
+-- ==============================================
+-- 10. 评论表 (t_comment)
+-- ==============================================
+CREATE TABLE IF NOT EXISTS `t_comment` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `article_id` BIGINT NOT NULL COMMENT '文章ID',
+    `parent_id` BIGINT DEFAULT NULL COMMENT '父评论ID（NULL=顶级评论）',
+    `root_id` BIGINT DEFAULT NULL COMMENT '根评论ID（便于查询整个评论树）',
+    `user_id` BIGINT DEFAULT NULL COMMENT '登录用户ID（NULL=游客）',
+    `nickname` VARCHAR(50) NOT NULL COMMENT '昵称',
+    `email` VARCHAR(100) DEFAULT NULL COMMENT '邮箱（用于Gravatar头像）',
+    `avatar` VARCHAR(500) DEFAULT NULL COMMENT '头像URL',
+    `content` TEXT NOT NULL COMMENT '评论内容',
+    `ip_address` VARCHAR(50) DEFAULT NULL COMMENT 'IP地址',
+    `user_agent` VARCHAR(500) DEFAULT NULL COMMENT '浏览器UA',
+    `like_count` INT NOT NULL DEFAULT 0 COMMENT '点赞数',
+    `reply_count` INT NOT NULL DEFAULT 0 COMMENT '回复数量',
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态 0:待审核 1:已通过 2:已拒绝/垃圾',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '删除标识 0:未删除 1:已删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_article_id` (`article_id`),
+    KEY `idx_parent_id` (`parent_id`),
+    KEY `idx_root_id` (`root_id`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_status` (`status`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='评论表';
+
+-- ==============================================
+-- 11. 评论点赞表 (t_comment_like)
+-- ==============================================
+CREATE TABLE IF NOT EXISTS `t_comment_like` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `comment_id` BIGINT NOT NULL COMMENT '评论ID',
+    `user_id` BIGINT DEFAULT NULL COMMENT '点赞用户ID',
+    `ip_address` VARCHAR(50) DEFAULT NULL COMMENT '游客IP',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '删除标识 0:未删除 1:已删除',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_comment_user` (`comment_id`, `user_id`),
+    UNIQUE KEY `uk_comment_ip` (`comment_id`, `ip_address`),
+    KEY `idx_comment_id` (`comment_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='评论点赞表';

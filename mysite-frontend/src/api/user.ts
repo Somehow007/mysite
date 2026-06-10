@@ -7,15 +7,19 @@ export function updateUser(data: Partial<User>): Promise<User> {
   return put<User>('/v1/users/me', data)
 }
 
-export function uploadAvatar(file: File): Promise<string> {
+export async function uploadAvatar(file: File): Promise<string> {
   const formData = new FormData()
   formData.append('file', file)
-  return apiClient.post<ApiResponse<{ url: string }>>('/v1/users/avatar', formData, {
+  const res = await apiClient.post<ApiResponse<{ url: string }>>('/v1/users/avatar', formData, {
     timeout: 30000,
-  }).then(res => {
-    userStore().updateUser({ avatar: res.data.data?.url })
-    return res.data.data?.url || ''
   })
+  const url = res.data.data?.url || ''
+  if (url) {
+    const { useUserStore } = await import('@/stores/user')
+    const store = useUserStore()
+    if (store.user) {
+      store.user.avatar = url
+    }
+  }
+  return url
 }
-
-import { useUserStore as userStore } from '@/stores/user'

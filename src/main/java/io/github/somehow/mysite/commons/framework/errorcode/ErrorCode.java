@@ -94,6 +94,19 @@ public enum ErrorCode implements IErrorCode {
     IMAGE_SSRF_BLOCKED("A080205", "不允许访问内网地址"),
     IMAGE_UPLOAD_RATE_LIMITED("A080300", "上传频率过高，请稍后再试"),
 
+    // ---------- A09: 评论模块错误 ----------
+    COMMENT_ERROR("A090001", "评论模块错误"),
+    COMMENT_NOT_FOUND("A090100", "评论不存在"),
+    COMMENT_CONTENT_REQUIRED("A090101", "评论内容不能为空"),
+    COMMENT_ARTICLE_REQUIRED("A090102", "文章ID不能为空"),
+    COMMENT_NICKNAME_REQUIRED("A090103", "昵称不能为空"),
+    COMMENT_CONTENT_TOO_LONG("A090104", "评论内容过长"),
+    COMMENT_RATE_LIMITED("A090105", "评论频率过高，请稍后再试"),
+    COMMENT_PERMISSION_DENIED("A090106", "权限不足，只能删除自己的评论"),
+    COMMENT_ALREADY_LIKED("A090107", "已经点赞过了"),
+    COMMENT_PARENT_NOT_FOUND("A090108", "父评论不存在"),
+    COMMENT_STATUS_INVALID("A090109", "无效的评论状态"),
+
     // ==================== B: 服务端错误 ====================
     SERVICE_ERROR("B000001", "系统执行出错"),
     SERVICE_TIMEOUT_ERROR("B000100", "系统执行超时"),

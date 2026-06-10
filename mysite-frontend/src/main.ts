@@ -3,7 +3,6 @@ import '@/styles/glass.css'
 import '@/styles/transitions.css'
 import '@/styles/typography.css'
 import '@/styles/code.css'
-import '@/styles/artalk.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'

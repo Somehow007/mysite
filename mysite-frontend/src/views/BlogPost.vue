@@ -10,7 +10,7 @@ import { useFavorite } from '@/composables/useFavorite'
 import ArticleContent from '@/components/article/ArticleContent.vue'
 import ArticleToc from '@/components/article/ArticleToc.vue'
 import FavoriteButton from '@/components/article/FavoriteButton.vue'
-import ArtalkComment from '@/components/comment/ArtalkComment.vue'
+import CommentSection from '@/components/comment/CommentSection.vue'
 import type { Article } from '@/types'
 import type { TocItem } from '@/composables/useMarkdown'
 
@@ -196,9 +196,8 @@ onMounted(() => {
             />
           </div>
 
-          <ArtalkComment
-            :page-key="`/post/${article.id}`"
-            :page-title="article.title"
+          <CommentSection
+            :article-id="article.id"
           />
         </article>
 

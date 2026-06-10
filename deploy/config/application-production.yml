@@ -54,11 +54,6 @@ mybatis-plus:
       logic-delete-value: 1
       logic-not-delete-value: 0
 
-artalk:
-  server: ${ARTALK_SERVER:http://localhost:23366}
-  site: ${ARTALK_SITE:MySite博客}
-  enabled: true
-  
 jwt:
   secret: ${JWT_SECRET:mysite-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm-2026}
   access-token-expiration: 86400000

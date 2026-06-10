@@ -162,3 +162,44 @@ export interface SearchParams {
   size?: number
   searchType?: 'title' | 'content' | 'all'
 }
+
+export interface Comment {
+  id: string
+  articleId: string
+  parentId: string | null
+  rootId: string | null
+  userId: string | null
+  nickname: string
+  email: string | null
+  avatar: string | null
+  content: string
+  likeCount: number
+  replyCount: number
+  status: number
+  isLiked: boolean
+  createTime: string
+  replies: Comment[]
+}
+
+export interface CommentAdmin {
+  id: string
+  articleId: string
+  articleTitle: string | null
+  parentId: string | null
+  userId: string | null
+  nickname: string
+  email: string | null
+  avatar: string | null
+  content: string
+  ipAddress: string | null
+  userAgent: string | null
+  likeCount: number
+  replyCount: number
+  status: number
+  createTime: string
+}
+
+export interface CommentLikeResult {
+  liked: boolean
+  likeCount: number
+}

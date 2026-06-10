@@ -68,11 +68,6 @@ knife4j:
   setting:
     language: zh_cn
 
-artalk:
-  server: http://localhost:23366
-  site: MySite博客
-  enabled: true
-
 jwt:
   secret: mysite-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm-2026
   access-token-expiration: 86400000

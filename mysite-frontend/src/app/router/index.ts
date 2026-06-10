@@ -113,6 +113,12 @@ const router = createRouter({
           meta: { requiresDeveloper: true },
         },
         {
+          path: 'comments',
+          name: 'comments',
+          component: () => import('@/views/CommentManageView.vue'),
+          meta: { requiresDeveloper: true },
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/SettingsView.vue'),

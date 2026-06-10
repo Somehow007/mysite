@@ -105,6 +105,25 @@ public class WebSecurityConfig {
                         .requestMatchers(
                                 "/v1/admin/users/**"
                         ).hasRole("DEVELOPER")
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/v1/comments/article/**"
+                        ).permitAll()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/v1/comments"
+                        ).authenticated()
+                        .requestMatchers(
+                                HttpMethod.DELETE,
+                                "/v1/comments/*"
+                        ).authenticated()
+                        .requestMatchers(
+                                HttpMethod.POST,
+                                "/v1/comments/*/like"
+                        ).permitAll()
+                        .requestMatchers(
+                                "/v1/admin/comments/**"
+                        ).hasRole("DEVELOPER")
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {

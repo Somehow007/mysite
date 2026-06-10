@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { FileText, PenSquare, FolderTree, Users, Settings, LogOut, ChevronLeft, ChevronRight, Image as ImageIcon, Tags } from 'lucide-vue-next'
+import { FileText, PenSquare, FolderTree, Users, Settings, LogOut, ChevronLeft, ChevronRight, Image as ImageIcon, Tags, MessageSquare } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { usePermission } from '@/composables/usePermission'
 
@@ -18,6 +18,7 @@ const allNavItems = [
   { label: '标签管理', path: '/dashboard/tags', icon: Tags, requireDeveloper: true },
   { label: '图片管理', path: '/dashboard/images', icon: ImageIcon, requireDeveloper: true },
   { label: '用户管理', path: '/dashboard/users', icon: Users, requireDeveloper: true },
+  { label: '评论管理', path: '/dashboard/comments', icon: MessageSquare, requireDeveloper: true },
   { label: '设置', path: '/dashboard/settings', icon: Settings, requireDeveloper: false },
 ]
 

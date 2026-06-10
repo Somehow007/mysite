@@ -38,74 +38,10 @@ services:
     networks:
       - mysite-network
 
-  # elasticsearch:
-  #   container_name: mysite-elasticsearch
-  #   build:
-  #     context: ./elasticsearch
-  #     dockerfile: Dockerfile
-  #   restart: unless-stopped
-  #   environment:
-  #     - node.name=elasticsearch
-  #     - cluster.name=es-docker-cluster
-  #     - discovery.type=single-node
-  #     - bootstrap.memory_lock=true
-  #     - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
-  #     - xpack.security.enabled=false
-  #   ulimits:
-  #     memlock:
-  #       soft: -1
-  #       hard: -1
-  #   volumes:
-  #     - es_data:/usr/share/elasticsearch/data
-  #     - es_logs:/usr/share/elasticsearch/logs
-  #   ports:
-  #     - "9200:9200"
-  #     - "9300:9300"
-  #   networks:
-  #     - mysite-network
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"yellow\"' || exit 1"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #     start_period: 60s
-
-  # kibana:
-  #   container_name: mysite-kibana
-  #   image: docker.elastic.co/kibana/kibana:7.17.21
-  #   restart: unless-stopped
-  #   environment:
-  #     - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
-  #   volumes:
-  #     - kibana_data:/usr/share/kibana/data
-  #   ports:
-  #     - "5601:5601"
-  #   networks:
-  #     - mysite-network
-  #   depends_on:
-  #     - elasticsearch
-
-  artalk:
-    container_name: mysite-artalk
-    image: artalk/artalk-go:latest
-    restart: unless-stopped
-    ports:
-      - "23366:23366"
-    volumes:
-      - ./artalk_data:/data
-      - ./artalk.yml:/data/artalk.yml:ro
-    environment:
-      - TZ=Asia/Shanghai
-    networks:
-      - mysite-network
-
 # volumes:
 #   mysql_data:
 #   redis_data:
 #   es_data:
-#   es_logs:
-#   kibana_data:
-#   artalk_data:
 
 networks:
   mysite-network:

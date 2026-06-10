@@ -385,7 +385,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
                 Files.deleteIfExists(webpPath);
                 log.debug("WebP编码器不可用，跳过WebP生成: {}", webpName);
             }
-        } catch (IOException e) {
+        } catch (Throwable e) {
             log.warn("生成WebP副本失败: {}", webpName, e);
             try {
                 Files.deleteIfExists(webpPath);
