@@ -3,6 +3,7 @@ import '@/styles/glass.css'
 import '@/styles/transitions.css'
 import '@/styles/typography.css'
 import '@/styles/code.css'
+import 'katex/dist/katex.min.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'

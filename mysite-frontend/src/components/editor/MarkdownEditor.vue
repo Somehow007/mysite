@@ -4,7 +4,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { useMarkdown } from '@/composables/useMarkdown'
 import { uploadImage, uploadImageByUrl, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useToast } from '@/composables/useToast'
-import { Image as ImageIcon, HelpCircle, X, Bold, Italic, Link, Code, List, Quote, Heading, LinkIcon, Loader2 } from 'lucide-vue-next'
+import { Image as ImageIcon, HelpCircle, X, Bold, Italic, Link, Code, List, Quote, Heading, LinkIcon, Loader2, Sigma } from 'lucide-vue-next'
 
 interface HistoryEntry {
   content: string
@@ -736,6 +736,38 @@ function insertQuote() {
   })
 }
 
+function insertMath() {
+  if (!textareaRef.value) return
+  pushUndoNow()
+
+  const start = textareaRef.value.selectionStart
+  const end = textareaRef.value.selectionEnd
+  const value = textareaRef.value.value
+  const selectedText = value.substring(start, end)
+
+  if (selectedText.trim()) {
+    // Wrap selected text in $...$ (inline math)
+    const newText = value.substring(0, start) + '$' + selectedText + '$' + value.substring(end)
+    content.value = newText
+    nextTick(() => {
+      if (!textareaRef.value) return
+      textareaRef.value.setSelectionRange(start + 1, start + 1 + selectedText.length)
+      textareaRef.value.focus()
+    })
+  } else {
+    // Insert empty inline math template $ $
+    const template = '$ $'
+    const newText = value.substring(0, start) + template + value.substring(end)
+    content.value = newText
+    nextTick(() => {
+      if (!textareaRef.value) return
+      const cursorPos = start + 2 // Between the two $
+      textareaRef.value.setSelectionRange(cursorPos, cursorPos)
+      textareaRef.value.focus()
+    })
+  }
+}
+
 function handleImageUpload() {
   const input = document.createElement('input')
   input.type = 'file'
@@ -873,6 +905,14 @@ async function handleUrlUpload() {
         title="通过URL插入图片"
       >
         <LinkIcon :size="15" />
+      </button>
+      <div class="w-px h-4 bg-border mx-0.5 flex-shrink-0" />
+      <button
+        @click="insertMath"
+        class="toolbar-btn"
+        title="插入行内公式 ($...$)"
+      >
+        <Sigma :size="15" />
       </button>
       <div class="flex-1 min-w-4" />
       <div v-if="isUploading" class="flex items-center gap-1.5 text-xs text-accent flex-shrink-0">

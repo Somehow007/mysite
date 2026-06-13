@@ -1,12 +1,101 @@
 import { ref } from 'vue'
 import { Marked } from 'marked'
 import { createHighlighter } from 'shiki'
+import katex from 'katex'
 
 export interface TocItem {
   id: string
   text: string
   level: number
 }
+
+// \u2500\u2500 LaTeX math protection \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
+interface MathEntry {
+  math: string
+  display: boolean
+}
+
+/**
+ * Protect code blocks and math formulas with placeholders before marked parsing.
+ * This prevents marked from treating $ inside code as math delimiters,
+ * and prevents marked from interfering with LaTeX syntax.
+ */
+function protectMath(markdown: string): { processed: string; mathBlocks: Map<string, MathEntry> } {
+  const mathBlocks = new Map<string, MathEntry>()
+  let mathId = 0
+
+  // Step 1: Protect fenced code blocks (``` ... ```)
+  const fencedBlocks: string[] = []
+  let processed = markdown.replace(/(^|\n)(```[\s\S]*?\n```)/g, (_match, newline: string, code: string) => {
+    const key = `\x00FENCED\x00${fencedBlocks.length}\x00`
+    fencedBlocks.push(code)
+    return `${newline}${key}`
+  })
+
+  // Step 2: Protect inline code spans (`...`)
+  const inlineCodes: string[] = []
+  processed = processed.replace(/`([^`]+)`/g, (_match, code: string) => {
+    const key = `\x00CODE\x00${inlineCodes.length}\x00`
+    inlineCodes.push(code)
+    return key
+  })
+
+  // Step 3: Protect escaped dollar signs (\$)
+  let escapedCount = 0
+  processed = processed.replace(/\\\$/g, () => {
+    const key = `\x00ESCDOLLAR\x00${escapedCount++}\x00`
+    return key
+  })
+
+  // Step 4: Protect display math ($$...$$) \u2014 can span multiple lines
+  processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, (_match, math: string) => {
+    const key = `\x00MATH\x00${mathId++}\x00`
+    mathBlocks.set(key, { math: math.trim(), display: true })
+    return `\n${key}\n`
+  })
+
+  // Step 5: Protect inline math ($...$) \u2014 single line only
+  processed = processed.replace(/(?<!\$)\$(?!\$)([^$\n]+?)(?<!\$)\$(?!\$)/g, (_match, math: string) => {
+    if (!math.trim()) return _match // skip empty math like $$
+    const key = `\x00MATH\x00${mathId++}\x00`
+    mathBlocks.set(key, { math: math.trim(), display: false })
+    return key
+  })
+
+  // Step 6: Restore code blocks and inline code (their $ signs are now safe)
+  processed = processed.replace(/\x00FENCED\x00(\d+)\x00/g, (_m, i: string) => fencedBlocks[parseInt(i)] ?? '')
+  processed = processed.replace(/\x00CODE\x00(\d+)\x00/g, (_m, i: string) => inlineCodes[parseInt(i)] ?? '')
+
+  // Step 7: Restore escaped dollar signs as literal $
+  processed = processed.replace(/\x00ESCDOLLAR\x00\d+\x00/g, '$')
+
+  return { processed, mathBlocks }
+}
+
+/**
+ * Render LaTeX math placeholders in HTML with KaTeX.
+ */
+function renderMathInHtml(html: string, mathBlocks: Map<string, MathEntry>): string {
+  let result = html
+  for (const [key, { math, display }] of mathBlocks) {
+    try {
+      const rendered = katex.renderToString(math, {
+        displayMode: display,
+        throwOnError: false,
+        trust: false,
+        strict: false,
+      })
+      result = result.replace(key, rendered)
+    } catch {
+      // If KaTeX fails, show the raw LaTeX
+      result = result.replace(key, escapeHtml(math))
+    }
+  }
+  return result
+}
+
+// \u2500\u2500 Marked setup \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 const markedInstance = new Marked()
 
@@ -133,8 +222,11 @@ export function useMarkdown() {
 
     rendering.value = true
     try {
-      const html = await markedInstance.parse(markdown)
-      renderedHtml.value = typeof html === 'string' ? html : ''
+      const { processed, mathBlocks } = protectMath(markdown)
+      const html = await markedInstance.parse(processed)
+      let result = typeof html === 'string' ? html : ''
+      result = renderMathInHtml(result, mathBlocks)
+      renderedHtml.value = result
       toc.value = extractToc(renderedHtml.value)
     } catch {
       renderedHtml.value = ''
