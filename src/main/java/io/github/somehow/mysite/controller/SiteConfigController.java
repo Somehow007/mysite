@@ -26,6 +26,7 @@ public class SiteConfigController {
                 "description", "一个极简的个人博客",
                 "author", "Admin",
                 "url", "",
+                "commentEnabled", false,  // 临时关闭评论以通过公安备案，通过后改为 true
                 "navigation", List.of(
                         Map.of("label", "首页", "path", "/"),
                         Map.of("label", "归档", "path", "/archive"),

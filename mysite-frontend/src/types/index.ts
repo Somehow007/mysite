@@ -129,6 +129,7 @@ export interface SiteConfig {
   description: string
   author: string
   url: string
+  commentEnabled?: boolean
   navigation: NavigationItem[]
 }
 

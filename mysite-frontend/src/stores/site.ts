@@ -9,6 +9,7 @@ export const useSiteStore = defineStore('site', () => {
     description: '一个极简的个人博客',
     author: 'Admin',
     url: '',
+    commentEnabled: true,
     navigation: [
       { label: '首页', path: '/' },
       { label: '归档', path: '/archive' },

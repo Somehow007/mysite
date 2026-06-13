@@ -7,6 +7,7 @@ import { getArticleById } from '@/api/article'
 import { formatDate, calculateReadingTime } from '@/utils/date'
 import { useScrollProgress } from '@/composables/useScrollProgress'
 import { useFavorite } from '@/composables/useFavorite'
+import { useSiteStore } from '@/stores/site'
 import ArticleContent from '@/components/article/ArticleContent.vue'
 import ArticleToc from '@/components/article/ArticleToc.vue'
 import FavoriteButton from '@/components/article/FavoriteButton.vue'
@@ -18,6 +19,7 @@ const route = useRoute()
 const router = useRouter()
 const { progress } = useScrollProgress()
 const { setFavoriteStatus } = useFavorite()
+const siteStore = useSiteStore()
 
 const article = ref<Article | null>(null)
 const loading = ref(false)
@@ -197,6 +199,7 @@ onMounted(() => {
           </div>
 
           <CommentSection
+            v-if="siteStore.site.commentEnabled !== false"
             :article-id="article.id"
           />
         </article>
