@@ -205,9 +205,18 @@
     max-width: 100%;
   }
 
+  /* Inline KaTeX: generous line-height to prevent clipping of
+     tall formulas (fractions, superscripts, subscripts, etc.) */
   .prose .katex {
     font-size: 1.1em;
+    line-height: 1.8;
+    vertical-align: middle;
+  }
+
+  /* Display KaTeX resets to tighter line-height */
+  .prose .katex-display .katex {
     line-height: 1.2;
+    vertical-align: baseline;
   }
 
   .prose del {
