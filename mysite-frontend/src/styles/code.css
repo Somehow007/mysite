@@ -1,6 +1,6 @@
 @layer components {
-  /* ---- Shiki base ---- */
-  .shiki {
+  /* ── Code block base (Prism-highlighted) ── */
+  .code-block {
     font-family: var(--font-mono);
     font-size: 0.875rem;
     line-height: 1.7;
@@ -8,43 +8,112 @@
     border-radius: 8px;
     overflow-x: auto;
     background-color: var(--code-bg) !important;
-    color: var(--code-token-plain) !important;
+    color: var(--code-token-plain);
   }
 
-  .shiki .line {
+  .code-block .line {
     min-height: 1.7em;
   }
 
-  .shiki .line.highlighted {
+  .code-block .line.highlighted {
     background-color: var(--code-line-highlight);
     display: inline-block;
     width: 100%;
   }
 
-  /* ---- Override Shiki inline color styles with theme tokens ---- */
-  .shiki span[style] {
-    color: var(--shiki-color, inherit) !important;
+  /* ── Prism token color mapping ──
+     Uses the project's existing --code-token-* CSS variables so every
+     theme (classic, aurora, ocean-breeze, etc.) works automatically. */
+
+  .prose pre.code-block .token.comment,
+  .prose pre.code-block .token.prolog,
+  .prose pre.code-block .token.doctype,
+  .prose pre.code-block .token.cdata {
+    color: var(--code-token-comment);
+    font-style: italic;
   }
 
-  /* Map Shiki's generated class names to theme tokens */
-  .shiki .line span { color: var(--code-token-plain); }
+  .prose pre.code-block .token.keyword,
+  .prose pre.code-block .token.atrule,
+  .prose pre.code-block .token.important,
+  .prose pre.code-block .token.boolean,
+  .prose pre.code-block .token.constant {
+    color: var(--code-token-keyword);
+  }
 
-  /* ---- Prose code block integration ---- */
-  .prose pre.shiki {
+  .prose pre.code-block .token.string,
+  .prose pre.code-block .token.char,
+  .prose pre.code-block .token.attr-value,
+  .prose pre.code-block .token.regex,
+  .prose pre.code-block .token.inserted {
+    color: var(--code-token-string);
+  }
+
+  .prose pre.code-block .token.function,
+  .prose pre.code-block .token.class-name,
+  .prose pre.code-block .token.maybe-class-name {
+    color: var(--code-token-function);
+  }
+
+  .prose pre.code-block .token.number {
+    color: var(--code-token-number);
+  }
+
+  .prose pre.code-block .token.operator,
+  .prose pre.code-block .token.entity,
+  .prose pre.code-block .token.url,
+  .prose pre.code-block .token.symbol {
+    color: var(--code-token-operator);
+  }
+
+  .prose pre.code-block .token.variable,
+  .prose pre.code-block .token.parameter,
+  .prose pre.code-block .token.interpolation {
+    color: var(--code-token-variable);
+  }
+
+  .prose pre.code-block .token.tag,
+  .prose pre.code-block .token.selector {
+    color: var(--code-token-tag);
+  }
+
+  .prose pre.code-block .token.attr-name,
+  .prose pre.code-block .token.property {
+    color: var(--code-token-property);
+  }
+
+  .prose pre.code-block .token.builtin,
+  .prose pre.code-block .token.module,
+  .prose pre.code-block .token.type {
+    color: var(--code-token-type);
+  }
+
+  .prose pre.code-block .token.punctuation,
+  .prose pre.code-block .token.delimiter {
+    color: var(--code-token-punctuation);
+  }
+
+  .prose pre.code-block .token.deleted {
+    color: var(--code-token-variable);
+    text-decoration: line-through;
+  }
+
+  .prose pre.code-block .token.italic {
+    font-style: italic;
+  }
+
+  .prose pre.code-block .token.bold {
+    font-weight: 600;
+  }
+
+  /* ── Prose integration ── */
+  .prose pre.code-block {
     margin: 1.5em 0;
     padding: 1.25rem 1.5rem;
     border: 1px solid var(--code-border);
   }
 
-  .prose pre.shiki code {
-    display: grid;
-  }
-
-  .prose pre.shiki .line {
-    padding: 0 1.5rem;
-  }
-
-  /* ---- Code block wrapper with header ---- */
+  /* ── Code block wrapper (language label + copy button) ── */
   .code-block-wrapper {
     position: relative;
     margin: 1.5em 0;
@@ -110,17 +179,17 @@
     color: #059669;
   }
 
-  .code-block-wrapper pre.shiki {
+  .code-block-wrapper pre.code-block {
     border-radius: 0;
     margin: 0;
     border: none;
   }
 
-  .code-block-wrapper:has(pre.shiki:first-child) pre.shiki {
+  .code-block-wrapper:has(pre.code-block:first-child) pre.code-block {
     border-radius: 8px;
   }
 
-  /* ---- Language-specific accent dots ---- */
+  /* ── Language-specific accent dots ── */
   .code-block-lang[data-lang="java"]::before { background-color: #E76F00; }
   .code-block-lang[data-lang="python"]::before,
   .code-block-lang[data-lang="py"]::before { background-color: #3776AB; }
@@ -142,71 +211,4 @@
   .code-block-lang[data-lang="dockerfile"]::before { background-color: #2496ED; }
   .code-block-lang[data-lang="c"]::before { background-color: #A8B9CC; }
   .code-block-lang[data-lang="cpp"]::before { background-color: #00599C; }
-}
-
-/* ---- Syntax token color overrides (outside @layer for specificity) ---- */
-/* These override Shiki's inline style colors with theme-aware CSS variables */
-.prose pre.shiki span[style*="color:#24292E"],
-.prose pre.shiki span[style*="color:#24292e"],
-.prose pre.shiki span[style*="color:#e1e4e8"] {
-  color: var(--code-token-plain) !important;
-}
-
-.prose pre.shiki span[style*="color:#D73A49"],
-.prose pre.shiki span[style*="color:#d73a49"],
-.prose pre.shiki span[style*="color:#FF7B72"],
-.prose pre.shiki span[style*="color:#ff7b72"] {
-  color: var(--code-token-keyword) !important;
-}
-
-.prose pre.shiki span[style*="color:#032F62"],
-.prose pre.shiki span[style*="color:#032f62"],
-.prose pre.shiki span[style*="color:#A5D6FF"],
-.prose pre.shiki span[style*="color:#a5d6ff"] {
-  color: var(--code-token-string) !important;
-}
-
-.prose pre.shiki span[style*="color:#6F42C1"],
-.prose pre.shiki span[style*="color:#6f42c1"],
-.prose pre.shiki span[style*="color:#D2A8FF"],
-.prose pre.shiki span[style*="color:#d2a8ff"] {
-  color: var(--code-token-function) !important;
-}
-
-.prose pre.shiki span[style*="color:#005CC5"],
-.prose pre.shiki span[style*="color:#005cc5"],
-.prose pre.shiki span[style*="color:#79C0FF"],
-.prose pre.shiki span[style*="color:#79c0ff"] {
-  color: var(--code-token-variable) !important;
-}
-
-.prose pre.shiki span[style*="color:#E36209"],
-.prose pre.shiki span[style*="color:#e36209"],
-.prose pre.shiki span[style*="color:#FFA657"],
-.prose pre.shiki span[style*="color:#ffa657"] {
-  color: var(--code-token-number) !important;
-}
-
-.prose pre.shiki span[style*="color:#6A737D"],
-.prose pre.shiki span[style*="color:#6a737d"],
-.prose pre.shiki span[style*="color:#8B949E"],
-.prose pre.shiki span[style*="color:#8b949e"] {
-  color: var(--code-token-comment) !important;
-}
-
-.prose pre.shiki span[style*="color:#22863A"],
-.prose pre.shiki span[style*="color:#22863a"],
-.prose pre.shiki span[style*="color:#7EE787"],
-.prose pre.shiki span[style*="color:#7ee787"] {
-  color: var(--code-token-string) !important;
-}
-
-.prose pre.shiki span[style*="color:#005CC5"],
-.prose pre.shiki span[style*="color:#005cc5"] {
-  color: var(--code-token-tag) !important;
-}
-
-.prose pre.shiki span[style*="color:#E36209"],
-.prose pre.shiki span[style*="color:#e36209"] {
-  color: var(--code-token-attr) !important;
 }

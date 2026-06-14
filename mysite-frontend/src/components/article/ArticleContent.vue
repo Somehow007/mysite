@@ -13,7 +13,7 @@ const emit = defineEmits<{
 }>()
 
 const contentRef = ref<HTMLElement | null>(null)
-const { renderedHtml, render, applyHighlighting, rendering, toc } = useMarkdown()
+const { renderedHtml, render, rendering, toc } = useMarkdown()
 const { processContainer } = useImageOptimizer(contentRef)
 
 function enhanceCodeBlocks(container: HTMLElement) {
@@ -78,7 +78,6 @@ watch(
       await nextTick()
       if (contentRef.value) {
         processContainer(contentRef.value)
-        await applyHighlighting(contentRef.value)
         enhanceCodeBlocks(contentRef.value)
       }
     }

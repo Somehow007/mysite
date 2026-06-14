@@ -1,7 +1,27 @@
 import { ref } from 'vue'
 import { Marked } from 'marked'
-import { createHighlighter } from 'shiki'
+import Prism from 'prismjs'
 import katex from 'katex'
+
+// Prism language grammars — loaded at build time, tree-shaken by Vite
+import 'prismjs/components/prism-javascript'
+import 'prismjs/components/prism-typescript'
+import 'prismjs/components/prism-python'
+import 'prismjs/components/prism-java'
+import 'prismjs/components/prism-css'
+import 'prismjs/components/prism-markup' // html / xml
+import 'prismjs/components/prism-json'
+import 'prismjs/components/prism-yaml'
+import 'prismjs/components/prism-bash'
+import 'prismjs/components/prism-markdown'
+import 'prismjs/components/prism-sql'
+import 'prismjs/components/prism-go'
+import 'prismjs/components/prism-rust'
+import 'prismjs/components/prism-c'
+import 'prismjs/components/prism-cpp'
+import 'prismjs/components/prism-diff'
+import 'prismjs/components/prism-docker'
+import 'prismjs/components/prism-nginx'
 
 export interface TocItem {
   id: string
@@ -9,7 +29,7 @@ export interface TocItem {
   level: number
 }
 
-// \u2500\u2500 LaTeX math protection \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── LaTeX math protection ──────────────────────────────────────────────
 
 interface MathEntry {
   math: string
@@ -48,14 +68,14 @@ function protectMath(markdown: string): { processed: string; mathBlocks: Map<str
     return key
   })
 
-  // Step 4: Protect display math ($$...$$) \u2014 can span multiple lines
+  // Step 4: Protect display math ($$...$$) — can span multiple lines
   processed = processed.replace(/\$\$([\s\S]*?)\$\$/g, (_match, math: string) => {
     const key = `\x00MATH\x00${mathId++}\x00`
     mathBlocks.set(key, { math: math.trim(), display: true })
     return `\n${key}\n`
   })
 
-  // Step 5: Protect inline math ($...$) \u2014 single line only
+  // Step 5: Protect inline math ($...$) — single line only
   processed = processed.replace(/(?<!\$)\$(?!\$)([^$\n]+?)(?<!\$)\$(?!\$)/g, (_match, math: string) => {
     if (!math.trim()) return _match // skip empty math like $$
     const key = `\x00MATH\x00${mathId++}\x00`
@@ -95,7 +115,7 @@ function renderMathInHtml(html: string, mathBlocks: Map<string, MathEntry>): str
   return result
 }
 
-// \u2500\u2500 Marked setup \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+// ── Marked setup ──────────────────────────────────────────────────────
 
 const markedInstance = new Marked()
 
@@ -110,14 +130,39 @@ renderer.heading = function ({ text, depth }) {
   const rawText = String(text)
   const id = rawText
     .toLowerCase()
-    .replace(/[^\w\u4e00-\u9fa5]+/g, '-')
+    .replace(/[^\w一-龥]+/g, '-')
     .replace(/^-+|-+$/g, '')
   return `<h${depth} id="${escapeHtml(id)}">${escapeHtml(rawText)}</h${depth}>`
 }
 
+// Map common markdown fence names to Prism language keys
+const langAliases: Record<string, string> = {
+  'sh': 'bash',
+  'shell': 'bash',
+  'js': 'javascript',
+  'jsx': 'javascript',
+  'ts': 'typescript',
+  'tsx': 'typescript',
+  'py': 'python',
+  'yml': 'yaml',
+  'c++': 'cpp',
+}
+
 renderer.code = function ({ text, lang }) {
   const language = lang || ''
-  return `<pre><code class="language-${escapeHtml(language)}" data-language="${escapeHtml(language)}">${escapeHtml(text)}</code></pre>`
+  const prismLang = langAliases[language] || language
+  let highlighted: string
+  try {
+    const grammar = prismLang ? Prism.languages[prismLang] : undefined
+    if (grammar) {
+      highlighted = Prism.highlight(text, grammar, prismLang)
+    } else {
+      highlighted = escapeHtml(text)
+    }
+  } catch {
+    highlighted = escapeHtml(text)
+  }
+  return `<pre class="code-block"><code class="language-${escapeHtml(language)}" data-language="${escapeHtml(language)}">${highlighted}</code></pre>`
 }
 
 renderer.image = function ({ href, title: _title, text }) {
@@ -137,62 +182,7 @@ function escapeHtml(str: string): string {
 
 markedInstance.use({ renderer })
 
-type ShikiHighlighter = Awaited<ReturnType<typeof createHighlighter>>
-
-let highlighterInstance: ShikiHighlighter | null = null
-let highlighterInitPromise: Promise<ShikiHighlighter> | null = null
-
-async function getHighlighter(): Promise<ShikiHighlighter> {
-  if (highlighterInstance) return highlighterInstance
-  if (highlighterInitPromise) return highlighterInitPromise
-
-  highlighterInitPromise = createHighlighter({
-    themes: ['github-light', 'github-dark'],
-    langs: [
-      'javascript', 'typescript', 'python', 'java', 'css', 'html',
-      'json', 'bash', 'markdown', 'xml', 'yaml', 'sql', 'go', 'rust',
-      'c', 'cpp', 'shell', 'diff', 'plaintext',
-    ],
-  }).then((h) => {
-    highlighterInstance = h
-    return h
-  })
-
-  return highlighterInitPromise
-}
-
-async function highlightCodeBlocks(container: HTMLElement) {
-  const highlighter = await getHighlighter()
-  const isDark = document.documentElement.classList.contains('dark')
-  const theme = isDark ? 'github-dark' : 'github-light'
-
-  const codeBlocks = container.querySelectorAll('pre code[data-language]')
-  const promises: Promise<void>[] = []
-
-  for (const block of codeBlocks) {
-    const lang = block.getAttribute('data-language') || ''
-    const code = block.textContent || ''
-
-    promises.push(
-      (async () => {
-        try {
-          const loadedLangs = highlighter.getLoadedLanguages()
-          const effectiveLang = loadedLangs.includes(lang) ? lang : 'text'
-          const html = highlighter.codeToHtml(code, { lang: effectiveLang, theme })
-          const pre = block.parentElement
-          if (pre) {
-            pre.innerHTML = html
-            pre.classList.add('shiki')
-          }
-        } catch {
-          block.classList.add('shiki')
-        }
-      })(),
-    )
-  }
-
-  await Promise.all(promises)
-}
+// ── Public composable ─────────────────────────────────────────────────
 
 export function useMarkdown() {
   const renderedHtml = ref('')
@@ -236,15 +226,10 @@ export function useMarkdown() {
     }
   }
 
-  async function applyHighlighting(container: HTMLElement) {
-    await highlightCodeBlocks(container)
-  }
-
   return {
     renderedHtml,
     toc,
     rendering,
     render,
-    applyHighlighting,
   }
 }

@@ -82,7 +82,7 @@ const lineCount = ref(0)
 
 const undoManager = markRaw(new UndoManager())
 
-const { renderedHtml, render, applyHighlighting, rendering } = useMarkdown()
+const { renderedHtml, render, rendering } = useMarkdown()
 const toast = useToast()
 
 const isMac = computed(() => {
@@ -200,10 +200,6 @@ onUnmounted(() => {
 async function updatePreview() {
   if (showPreview.value && content.value) {
     await render(content.value)
-    await nextTick()
-    if (previewRef.value) {
-      await applyHighlighting(previewRef.value)
-    }
   } else if (!content.value) {
     await render('')
   }
