@@ -45,9 +45,10 @@ function protectMath(markdown: string): { processed: string; mathBlocks: Map<str
   const mathBlocks = new Map<string, MathEntry>()
   let mathId = 0
 
-  // Step 1: Protect fenced code blocks (``` ... ```)
+  // Step 1: Protect fenced code blocks (``` ... ```), including those
+  // nested inside blockquotes (each line prefixed with "> ").
   const fencedBlocks: string[] = []
-  let processed = markdown.replace(/(^|\n)(```[\s\S]*?\n```)/g, (_match, newline: string, code: string) => {
+  let processed = markdown.replace(/(^|\n)((?:> )*```[\s\S]*?\n(?:> )*```)/g, (_match, newline: string, code: string) => {
     const key = `\x00FENCED\x00${fencedBlocks.length}\x00`
     fencedBlocks.push(code)
     return `${newline}${key}`
@@ -126,38 +127,73 @@ const CALLOUT_CONFIG: Record<string, CalloutConfig> = {
 
 /**
  * Transform <blockquote> elements that start with [!TYPE] into styled callout divs.
+ *
+ * The first <p> inside such a blockquote contains both the callout title
+ * (first line after [!TYPE]) and optionally body text (subsequent lines).
+ * Subsequent block elements (<pre>, <p>, <ul>, etc.) are also part of the body.
  */
 function renderCallouts(html: string): string {
+  // HTML entity decoder — reverses only the entities that escapeHtml & marked produce
+  const decodeEntities = (s: string): string =>
+    s
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+
+  const CALLOUT_TYPE_RE =
+    /^\s*<p>\[!(NOTE|INFO|TODO|TIP|SUCCESS|CHECK|DONE|QUESTION|WARNING|CAUTION|ATTENTION|FAILURE|FAIL|MISSING|ERROR|DANGER|BUG|EXAMPLE|QUOTE|CITE|ABSTRACT|SUMMARY|TLDR)\]([\s\S]*?)<\/p>([\s\S]*)$/i
+
   return html.replace(
     /<blockquote>([\s\S]*?)<\/blockquote>/g,
     (match: string, content: string) => {
-      const calloutMatch = content.match(
-        /^\s*<p>\[!(NOTE|INFO|TODO|TIP|SUCCESS|CHECK|DONE|QUESTION|WARNING|CAUTION|ATTENTION|FAILURE|FAIL|MISSING|ERROR|DANGER|BUG|EXAMPLE|QUOTE|CITE|ABSTRACT|SUMMARY|TLDR)\](.*?)<\/p>([\s\S]*)$/i,
-      )
+      const calloutMatch = content.match(CALLOUT_TYPE_RE)
       if (!calloutMatch) return match // Regular blockquote — leave as-is
 
       const [, type, titlePart, rest] = calloutMatch
       const typeLower = type!.toLowerCase()
       const config = CALLOUT_CONFIG[typeLower] ?? CALLOUT_CONFIG['note']!
 
-      // Extract title: strip leading <br> and whitespace, decode HTML entities
-      const rawTitle = titlePart!
-        .replace(/^<br>\s*/, '')
-        .trim()
-      const title = rawTitle
-        ? rawTitle.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
-        : ''
+      // The titlePart contains everything from "] " to the closing </p>,
+      // possibly including newlines. Split at the first newline:
+      //   line 0 → title,  lines 1+ → body text (re-wrapped in <p>).
+      const afterBracket = titlePart!.replace(/^\]\s?/, '') // strip "] " or "]"
+      const firstBr = afterBracket.indexOf('\n')
+      let rawTitle: string
+      let bodyFromFirstP = ''
+      if (firstBr >= 0) {
+        rawTitle = afterBracket.slice(0, firstBr)
+        bodyFromFirstP = afterBracket.slice(firstBr + 1)
+      } else {
+        rawTitle = afterBracket
+      }
+      rawTitle = rawTitle.trim()
+
+      // Decode HTML entities that marked produced (e.g. &quot; → ")
+      // before re-escaping for safe HTML output.
+      const title = rawTitle ? decodeEntities(rawTitle) : ''
 
       const titleHtml = title
         ? `<span class="callout-title-text">${escapeHtml(title)}</span>`
         : `<span class="callout-title-text callout-title-placeholder">${type}</span>`
+
+      // Assemble body: inline text from the first <p> + any trailing block elements
+      const bodyParts: string[] = []
+      if (bodyFromFirstP.trim()) {
+        bodyParts.push(`<p>${bodyFromFirstP.trim()}</p>`)
+      }
+      if (rest.trim()) {
+        bodyParts.push(rest.trim())
+      }
+      const bodyHtml = bodyParts.join('\n')
 
       return `<div class="callout callout-${typeLower}" style="--callout-color: ${config.color}">
         <div class="callout-header">
           <span class="callout-icon">${config.icon}</span>
           ${titleHtml}
         </div>
-        <div class="callout-body">${rest}</div>
+        <div class="callout-body">${bodyHtml}</div>
       </div>`
     },
   )
