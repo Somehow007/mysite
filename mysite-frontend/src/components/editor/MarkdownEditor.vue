@@ -71,6 +71,10 @@ const showUrlDialog = ref(false)
 const imageUrl = ref('')
 const urlUploading = ref(false)
 
+// Guard to prevent undo/redo double-firing when both keydown and
+// beforeinput handlers catch the same Cmd+Z / Cmd+Shift+Z action.
+let undoRedoHandledByKeydown = false
+
 // ── Callout state ──
 const showCalloutDialog = ref(false)
 const calloutSearchQuery = ref('')
@@ -247,6 +251,7 @@ const debouncedPushUndo = useDebounceFn(() => {
 
 onMounted(() => {
   if (textareaRef.value) {
+    textareaRef.value.addEventListener('beforeinput', handleBeforeInput)
     textareaRef.value.addEventListener('keydown', handleKeyDown)
     textareaRef.value.addEventListener('input', handleInput)
     textareaRef.value.addEventListener('paste', handlePaste)
@@ -268,6 +273,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (textareaRef.value) {
+    textareaRef.value.removeEventListener('beforeinput', handleBeforeInput)
     textareaRef.value.removeEventListener('keydown', handleKeyDown)
     textareaRef.value.removeEventListener('input', handleInput)
     textareaRef.value.removeEventListener('paste', handlePaste)
@@ -370,6 +376,30 @@ function performRedo() {
   }
 }
 
+// Intercept native undo/redo at the beforeinput level — this catches
+// undo/redo from ALL sources: keyboard shortcuts, Edit menu, touch gestures.
+// More reliable than keydown.preventDefault() alone, especially on macOS.
+// The undoRedoHandledByKeydown guard prevents double-firing when keydown
+// already handled the same Cmd+Z / Cmd+Shift+Z action.
+function handleBeforeInput(e: InputEvent) {
+  if (e.inputType === 'historyUndo') {
+    e.preventDefault()
+    if (!undoRedoHandledByKeydown) {
+      performUndo()
+    }
+    undoRedoHandledByKeydown = false
+    return
+  }
+  if (e.inputType === 'historyRedo') {
+    e.preventDefault()
+    if (!undoRedoHandledByKeydown) {
+      performRedo()
+    }
+    undoRedoHandledByKeydown = false
+    return
+  }
+}
+
 function handleKeyDown(e: KeyboardEvent) {
   if (showAutocomplete.value) {
     if (e.key === 'ArrowDown') {
@@ -394,18 +424,23 @@ function handleKeyDown(e: KeyboardEvent) {
   }
 
   if (e.ctrlKey || e.metaKey) {
-    if (!e.shiftKey && e.key.toLowerCase() === 'z') {
+    // Undo: Ctrl/Cmd+Z  (use e.code for keyboard-layout independence)
+    if (!e.shiftKey && (e.key.toLowerCase() === 'z' || e.code === 'KeyZ')) {
       e.preventDefault()
+      undoRedoHandledByKeydown = true
       performUndo()
       return
     }
-    if (e.shiftKey && e.key.toLowerCase() === 'z') {
+    // Redo: Ctrl/Cmd+Shift+Z (macOS standard) or Ctrl+Y (Windows standard)
+    if (e.key.toLowerCase() === 'y' || e.code === 'KeyY') {
       e.preventDefault()
+      undoRedoHandledByKeydown = true
       performRedo()
       return
     }
-    if (e.key.toLowerCase() === 'y') {
+    if (e.shiftKey && (e.key.toLowerCase() === 'z' || e.code === 'KeyZ')) {
       e.preventDefault()
+      undoRedoHandledByKeydown = true
       performRedo()
       return
     }
