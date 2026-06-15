@@ -26,6 +26,19 @@ class UndoManager {
 
   undo(current: HistoryEntry): HistoryEntry | null {
     if (this.undoStack.length <= 1) return null
+
+    // Skip past entries at the top whose content matches the current state.
+    // These are save-points of the current content (pushed by debounced
+    // saves or flushPushUndo); restoring them would produce no visible change.
+    while (
+      this.undoStack.length > 1 &&
+      this.undoStack[this.undoStack.length - 1]!.content === current.content
+    ) {
+      this.undoStack.pop()
+    }
+
+    if (this.undoStack.length === 0) return null
+
     this.redoStack.push({ ...current })
     return this.undoStack.pop()!
   }
