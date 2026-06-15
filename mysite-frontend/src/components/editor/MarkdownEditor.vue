@@ -228,7 +228,7 @@ watch(
 watch(content, (newVal) => {
   if (!isRestoring.value) {
     emit('update:modelValue', newVal)
-    debouncedPushUndo()
+    schedulePushUndo()
   }
   updateCounts(newVal)
   debouncedUpdatePreview()
@@ -240,14 +240,38 @@ watch(showPreview, (newVal) => {
 
 const debouncedUpdatePreview = useDebounceFn(updatePreview, 300)
 
-const debouncedPushUndo = useDebounceFn(() => {
-  if (!textareaRef.value || isRestoring.value) return
-  undoManager.push({
-    content: content.value,
-    selectionStart: textareaRef.value.selectionStart,
-    selectionEnd: textareaRef.value.selectionEnd,
-  })
-}, 400)
+// ── Debounced push to undo stack (150ms, with flush support) ──
+// Using a short debounce so keystrokes are grouped for undo,
+// but changes are captured quickly. The flush function is called
+// before undo/redo to guarantee the latest state is always saved.
+let pushUndoTimer: ReturnType<typeof setTimeout> | null = null
+
+function schedulePushUndo() {
+  if (pushUndoTimer) clearTimeout(pushUndoTimer)
+  pushUndoTimer = setTimeout(() => {
+    pushUndoTimer = null
+    if (!textareaRef.value || isRestoring.value) return
+    undoManager.push({
+      content: content.value,
+      selectionStart: textareaRef.value.selectionStart,
+      selectionEnd: textareaRef.value.selectionEnd,
+    })
+  }, 150)
+}
+
+function flushPushUndo() {
+  if (pushUndoTimer) {
+    clearTimeout(pushUndoTimer)
+    pushUndoTimer = null
+    if (textareaRef.value && !isRestoring.value) {
+      undoManager.push({
+        content: content.value,
+        selectionStart: textareaRef.value.selectionStart,
+        selectionEnd: textareaRef.value.selectionEnd,
+      })
+    }
+  }
+}
 
 onMounted(() => {
   if (textareaRef.value) {
@@ -331,7 +355,11 @@ function pushUndoNow() {
 }
 
 function performUndo() {
-  if (!textareaRef.value || !undoManager.canUndo()) return
+  if (!textareaRef.value) return
+  // Flush any pending debounced state so the undo stack always
+  // has the latest content before we try to undo.
+  flushPushUndo()
+  if (!undoManager.canUndo()) return
   showAutocomplete.value = false
   const entry = undoManager.undo({
     content: content.value,
@@ -354,7 +382,9 @@ function performUndo() {
 }
 
 function performRedo() {
-  if (!textareaRef.value || !undoManager.canRedo()) return
+  if (!textareaRef.value) return
+  flushPushUndo()
+  if (!undoManager.canRedo()) return
   showAutocomplete.value = false
   const entry = undoManager.redo({
     content: content.value,
@@ -428,6 +458,7 @@ function handleKeyDown(e: KeyboardEvent) {
     if (!e.shiftKey && (e.key.toLowerCase() === 'z' || e.code === 'KeyZ')) {
       e.preventDefault()
       undoRedoHandledByKeydown = true
+      setTimeout(() => { undoRedoHandledByKeydown = false }, 0)
       performUndo()
       return
     }
@@ -435,12 +466,14 @@ function handleKeyDown(e: KeyboardEvent) {
     if (e.key.toLowerCase() === 'y' || e.code === 'KeyY') {
       e.preventDefault()
       undoRedoHandledByKeydown = true
+      setTimeout(() => { undoRedoHandledByKeydown = false }, 0)
       performRedo()
       return
     }
     if (e.shiftKey && (e.key.toLowerCase() === 'z' || e.code === 'KeyZ')) {
       e.preventDefault()
       undoRedoHandledByKeydown = true
+      setTimeout(() => { undoRedoHandledByKeydown = false }, 0)
       performRedo()
       return
     }
