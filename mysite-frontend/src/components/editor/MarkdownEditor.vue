@@ -331,18 +331,50 @@ function updateCursorPosition() {
   const lines = text.split('\n')
   cursorLine.value = lines.length
   cursorCol.value = (lines[lines.length - 1] ?? '').length + 1
+  // Auto-scroll preview to follow the editing position
+  syncPreviewScroll()
 }
 
-let scrollRafId = 0
+// ── Preview scroll sync ──
+// When the user manually scrolls the preview, we pause auto-sync for 2s
+// so they can read freely without the preview jumping around.
+const previewUserScrolling = ref(false)
+let ignoreNextPreviewScroll = false
+let previewScrollTimer: ReturnType<typeof setTimeout> | null = null
+let syncPreviewRafId = 0
+
+function syncPreviewScroll() {
+  if (syncPreviewRafId) return
+  syncPreviewRafId = requestAnimationFrame(() => {
+    syncPreviewRafId = 0
+    if (!textareaRef.value || !showPreview.value || !previewRef.value) return
+    if (previewUserScrolling.value) return
+
+    const maxEditorScroll = textareaRef.value.scrollHeight - textareaRef.value.clientHeight
+    const maxPreviewScroll = previewRef.value.scrollHeight - previewRef.value.clientHeight
+    if (maxEditorScroll <= 0) return
+
+    const ratio = textareaRef.value.scrollTop / maxEditorScroll
+    ignoreNextPreviewScroll = true
+    previewRef.value.scrollTop = ratio * Math.max(maxPreviewScroll, 0)
+  })
+}
+
+function handlePreviewScroll() {
+  if (ignoreNextPreviewScroll) {
+    ignoreNextPreviewScroll = false
+    return
+  }
+  // User manually scrolled the preview — pause auto-follow
+  previewUserScrolling.value = true
+  if (previewScrollTimer) clearTimeout(previewScrollTimer)
+  previewScrollTimer = setTimeout(() => {
+    previewUserScrolling.value = false
+  }, 2000)
+}
 
 function handleEditorScroll() {
-  if (scrollRafId) return
-  scrollRafId = requestAnimationFrame(() => {
-    scrollRafId = 0
-    if (!textareaRef.value || !showPreview.value || !previewRef.value) return
-    const ratio = textareaRef.value.scrollTop / (textareaRef.value.scrollHeight - textareaRef.value.clientHeight || 1)
-    previewRef.value.scrollTop = ratio * (previewRef.value.scrollHeight - previewRef.value.clientHeight)
-  })
+  syncPreviewScroll()
 }
 
 function pushUndoNow() {
@@ -1177,7 +1209,12 @@ async function handleUrlUpload() {
         />
       </div>
 
-      <div v-if="showPreview" class="preview-pane flex-1 overflow-auto bg-bg-secondary">
+      <div
+        v-if="showPreview"
+        ref="previewRef"
+        class="preview-pane flex-1 overflow-auto bg-bg-secondary"
+        @scroll="handlePreviewScroll"
+      >
         <div v-if="rendering" class="p-6 animate-pulse space-y-4">
           <div class="h-8 w-3/4 bg-bg-code rounded" />
           <div class="h-4 w-full bg-bg-code rounded" />
@@ -1185,7 +1222,6 @@ async function handleUrlUpload() {
         </div>
         <div
           v-else
-          ref="previewRef"
           class="prose prose-sm max-w-none p-6"
           v-html="renderedHtml"
         />
