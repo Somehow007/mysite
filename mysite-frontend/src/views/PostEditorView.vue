@@ -244,7 +244,7 @@ function removeCover() {
 </script>
 
 <template>
-  <div class="max-w-[1400px] mx-auto">
+  <div class="max-w-[1400px] mx-auto flex-1 flex flex-col min-h-0 w-full">
     <div class="flex items-center justify-between mb-6">
       <div class="flex items-center gap-4">
         <button
@@ -303,8 +303,8 @@ function removeCover() {
       加载中...
     </div>
 
-    <div v-else class="flex gap-6">
-      <div class="flex-1 min-w-0 space-y-4">
+    <div v-else class="flex gap-6 flex-1 min-h-0">
+      <div class="flex-1 min-w-0 flex flex-col space-y-4 min-h-0">
         <input
           v-model="title"
           type="text"
@@ -312,7 +312,7 @@ function removeCover() {
           class="w-full px-0 py-3 text-2xl font-semibold bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted"
         />
 
-        <div class="h-[calc(100vh-280px)] min-h-[500px] rounded-xl border border-border overflow-hidden bg-bg-secondary card-shadow">
+        <div class="flex-1 min-h-[500px] rounded-xl border border-border overflow-hidden bg-bg-secondary card-shadow">
           <MarkdownEditor
             v-model="content"
             placeholder="用 Markdown 写文章..."

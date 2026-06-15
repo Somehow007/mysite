@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { FileText, PenSquare, FolderTree, Users, Settings, LogOut, ChevronLeft, ChevronRight, Image as ImageIcon, Tags, MessageSquare } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
@@ -30,6 +30,17 @@ async function handleLogout() {
   await userStore.logout()
   window.location.href = '/'
 }
+
+// 编写文章时默认收起侧边栏，给编辑器更多空间
+watch(
+  () => route.name,
+  (name) => {
+    if (name === 'post-new' || name === 'post-edit') {
+      isCollapsed.value = true
+    }
+  },
+  { immediate: true },
+)
 
 function toggleSidebar() {
   isCollapsed.value = !isCollapsed.value
