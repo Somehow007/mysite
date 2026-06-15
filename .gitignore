@@ -33,6 +33,9 @@ build/
 .vscode/
 
 ### Project specific ###
+.DS_Store
+uploads/
+备案图标.png
 artalk-data/
 mysite-frontend/mysite/
 mysite-frontend/dist/
