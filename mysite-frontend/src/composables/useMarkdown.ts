@@ -93,6 +93,76 @@ function protectMath(markdown: string): { processed: string; mathBlocks: Map<str
   return { processed, mathBlocks }
 }
 
+// ── Callout rendering ─────────────────────────────────────────────────
+
+interface CalloutConfig {
+  icon: string
+  color: string
+}
+
+const CALLOUT_CONFIG: Record<string, CalloutConfig> = {
+  note: { icon: '📝', color: '#448aff' },
+  info: { icon: 'ℹ️', color: '#448aff' },
+  todo: { icon: '☑️', color: '#448aff' },
+  tip: { icon: '💡', color: '#00c853' },
+  success: { icon: '✅', color: '#00c853' },
+  check: { icon: '✔️', color: '#00c853' },
+  done: { icon: '🏁', color: '#00c853' },
+  warning: { icon: '⚠️', color: '#ff9100' },
+  caution: { icon: '⚠️', color: '#ff9100' },
+  question: { icon: '❓', color: '#ff9100' },
+  attention: { icon: '👀', color: '#ff9100' },
+  error: { icon: '❌', color: '#ff1744' },
+  danger: { icon: '⚡', color: '#ff1744' },
+  failure: { icon: '🚫', color: '#ff1744' },
+  bug: { icon: '🐛', color: '#ff1744' },
+  example: { icon: '📋', color: '#7c4dff' },
+  quote: { icon: '💬', color: '#9e9e9e' },
+  cite: { icon: '📖', color: '#9e9e9e' },
+  abstract: { icon: '📄', color: '#9e9e9e' },
+  summary: { icon: '📊', color: '#9e9e9e' },
+  tldr: { icon: '⚡', color: '#9e9e9e' },
+}
+
+/**
+ * Transform <blockquote> elements that start with [!TYPE] into styled callout divs.
+ */
+function renderCallouts(html: string): string {
+  return html.replace(
+    /<blockquote>([\s\S]*?)<\/blockquote>/g,
+    (match: string, content: string) => {
+      const calloutMatch = content.match(
+        /^\s*<p>\[!(NOTE|INFO|TODO|TIP|SUCCESS|CHECK|DONE|QUESTION|WARNING|CAUTION|ATTENTION|FAILURE|FAIL|MISSING|ERROR|DANGER|BUG|EXAMPLE|QUOTE|CITE|ABSTRACT|SUMMARY|TLDR)\](.*?)<\/p>([\s\S]*)$/i,
+      )
+      if (!calloutMatch) return match // Regular blockquote — leave as-is
+
+      const [, type, titlePart, rest] = calloutMatch
+      const typeLower = type!.toLowerCase()
+      const config = CALLOUT_CONFIG[typeLower] ?? CALLOUT_CONFIG['note']!
+
+      // Extract title: strip leading <br> and whitespace, decode HTML entities
+      const rawTitle = titlePart!
+        .replace(/^<br>\s*/, '')
+        .trim()
+      const title = rawTitle
+        ? rawTitle.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
+        : ''
+
+      const titleHtml = title
+        ? `<span class="callout-title-text">${escapeHtml(title)}</span>`
+        : `<span class="callout-title-text callout-title-placeholder">${type}</span>`
+
+      return `<div class="callout callout-${typeLower}" style="--callout-color: ${config.color}">
+        <div class="callout-header">
+          <span class="callout-icon">${config.icon}</span>
+          ${titleHtml}
+        </div>
+        <div class="callout-body">${rest}</div>
+      </div>`
+    },
+  )
+}
+
 /**
  * Render LaTeX math placeholders in HTML with KaTeX.
  */
@@ -215,7 +285,8 @@ export function useMarkdown() {
       const { processed, mathBlocks } = protectMath(markdown)
       const html = await markedInstance.parse(processed)
       let result = typeof html === 'string' ? html : ''
-      result = renderMathInHtml(result, mathBlocks)
+      result = renderCallouts(result)            // Step 1: transform [!TYPE] blockquotes → callout divs
+      result = renderMathInHtml(result, mathBlocks) // Step 2: render LaTeX
       renderedHtml.value = result
       toc.value = extractToc(renderedHtml.value)
     } catch {

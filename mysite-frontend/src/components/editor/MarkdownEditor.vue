@@ -4,7 +4,7 @@ import { useDebounceFn } from '@vueuse/core'
 import { useMarkdown } from '@/composables/useMarkdown'
 import { uploadImage, uploadImageByUrl, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useToast } from '@/composables/useToast'
-import { Image as ImageIcon, HelpCircle, X, Bold, Italic, Link, Code, List, Quote, Heading, LinkIcon, Loader2, Sigma } from 'lucide-vue-next'
+import { Image as ImageIcon, HelpCircle, X, Bold, Italic, Link, Code, List, Quote, Heading, LinkIcon, Loader2, Sigma, Lightbulb } from 'lucide-vue-next'
 
 interface HistoryEntry {
   content: string
@@ -71,6 +71,87 @@ const showUrlDialog = ref(false)
 const imageUrl = ref('')
 const urlUploading = ref(false)
 
+// ── Callout state ──
+const showCalloutDialog = ref(false)
+const calloutSearchQuery = ref('')
+
+interface CalloutType {
+  type: string
+  label: string
+  icon: string
+}
+
+interface CalloutGroup {
+  label: string
+  color: string
+  types: CalloutType[]
+}
+
+const calloutGroups: CalloutGroup[] = [
+  {
+    label: '信息',
+    color: '#448aff',
+    types: [
+      { type: 'NOTE', label: '备注', icon: '📝' },
+      { type: 'INFO', label: '信息', icon: 'ℹ️' },
+      { type: 'TODO', label: '待办', icon: '☑️' },
+    ],
+  },
+  {
+    label: '成功/提示',
+    color: '#00c853',
+    types: [
+      { type: 'TIP', label: '提示', icon: '💡' },
+      { type: 'SUCCESS', label: '成功', icon: '✅' },
+      { type: 'CHECK', label: '检查', icon: '✔️' },
+      { type: 'DONE', label: '完成', icon: '🏁' },
+    ],
+  },
+  {
+    label: '警告/注意',
+    color: '#ff9100',
+    types: [
+      { type: 'WARNING', label: '警告', icon: '⚠️' },
+      { type: 'CAUTION', label: '注意', icon: '⚠️' },
+      { type: 'QUESTION', label: '问题', icon: '❓' },
+      { type: 'ATTENTION', label: '关注', icon: '👀' },
+    ],
+  },
+  {
+    label: '错误/危险',
+    color: '#ff1744',
+    types: [
+      { type: 'ERROR', label: '错误', icon: '❌' },
+      { type: 'DANGER', label: '危险', icon: '⚡' },
+      { type: 'FAILURE', label: '失败', icon: '🚫' },
+      { type: 'BUG', label: '缺陷', icon: '🐛' },
+    ],
+  },
+  {
+    label: '示例/引用',
+    color: '#7c4dff',
+    types: [
+      { type: 'EXAMPLE', label: '示例', icon: '📋' },
+      { type: 'QUOTE', label: '引用', icon: '💬' },
+      { type: 'ABSTRACT', label: '摘要', icon: '📄' },
+      { type: 'SUMMARY', label: '总结', icon: '📊' },
+    ],
+  },
+]
+
+const filteredCalloutGroups = computed(() => {
+  if (!calloutSearchQuery.value.trim()) return calloutGroups
+  const q = calloutSearchQuery.value.trim().toLowerCase()
+  return calloutGroups
+    .map(g => ({
+      ...g,
+      types: g.types.filter(t => t.type.toLowerCase().includes(q) || t.label.includes(q)),
+    }))
+    .filter(g => g.types.length > 0)
+})
+
+const allCalloutTypes = computed(() => calloutGroups.flatMap(g => g.types))
+
 const uploadingFiles = ref<Map<string, { name: string; progress: number }>>(new Map())
 
 const isRestoring = ref(false)
@@ -124,6 +205,7 @@ const shortcuts = computed(() => [
   { key: `${modKey.value}+Shift+L`, description: '无序列表', syntax: '- 列表项' },
   { key: `${modKey.value}+Shift+O`, description: '有序列表', syntax: '1. 列表项' },
   { key: `${modKey.value}+Shift+Q`, description: '引用', syntax: '> 引用内容' },
+  { key: `${modKey.value}+Shift+.`, description: '插入标注', syntax: '> [!NOTE] 标题' },
   { key: `${modKey.value}+Shift+I`, description: '插入图片', syntax: '![描述](图片URL)' },
   { key: 'Tab', description: '插入缩进', syntax: '    ' },
   { key: 'Shift+Tab', description: '删除缩进', syntax: '删除行首缩进' },
@@ -388,6 +470,12 @@ function handleKeyDown(e: KeyboardEvent) {
           insertQuote()
         }
         break
+      case '.':
+        if (e.shiftKey) {
+          e.preventDefault()
+          showCalloutDialog.value = true
+        }
+        break
     }
   }
 
@@ -477,14 +565,27 @@ function handleInput(e: Event) {
   const lastNewLine = value.lastIndexOf('\n', cursorPos - 1)
   const currentLine = value.substring(lastNewLine + 1, cursorPos)
 
-  if (currentLine.match(/^#{1,6}$/)) {
+  // Callout autocomplete: trigger when typing "> [" or "> [!PARTIAL"
+  const calloutMatch = currentLine.match(/^> \[!(\w*)$/i)
+  if (calloutMatch) {
+    const partial = (calloutMatch[1] ?? '').toLowerCase()
+    const items = allCalloutTypes.value
+      .filter(ct => ct.type.toLowerCase().startsWith(partial))
+      .slice(0, 8)
+      .map(ct => `> [!${ct.type}] ${ct.icon} ${ct.label}`)
+    if (items.length > 0) {
+      showAutocompletePanel(items)
+    } else {
+      showAutocomplete.value = false
+    }
+  } else if (currentLine.match(/^#{1,6}$/)) {
     showAutocompletePanel(['# 一级标题', '## 二级标题', '### 三级标题', '#### 四级标题', '##### 五级标题', '###### 六级标题'])
   } else if (currentLine.match(/^[-*+]$/)) {
     showAutocompletePanel(['- 列表项', '* 列表项', '+ 列表项'])
   } else if (currentLine.match(/^\d+\.$/)) {
     showAutocompletePanel(['1. 有序列表'])
   } else if (currentLine.match(/^>$/)) {
-    showAutocompletePanel(['> 引用内容'])
+    showAutocompletePanel(['> 引用内容', ...allCalloutTypes.value.slice(0, 4).map(ct => `> [!${ct.type}] ${ct.icon} ${ct.label}`)])
   } else if (currentLine.match(/^`{1,2}$/)) {
     showAutocompletePanel(['`行内代码`', '```lang 代码块 ```'])
   } else if (currentLine.match(/^\[.*\]$/)) {
@@ -764,6 +865,61 @@ function insertMath() {
   }
 }
 
+function insertCallout(type: string) {
+  if (!textareaRef.value) return
+  pushUndoNow()
+
+  const start = textareaRef.value.selectionStart
+  const end = textareaRef.value.selectionEnd
+  const value = textareaRef.value.value
+  const selectedText = value.substring(start, end)
+  const beforeCursor = value.substring(0, start)
+  const afterCursor = value.substring(end)
+
+  const needsLeadingNewline = beforeCursor.length > 0 && !beforeCursor.endsWith('\n')
+  const leadingNewline = needsLeadingNewline ? '\n' : ''
+
+  if (selectedText.trim()) {
+    // Wrap selected lines as callout content — each non-empty line gets "> " prefix
+    const lines = selectedText.split('\n')
+    const wrappedLines = lines.map(line => {
+      // Preserve empty lines (but they still need the ">" marker for callout continuation)
+      if (line.length === 0) return '>'
+      // If already starts with "> ", just keep it as-is
+      if (line.startsWith('> ')) return line
+      if (line === '>') return line
+      return '> ' + line
+    }).join('\n')
+
+    const calloutText = `${leadingNewline}> [!${type}]\n${wrappedLines}\n`
+    content.value = beforeCursor + calloutText + afterCursor
+
+    nextTick(() => {
+      if (!textareaRef.value) return
+      // Position cursor after "[!TYPE]" — ready to type a title
+      const cursorPos = start + leadingNewline.length + 4 + type.length + 1
+      textareaRef.value.setSelectionRange(cursorPos, cursorPos)
+      textareaRef.value.focus()
+    })
+  } else {
+    // Insert empty callout template
+    const titlePlaceholder = '标题'
+    const template = `${leadingNewline}> [!${type}] ${titlePlaceholder}\n> 内容\n`
+    content.value = beforeCursor + template + afterCursor
+
+    nextTick(() => {
+      if (!textareaRef.value) return
+      // Select the title placeholder so user can immediately type a title
+      const titleStart = start + leadingNewline.length + 4 + type.length + 2
+      textareaRef.value.setSelectionRange(titleStart, titleStart + titlePlaceholder.length)
+      textareaRef.value.focus()
+    })
+  }
+
+  showCalloutDialog.value = false
+  calloutSearchQuery.value = ''
+}
+
 function handleImageUpload() {
   const input = document.createElement('input')
   input.type = 'file'
@@ -910,6 +1066,14 @@ async function handleUrlUpload() {
       >
         <Sigma :size="15" />
       </button>
+      <div class="w-px h-4 bg-border mx-0.5 flex-shrink-0" />
+      <button
+        @click="showCalloutDialog = true"
+        class="toolbar-btn"
+        :title="`插入标注 (${modKey}+Shift+.)`"
+      >
+        <Lightbulb :size="15" />
+      </button>
       <div class="flex-1 min-w-4" />
       <div v-if="isUploading" class="flex items-center gap-1.5 text-xs text-accent flex-shrink-0">
         <Loader2 :size="12" class="animate-spin" />
@@ -1032,6 +1196,72 @@ async function handleUrlUpload() {
               <Loader2 v-if="urlUploading" :size="14" class="animate-spin" />
               插入
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Callout type picker dialog -->
+    <div
+      v-if="showCalloutDialog"
+      class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      @click="showCalloutDialog = false; calloutSearchQuery = ''"
+    >
+      <div
+        class="glass glass-lg rounded-lg w-full max-w-lg mx-4 max-h-[80vh] flex flex-col"
+        @click.stop
+      >
+        <div class="flex items-center justify-between p-4 border-b border-border">
+          <h3 class="text-lg font-semibold">插入标注</h3>
+          <button
+            @click="showCalloutDialog = false; calloutSearchQuery = ''"
+            class="p-1 rounded hover:bg-bg-code transition-colors"
+          >
+            <X :size="18" />
+          </button>
+        </div>
+        <div class="p-3 border-b border-border">
+          <input
+            v-model="calloutSearchQuery"
+            type="text"
+            placeholder="搜索标注类型..."
+            class="input-base text-sm"
+            @keydown.escape="showCalloutDialog = false; calloutSearchQuery = ''"
+          />
+        </div>
+        <div class="p-4 overflow-y-auto flex-1">
+          <div
+            v-for="group in filteredCalloutGroups"
+            :key="group.label"
+            class="mb-4 last:mb-0"
+          >
+            <div class="flex items-center gap-2 mb-2">
+              <span
+                class="w-3 h-3 rounded-full flex-shrink-0"
+                :style="{ backgroundColor: group.color }"
+              />
+              <span class="text-xs font-medium text-text-muted uppercase tracking-wide">
+                {{ group.label }}
+              </span>
+            </div>
+            <div class="grid grid-cols-4 gap-2">
+              <button
+                v-for="ct in group.types"
+                :key="ct.type"
+                @click="insertCallout(ct.type)"
+                class="flex flex-col items-center gap-1 p-2.5 rounded-lg border border-border hover:border-accent hover:bg-accent-subtle transition-all duration-150 text-center"
+                :title="`${ct.label} — > [!${ct.type}]`"
+              >
+                <span class="text-lg">{{ ct.icon }}</span>
+                <span class="text-xs font-medium text-text-secondary leading-tight">{{ ct.label }}</span>
+              </button>
+            </div>
+          </div>
+          <div
+            v-if="filteredCalloutGroups.length === 0"
+            class="text-center py-8 text-text-muted text-sm"
+          >
+            没有匹配的标注类型
           </div>
         </div>
       </div>
