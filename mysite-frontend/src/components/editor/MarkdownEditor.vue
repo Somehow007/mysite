@@ -251,6 +251,15 @@ watch(showPreview, (newVal) => {
   if (newVal) updatePreview()
 })
 
+// After each preview re-render, re-sync the scroll position to match
+// the editor. The re-render replaces DOM via v-html which may reset
+// scrollTop — without this the sync is lost after every debounced update.
+watch(renderedHtml, () => {
+  nextTick(() => {
+    syncPreviewScroll()
+  })
+})
+
 const debouncedUpdatePreview = useDebounceFn(updatePreview, 300)
 
 // ── Debounced push to undo stack (150ms, with flush support) ──
@@ -352,9 +361,12 @@ function updateCursorPosition() {
 // When the user manually scrolls the preview, we pause auto-sync for 2s
 // so they can read freely without the preview jumping around.
 const previewUserScrolling = ref(false)
-let ignoreNextPreviewScroll = false
 let previewScrollTimer: ReturnType<typeof setTimeout> | null = null
 let syncPreviewRafId = 0
+// Timestamp of the last programmatic scrollTop assignment. Used to
+// distinguish our own scrolls from real user scrolls — any scroll
+// event within 50ms is treated as programmatic.
+let lastProgrammaticScrollTime = 0
 
 function syncPreviewScroll() {
   if (syncPreviewRafId) return
@@ -368,14 +380,15 @@ function syncPreviewScroll() {
     if (maxEditorScroll <= 0) return
 
     const ratio = textareaRef.value.scrollTop / maxEditorScroll
-    ignoreNextPreviewScroll = true
+    lastProgrammaticScrollTime = performance.now()
     previewRef.value.scrollTop = ratio * Math.max(maxPreviewScroll, 0)
   })
 }
 
 function handlePreviewScroll() {
-  if (ignoreNextPreviewScroll) {
-    ignoreNextPreviewScroll = false
+  // Ignore scroll events that fire right after our own programmatic
+  // scrollTop assignment — these are not user-initiated.
+  if (performance.now() - lastProgrammaticScrollTime < 50) {
     return
   }
   // User manually scrolled the preview — pause auto-follow
