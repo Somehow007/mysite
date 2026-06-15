@@ -24,10 +24,20 @@ const siteStore = useSiteStore()
         >
           苏ICP备2026038560号-1
         </a>
-        <span class="inline-flex items-center gap-1 opacity-50">
-          <span>|</span>
-          <span>公安备案号申请中，预留位置</span>
-        </span>
+        <span class="text-text-muted">|</span>
+        <a
+          href="https://beian.mps.gov.cn/#/query/webSearch?code=32110202000819"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1 hover:text-accent transition-colors"
+        >
+          <img
+            src="/beian-icon.png"
+            alt="公安备案图标"
+            class="w-[18px] h-[20px] inline-block align-middle"
+          />
+          苏公网安备32110202000819号
+        </a>
       </div>
     </div>
   </footer>
