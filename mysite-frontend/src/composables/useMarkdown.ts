@@ -183,7 +183,7 @@ function renderCallouts(html: string): string {
       if (bodyFromFirstP.trim()) {
         bodyParts.push(`<p>${bodyFromFirstP.trim()}</p>`)
       }
-      if (rest.trim()) {
+      if (rest && rest.trim()) {
         bodyParts.push(rest.trim())
       }
       const bodyHtml = bodyParts.join('\n')
