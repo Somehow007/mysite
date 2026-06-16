@@ -187,35 +187,46 @@ function decorateInline(
   lineFrom: number,
   builder: RangeSetBuilder<Decoration>,
 ): void {
-  // Bold: **text** — hide opening/closing **, bold the content
+  // Collect all inline decorations for this line, then sort by `from` before
+  // adding to the RangeSetBuilder (which requires strictly ascending `from`).
+  type InlineDeco = { from: number; to: number; deco: Decoration }
+  const decos: InlineDeco[] = []
+
+  // Bold: **text**
   for (const m of lineText.matchAll(/\*\*(.+?)\*\*/g)) {
     const start = lineFrom + m.index!
     const end = start + m[0].length
-    builder.add(start, start + 2, Decoration.replace({}))
-    builder.add(end - 2, end, Decoration.replace({}))
-    builder.add(start + 2, end - 2, Decoration.mark({ attributes: { style: 'font-weight:700' } }))
+    decos.push({ from: start, to: start + 2, deco: Decoration.replace({}) })
+    decos.push({ from: start + 2, to: end - 2, deco: Decoration.mark({ attributes: { style: 'font-weight:700' } }) })
+    decos.push({ from: end - 2, to: end, deco: Decoration.replace({}) })
   }
 
   // Italic: *text* (not ** — lookbehind ensures single *)
   for (const m of lineText.matchAll(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g)) {
     const start = lineFrom + m.index!
     const end = start + m[0].length
-    builder.add(start, start + 1, Decoration.replace({}))
-    builder.add(end - 1, end, Decoration.replace({}))
-    builder.add(start + 1, end - 1, Decoration.mark({ attributes: { style: 'font-style:italic' } }))
+    decos.push({ from: start, to: start + 1, deco: Decoration.replace({}) })
+    decos.push({ from: start + 1, to: end - 1, deco: Decoration.mark({ attributes: { style: 'font-style:italic' } }) })
+    decos.push({ from: end - 1, to: end, deco: Decoration.replace({}) })
   }
 
   // Inline code: `code`
   for (const m of lineText.matchAll(/`([^`]+)`/g)) {
     const start = lineFrom + m.index!
     const end = start + m[0].length
-    builder.add(start, start + 1, Decoration.replace({}))
-    builder.add(end - 1, end, Decoration.replace({}))
-    builder.add(start + 1, end - 1, Decoration.mark({
+    decos.push({ from: start, to: start + 1, deco: Decoration.replace({}) })
+    decos.push({ from: start + 1, to: end - 1, deco: Decoration.mark({
       attributes: {
         style: 'background:var(--bg-code);font-family:ui-monospace,monospace;font-size:0.875em;padding:0.1em 0.3em;border-radius:3px',
       },
-    }))
+    }) })
+    decos.push({ from: end - 1, to: end, deco: Decoration.replace({}) })
+  }
+
+  // Sort by `from` ascending, then add to builder
+  decos.sort((a, b) => a.from - b.from)
+  for (const d of decos) {
+    builder.add(d.from, d.to, d.deco)
   }
 }
 
@@ -327,11 +338,7 @@ function* iterLines(doc: Text): Generator<{ from: number; text: string }> {
   while (pos < len) {
     const line = doc.lineAt(pos)
     yield { from: line.from, text: line.text }
-    // Advance past line.to (exclusive end of content).
-    // If a newline follows, skip it too.
-    pos = line.to + 1
-    if (pos < len && doc.sliceString(pos, pos + 1) === '\n') {
-      pos++
-    }
+    // line.length does NOT include the newline, so +1 skips past it
+    pos = line.from + line.length + 1
   }
 }
