@@ -353,53 +353,49 @@ function updateCursorPosition() {
   const lines = text.split('\n')
   cursorLine.value = lines.length
   cursorCol.value = (lines[lines.length - 1] ?? '').length + 1
-  // Auto-scroll preview to follow the editing position
+  // Re-engage preview follow and sync to editing position
+  previewFollowsEditor.value = true
   syncPreviewScroll()
 }
 
 // ── Preview scroll sync ──
-// When the user manually scrolls the preview, we pause auto-sync for 2s
-// so they can read freely without the preview jumping around.
-const previewUserScrolling = ref(false)
-let previewScrollTimer: ReturnType<typeof setTimeout> | null = null
+// The preview normally follows the editor scroll position proportionally.
+// When the user manually scrolls the preview, we break the link so the
+// preview can scroll independently. Scrolling or clicking the editor
+// re-engages the link.
+const previewFollowsEditor = ref(true)
+let programmaticScroll = false
 let syncPreviewRafId = 0
-// Timestamp of the last programmatic scrollTop assignment. Used to
-// distinguish our own scrolls from real user scrolls — any scroll
-// event within 50ms is treated as programmatic.
-let lastProgrammaticScrollTime = 0
 
 function syncPreviewScroll() {
   if (syncPreviewRafId) return
   syncPreviewRafId = requestAnimationFrame(() => {
     syncPreviewRafId = 0
+    if (!previewFollowsEditor.value) return
     if (!textareaRef.value || !showPreview.value || !previewRef.value) return
-    if (previewUserScrolling.value) return
 
     const maxEditorScroll = textareaRef.value.scrollHeight - textareaRef.value.clientHeight
     const maxPreviewScroll = previewRef.value.scrollHeight - previewRef.value.clientHeight
     if (maxEditorScroll <= 0) return
 
     const ratio = textareaRef.value.scrollTop / maxEditorScroll
-    lastProgrammaticScrollTime = performance.now()
+    programmaticScroll = true
     previewRef.value.scrollTop = ratio * Math.max(maxPreviewScroll, 0)
   })
 }
 
 function handlePreviewScroll() {
-  // Ignore scroll events that fire right after our own programmatic
-  // scrollTop assignment — these are not user-initiated.
-  if (performance.now() - lastProgrammaticScrollTime < 50) {
+  // Ignore scroll events triggered by our own programmatic scrollTop
+  if (programmaticScroll) {
+    programmaticScroll = false
     return
   }
-  // User manually scrolled the preview — pause auto-follow
-  previewUserScrolling.value = true
-  if (previewScrollTimer) clearTimeout(previewScrollTimer)
-  previewScrollTimer = setTimeout(() => {
-    previewUserScrolling.value = false
-  }, 2000)
+  // User manually scrolled the preview — stop following the editor
+  previewFollowsEditor.value = false
 }
 
 function handleEditorScroll() {
+  previewFollowsEditor.value = true
   syncPreviewScroll()
 }
 
@@ -1222,7 +1218,7 @@ async function handleUrlUpload() {
     </div>
 
     <div class="editor-content flex-1 flex min-h-0">
-      <div class="editor-pane flex-1" :class="{ 'border-r border-border': showPreview }">
+      <div class="editor-pane flex-1 min-h-0" :class="{ 'border-r border-border': showPreview }">
         <textarea
           ref="textareaRef"
           v-model="content"
@@ -1238,7 +1234,7 @@ async function handleUrlUpload() {
       <div
         v-if="showPreview"
         ref="previewRef"
-        class="preview-pane flex-1 overflow-auto bg-bg-secondary"
+        class="preview-pane flex-1 min-h-0 overflow-auto bg-bg-secondary"
         @scroll="handlePreviewScroll"
       >
         <div v-if="rendering" class="p-6 animate-pulse space-y-4">
