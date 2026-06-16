@@ -6,11 +6,12 @@ import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X, Plus,
 import { createArticle, updateArticle, getArticleById } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { getTags, createTag } from '@/api/tag'
+import { getCollections, addArticleToCollection, removeArticleFromCollection } from '@/api/collection'
 import { uploadImage, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useUserStore } from '@/stores/user'
 import { useToast } from '@/composables/useToast'
 import MarkdownEditor from '@/components/editor/MarkdownEditor.vue'
-import type { Category, Tag } from '@/types'
+import type { Category, Tag, Collection } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,6 +34,8 @@ const selectedTagIds = ref<string[]>([])
 
 const categories = ref<Category[]>([])
 const tags = ref<Tag[]>([])
+const collections = ref<Collection[]>([])
+const selectedCollectionId = ref<string>('')
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -64,12 +67,14 @@ const hotTags = computed(() =>
 onMounted(async () => {
   loading.value = true
   try {
-    const [catsRes, tagsRes] = await Promise.all([
+    const [catsRes, tagsRes, collectionsRes] = await Promise.all([
       getCategories(),
       getTags(),
+      getCollections({ page: 1, size: 100 }).catch(() => ({ list: [] as Collection[], pagination: { page: 1, size: 100, total: 0, totalPages: 0 } })),
     ])
     categories.value = catsRes
     tags.value = tagsRes
+    collections.value = collectionsRes.list
 
     if (isEdit.value && route.params.id) {
       const article = await getArticleById(route.params.id as string)
@@ -81,7 +86,10 @@ onMounted(async () => {
       if (article.tags) {
         selectedTagIds.value = article.tags.map(t => t.id)
       }
-      if (summary.value || categoryId.value || coverImage.value || selectedTagIds.value.length > 0) {
+      if (article.collectionId) {
+        selectedCollectionId.value = article.collectionId
+      }
+      if (summary.value || categoryId.value || coverImage.value || selectedTagIds.value.length > 0 || selectedCollectionId.value) {
         showMetaPanel.value = true
       }
     }
@@ -133,6 +141,15 @@ async function handleSave(isPublish: boolean) {
         tagIds: selectedTagIds.value.length > 0 ? selectedTagIds.value : undefined,
         published: isPublish ? 1 : 0,
       })
+      // 更新合集关联
+      const articleId = route.params.id as string
+      if (selectedCollectionId.value) {
+        try {
+          await addArticleToCollection(selectedCollectionId.value, articleId)
+        } catch {
+          // 文章可能已在合集中，忽略错误
+        }
+      }
     } else {
       await createArticle({
         title: title.value.trim(),
@@ -451,6 +468,18 @@ function removeCover() {
                 </button>
               </div>
             </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">
+              合集
+            </label>
+            <select v-model="selectedCollectionId" class="input-base">
+              <option value="">未选择合集</option>
+              <option v-for="col in collections" :key="col.id" :value="col.id">
+                {{ col.title }}
+              </option>
+            </select>
           </div>
 
           <div>

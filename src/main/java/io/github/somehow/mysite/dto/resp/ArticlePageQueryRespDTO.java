@@ -25,4 +25,10 @@ public class ArticlePageQueryRespDTO {
     private java.util.Date createTime;
     private java.util.Date updateTime;
     private Boolean isFavorited;
+
+    // 合集相关字段
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long collectionId;
+    private String collectionTitle;
+    private Integer collectionSortOrder;
 }

@@ -22,6 +22,7 @@ import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
 import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.ArticleService;
 import io.github.somehow.mysite.service.CategoryService;
+import io.github.somehow.mysite.service.CollectionService;
 import io.github.somehow.mysite.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,6 +54,8 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     private final TagService tagService;
     private final TagMapper tagMapper;
     private final ArticleTagMapper articleTagMapper;
+    private final CollectionService collectionService;
+    private final CollectionArticleMapper collectionArticleMapper;
 
     @Override
     @Transactional
@@ -248,6 +251,21 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                 tagInfo.setSlug(tag.getSlug());
                 return tagInfo;
             }).collect(Collectors.toList()));
+        }
+
+        // 查询文章所属合集信息
+        CollectionDO collection = collectionService.getCollectionByArticleId(id);
+        if (collection != null) {
+            result.setCollectionId(collection.getId());
+            result.setCollectionTitle(collection.getTitle());
+            // 查询在合集中的排序
+            CollectionArticleDO ca = collectionArticleMapper.selectOne(Wrappers.lambdaQuery(CollectionArticleDO.class)
+                    .eq(CollectionArticleDO::getArticleId, id)
+                    .eq(CollectionArticleDO::getCollectionId, collection.getId())
+                    .eq(CollectionArticleDO::getDelFlag, 0));
+            if (ca != null) {
+                result.setCollectionSortOrder(ca.getSortOrder());
+            }
         }
 
         return result;

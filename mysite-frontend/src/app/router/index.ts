@@ -50,6 +50,11 @@ const router = createRouter({
           component: () => import('@/views/SearchView.vue'),
         },
         {
+          path: 'collection/:id',
+          name: 'collection',
+          component: () => import('@/views/CollectionView.vue'),
+        },
+        {
           path: 'favorites',
           name: 'favorites',
           component: () => import('@/views/FavoritesView.vue'),
@@ -117,6 +122,16 @@ const router = createRouter({
           name: 'comments',
           component: () => import('@/views/CommentManageView.vue'),
           meta: { requiresDeveloper: true },
+        },
+        {
+          path: 'collections',
+          name: 'collections',
+          component: () => import('@/views/CollectionManageView.vue'),
+        },
+        {
+          path: 'collections/:id/edit',
+          name: 'collection-edit',
+          component: () => import('@/views/CollectionEditView.vue'),
         },
         {
           path: 'settings',

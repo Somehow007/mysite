@@ -8,6 +8,8 @@ import io.github.somehow.mysite.dao.entity.UserDO;
 import io.github.somehow.mysite.dao.mapper.ArticleMapper;
 import io.github.somehow.mysite.dao.mapper.ArticleTagMapper;
 import io.github.somehow.mysite.dao.mapper.CategoryMapper;
+import io.github.somehow.mysite.dao.mapper.CollectionArticleMapper;
+import io.github.somehow.mysite.dao.mapper.CollectionMapper;
 import io.github.somehow.mysite.dao.mapper.TagMapper;
 import io.github.somehow.mysite.dao.mapper.UserFavoriteArticleMapper;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
@@ -51,6 +53,12 @@ class DatabaseArticleSearchServiceImplTest {
 
     @Mock
     private UserFavoriteArticleMapper userFavoriteArticleMapper;
+
+    @Mock
+    private CollectionMapper collectionMapper;
+
+    @Mock
+    private CollectionArticleMapper collectionArticleMapper;
 
     @Mock
     private ElasticsearchProperties elasticsearchProperties;

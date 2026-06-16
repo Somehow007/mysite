@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.somehow.mysite.dao.mapper.CollectionMapper">
+    <select id="selectByAuthorId" resultType="io.github.somehow.mysite.dao.entity.CollectionDO">
+        SELECT * FROM t_collection
+        WHERE author_id = #{authorId} AND del_flag = 0
+        ORDER BY sort_order ASC, create_time DESC
+    </select>
+</mapper>

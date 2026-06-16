@@ -57,6 +57,9 @@ export interface Article {
   isFavorited?: boolean
   tags: Tag[] | null
   updateTime: string
+  collectionId?: string | null
+  collectionTitle?: string | null
+  collectionSortOrder?: number | null
 }
 
 export interface ArticleListItem {
@@ -75,6 +78,9 @@ export interface ArticleListItem {
   isFavorited?: boolean
   createTime: string
   updateTime: string
+  collectionId?: string | null
+  collectionTitle?: string | null
+  collectionSortOrder?: number | null
 }
 
 export interface Pagination {
@@ -203,4 +209,61 @@ export interface CommentAdmin {
 export interface CommentLikeResult {
   liked: boolean
   likeCount: number
+}
+
+// ========== 合集相关类型 ==========
+
+export interface Collection {
+  id: string
+  title: string
+  description: string | null
+  coverImage: string | null
+  authorId: string
+  authorName: string
+  articleCount: number
+  sortOrder: number
+  createTime: string
+  updateTime: string
+}
+
+export interface CollectionDetail extends Collection {
+  articles: CollectionArticleItem[]
+}
+
+export interface CollectionArticleItem {
+  id: string
+  title: string
+  summary: string | null
+  coverImage: string | null
+  authorName: string
+  authorId: string
+  viewCount: number
+  favoriteCount: number
+  readingTime: number | null
+  sortOrder: number
+  createTime: string
+}
+
+export interface ArticleNavInfo {
+  prev: { id: string; title: string } | null
+  next: { id: string; title: string } | null
+  inCollection: boolean
+  collectionId: string | null
+  collectionTitle: string | null
+}
+
+export interface CollectionListItem extends Collection {}
+
+export interface CreateCollectionRequest {
+  title: string
+  description?: string
+  coverImage?: string
+  sortOrder?: number
+}
+
+export interface UpdateCollectionRequest {
+  title?: string
+  description?: string
+  coverImage?: string
+  sortOrder?: number
 }

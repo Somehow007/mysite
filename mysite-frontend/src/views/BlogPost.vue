@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
 import { ArrowLeft, Calendar, Eye, Clock, Tag } from 'lucide-vue-next'
 import { getArticleById } from '@/api/article'
+import { getArticleNavigation } from '@/api/collection'
 import { formatDate, calculateReadingTime } from '@/utils/date'
 import { useScrollProgress } from '@/composables/useScrollProgress'
 import { useFavorite } from '@/composables/useFavorite'
@@ -12,7 +13,8 @@ import ArticleContent from '@/components/article/ArticleContent.vue'
 import ArticleToc from '@/components/article/ArticleToc.vue'
 import FavoriteButton from '@/components/article/FavoriteButton.vue'
 import CommentSection from '@/components/comment/CommentSection.vue'
-import type { Article } from '@/types'
+import ArticleNav from '@/components/collection/ArticleNav.vue'
+import type { Article, ArticleNavInfo } from '@/types'
 import type { TocItem } from '@/composables/useMarkdown'
 
 const route = useRoute()
@@ -25,6 +27,7 @@ const article = ref<Article | null>(null)
 const loading = ref(false)
 const error = ref(false)
 const tocItems = ref<TocItem[]>([])
+const navInfo = ref<ArticleNavInfo | null>(null)
 
 const readingTime = computed(() =>
   article.value?.readingTime || calculateReadingTime(article.value?.content || article.value?.summary || ''),
@@ -65,6 +68,12 @@ async function fetchArticle(id: string) {
     article.value = await getArticleById(id)
     if (article.value && article.value.isFavorited !== undefined) {
       setFavoriteStatus(id, article.value.isFavorited)
+    }
+    // 获取导航信息
+    try {
+      navInfo.value = await getArticleNavigation(id)
+    } catch {
+      navInfo.value = null
     }
   } catch {
     error.value = true
@@ -197,6 +206,8 @@ onMounted(() => {
               @login-required="handleLoginRequired"
             />
           </div>
+
+          <ArticleNav v-if="navInfo" :nav-info="navInfo" />
 
           <CommentSection
             v-if="siteStore.site.commentEnabled !== false"

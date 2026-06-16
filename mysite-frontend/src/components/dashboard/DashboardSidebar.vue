@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { FileText, PenSquare, FolderTree, Users, Settings, LogOut, ChevronLeft, ChevronRight, Image as ImageIcon, Tags, MessageSquare } from 'lucide-vue-next'
+import { FileText, PenSquare, FolderTree, Users, Settings, LogOut, ChevronLeft, ChevronRight, Image as ImageIcon, Tags, MessageSquare, BookOpen } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { usePermission } from '@/composables/usePermission'
 
@@ -14,6 +14,7 @@ const isCollapsed = ref(false)
 const allNavItems = [
   { label: '文章管理', path: '/dashboard', icon: FileText, requireDeveloper: false },
   { label: '写文章', path: '/dashboard/posts/new', icon: PenSquare, requireDeveloper: false },
+  { label: '合集管理', path: '/dashboard/collections', icon: BookOpen, requireDeveloper: false },
   { label: '分类管理', path: '/dashboard/categories', icon: FolderTree, requireDeveloper: true },
   { label: '标签管理', path: '/dashboard/tags', icon: Tags, requireDeveloper: true },
   { label: '图片管理', path: '/dashboard/images', icon: ImageIcon, requireDeveloper: true },

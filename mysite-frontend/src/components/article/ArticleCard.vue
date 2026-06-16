@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { BookOpen } from 'lucide-vue-next'
 import ArticleMeta from './ArticleMeta.vue'
 import FavoriteButton from './FavoriteButton.vue'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
@@ -46,6 +47,16 @@ function handleLoginRequired() {
         <h2 class="text-xl font-semibold text-text-primary group-hover:text-accent transition-colors duration-200 mb-2 leading-snug">
           {{ article.title }}
         </h2>
+
+        <RouterLink
+          v-if="article.collectionTitle"
+          :to="`/collection/${article.collectionId}`"
+          class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-accent-subtle text-accent mb-2 hover:bg-accent hover:text-text-inverse transition-all duration-200"
+          @click.stop
+        >
+          <BookOpen :size="10" />
+          {{ article.collectionTitle }}
+        </RouterLink>
 
         <p
           v-if="article.summary"
