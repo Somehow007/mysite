@@ -10,7 +10,7 @@ import {
 
 // ── CodeMirror 6 ──
 import { EditorView, keymap, lineNumbers, drawSelection, dropCursor, highlightActiveLine, highlightSpecialChars } from '@codemirror/view'
-import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
+import { history, historyKeymap, defaultKeymap, indentWithTab, redo, undo } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from '@codemirror/language'
 
@@ -448,53 +448,62 @@ const customKeymap = keymap.of([
   {
     key: 'Mod-b',
     run: () => { insertMarkdown('**', '**', '粗体文本'); return true },
+    preventDefault: true,
   },
   {
     key: 'Mod-i',
-    run: () => {
-      insertMarkdown('*', '*', '斜体文本')
-      return true
-    },
+    run: () => { insertMarkdown('*', '*', '斜体文本'); return true },
+    preventDefault: true,
   },
   {
     key: 'Mod-u',
     run: () => { insertMarkdown('<u>', '</u>', '下划线文本'); return true },
+    preventDefault: true,
   },
   {
     key: 'Mod-k',
     run: () => { insertLink(); return true },
+    preventDefault: true,
   },
   {
     key: 'Mod-Shift-k',
     run: () => { insertCodeBlock(); return true },
+    preventDefault: true,
   },
   {
     key: 'Mod-`',
     run: () => { insertMarkdown('`', '`', '代码'); return true },
+    preventDefault: true,
   },
   {
     key: 'Mod-Shift-h',
     run: () => { insertHeading(); return true },
+    preventDefault: true,
   },
   {
     key: 'Mod-Shift-l',
     run: () => { insertList('-'); return true },
+    preventDefault: true,
   },
   {
     key: 'Mod-Shift-o',
     run: () => { insertList('1.'); return true },
+    preventDefault: true,
   },
   {
     key: 'Mod-Shift-q',
     run: () => { insertQuote(); return true },
+    preventDefault: true,
   },
   {
     key: 'Mod-Shift-.',
     run: () => { showCalloutDialog.value = true; return true },
+    preventDefault: true,
   },
   {
     key: 'Mod-Shift-i',
     run: () => { handleImageUpload(); return true },
+    preventDefault: true,
   },
 ])
 
@@ -529,8 +538,16 @@ onMounted(() => {
       indentOnInput(),
       bracketMatching(),
 
-      // ── Keymaps ──
+      // ── Keymaps (order matters: later = higher priority) ──
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+
+      // ── Explicit undo/redo with preventDefault to override browser shortcuts ──
+      keymap.of([
+        { key: 'Mod-z', run: undo, preventDefault: true },
+        { key: 'Mod-Shift-z', run: redo, preventDefault: true },
+        { key: 'Mod-y', run: redo, preventDefault: true },
+      ]),
+
       customKeymap,
       enterContinuationKeymap,
       autoConvertKeymap,
