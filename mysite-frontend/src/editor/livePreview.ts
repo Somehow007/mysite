@@ -122,6 +122,13 @@ class KaTeXDisplayWidget extends WidgetType {
   toDOM() { const d = document.createElement('div'); d.className = 'cm-lp-katex-display'; d.style.cssText = 'text-align:center;padding:0.5em 0;overflow-x:auto;overflow-y:visible;margin:1.5em 0 2.2em'; try { katex.render(this.latex, d, { throwOnError: false, displayMode: true, strict: false }) } catch { d.textContent = `$$${this.latex}$$` }; return d }
 }
 
+/** Zero-height block widget for hidden lines (e.g. $$ fences). Allows cursor to land on the line. */
+class HiddenLineWidget extends WidgetType {
+  toDOM() { const d = document.createElement('div'); d.style.cssText = 'height:0;overflow:hidden'; return d }
+  get estimatedHeight() { return 0 }
+  ignoreEvent() { return true }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Inline decoration cache — keyed by line text
 // ═══════════════════════════════════════════════════════════════
@@ -265,21 +272,21 @@ function codeBlockDecos(text: string, from: number, block: CodeBlock, ln: number
   if (isLast) lineParts.push('border-bottom:1px solid var(--code-border)', 'border-bottom-left-radius:8px', 'border-bottom-right-radius:8px', 'padding-bottom:1.25rem')
   result.push({ from, to: from, deco: Decoration.line({ attributes: { style: lineParts.join(';') } }) })
 
-  // Replace fence markers with label / hidden
+  // Replace fence markers with label / hidden (block: true allows cursor to land on the line)
   if (isFirst) {
-    result.push({ from, to: from + text.length, deco: Decoration.replace({ widget: new CodeFenceLabelWidget(block.lang) }) })
+    result.push({ from, to: from + text.length, deco: Decoration.replace({ widget: new CodeFenceLabelWidget(block.lang), block: true }) })
   } else if (isLast) {
-    result.push({ from, to: from + text.length, deco: Decoration.replace({ widget: new CodeFenceLabelWidget('') }) })
+    result.push({ from, to: from + text.length, deco: Decoration.replace({ widget: new CodeFenceLabelWidget(''), block: true }) })
   }
 
   return result
 }
 
 function mathBlockDecos(text: string, from: number, block: MathBlock, ln: number): PendingDeco[] {
-  if (block.startLine === block.endLine) return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new KaTeXDisplayWidget(block.content) }) }]
-  if (ln === block.startLine || ln === block.endLine) return [{ from, to: from + text.length, deco: Decoration.replace({}) }]
-  if (ln === block.startLine + 1) return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new KaTeXDisplayWidget(block.content) }) }]
-  return [{ from, to: from + text.length, deco: Decoration.replace({}) }]
+  if (block.startLine === block.endLine) return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new KaTeXDisplayWidget(block.content), block: true }) }]
+  if (ln === block.startLine || ln === block.endLine) return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new HiddenLineWidget(), block: true }) }]
+  if (ln === block.startLine + 1) return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new KaTeXDisplayWidget(block.content), block: true }) }]
+  return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new HiddenLineWidget(), block: true }) }]
 }
 
 function calloutDecos(text: string, from: number, block: CalloutBlock, ln: number): PendingDeco[] {
@@ -304,7 +311,7 @@ function calloutDecos(text: string, from: number, block: CalloutBlock, ln: numbe
       const titleText = hm[2] ?? ''
       const bracketEnd = text.indexOf(']')
       const prefixEnd = bracketEnd + 1 + (text[bracketEnd + 1] === ' ' ? 1 : 0)
-      result.push({ from, to: from + prefixEnd, deco: Decoration.replace({ widget: new CalloutHeaderWidget(type, color, icon) }) })
+      result.push({ from, to: from + prefixEnd, deco: Decoration.replace({ widget: new CalloutHeaderWidget(type, color, icon), block: true }) })
       if (titleText.trim()) result.push({ from: from + prefixEnd, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'font-weight:600;font-size:0.9375rem;color:var(--text-primary)' } }) })
     } else {
       const m = text.match(/^>\s?/)
