@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, onUnmounted, nextTick, computed, markRaw } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
 import { useMarkdown } from '@/composables/useMarkdown'
+import { processEnterKey } from '@/utils/markdownContinuation'
 import { uploadImage, uploadImageByUrl, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useToast } from '@/composables/useToast'
 import { Image as ImageIcon, HelpCircle, X, Bold, Italic, Link, Code, List, Quote, Heading, LinkIcon, Loader2, Sigma, Lightbulb } from 'lucide-vue-next'
@@ -505,6 +506,25 @@ function handleKeyDown(e: KeyboardEvent) {
       showAutocomplete.value = false
       return
     }
+  }
+
+  // ── Enter key continuation (Obsidian-style) ──
+  if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !showAutocomplete.value) {
+    if (!textareaRef.value) return
+    const result = processEnterKey(textareaRef.value.value, textareaRef.value.selectionStart)
+    if (result) {
+      e.preventDefault()
+      pushUndoNow()
+      content.value = result.text
+      emit('update:modelValue', result.text)
+      nextTick(() => {
+        if (!textareaRef.value) return
+        textareaRef.value.setSelectionRange(result.cursorPos, result.cursorPos)
+        textareaRef.value.focus()
+        updateCursorPosition()
+      })
+    }
+    // If null, let native Enter pass through
   }
 
   if (e.ctrlKey || e.metaKey) {
