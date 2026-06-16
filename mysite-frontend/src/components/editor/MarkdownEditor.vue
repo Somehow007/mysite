@@ -1,64 +1,24 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, nextTick, computed, markRaw } from 'vue'
-import { useDebounceFn } from '@vueuse/core'
-import { useMarkdown } from '@/composables/useMarkdown'
-import { processEnterKey } from '@/utils/markdownContinuation'
+import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue'
+
 import { uploadImage, uploadImageByUrl, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useToast } from '@/composables/useToast'
-import { Image as ImageIcon, HelpCircle, X, Bold, Italic, Link, Code, List, Quote, Heading, LinkIcon, Loader2, Sigma, Lightbulb } from 'lucide-vue-next'
+import {
+  Image as ImageIcon, HelpCircle, X, Bold, Italic, Link, Code,
+  List, Quote, Heading, LinkIcon, Loader2, Sigma, Lightbulb,
+} from 'lucide-vue-next'
 
-interface HistoryEntry {
-  content: string
-  selectionStart: number
-  selectionEnd: number
-}
+// ── CodeMirror 6 ──
+import { EditorView, keymap, lineNumbers, drawSelection, dropCursor, highlightActiveLine, highlightSpecialChars } from '@codemirror/view'
+import { EditorState } from '@codemirror/state'
+import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
+import { markdown } from '@codemirror/lang-markdown'
+import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from '@codemirror/language'
 
-class UndoManager {
-  private undoStack: HistoryEntry[] = []
-  private redoStack: HistoryEntry[] = []
-  private maxSize = 100
-
-  push(entry: HistoryEntry) {
-    if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1]!.content === entry.content) return
-    this.undoStack.push({ ...entry })
-    this.redoStack = []
-    if (this.undoStack.length > this.maxSize) this.undoStack.shift()
-  }
-
-  undo(current: HistoryEntry): HistoryEntry | null {
-    if (this.undoStack.length <= 1) return null
-
-    // Skip past entries at the top whose content matches the current state.
-    // These are save-points of the current content (pushed by debounced
-    // saves or flushPushUndo); restoring them would produce no visible change.
-    while (
-      this.undoStack.length > 1 &&
-      this.undoStack[this.undoStack.length - 1]!.content === current.content
-    ) {
-      this.undoStack.pop()
-    }
-
-    if (this.undoStack.length === 0) return null
-
-    this.redoStack.push({ ...current })
-    return this.undoStack.pop()!
-  }
-
-  redo(current: HistoryEntry): HistoryEntry | null {
-    if (this.redoStack.length === 0) return null
-    const entry = this.redoStack.pop()!
-    this.undoStack.push({ ...current })
-    return entry
-  }
-
-  canUndo() { return this.undoStack.length > 1 }
-  canRedo() { return this.redoStack.length > 0 }
-
-  reset(entry: HistoryEntry) {
-    this.undoStack = [{ ...entry }]
-    this.redoStack = []
-  }
-}
+// ── Custom editor extensions ──
+import { livePreview } from '@/editor/livePreview'
+import { autoConvertKeymap } from '@/editor/autoConvert'
+import { enterContinuationKeymap } from '@/editor/enterContinuation'
 
 const props = defineProps<{
   modelValue: string
@@ -70,11 +30,10 @@ const emit = defineEmits<{
   'save': []
 }>()
 
-const textareaRef = ref<HTMLTextAreaElement | null>(null)
-const previewRef = ref<HTMLDivElement | null>(null)
+// ── Editor state ──
+const cmContainer = ref<HTMLDivElement | null>(null)
+const editorView = ref<EditorView | null>(null)
 
-const content = ref(props.modelValue)
-const showPreview = ref(true)
 const showShortcuts = ref(false)
 const showAutocomplete = ref(false)
 const autocompleteItems = ref<string[]>([])
@@ -84,10 +43,6 @@ const selectedIndex = ref(0)
 const showUrlDialog = ref(false)
 const imageUrl = ref('')
 const urlUploading = ref(false)
-
-// Guard to prevent undo/redo double-firing when both keydown and
-// beforeinput handlers catch the same Cmd+Z / Cmd+Shift+Z action.
-let undoRedoHandledByKeydown = false
 
 // ── Callout state ──
 const showCalloutDialog = ref(false)
@@ -172,16 +127,12 @@ const allCalloutTypes = computed(() => calloutGroups.flatMap(g => g.types))
 
 const uploadingFiles = ref<Map<string, { name: string; progress: number }>>(new Map())
 
-const isRestoring = ref(false)
 const cursorLine = ref(1)
 const cursorCol = ref(1)
 const wordCount = ref(0)
 const charCount = ref(0)
 const lineCount = ref(0)
 
-const undoManager = markRaw(new UndoManager())
-
-const { renderedHtml, render, rendering } = useMarkdown()
 const toast = useToast()
 
 const isMac = computed(() => {
@@ -208,10 +159,6 @@ const shortcuts = computed(() => [
   { key: `${modKey.value}+Z`, description: '撤销', syntax: '撤销上一步操作' },
   { key: `${modKey.value}+Shift+Z`, description: '重做', syntax: '重做已撤销操作' },
   { key: `${modKey.value}+Y`, description: '重做（备选）', syntax: '重做已撤销操作' },
-  { key: `${modKey.value}+A`, description: '全选', syntax: '选中全部内容' },
-  { key: `${modKey.value}+X`, description: '剪切', syntax: '剪切选中内容' },
-  { key: `${modKey.value}+C`, description: '复制', syntax: '复制选中内容' },
-  { key: `${modKey.value}+V`, description: '粘贴', syntax: '粘贴剪贴板内容' },
   { key: `${modKey.value}+S`, description: '保存', syntax: '保存文章' },
   { key: `${modKey.value}+B`, description: '加粗', syntax: '**文字**' },
   { key: `${modKey.value}+I`, description: '斜体', syntax: '*文字*' },
@@ -229,486 +176,44 @@ const shortcuts = computed(() => [
   { key: 'Shift+Tab', description: '删除缩进', syntax: '删除行首缩进' },
 ])
 
+// ── Sync: external modelValue → CM6 ──
 watch(
   () => props.modelValue,
   (newVal) => {
-    if (newVal !== content.value) {
-      content.value = newVal
-      updateCounts(newVal)
+    const view = editorView.value
+    if (!view) return
+    const current = view.state.doc.toString()
+    if (newVal !== current) {
+      view.dispatch({
+        changes: { from: 0, to: current.length, insert: newVal },
+      })
     }
   },
 )
 
-watch(content, (newVal) => {
-  if (!isRestoring.value) {
-    emit('update:modelValue', newVal)
-    schedulePushUndo()
-  }
-  updateCounts(newVal)
-  debouncedUpdatePreview()
-})
+// ── Cursor/selection tracking ──
+function updateCursorStats(view: EditorView) {
+  const pos = view.state.selection.main.head
+  const doc = view.state.doc
+  const line = doc.lineAt(pos)
+  cursorLine.value = line.number
+  cursorCol.value = pos - line.from + 1
 
-watch(showPreview, (newVal) => {
-  if (newVal) updatePreview()
-})
-
-// After each preview re-render, re-sync the scroll position to match
-// the editor. The re-render replaces DOM via v-html which may reset
-// scrollTop — without this the sync is lost after every debounced update.
-watch(renderedHtml, () => {
-  nextTick(() => {
-    syncPreviewScroll()
-  })
-})
-
-const debouncedUpdatePreview = useDebounceFn(updatePreview, 300)
-
-// ── Debounced push to undo stack (150ms, with flush support) ──
-// Using a short debounce so keystrokes are grouped for undo,
-// but changes are captured quickly. The flush function is called
-// before undo/redo to guarantee the latest state is always saved.
-let pushUndoTimer: ReturnType<typeof setTimeout> | null = null
-
-function schedulePushUndo() {
-  if (pushUndoTimer) clearTimeout(pushUndoTimer)
-  pushUndoTimer = setTimeout(() => {
-    pushUndoTimer = null
-    if (!textareaRef.value || isRestoring.value) return
-    undoManager.push({
-      content: content.value,
-      selectionStart: textareaRef.value.selectionStart,
-      selectionEnd: textareaRef.value.selectionEnd,
-    })
-  }, 150)
-}
-
-function flushPushUndo() {
-  if (pushUndoTimer) {
-    clearTimeout(pushUndoTimer)
-    pushUndoTimer = null
-    if (textareaRef.value && !isRestoring.value) {
-      undoManager.push({
-        content: content.value,
-        selectionStart: textareaRef.value.selectionStart,
-        selectionEnd: textareaRef.value.selectionEnd,
-      })
-    }
-  }
-}
-
-onMounted(() => {
-  if (textareaRef.value) {
-    textareaRef.value.addEventListener('beforeinput', handleBeforeInput)
-    textareaRef.value.addEventListener('keydown', handleKeyDown)
-    textareaRef.value.addEventListener('input', handleInput)
-    textareaRef.value.addEventListener('paste', handlePaste)
-    textareaRef.value.addEventListener('drop', handleDrop)
-    textareaRef.value.addEventListener('dragover', handleDragOver)
-    textareaRef.value.addEventListener('scroll', handleEditorScroll, { passive: true })
-    textareaRef.value.addEventListener('click', updateCursorPosition)
-    textareaRef.value.addEventListener('keyup', updateCursorPosition)
-  }
-  updateCounts(content.value)
-  updateCursorPosition()
-  undoManager.reset({
-    content: content.value,
-    selectionStart: 0,
-    selectionEnd: 0,
-  })
-  updatePreview()
-})
-
-onUnmounted(() => {
-  if (textareaRef.value) {
-    textareaRef.value.removeEventListener('beforeinput', handleBeforeInput)
-    textareaRef.value.removeEventListener('keydown', handleKeyDown)
-    textareaRef.value.removeEventListener('input', handleInput)
-    textareaRef.value.removeEventListener('paste', handlePaste)
-    textareaRef.value.removeEventListener('drop', handleDrop)
-    textareaRef.value.removeEventListener('dragover', handleDragOver)
-    textareaRef.value.removeEventListener('scroll', handleEditorScroll)
-    textareaRef.value.removeEventListener('click', updateCursorPosition)
-    textareaRef.value.removeEventListener('keyup', updateCursorPosition)
-  }
-})
-
-async function updatePreview() {
-  if (showPreview.value && content.value) {
-    await render(content.value)
-  } else if (!content.value) {
-    await render('')
-  }
-}
-
-function updateCounts(text: string) {
+  const text = doc.toString()
   charCount.value = text.length
-  lineCount.value = text.split('\n').length
+  lineCount.value = doc.lines
   const words = text.trim().split(/\s+/).filter(Boolean)
   wordCount.value = words.length
 }
 
-function updateCursorPosition() {
-  if (!textareaRef.value) return
-  const pos = textareaRef.value.selectionStart
-  const text = content.value.substring(0, pos)
-  const lines = text.split('\n')
-  cursorLine.value = lines.length
-  cursorCol.value = (lines[lines.length - 1] ?? '').length + 1
-  // Re-engage preview follow and sync to editing position
-  previewFollowsEditor.value = true
-  syncPreviewScroll()
-}
+// ── Autocomplete detection ──
+function checkAutocomplete(view: EditorView) {
+  const pos = view.state.selection.main.head
+  const line = view.state.doc.lineAt(pos)
+  const textBeforeCursor = view.state.sliceDoc(line.from, pos)
 
-// ── Preview scroll sync ──
-// The preview normally follows the editor scroll position proportionally.
-// When the user manually scrolls the preview, we break the link so the
-// preview can scroll independently. Scrolling or clicking the editor
-// re-engages the link.
-const previewFollowsEditor = ref(true)
-let programmaticScroll = false
-let syncPreviewRafId = 0
-
-function syncPreviewScroll() {
-  if (syncPreviewRafId) return
-  syncPreviewRafId = requestAnimationFrame(() => {
-    syncPreviewRafId = 0
-    if (!previewFollowsEditor.value) return
-    if (!textareaRef.value || !showPreview.value || !previewRef.value) return
-
-    const maxEditorScroll = textareaRef.value.scrollHeight - textareaRef.value.clientHeight
-    const maxPreviewScroll = previewRef.value.scrollHeight - previewRef.value.clientHeight
-    if (maxEditorScroll <= 0) return
-
-    const ratio = textareaRef.value.scrollTop / maxEditorScroll
-    programmaticScroll = true
-    previewRef.value.scrollTop = ratio * Math.max(maxPreviewScroll, 0)
-  })
-}
-
-function handlePreviewScroll() {
-  // Ignore scroll events triggered by our own programmatic scrollTop
-  if (programmaticScroll) {
-    programmaticScroll = false
-    return
-  }
-  // User manually scrolled the preview — stop following the editor
-  previewFollowsEditor.value = false
-}
-
-function handleEditorScroll() {
-  previewFollowsEditor.value = true
-  syncPreviewScroll()
-}
-
-function pushUndoNow() {
-  if (!textareaRef.value || isRestoring.value) return
-  undoManager.push({
-    content: content.value,
-    selectionStart: textareaRef.value.selectionStart,
-    selectionEnd: textareaRef.value.selectionEnd,
-  })
-}
-
-function performUndo() {
-  if (!textareaRef.value) return
-  // Flush any pending debounced state so the undo stack always
-  // has the latest content before we try to undo.
-  flushPushUndo()
-  if (!undoManager.canUndo()) return
-  showAutocomplete.value = false
-  const entry = undoManager.undo({
-    content: content.value,
-    selectionStart: textareaRef.value.selectionStart,
-    selectionEnd: textareaRef.value.selectionEnd,
-  })
-  if (entry) {
-    isRestoring.value = true
-    content.value = entry.content
-    emit('update:modelValue', entry.content)
-    nextTick(() => {
-      if (textareaRef.value) {
-        textareaRef.value.setSelectionRange(entry.selectionStart, entry.selectionEnd)
-        textareaRef.value.focus()
-      }
-      isRestoring.value = false
-      updateCursorPosition()
-    })
-  }
-}
-
-function performRedo() {
-  if (!textareaRef.value) return
-  flushPushUndo()
-  if (!undoManager.canRedo()) return
-  showAutocomplete.value = false
-  const entry = undoManager.redo({
-    content: content.value,
-    selectionStart: textareaRef.value.selectionStart,
-    selectionEnd: textareaRef.value.selectionEnd,
-  })
-  if (entry) {
-    isRestoring.value = true
-    content.value = entry.content
-    emit('update:modelValue', entry.content)
-    nextTick(() => {
-      if (textareaRef.value) {
-        textareaRef.value.setSelectionRange(entry.selectionStart, entry.selectionEnd)
-        textareaRef.value.focus()
-      }
-      isRestoring.value = false
-      updateCursorPosition()
-    })
-  }
-}
-
-// Intercept native undo/redo at the beforeinput level — this catches
-// undo/redo from ALL sources: keyboard shortcuts, Edit menu, touch gestures.
-// More reliable than keydown.preventDefault() alone, especially on macOS.
-// The undoRedoHandledByKeydown guard prevents double-firing when keydown
-// already handled the same Cmd+Z / Cmd+Shift+Z action.
-function handleBeforeInput(e: InputEvent) {
-  if (e.inputType === 'historyUndo') {
-    e.preventDefault()
-    if (!undoRedoHandledByKeydown) {
-      performUndo()
-    }
-    undoRedoHandledByKeydown = false
-    return
-  }
-  if (e.inputType === 'historyRedo') {
-    e.preventDefault()
-    if (!undoRedoHandledByKeydown) {
-      performRedo()
-    }
-    undoRedoHandledByKeydown = false
-    return
-  }
-}
-
-function handleKeyDown(e: KeyboardEvent) {
-  if (showAutocomplete.value) {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault()
-      selectedIndex.value = Math.min(selectedIndex.value + 1, autocompleteItems.value.length - 1)
-      return
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      selectedIndex.value = Math.max(selectedIndex.value - 1, 0)
-      return
-    }
-    if (e.key === 'Enter' || e.key === 'Tab') {
-      e.preventDefault()
-      applyAutocomplete()
-      return
-    }
-    if (e.key === 'Escape') {
-      showAutocomplete.value = false
-      return
-    }
-  }
-
-  // ── Enter key continuation (Obsidian-style) ──
-  if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !showAutocomplete.value) {
-    if (!textareaRef.value) return
-    const result = processEnterKey(textareaRef.value.value, textareaRef.value.selectionStart)
-    if (result) {
-      e.preventDefault()
-      pushUndoNow()
-      content.value = result.text
-      emit('update:modelValue', result.text)
-      nextTick(() => {
-        if (!textareaRef.value) return
-        textareaRef.value.setSelectionRange(result.cursorPos, result.cursorPos)
-        textareaRef.value.focus()
-        updateCursorPosition()
-      })
-    }
-    // If null, let native Enter pass through
-  }
-
-  if (e.ctrlKey || e.metaKey) {
-    // Undo: Ctrl/Cmd+Z  (use e.code for keyboard-layout independence)
-    if (!e.shiftKey && (e.key.toLowerCase() === 'z' || e.code === 'KeyZ')) {
-      e.preventDefault()
-      undoRedoHandledByKeydown = true
-      setTimeout(() => { undoRedoHandledByKeydown = false }, 0)
-      performUndo()
-      return
-    }
-    // Redo: Ctrl/Cmd+Shift+Z (macOS standard) or Ctrl+Y (Windows standard)
-    if (e.key.toLowerCase() === 'y' || e.code === 'KeyY') {
-      e.preventDefault()
-      undoRedoHandledByKeydown = true
-      setTimeout(() => { undoRedoHandledByKeydown = false }, 0)
-      performRedo()
-      return
-    }
-    if (e.shiftKey && (e.key.toLowerCase() === 'z' || e.code === 'KeyZ')) {
-      e.preventDefault()
-      undoRedoHandledByKeydown = true
-      setTimeout(() => { undoRedoHandledByKeydown = false }, 0)
-      performRedo()
-      return
-    }
-    if (e.key.toLowerCase() === 's') {
-      e.preventDefault()
-      emit('save')
-      return
-    }
-
-    switch (e.key.toLowerCase()) {
-      case 'b':
-        e.preventDefault()
-        insertMarkdown('**', '**', '粗体文本')
-        break
-      case 'i':
-        if (e.shiftKey) {
-          e.preventDefault()
-          handleImageUpload()
-        } else {
-          e.preventDefault()
-          insertMarkdown('*', '*', '斜体文本')
-        }
-        break
-      case 'u':
-        e.preventDefault()
-        insertMarkdown('<u>', '</u>', '下划线文本')
-        break
-      case 'k':
-        if (e.shiftKey) {
-          e.preventDefault()
-          insertCodeBlock()
-        } else {
-          e.preventDefault()
-          insertLink()
-        }
-        break
-      case '`':
-        e.preventDefault()
-        insertMarkdown('`', '`', '代码')
-        break
-      case 'h':
-        if (e.shiftKey) {
-          e.preventDefault()
-          insertHeading()
-        }
-        break
-      case 'l':
-        if (e.shiftKey) {
-          e.preventDefault()
-          insertList('-')
-        }
-        break
-      case 'o':
-        if (e.shiftKey) {
-          e.preventDefault()
-          insertList('1.')
-        }
-        break
-      case 'q':
-        if (e.shiftKey) {
-          e.preventDefault()
-          insertQuote()
-        }
-        break
-      case '.':
-        if (e.shiftKey) {
-          e.preventDefault()
-          showCalloutDialog.value = true
-        }
-        break
-    }
-  }
-
-  if (e.key === 'Tab' && !showAutocomplete.value) {
-    e.preventDefault()
-    if (e.shiftKey) {
-      removeIndent()
-    } else {
-      insertText('    ')
-    }
-  }
-}
-
-function handleDragOver(e: DragEvent) {
-  if (e.dataTransfer?.types.includes('Files')) {
-    e.preventDefault()
-  }
-}
-
-function handleDrop(e: DragEvent) {
-  const files = e.dataTransfer?.files
-  if (files && files.length > 0) {
-    e.preventDefault()
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      if (file && file.type.startsWith('image/')) {
-        doUploadFile(file)
-      }
-    }
-  }
-}
-
-function handlePaste(e: ClipboardEvent) {
-  pushUndoNow()
-
-  const items = e.clipboardData?.items
-  if (!items) return
-
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i]
-    if (item && item.type.startsWith('image/')) {
-      e.preventDefault()
-      const file = item.getAsFile()
-      if (file) {
-        doUploadFile(file)
-      }
-      return
-    }
-  }
-}
-
-function removeIndent() {
-  if (!textareaRef.value) return
-  pushUndoNow()
-
-  const start = textareaRef.value.selectionStart
-  const value = textareaRef.value.value
-
-  const lastNewLine = value.lastIndexOf('\n', start - 1)
-  const lineStart = lastNewLine + 1
-  const lineContent = value.substring(lineStart, start)
-
-  if (lineContent.startsWith('    ')) {
-    const newText = value.substring(0, lineStart) + lineContent.substring(4) + value.substring(start)
-    content.value = newText
-    nextTick(() => {
-      if (!textareaRef.value) return
-      textareaRef.value.setSelectionRange(start - 4, start - 4)
-      textareaRef.value.focus()
-    })
-  } else if (lineContent.startsWith('\t')) {
-    const newText = value.substring(0, lineStart) + lineContent.substring(1) + value.substring(start)
-    content.value = newText
-    nextTick(() => {
-      if (!textareaRef.value) return
-      textareaRef.value.setSelectionRange(start - 1, start - 1)
-      textareaRef.value.focus()
-    })
-  }
-}
-
-function handleInput(e: Event) {
-  const target = e.target as HTMLTextAreaElement
-  const value = target.value
-  const cursorPos = target.selectionStart
-
-  const lastNewLine = value.lastIndexOf('\n', cursorPos - 1)
-  const currentLine = value.substring(lastNewLine + 1, cursorPos)
-
-  // Callout autocomplete: trigger when typing "> [" or "> [!PARTIAL"
-  const calloutMatch = currentLine.match(/^> \[!(\w*)$/i)
+  // Callout autocomplete
+  const calloutMatch = textBeforeCursor.match(/^> \[!(\w*)$/i)
   if (calloutMatch) {
     const partial = (calloutMatch[1] ?? '').toLowerCase()
     const items = allCalloutTypes.value
@@ -716,351 +221,400 @@ function handleInput(e: Event) {
       .slice(0, 8)
       .map(ct => `> [!${ct.type}] ${ct.icon} ${ct.label}`)
     if (items.length > 0) {
-      showAutocompletePanel(items)
-    } else {
-      showAutocomplete.value = false
+      showAutocompletePanel(items, view)
+      return
     }
-  } else if (currentLine.match(/^#{1,6}$/)) {
-    showAutocompletePanel(['# 一级标题', '## 二级标题', '### 三级标题', '#### 四级标题', '##### 五级标题', '###### 六级标题'])
-  } else if (currentLine.match(/^[-*+]$/)) {
-    showAutocompletePanel(['- 列表项', '* 列表项', '+ 列表项'])
-  } else if (currentLine.match(/^\d+\.$/)) {
-    showAutocompletePanel(['1. 有序列表'])
-  } else if (currentLine.match(/^>$/)) {
-    showAutocompletePanel(['> 引用内容', ...allCalloutTypes.value.slice(0, 4).map(ct => `> [!${ct.type}] ${ct.icon} ${ct.label}`)])
-  } else if (currentLine.match(/^`{1,2}$/)) {
-    showAutocompletePanel(['`行内代码`', '```lang 代码块 ```'])
-  } else if (currentLine.match(/^\[.*\]$/)) {
-    showAutocompletePanel(['[链接文字](URL)', '![图片描述](图片URL)'])
-  } else {
-    showAutocomplete.value = false
   }
-}
 
-function showAutocompletePanel(items: string[]) {
-  if (!textareaRef.value) return
-
-  autocompleteItems.value = items
-  selectedIndex.value = 0
-  showAutocomplete.value = true
-
-  const textarea = textareaRef.value
-  const rect = textarea.getBoundingClientRect()
-  const style = getComputedStyle(textarea)
-  const lineHeight = parseFloat(style.lineHeight) || 20
-  const paddingTop = parseFloat(style.paddingTop) || 0
-  const paddingLeft = parseFloat(style.paddingLeft) || 0
-
-  const textBeforeCursor = textarea.value.substring(0, textarea.selectionStart)
-  const lines = textBeforeCursor.split('\n')
-  const currentLineIndex = lines.length - 1
-  const currentCol = (lines[lines.length - 1] ?? '').length
-
-  const charWidth = parseFloat(style.fontSize) * 0.6
-
-  const top = rect.top + paddingTop + (currentLineIndex + 1) * lineHeight - textarea.scrollTop
-  const left = rect.left + paddingLeft + currentCol * charWidth - textarea.scrollLeft
-
-  autocompletePosition.value = {
-    top: Math.max(top, rect.top + paddingTop),
-    left: Math.min(Math.max(left, rect.left + paddingLeft), rect.right - 220),
+  if (textBeforeCursor.match(/^#{1,6}$/)) {
+    showAutocompletePanel(['# 一级标题', '## 二级标题', '### 三级标题', '#### 四级标题', '##### 五级标题', '###### 六级标题'], view)
+    return
   }
-}
-
-function applyAutocomplete() {
-  if (!textareaRef.value || selectedIndex.value >= autocompleteItems.value.length) return
-  pushUndoNow()
-
-  const selected = autocompleteItems.value[selectedIndex.value]
-  const cursorPos = textareaRef.value.selectionStart
-  const value = textareaRef.value.value
-
-  const lastNewLine = value.lastIndexOf('\n', cursorPos - 1)
-  const beforeLine = value.substring(0, lastNewLine + 1)
-  const afterCursor = value.substring(cursorPos)
-
-  const newText = beforeLine + selected + '\n' + afterCursor
-  content.value = newText
-
-  const newPos = beforeLine.length + (selected?.length || 0) + 1
-  nextTick(() => {
-    if (!textareaRef.value) return
-    textareaRef.value.setSelectionRange(newPos, newPos)
-    textareaRef.value.focus()
-  })
+  if (textBeforeCursor.match(/^[-*+]$/)) {
+    showAutocompletePanel(['- 列表项', '* 列表项', '+ 列表项'], view)
+    return
+  }
+  if (textBeforeCursor.match(/^\d+\.$/)) {
+    showAutocompletePanel(['1. 有序列表'], view)
+    return
+  }
+  if (textBeforeCursor.match(/^>$/)) {
+    const items = ['> 引用内容', ...allCalloutTypes.value.slice(0, 4).map(ct => `> [!${ct.type}] ${ct.icon} ${ct.label}`)]
+    showAutocompletePanel(items, view)
+    return
+  }
+  if (textBeforeCursor.match(/^`{1,2}$/)) {
+    showAutocompletePanel(['`行内代码`', '```lang 代码块 ```'], view)
+    return
+  }
+  if (textBeforeCursor.match(/^\[.*\]$/)) {
+    showAutocompletePanel(['[链接文字](URL)', '![图片描述](图片URL)'], view)
+    return
+  }
 
   showAutocomplete.value = false
 }
 
-function insertMarkdown(before: string, after: string, placeholder: string) {
-  if (!textareaRef.value) return
-  pushUndoNow()
+function showAutocompletePanel(items: string[], view: EditorView) {
+  autocompleteItems.value = items
+  selectedIndex.value = 0
+  showAutocomplete.value = true
 
-  const start = textareaRef.value.selectionStart
-  const end = textareaRef.value.selectionEnd
-  const value = textareaRef.value.value
-  const selectedText = value.substring(start, end) || placeholder
+  const pos = view.state.selection.main.head
+  const coords = view.coordsAtPos(pos)
+  if (coords) {
+    autocompletePosition.value = {
+      top: coords.bottom,
+      left: coords.left,
+    }
+  }
+}
 
-  const newText = value.substring(0, start) + before + selectedText + after + value.substring(end)
-  content.value = newText
+function applyAutocomplete() {
+  const view = editorView.value
+  if (!view || selectedIndex.value >= autocompleteItems.value.length) return
 
-  nextTick(() => {
-    if (!textareaRef.value) return
-    const newCursorPos = start + before.length + selectedText.length
-    textareaRef.value.setSelectionRange(start + before.length, newCursorPos)
-    textareaRef.value.focus()
+  const selected = autocompleteItems.value[selectedIndex.value]
+  const pos = view.state.selection.main.head
+  const line = view.state.doc.lineAt(pos)
+  const afterCursor = view.state.sliceDoc(pos, line.to)
+
+  // Replace current line prefix with the selected item
+  view.dispatch({
+    changes: { from: line.from, to: line.to, insert: selected },
   })
+
+  showAutocomplete.value = false
+  view.focus()
+}
+
+// ── Toolbar actions ──
+
+function getSelection(): { from: number; to: number; text: string } | null {
+  const view = editorView.value
+  if (!view) return null
+  const { from, to } = view.state.selection.main
+  return { from, to, text: view.state.sliceDoc(from, to) }
+}
+
+function replaceSelection(insertion: string, anchorOffset?: number) {
+  const view = editorView.value
+  if (!view) return
+  const { from, to } = view.state.selection.main
+  view.focus()
+  view.dispatch({
+    changes: { from, to, insert: insertion },
+    selection: { anchor: anchorOffset != null ? from + anchorOffset : from + insertion.length },
+  })
+}
+
+function insertMarkdown(before: string, after: string, placeholder: string) {
+  const sel = getSelection()
+  if (!sel) return
+  const selectedText = sel.text || placeholder
+  const insertion = before + selectedText + after
+  const anchorOffset = before.length + selectedText.length
+  replaceSelection(insertion, anchorOffset)
 }
 
 function insertText(text: string) {
-  if (!textareaRef.value) return
-  pushUndoNow()
-
-  const start = textareaRef.value.selectionStart
-  const end = textareaRef.value.selectionEnd
-  const value = textareaRef.value.value
-
-  const newText = value.substring(0, start) + text + value.substring(end)
-  content.value = newText
-
-  nextTick(() => {
-    if (!textareaRef.value) return
-    textareaRef.value.setSelectionRange(start + text.length, start + text.length)
-    textareaRef.value.focus()
-  })
+  const sel = getSelection()
+  if (!sel) return
+  replaceSelection(text)
 }
 
 function insertLink() {
-  if (!textareaRef.value) return
-  pushUndoNow()
-
-  const start = textareaRef.value.selectionStart
-  const end = textareaRef.value.selectionEnd
-  const value = textareaRef.value.value
-  const selectedText = value.substring(start, end) || '链接文字'
-
+  const sel = getSelection()
+  if (!sel) return
+  const selectedText = sel.text || '链接文字'
   const linkMarkdown = `[${selectedText}](URL)`
-  const newText = value.substring(0, start) + linkMarkdown + value.substring(end)
-  content.value = newText
-
-  nextTick(() => {
-    if (!textareaRef.value) return
-    const urlStartPos = start + selectedText.length + 3
-    textareaRef.value.setSelectionRange(urlStartPos, urlStartPos + 3)
-    textareaRef.value.focus()
-  })
+  replaceSelection(linkMarkdown, sel.from + selectedText.length + 3) // select "URL"
 }
 
 function insertImageMarkdown(url: string, alt?: string) {
-  if (!textareaRef.value) return
-  pushUndoNow()
-
-  const start = textareaRef.value.selectionStart
-  const value = textareaRef.value.value
+  const view = editorView.value
+  if (!view) return
+  const pos = view.state.selection.main.head
   const imageMarkdown = `![${alt || '图片'}](${url})`
-
-  const newText = value.substring(0, start) + imageMarkdown + value.substring(start)
-  content.value = newText
-
-  nextTick(() => {
-    if (!textareaRef.value) return
-    const newPos = start + imageMarkdown.length
-    textareaRef.value.setSelectionRange(newPos, newPos)
-    textareaRef.value.focus()
+  view.focus()
+  view.dispatch({
+    changes: { from: pos, insert: imageMarkdown },
+    selection: { anchor: pos + imageMarkdown.length },
   })
 }
 
 function insertCodeBlock() {
-  if (!textareaRef.value) return
-  pushUndoNow()
-
-  const start = textareaRef.value.selectionStart
-  const end = textareaRef.value.selectionEnd
-  const value = textareaRef.value.value
-  const selectedText = value.substring(start, end)
-
-  const langPlaceholder = 'lang'
-  const codeContent = selectedText || ''
-  const beforeCursor = value.substring(0, start)
-  const afterCursor = value.substring(end)
-
-  const needsLeadingNewline = beforeCursor.length > 0 && !beforeCursor.endsWith('\n')
-  const leadingNewline = needsLeadingNewline ? '\n' : ''
-
-  const codeBlock = `${leadingNewline}\`\`\`${langPlaceholder}\n${codeContent}\n\`\`\`\n`
-  content.value = beforeCursor + codeBlock + afterCursor
-
-  nextTick(() => {
-    if (!textareaRef.value) return
-    const langOffset = start + leadingNewline.length + 3
-    textareaRef.value.setSelectionRange(langOffset, langOffset + langPlaceholder.length)
-    textareaRef.value.focus()
-  })
+  const sel = getSelection()
+  if (!sel) return
+  const codeContent = sel.text || ''
+  const beforeCursor = sel.from > 0 ? '\n' : ''
+  const codeBlock = `${beforeCursor}\`\`\`lang\n${codeContent}\n\`\`\`\n`
+  replaceSelection(codeBlock, beforeCursor.length + 3) // select "lang"
 }
 
 function insertHeading() {
-  if (!textareaRef.value) return
-  pushUndoNow()
+  const view = editorView.value
+  if (!view) return
+  const pos = view.state.selection.main.head
+  const line = view.state.doc.lineAt(pos)
+  const hasContent = line.text.trim().length > 0 && pos > line.from
 
-  const start = textareaRef.value.selectionStart
-  const value = textareaRef.value.value
+  const prefix = hasContent ? '\n# ' : '# '
+  const insertPos = hasContent ? pos : line.from
 
-  const lastNewLine = value.lastIndexOf('\n', start - 1)
-  const lineStart = lastNewLine + 1
-  const currentLineText = value.substring(lineStart, start)
-
-  const needsNewline = currentLineText.trim().length > 0
-  const prefix = needsNewline ? '\n# ' : '# '
-  const insertPos = needsNewline ? start : lineStart
-
-  const newText = value.substring(0, insertPos) + prefix + value.substring(insertPos)
-  content.value = newText
-
-  nextTick(() => {
-    if (!textareaRef.value) return
-    textareaRef.value.setSelectionRange(insertPos + prefix.length, insertPos + prefix.length)
-    textareaRef.value.focus()
+  view.focus()
+  view.dispatch({
+    changes: { from: insertPos, insert: prefix },
+    selection: { anchor: insertPos + prefix.length },
   })
 }
 
 function insertList(prefix: string) {
-  if (!textareaRef.value) return
-  pushUndoNow()
+  const view = editorView.value
+  if (!view) return
+  const pos = view.state.selection.main.head
+  const line = view.state.doc.lineAt(pos)
+  const hasContent = line.text.trim().length > 0 && pos > line.from
 
-  const start = textareaRef.value.selectionStart
-  const value = textareaRef.value.value
-
-  const lastNewLine = value.lastIndexOf('\n', start - 1)
-  const lineStart = lastNewLine + 1
-  const currentLineText = value.substring(lineStart, start)
-
-  const needsNewline = currentLineText.trim().length > 0
   const listMarkdown = prefix + ' '
-  const insertPrefix = needsNewline ? '\n' + listMarkdown : listMarkdown
-  const insertPos = needsNewline ? start : lineStart
+  const insertion = hasContent ? '\n' + listMarkdown : listMarkdown
+  const insertPos = hasContent ? pos : line.from
 
-  const newText = value.substring(0, insertPos) + insertPrefix + value.substring(insertPos)
-  content.value = newText
-
-  nextTick(() => {
-    if (!textareaRef.value) return
-    textareaRef.value.setSelectionRange(insertPos + insertPrefix.length, insertPos + insertPrefix.length)
-    textareaRef.value.focus()
+  view.focus()
+  view.dispatch({
+    changes: { from: insertPos, insert: insertion },
+    selection: { anchor: insertPos + insertion.length },
   })
 }
 
 function insertQuote() {
-  if (!textareaRef.value) return
-  pushUndoNow()
+  const view = editorView.value
+  if (!view) return
+  const pos = view.state.selection.main.head
+  const line = view.state.doc.lineAt(pos)
+  const hasContent = line.text.trim().length > 0 && pos > line.from
 
-  const start = textareaRef.value.selectionStart
-  const value = textareaRef.value.value
+  const insertion = hasContent ? '\n> ' : '> '
+  const insertPos = hasContent ? pos : line.from
 
-  const lastNewLine = value.lastIndexOf('\n', start - 1)
-  const lineStart = lastNewLine + 1
-  const currentLineText = value.substring(lineStart, start)
-
-  const needsNewline = currentLineText.trim().length > 0
-  const quoteMarkdown = '> '
-  const insertPrefix = needsNewline ? '\n' + quoteMarkdown : quoteMarkdown
-  const insertPos = needsNewline ? start : lineStart
-
-  const newText = value.substring(0, insertPos) + insertPrefix + value.substring(insertPos)
-  content.value = newText
-
-  nextTick(() => {
-    if (!textareaRef.value) return
-    textareaRef.value.setSelectionRange(insertPos + insertPrefix.length, insertPos + insertPrefix.length)
-    textareaRef.value.focus()
+  view.focus()
+  view.dispatch({
+    changes: { from: insertPos, insert: insertion },
+    selection: { anchor: insertPos + insertion.length },
   })
 }
 
 function insertMath() {
-  if (!textareaRef.value) return
-  pushUndoNow()
-
-  const start = textareaRef.value.selectionStart
-  const end = textareaRef.value.selectionEnd
-  const value = textareaRef.value.value
-  const selectedText = value.substring(start, end)
-
-  if (selectedText.trim()) {
-    // Wrap selected text in $...$ (inline math)
-    const newText = value.substring(0, start) + '$' + selectedText + '$' + value.substring(end)
-    content.value = newText
-    nextTick(() => {
-      if (!textareaRef.value) return
-      textareaRef.value.setSelectionRange(start + 1, start + 1 + selectedText.length)
-      textareaRef.value.focus()
-    })
+  const sel = getSelection()
+  if (!sel) return
+  if (sel.text.trim()) {
+    replaceSelection('$' + sel.text + '$', sel.text.length + 1)
   } else {
-    // Insert empty inline math template $ $
-    const template = '$ $'
-    const newText = value.substring(0, start) + template + value.substring(end)
-    content.value = newText
-    nextTick(() => {
-      if (!textareaRef.value) return
-      const cursorPos = start + 2 // Between the two $
-      textareaRef.value.setSelectionRange(cursorPos, cursorPos)
-      textareaRef.value.focus()
-    })
+    replaceSelection('$ $', 2)
   }
 }
 
 function insertCallout(type: string) {
-  if (!textareaRef.value) return
-  pushUndoNow()
+  const sel = getSelection()
+  if (!sel) return
 
-  const start = textareaRef.value.selectionStart
-  const end = textareaRef.value.selectionEnd
-  const value = textareaRef.value.value
-  const selectedText = value.substring(start, end)
-  const beforeCursor = value.substring(0, start)
-  const afterCursor = value.substring(end)
+  const beforeCursor = sel.from > 0 ? '\n' : ''
 
-  const needsLeadingNewline = beforeCursor.length > 0 && !beforeCursor.endsWith('\n')
-  const leadingNewline = needsLeadingNewline ? '\n' : ''
-
-  if (selectedText.trim()) {
-    // Wrap selected lines as callout content — each non-empty line gets "> " prefix
-    const lines = selectedText.split('\n')
+  if (sel.text.trim()) {
+    const lines = sel.text.split('\n')
     const wrappedLines = lines.map(line => {
-      // Preserve empty lines (but they still need the ">" marker for callout continuation)
       if (line.length === 0) return '>'
-      // If already starts with "> ", just keep it as-is
       if (line.startsWith('> ')) return line
-      if (line === '>') return line
       return '> ' + line
     }).join('\n')
-
-    const calloutText = `${leadingNewline}> [!${type}]\n${wrappedLines}\n`
-    content.value = beforeCursor + calloutText + afterCursor
-
-    nextTick(() => {
-      if (!textareaRef.value) return
-      // Position cursor after "[!TYPE]" — ready to type a title
-      const cursorPos = start + leadingNewline.length + 4 + type.length + 1
-      textareaRef.value.setSelectionRange(cursorPos, cursorPos)
-      textareaRef.value.focus()
-    })
+    const calloutText = `${beforeCursor}> [!${type}]\n${wrappedLines}\n`
+    replaceSelection(calloutText, beforeCursor.length + 4 + type.length + 1)
   } else {
-    // Insert empty callout template
-    const titlePlaceholder = '标题'
-    const template = `${leadingNewline}> [!${type}] ${titlePlaceholder}\n> 内容\n`
-    content.value = beforeCursor + template + afterCursor
-
-    nextTick(() => {
-      if (!textareaRef.value) return
-      // Select the title placeholder so user can immediately type a title
-      const titleStart = start + leadingNewline.length + 4 + type.length + 2
-      textareaRef.value.setSelectionRange(titleStart, titleStart + titlePlaceholder.length)
-      textareaRef.value.focus()
-    })
+    const template = `${beforeCursor}> [!${type}] 标题\n> 内容\n`
+    replaceSelection(template, beforeCursor.length + 4 + type.length + 2) // select "标题"
   }
 
   showCalloutDialog.value = false
   calloutSearchQuery.value = ''
 }
+
+// ── Custom editor keymap ──
+
+function isMod(e: KeyboardEvent) {
+  return isMac.value ? e.metaKey : e.ctrlKey
+}
+
+const customKeymap = keymap.of([
+  {
+    key: 'Mod-s',
+    run: () => { emit('save'); return true },
+    preventDefault: true,
+  },
+  {
+    key: 'Mod-b',
+    run: () => { insertMarkdown('**', '**', '粗体文本'); return true },
+  },
+  {
+    key: 'Mod-i',
+    run: () => {
+      insertMarkdown('*', '*', '斜体文本')
+      return true
+    },
+  },
+  {
+    key: 'Mod-u',
+    run: () => { insertMarkdown('<u>', '</u>', '下划线文本'); return true },
+  },
+  {
+    key: 'Mod-k',
+    run: () => { insertLink(); return true },
+  },
+  {
+    key: 'Mod-Shift-k',
+    run: () => { insertCodeBlock(); return true },
+  },
+  {
+    key: 'Mod-`',
+    run: () => { insertMarkdown('`', '`', '代码'); return true },
+  },
+  {
+    key: 'Mod-Shift-h',
+    run: () => { insertHeading(); return true },
+  },
+  {
+    key: 'Mod-Shift-l',
+    run: () => { insertList('-'); return true },
+  },
+  {
+    key: 'Mod-Shift-o',
+    run: () => { insertList('1.'); return true },
+  },
+  {
+    key: 'Mod-Shift-q',
+    run: () => { insertQuote(); return true },
+  },
+  {
+    key: 'Mod-Shift-.',
+    run: () => { showCalloutDialog.value = true; return true },
+  },
+  {
+    key: 'Mod-Shift-i',
+    run: () => { handleImageUpload(); return true },
+  },
+])
+
+// ── Create CM6 editor ──
+
+onMounted(() => {
+  if (!cmContainer.value) return
+
+  const updateListener = EditorView.updateListener.of((update) => {
+    if (update.docChanged) {
+      const text = update.state.doc.toString()
+      emit('update:modelValue', text)
+      checkAutocomplete(update.view)
+    }
+    if (update.docChanged || update.selectionSet) {
+      updateCursorStats(update.view)
+    }
+  })
+
+  const view = new EditorView({
+    doc: props.modelValue,
+    parent: cmContainer.value,
+    extensions: [
+      // ── Basic editing ──
+      lineNumbers(),
+      drawSelection(),
+      dropCursor(),
+      highlightActiveLine(),
+      highlightSpecialChars(),
+      history(),
+      indentOnInput(),
+      bracketMatching(),
+
+      // ── Keymaps ──
+      defaultKeymap,
+      historyKeymap,
+      indentWithTab,
+      customKeymap,
+      enterContinuationKeymap,
+      autoConvertKeymap,
+
+      // ── Markdown language ──
+      markdown(),
+
+      // ── Syntax highlighting ──
+      syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+
+      // ── Live preview (WYSIWYG decorations) ──
+      livePreview(),
+
+      // ── Listeners ──
+      updateListener,
+
+      // ── Theme ──
+      EditorView.theme({
+        '&': {
+          height: '100%',
+          fontSize: '0.875rem',
+          fontFamily: 'ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, "Liberation Mono", monospace',
+        },
+        '.cm-scroller': {
+          overflow: 'auto',
+          lineHeight: '1.7',
+        },
+        '.cm-content': {
+          padding: '0.75rem',
+          caretColor: 'var(--text-primary)',
+        },
+        '.cm-gutters': {
+          backgroundColor: 'transparent',
+          borderRight: '1px solid var(--border)',
+          color: 'var(--text-muted)',
+        },
+        '.cm-activeLine': {
+          backgroundColor: 'transparent',
+        },
+        '.cm-activeLineGutter': {
+          backgroundColor: 'var(--bg-code)',
+        },
+        '.cm-cursor': {
+          borderLeftColor: 'var(--text-primary)',
+        },
+        '.cm-selectionMatch': {
+          backgroundColor: 'rgba(59, 130, 246, 0.15)',
+        },
+        '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
+          backgroundColor: 'rgba(59, 130, 246, 0.25) !important',
+        },
+        '.cm-line': {
+          padding: '0 0.25rem',
+        },
+      }),
+    ],
+  })
+
+  editorView.value = view
+  updateCursorStats(view)
+
+  // Handle paste/drop for images
+  const cmDom = view.dom
+  cmDom.addEventListener('paste', handlePaste)
+  cmDom.addEventListener('drop', handleDrop)
+  cmDom.addEventListener('dragover', handleDragOver)
+
+  // Autocomplete keyboard: listen on the container to intercept keys
+  // when the autocomplete panel is visible (CM6 keymaps won't see our panel)
+  cmContainer.value.addEventListener('keydown', handleAutocompleteKeydown, true)
+})
+
+onUnmounted(() => {
+  editorView.value?.destroy()
+  editorView.value = null
+})
+
+// ── Image upload ──
 
 function handleImageUpload() {
   const input = document.createElement('input')
@@ -1073,9 +627,7 @@ function handleImageUpload() {
     if (files) {
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
-        if (file) {
-          doUploadFile(file)
-        }
+        if (file) doUploadFile(file)
       }
     }
   }
@@ -1083,7 +635,6 @@ function handleImageUpload() {
 }
 
 async function doUploadFile(file: File) {
-  // 文件大小预检
   if (file.size > MAX_IMAGE_FILE_SIZE) {
     toast.error(`图片 "${file.name}" 超过大小限制（最大 5MB）`)
     return
@@ -1131,10 +682,67 @@ async function handleUrlUpload() {
     urlUploading.value = false
   }
 }
+
+// ── Drag & drop / paste event handlers ──
+
+function handleDragOver(e: DragEvent) {
+  if (e.dataTransfer?.types.includes('Files')) {
+    e.preventDefault()
+  }
+}
+
+function handleDrop(e: DragEvent) {
+  const files = e.dataTransfer?.files
+  if (files && files.length > 0) {
+    e.preventDefault()
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      if (file && file.type.startsWith('image/')) {
+        doUploadFile(file)
+      }
+    }
+  }
+}
+
+function handlePaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (!items) return
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    if (item && item.type.startsWith('image/')) {
+      e.preventDefault()
+      const file = item.getAsFile()
+      if (file) {
+        doUploadFile(file)
+      }
+      return
+    }
+  }
+}
+
+// ── Autocomplete keyboard ──
+
+function handleAutocompleteKeydown(e: KeyboardEvent) {
+  if (!showAutocomplete.value) return
+  if (e.key === 'ArrowDown') {
+    e.preventDefault()
+    selectedIndex.value = Math.min(selectedIndex.value + 1, autocompleteItems.value.length - 1)
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault()
+    selectedIndex.value = Math.max(selectedIndex.value - 1, 0)
+  } else if (e.key === 'Enter' || e.key === 'Tab') {
+    e.preventDefault()
+    applyAutocomplete()
+  } else if (e.key === 'Escape') {
+    showAutocomplete.value = false
+  }
+}
 </script>
 
 <template>
   <div class="markdown-editor h-full flex flex-col">
+    <!-- Toolbar -->
     <div class="editor-toolbar glass glass-sm flex items-center gap-1 p-1.5 border-b border-border overflow-x-auto">
       <button
         @click="insertMarkdown('**', '**', '粗体文本')"
@@ -1222,13 +830,6 @@ async function handleUrlUpload() {
         <span>上传中 {{ uploadingProgress }}%</span>
       </div>
       <button
-        @click="showPreview = !showPreview"
-        class="toolbar-btn text-xs px-2 gap-1"
-        :class="{ 'bg-bg-code': showPreview }"
-      >
-        预览
-      </button>
-      <button
         @click="showShortcuts = true"
         class="toolbar-btn"
         title="快捷键帮助"
@@ -1237,39 +838,12 @@ async function handleUrlUpload() {
       </button>
     </div>
 
-    <div class="editor-content flex-1 flex min-h-0">
-      <div class="editor-pane flex-1 min-h-0" :class="{ 'border-r border-border': showPreview }">
-        <textarea
-          ref="textareaRef"
-          v-model="content"
-          :placeholder="placeholder"
-          class="editor-textarea"
-          spellcheck="false"
-          autocomplete="off"
-          autocorrect="off"
-          autocapitalize="off"
-        />
-      </div>
-
-      <div
-        v-if="showPreview"
-        ref="previewRef"
-        class="preview-pane flex-1 min-h-0 overflow-auto bg-bg-secondary"
-        @scroll="handlePreviewScroll"
-      >
-        <div v-if="rendering" class="p-6 animate-pulse space-y-4">
-          <div class="h-8 w-3/4 bg-bg-code rounded" />
-          <div class="h-4 w-full bg-bg-code rounded" />
-          <div class="h-4 w-5/6 bg-bg-code rounded" />
-        </div>
-        <div
-          v-else
-          class="prose prose-sm max-w-none p-6"
-          v-html="renderedHtml"
-        />
-      </div>
+    <!-- CM6 Editor -->
+    <div class="editor-content flex-1 min-h-0 overflow-hidden bg-bg-secondary">
+      <div ref="cmContainer" class="cm-editor-container h-full w-full" />
     </div>
 
+    <!-- Status bar -->
     <div class="editor-status-bar flex items-center gap-4 px-3 py-1 text-xs text-text-muted border-t border-border bg-bg-secondary/50 select-none flex-shrink-0">
       <span>{{ wordCount }} 字</span>
       <span>{{ charCount }} 字符</span>
@@ -1277,6 +851,7 @@ async function handleUrlUpload() {
       <span class="ml-auto">行 {{ cursorLine }}, 列 {{ cursorCol }}</span>
     </div>
 
+    <!-- Autocomplete panel -->
     <div
       v-if="showAutocomplete && autocompleteItems.length > 0"
       class="autocomplete-panel fixed glass glass-sm rounded-lg overflow-hidden z-50"
@@ -1293,6 +868,7 @@ async function handleUrlUpload() {
       </div>
     </div>
 
+    <!-- URL dialog -->
     <div
       v-if="showUrlDialog"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -1413,6 +989,7 @@ async function handleUrlUpload() {
       </div>
     </div>
 
+    <!-- Shortcuts dialog -->
     <div
       v-if="showShortcuts"
       class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
@@ -1463,41 +1040,19 @@ async function handleUrlUpload() {
   height: 100%;
 }
 
-.editor-pane {
+.editor-content {
   position: relative;
-  background: var(--bg-secondary);
-  overflow: hidden;
 }
 
-.editor-textarea {
-  display: block;
-  width: 100%;
+.cm-editor-container :deep(.cm-editor) {
   height: 100%;
-  padding: 0.75rem;
-  border: none;
   outline: none;
-  resize: none;
-  background: transparent;
-  color: var(--text-primary);
+}
+
+.cm-editor-container :deep(.cm-scroller) {
   font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, 'Liberation Mono', monospace;
-  font-size: 0.875rem;
   line-height: 1.7;
   tab-size: 4;
-  -moz-tab-size: 4;
-  box-sizing: border-box;
-}
-
-.editor-textarea::placeholder {
-  color: var(--text-muted);
-  opacity: 0.6;
-}
-
-.editor-textarea::selection {
-  background-color: rgba(59, 130, 246, 0.25);
-}
-
-.editor-textarea::-moz-selection {
-  background-color: rgba(59, 130, 246, 0.25);
 }
 
 .toolbar-btn {
@@ -1523,10 +1078,6 @@ async function handleUrlUpload() {
 .autocomplete-panel {
   min-width: 200px;
   max-width: 400px;
-}
-
-.prose {
-  color: var(--text-secondary);
 }
 
 @media (max-width: 768px) {
