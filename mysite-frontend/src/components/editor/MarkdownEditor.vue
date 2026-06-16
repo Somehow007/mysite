@@ -201,13 +201,7 @@ function updateCursorStats(view: EditorView) {
   // Use doc.length / doc.lines (O(1)) instead of doc.toString() (O(n))
   charCount.value = doc.length
   lineCount.value = doc.lines
-  // Word count: estimate from doc length (exact count would require full-text scan)
-  if (doc.length === 0) {
-    wordCount.value = 0
-  } else {
-    // Approximate word count using the cached toString — only on doc change
-    // For cursor stats we skip the full-text scan to keep this fast
-  }
+  // Word count is handled by updateWordCount (only on docChanged)
 }
 
 // Separate word-count update (heavier, called only on doc change)
@@ -734,14 +728,19 @@ function handleAutocompleteKeydown(e: KeyboardEvent) {
   if (!showAutocomplete.value) return
   if (e.key === 'ArrowDown') {
     e.preventDefault()
+    e.stopPropagation()
     selectedIndex.value = Math.min(selectedIndex.value + 1, autocompleteItems.value.length - 1)
   } else if (e.key === 'ArrowUp') {
     e.preventDefault()
+    e.stopPropagation()
     selectedIndex.value = Math.max(selectedIndex.value - 1, 0)
   } else if (e.key === 'Enter' || e.key === 'Tab') {
     e.preventDefault()
+    e.stopPropagation()
     applyAutocomplete()
   } else if (e.key === 'Escape') {
+    e.preventDefault()
+    e.stopPropagation()
     showAutocomplete.value = false
   }
 }

@@ -304,7 +304,21 @@ function computeCodeBlockRanges(doc: Text): CodeBlockRange[] {
 }
 
 function isLineInCodeBlock(lineNum: number, ranges: CodeBlockRange[]): boolean {
-  return ranges.some(([start, end]) => lineNum >= start && lineNum <= end)
+  // Binary search: find the last range whose start <= lineNum
+  let lo = 0
+  let hi = ranges.length - 1
+  let idx = -1
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1
+    if (ranges[mid]![0] <= lineNum) {
+      idx = mid
+      lo = mid + 1
+    } else {
+      hi = mid - 1
+    }
+  }
+  if (idx === -1) return false
+  return lineNum <= ranges[idx]![1]
 }
 
 function* iterLines(doc: Text): Generator<{ from: number; text: string }> {
@@ -313,6 +327,11 @@ function* iterLines(doc: Text): Generator<{ from: number; text: string }> {
   while (pos < len) {
     const line = doc.lineAt(pos)
     yield { from: line.from, text: line.text }
-    pos = line.from + line.length + 1
+    // Advance past line.to (exclusive end of content).
+    // If a newline follows, skip it too.
+    pos = line.to + 1
+    if (pos < len && doc.sliceString(pos, pos + 1) === '\n') {
+      pos++
+    }
   }
 }
