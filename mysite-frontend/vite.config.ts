@@ -15,6 +15,13 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
+    // Force single instance of @codemirror/* to prevent
+    // "Unrecognized extension value" instanceof errors
+    dedupe: [
+      '@codemirror/state',
+      '@codemirror/view',
+      '@codemirror/language',
+    ],
   },
   build: {
     rollupOptions: {
@@ -23,6 +30,7 @@ export default defineConfig({
           'vue-vendor': ['vue', 'vue-router', 'pinia'],
           'markdown': ['marked', 'katex'],
           'ui-vendor': ['@vueuse/core'],
+          'codemirror': ['@codemirror/view', '@codemirror/state', '@codemirror/language', '@codemirror/commands', '@codemirror/lang-markdown', '@codemirror/search'],
         },
       },
     },

@@ -2,7 +2,7 @@
  * CodeMirror 6 Live Preview / WYSIWYG extension.
  *
  * Hides Markdown syntax markers on lines that don't have the cursor,
- * replacing them with styled visual representations.
+ * replacing them with styled visual representations via Decoration.replace({widget}).
  *
  * Supported decorations:
  *   - Headings: hide hash markers, scale text
@@ -19,14 +19,13 @@ import {
   ViewUpdate,
   Decoration,
   WidgetType,
-  EditorView,
 } from '@codemirror/view'
 import { RangeSet, RangeSetBuilder, Text } from '@codemirror/state'
 
 // ── Widgets ──
 
-/** Renders a bullet point (•) for unordered lists. */
 class BulletWidget extends WidgetType {
+  get estimatedHeight(): number { return 22 }
   toDOM(): HTMLElement {
     const span = document.createElement('span')
     span.className = 'cm-live-bullet'
@@ -36,9 +35,9 @@ class BulletWidget extends WidgetType {
   }
 }
 
-/** Renders an ordered-list number. */
 class OrderedNumberWidget extends WidgetType {
   constructor(private readonly num: number) { super() }
+  get estimatedHeight(): number { return 22 }
   toDOM(): HTMLElement {
     const span = document.createElement('span')
     span.className = 'cm-live-ol-num'
@@ -48,8 +47,8 @@ class OrderedNumberWidget extends WidgetType {
   }
 }
 
-/** Renders an unchecked task checkbox. */
 class TaskUncheckedWidget extends WidgetType {
+  get estimatedHeight(): number { return 22 }
   toDOM(): HTMLElement {
     const span = document.createElement('span')
     span.className = 'cm-live-task'
@@ -59,8 +58,8 @@ class TaskUncheckedWidget extends WidgetType {
   }
 }
 
-/** Renders a checked task checkbox. */
 class TaskCheckedWidget extends WidgetType {
+  get estimatedHeight(): number { return 22 }
   toDOM(): HTMLElement {
     const span = document.createElement('span')
     span.className = 'cm-live-task checked'
@@ -70,8 +69,8 @@ class TaskCheckedWidget extends WidgetType {
   }
 }
 
-/** Renders a blockquote left-border gutter. */
 class BlockquoteGutterWidget extends WidgetType {
+  get estimatedHeight(): number { return 22 }
   toDOM(): HTMLElement {
     const div = document.createElement('div')
     div.className = 'cm-live-bq-gutter'
@@ -80,7 +79,10 @@ class BlockquoteGutterWidget extends WidgetType {
   }
 }
 
-// ── Helper: build heading decorations ──
+// ── Block-level decorations ──
+// Use Decoration.replace({widget}) to hide the syntax marker range and
+// show a visual widget in its place. This avoids the layout issues of
+// separate replace + widget decorations at overlapping positions.
 
 function decorateHeading(
   lineText: string,
@@ -94,25 +96,23 @@ function decorateHeading(
   const level = m[1]!.length
   const markerLen = m[0].length // e.g. "### " = 4
 
-  if (currentLine === cursorLine) return true // show raw source
+  if (currentLine === cursorLine) return true
 
-  // Replace "#" markers with nothing (hide them)
+  // Hide the "#" marker range
   builder.add(from, from + markerLen, Decoration.replace({}))
   // Style the heading text
-  const fontSize = 2.2 - level * 0.15 // h1 ~2em, h6 ~1.3em
+  const fontSizes = [2.05, 1.75, 1.5, 1.3, 1.15, 1.05] // h1..h6
   builder.add(
     from + markerLen,
     from + lineText.length,
     Decoration.mark({
       attributes: {
-        style: `font-size:${fontSize}em;font-weight:700;color:var(--text-primary);line-height:1.3`,
+        style: `font-size:${fontSizes[level - 1]!}em;font-weight:700;color:var(--text-primary);line-height:1.3`,
       },
     }),
   )
   return true
 }
-
-// ── Helper: build list decorations ──
 
 function decorateList(
   lineText: string,
@@ -121,30 +121,24 @@ function decorateList(
   currentLine: number,
   builder: RangeSetBuilder<Decoration>,
 ): boolean {
-  const leadingWs = lineText.match(/^(\s*)/)?.[1] ?? ''
-
-  // Task list: "- [ ]" or "- [x]" etc.
+  // Task list: "- [ ] " or "- [x] "
   const taskMatch = lineText.match(/^(\s*)([-*+])\s\[([ xX])\]\s/)
   if (taskMatch) {
-    const markerLen = taskMatch[0].length  // e.g. "- [ ] " = 6
+    const markerLen = taskMatch[0].length
     if (currentLine === cursorLine) return true
-    // Hide the marker
-    builder.add(from, from + markerLen, Decoration.replace({}))
-    // Show checkbox widget at the start
     const checked = taskMatch[3]!.toLowerCase() === 'x'
     const widget = checked ? new TaskCheckedWidget() : new TaskUncheckedWidget()
-    builder.add(from, from, Decoration.widget({ widget, side: 1 }))
+    builder.add(from, from + markerLen, Decoration.replace({ widget }))
     return true
   }
 
-  // Ordered list: "1. " etc.
+  // Ordered list: "1. "
   const olMatch = lineText.match(/^(\s*)(\d+)\.\s/)
   if (olMatch) {
     const markerLen = olMatch[0].length
     if (currentLine === cursorLine) return true
     const num = parseInt(olMatch[2]!, 10)
-    builder.add(from, from + markerLen, Decoration.replace({}))
-    builder.add(from, from, Decoration.widget({ widget: new OrderedNumberWidget(num), side: 1 }))
+    builder.add(from, from + markerLen, Decoration.replace({ widget: new OrderedNumberWidget(num) }))
     return true
   }
 
@@ -153,15 +147,12 @@ function decorateList(
   if (ulMatch) {
     const markerLen = ulMatch[0].length
     if (currentLine === cursorLine) return true
-    builder.add(from, from + markerLen, Decoration.replace({}))
-    builder.add(from, from, Decoration.widget({ widget: new BulletWidget(), side: 1 }))
+    builder.add(from, from + markerLen, Decoration.replace({ widget: new BulletWidget() }))
     return true
   }
 
   return false
 }
-
-// ── Helper: build blockquote decoration ──
 
 function decorateBlockquote(
   lineText: string,
@@ -176,11 +167,9 @@ function decorateBlockquote(
 
   if (currentLine === cursorLine) return true
 
-  // Hide "> " prefix
-  builder.add(from, from + markerLen, Decoration.replace({}))
-  // Add blockquote left-border widget
-  builder.add(from, from, Decoration.widget({ widget: new BlockquoteGutterWidget(), side: 1 }))
-  // Style the content with muted color
+  // Hide "> " prefix, show left-border gutter widget
+  builder.add(from, from + markerLen, Decoration.replace({ widget: new BlockquoteGutterWidget() }))
+  // Style the content
   builder.add(
     from + markerLen,
     from + lineText.length,
@@ -191,105 +180,86 @@ function decorateBlockquote(
   return true
 }
 
-// ── Helper: build inline decorations (bold, italic, code) ──
+// ── Inline decorations (bold, italic, code) ──
 
 function decorateInline(
   lineText: string,
   lineFrom: number,
   builder: RangeSetBuilder<Decoration>,
 ): void {
-  // Bold: **text** or __text__
+  // Bold: **text** — hide opening/closing **, bold the content
   for (const m of lineText.matchAll(/\*\*(.+?)\*\*/g)) {
     const start = lineFrom + m.index!
     const end = start + m[0].length
-    // Hide opening ** (2 chars)
     builder.add(start, start + 2, Decoration.replace({}))
-    // Hide closing ** (2 chars)
     builder.add(end - 2, end, Decoration.replace({}))
-    // Bold the inner text
-    builder.add(
-      start + 2,
-      end - 2,
-      Decoration.mark({ attributes: { style: 'font-weight:700' } }),
-    )
+    builder.add(start + 2, end - 2, Decoration.mark({ attributes: { style: 'font-weight:700' } }))
   }
 
-  // Italic: *text* (but not **)
+  // Italic: *text* (not ** — lookbehind ensures single *)
   for (const m of lineText.matchAll(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g)) {
     const start = lineFrom + m.index!
     const end = start + m[0].length
     builder.add(start, start + 1, Decoration.replace({}))
     builder.add(end - 1, end, Decoration.replace({}))
-    builder.add(
-      start + 1,
-      end - 1,
-      Decoration.mark({ attributes: { style: 'font-style:italic' } }),
-    )
+    builder.add(start + 1, end - 1, Decoration.mark({ attributes: { style: 'font-style:italic' } }))
   }
 
   // Inline code: `code`
-  for (const m of lineText.matchAll(/`(.+?)`/g)) {
+  for (const m of lineText.matchAll(/`([^`]+)`/g)) {
     const start = lineFrom + m.index!
     const end = start + m[0].length
     builder.add(start, start + 1, Decoration.replace({}))
     builder.add(end - 1, end, Decoration.replace({}))
-    builder.add(
-      start + 1,
-      end - 1,
-      Decoration.mark({
-        attributes: {
-          style: 'background:var(--bg-code);font-family:ui-monospace,monospace;font-size:0.875em;padding:0.1em 0.3em;border-radius:3px',
-        },
-      }),
-    )
+    builder.add(start + 1, end - 1, Decoration.mark({
+      attributes: {
+        style: 'background:var(--bg-code);font-family:ui-monospace,monospace;font-size:0.875em;padding:0.1em 0.3em;border-radius:3px',
+      },
+    }))
   }
 }
 
-// ── The ViewPlugin ──
+// ── ViewPlugin ──
 
 export function livePreview() {
   return ViewPlugin.fromClass(
     class {
       decorations: RangeSet<Decoration>
 
-      constructor(view: EditorView) {
+      constructor(view: any) {
         this.decorations = this.build(view)
       }
 
       update(update: ViewUpdate) {
+        // Only rebuild on doc changes or selection changes
         if (update.docChanged || update.selectionSet || update.viewportChanged) {
           this.decorations = this.build(update.view)
         }
       }
 
-      build(view: EditorView): RangeSet<Decoration> {
+      build(view: any): RangeSet<Decoration> {
         const builder = new RangeSetBuilder<Decoration>()
         const doc = view.state.doc
         const cursor = view.state.selection.main.head
         const cursorLine = doc.lineAt(cursor).number
 
-        // Precompute code-block regions in a single O(n) pass.
-        // We store arrays [startLine, endLine] for each code block.
+        // Precompute code-block ranges in a single O(n) pass
         const codeBlockRanges = computeCodeBlockRanges(doc)
 
-        // Iterate lines via the doc's text iterator (O(1) per line).
         let lineNum = 1
         for (const line of iterLines(doc)) {
           const from = line.from
           const lineText = line.text
 
-          // Skip lines inside code blocks
           if (isLineInCodeBlock(lineNum, codeBlockRanges)) {
             lineNum++
             continue
           }
 
-          // Apply decorations in order (first match wins for block-level)
           if (decorateHeading(lineText, from, cursorLine, lineNum, builder)) { lineNum++; continue }
           if (decorateList(lineText, from, cursorLine, lineNum, builder)) { lineNum++; continue }
           if (decorateBlockquote(lineText, from, cursorLine, lineNum, builder)) { lineNum++; continue }
 
-          // Inline decorations on non-cursor lines
           if (lineNum !== cursorLine) {
             decorateInline(lineText, from, builder)
           }
@@ -299,15 +269,14 @@ export function livePreview() {
         return builder.finish()
       }
     },
-    { decorations: (v) => v.decorations },
+    { decorations: (v: any) => v.decorations },
   )
 }
 
-// ── Code block detection (O(n) precompute) ──
+// ── Code block helpers (O(n) precompute) ──
 
 type CodeBlockRange = [startLine: number, endLine: number]
 
-/** Compute all code-block line ranges in a single O(n) pass over the doc. */
 function computeCodeBlockRanges(doc: Text): CodeBlockRange[] {
   const ranges: CodeBlockRange[] = []
   let inFence = false
@@ -327,7 +296,6 @@ function computeCodeBlockRanges(doc: Text): CodeBlockRange[] {
     lineNum++
   }
 
-  // Unclosed fence — mark to end of doc
   if (inFence) {
     ranges.push([fenceStart, lineNum - 1])
   }
@@ -339,13 +307,12 @@ function isLineInCodeBlock(lineNum: number, ranges: CodeBlockRange[]): boolean {
   return ranges.some(([start, end]) => lineNum >= start && lineNum <= end)
 }
 
-/** Efficiently iterate lines of a CM6 Text document (O(1) per line). */
 function* iterLines(doc: Text): Generator<{ from: number; text: string }> {
   const len = doc.length
   let pos = 0
   while (pos < len) {
     const line = doc.lineAt(pos)
     yield { from: line.from, text: line.text }
-    pos = line.from + line.length + 1 // +1 for newline
+    pos = line.from + line.length + 1
   }
 }

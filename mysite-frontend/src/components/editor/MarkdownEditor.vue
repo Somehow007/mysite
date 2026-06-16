@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, nextTick, computed } from 'vue'
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
 
 import { uploadImage, uploadImageByUrl, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useToast } from '@/composables/useToast'
@@ -10,7 +10,6 @@ import {
 
 // ── CodeMirror 6 ──
 import { EditorView, keymap, lineNumbers, drawSelection, dropCursor, highlightActiveLine, highlightSpecialChars } from '@codemirror/view'
-import { EditorState } from '@codemirror/state'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from '@codemirror/language'
@@ -199,9 +198,21 @@ function updateCursorStats(view: EditorView) {
   cursorLine.value = line.number
   cursorCol.value = pos - line.from + 1
 
-  const text = doc.toString()
-  charCount.value = text.length
+  // Use doc.length / doc.lines (O(1)) instead of doc.toString() (O(n))
+  charCount.value = doc.length
   lineCount.value = doc.lines
+  // Word count: estimate from doc length (exact count would require full-text scan)
+  if (doc.length === 0) {
+    wordCount.value = 0
+  } else {
+    // Approximate word count using the cached toString — only on doc change
+    // For cursor stats we skip the full-text scan to keep this fast
+  }
+}
+
+// Separate word-count update (heavier, called only on doc change)
+function updateWordCount(view: EditorView) {
+  const text = view.state.doc.toString()
   const words = text.trim().split(/\s+/).filter(Boolean)
   wordCount.value = words.length
 }
@@ -315,12 +326,6 @@ function insertMarkdown(before: string, after: string, placeholder: string) {
   const insertion = before + selectedText + after
   const anchorOffset = before.length + selectedText.length
   replaceSelection(insertion, anchorOffset)
-}
-
-function insertText(text: string) {
-  const sel = getSelection()
-  if (!sel) return
-  replaceSelection(text)
 }
 
 function insertLink() {
@@ -440,10 +445,6 @@ function insertCallout(type: string) {
 
 // ── Custom editor keymap ──
 
-function isMod(e: KeyboardEvent) {
-  return isMac.value ? e.metaKey : e.ctrlKey
-}
-
 const customKeymap = keymap.of([
   {
     key: 'Mod-s',
@@ -513,6 +514,7 @@ onMounted(() => {
       const text = update.state.doc.toString()
       emit('update:modelValue', text)
       checkAutocomplete(update.view)
+      updateWordCount(update.view)
     }
     if (update.docChanged || update.selectionSet) {
       updateCursorStats(update.view)
@@ -597,6 +599,7 @@ onMounted(() => {
 
   editorView.value = view
   updateCursorStats(view)
+  updateWordCount(view)
 
   // Handle paste/drop for images
   const cmDom = view.dom
@@ -610,6 +613,10 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  // Remove autocomplete keydown listener from container
+  if (cmContainer.value) {
+    cmContainer.value.removeEventListener('keydown', handleAutocompleteKeydown, true)
+  }
   editorView.value?.destroy()
   editorView.value = null
 })
