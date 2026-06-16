@@ -21,7 +21,7 @@ import {
   WidgetType,
   EditorView,
 } from '@codemirror/view'
-import { RangeSet, RangeSetBuilder } from '@codemirror/state'
+import { RangeSet, RangeSetBuilder, Text } from '@codemirror/state'
 
 // ── Widgets ──
 
@@ -120,7 +120,6 @@ function decorateList(
   cursorLine: number,
   currentLine: number,
   builder: RangeSetBuilder<Decoration>,
-  view: EditorView,
 ): boolean {
   const leadingWs = lineText.match(/^(\s*)/)?.[1] ?? ''
 
@@ -269,27 +268,32 @@ export function livePreview() {
         const cursor = view.state.selection.main.head
         const cursorLine = doc.lineAt(cursor).number
 
-        for (let i = 1; i <= doc.lines; i++) {
-          const line = doc.line(i)
-          const lineText = line.text
-          const from = line.from
+        // Precompute code-block regions in a single O(n) pass.
+        // We store arrays [startLine, endLine] for each code block.
+        const codeBlockRanges = computeCodeBlockRanges(doc)
 
-          // Check code blocks — always show raw source inside fences
-          // We do a quick check: if the line is inside a code block, skip decoration
-          // Detecting code blocks: scan backwards for unmatched ```
-          if (isInsideCodeBlock(doc.toString(), from)) {
-            continue // don't decorate code block content
+        // Iterate lines via the doc's text iterator (O(1) per line).
+        let lineNum = 1
+        for (const line of iterLines(doc)) {
+          const from = line.from
+          const lineText = line.text
+
+          // Skip lines inside code blocks
+          if (isLineInCodeBlock(lineNum, codeBlockRanges)) {
+            lineNum++
+            continue
           }
 
           // Apply decorations in order (first match wins for block-level)
-          if (decorateHeading(lineText, from, cursorLine, i, builder)) continue
-          if (decorateList(lineText, from, cursorLine, i, builder, view)) continue
-          if (decorateBlockquote(lineText, from, cursorLine, i, builder)) continue
+          if (decorateHeading(lineText, from, cursorLine, lineNum, builder)) { lineNum++; continue }
+          if (decorateList(lineText, from, cursorLine, lineNum, builder)) { lineNum++; continue }
+          if (decorateBlockquote(lineText, from, cursorLine, lineNum, builder)) { lineNum++; continue }
 
           // Inline decorations on non-cursor lines
-          if (i !== cursorLine) {
+          if (lineNum !== cursorLine) {
             decorateInline(lineText, from, builder)
           }
+          lineNum++
         }
 
         return builder.finish()
@@ -299,16 +303,49 @@ export function livePreview() {
   )
 }
 
-// ── Code block detection ──
+// ── Code block detection (O(n) precompute) ──
 
-function isInsideCodeBlock(docText: string, pos: number): boolean {
-  const textBefore = docText.substring(0, pos)
-  const lines = textBefore.split('\n')
+type CodeBlockRange = [startLine: number, endLine: number]
+
+/** Compute all code-block line ranges in a single O(n) pass over the doc. */
+function computeCodeBlockRanges(doc: Text): CodeBlockRange[] {
+  const ranges: CodeBlockRange[] = []
   let inFence = false
-  for (const line of lines) {
-    if (/^\s*```/.test(line)) {
-      inFence = !inFence
+  let fenceStart = 0
+  let lineNum = 1
+
+  for (const line of iterLines(doc)) {
+    if (/^\s*```/.test(line.text)) {
+      if (inFence) {
+        ranges.push([fenceStart, lineNum])
+        inFence = false
+      } else {
+        fenceStart = lineNum
+        inFence = true
+      }
     }
+    lineNum++
   }
-  return inFence
+
+  // Unclosed fence — mark to end of doc
+  if (inFence) {
+    ranges.push([fenceStart, lineNum - 1])
+  }
+
+  return ranges
+}
+
+function isLineInCodeBlock(lineNum: number, ranges: CodeBlockRange[]): boolean {
+  return ranges.some(([start, end]) => lineNum >= start && lineNum <= end)
+}
+
+/** Efficiently iterate lines of a CM6 Text document (O(1) per line). */
+function* iterLines(doc: Text): Generator<{ from: number; text: string }> {
+  const len = doc.length
+  let pos = 0
+  while (pos < len) {
+    const line = doc.lineAt(pos)
+    yield { from: line.from, text: line.text }
+    pos = line.from + line.length + 1 // +1 for newline
+  }
 }
