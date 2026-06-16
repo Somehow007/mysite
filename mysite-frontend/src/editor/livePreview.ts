@@ -90,7 +90,21 @@ class TaskCheckboxWidget extends WidgetType {
 }
 class CalloutHeaderWidget extends WidgetType {
   constructor(private cType: string, private color: string, private icon: string) { super() }
-  toDOM() { const s = document.createElement('span'); s.className = 'cm-lp-callout-hdr'; s.style.cssText = `display:inline-flex;align-items:center;gap:0.35em;font-weight:600;font-size:0.875em;color:${this.color};font-family:var(--font-sans,sans-serif)`; s.innerHTML = `<span>${this.icon}</span><span>${this.cType}</span>`; return s }
+  toDOM() {
+    const s = document.createElement('span')
+    s.className = 'cm-lp-callout-hdr'
+    s.style.cssText = 'display:inline-flex;align-items:center;gap:0.5rem;font-family:var(--font-sans,sans-serif)'
+    const iconSpan = document.createElement('span')
+    iconSpan.style.cssText = `font-size:1rem;line-height:1;flex-shrink:0;color:${this.color}`
+    iconSpan.textContent = this.icon
+    const titleSpan = document.createElement('span')
+    titleSpan.className = 'cm-lp-callout-title'
+    titleSpan.style.cssText = 'font-weight:600;font-size:0.9375rem;color:var(--text-primary)'
+    titleSpan.textContent = this.cType
+    s.appendChild(iconSpan)
+    s.appendChild(titleSpan)
+    return s
+  }
 }
 class CodeFenceLabelWidget extends WidgetType {
   constructor(private lang: string) { super() }
@@ -99,13 +113,13 @@ class CodeFenceLabelWidget extends WidgetType {
 class KaTeXInlineWidget extends WidgetType {
   constructor(private latex: string) { super() }
   eq(other: KaTeXInlineWidget) { return this.latex === other.latex }
-  toDOM() { const s = document.createElement('span'); s.className = 'cm-lp-katex-inline'; s.style.cssText = 'display:inline;vertical-align:middle'; try { katex.render(this.latex, s, { throwOnError: false, displayMode: false, strict: false }) } catch { s.textContent = `$${this.latex}$` }; return s }
+  toDOM() { const s = document.createElement('span'); s.className = 'cm-lp-katex-inline'; s.style.cssText = 'display:inline;vertical-align:middle;font-size:1.1em;line-height:1.8'; try { katex.render(this.latex, s, { throwOnError: false, displayMode: false, strict: false }) } catch { s.textContent = `$${this.latex}$` }; return s }
 }
 class KaTeXDisplayWidget extends WidgetType {
   constructor(private latex: string) { super() }
   eq(other: KaTeXDisplayWidget) { return this.latex === other.latex }
   get estimatedHeight() { return 40 }
-  toDOM() { const d = document.createElement('div'); d.className = 'cm-lp-katex-display'; d.style.cssText = 'text-align:center;padding:0.5em 0;overflow-x:auto;overflow-y:visible'; try { katex.render(this.latex, d, { throwOnError: false, displayMode: true, strict: false }) } catch { d.textContent = `$$${this.latex}$$` }; return d }
+  toDOM() { const d = document.createElement('div'); d.className = 'cm-lp-katex-display'; d.style.cssText = 'text-align:center;padding:0.5em 0;overflow-x:auto;overflow-y:visible;margin:1.5em 0 2.2em'; try { katex.render(this.latex, d, { throwOnError: false, displayMode: true, strict: false }) } catch { d.textContent = `$$${this.latex}$$` }; return d }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -201,11 +215,13 @@ function headingDecos(text: string, from: number): PendingDeco[] {
   const level = m[1]!.length
   const markerLen = m[0].length
   const size = HEADING_SIZES[level - 1]!
-  const parts = [`font-size:${size}rem`, 'font-weight:600', 'color:var(--text-primary)', 'line-height:1.3', 'font-family:var(--font-sans,sans-serif)', 'text-decoration:none', 'border-bottom:none']
-  if (level === 2) parts.push('padding-bottom:0.3rem', 'border-bottom:1px solid var(--border)')
+  const markParts = [`font-size:${size}rem`, 'font-weight:600', 'color:var(--text-primary)', 'line-height:1.3', 'font-family:var(--font-sans,sans-serif)', 'text-decoration:none', 'border-bottom:none']
+  if (level === 2) markParts.push('padding-bottom:0.3rem', 'border-bottom:1px solid var(--border)')
+  const lineParts = ['margin-top:2em', 'margin-bottom:0.5em']
   return [
+    { from, to: from, deco: Decoration.line({ attributes: { style: lineParts.join(';') } }) },
     { from, to: from + markerLen, deco: Decoration.replace({}) },
-    { from: from + markerLen, to: from + text.length, deco: Decoration.mark({ attributes: { style: parts.join(';') } }) },
+    { from: from + markerLen, to: from + text.length, deco: Decoration.mark({ attributes: { style: markParts.join(';') } }) },
   ]
 }
 
@@ -224,6 +240,7 @@ function blockquoteDecos(text: string, from: number): PendingDeco[] {
   if (!m) return []
   const markerLen = m[0].length
   return [
+    { from, to: from, deco: Decoration.line({ attributes: { style: 'border-left:3px solid var(--accent);padding-left:1rem' } }) },
     { from, to: from + markerLen, deco: Decoration.replace({}) },
     { from: from + markerLen, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'color:var(--text-muted);font-style:italic' } }) },
   ]
@@ -231,12 +248,31 @@ function blockquoteDecos(text: string, from: number): PendingDeco[] {
 
 function codeBlockDecos(text: string, from: number, block: CodeBlock, ln: number): PendingDeco[] {
   const isFirst = ln === block.startLine, isLast = ln === block.endLine
-  if (isFirst) return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new CodeFenceLabelWidget(block.lang) }) }]
-  if (isLast) return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new CodeFenceLabelWidget('') }) }]
-  const parts = ['background-color:var(--code-bg)', 'border-left:1px solid var(--code-border)', 'border-right:1px solid var(--code-border)', 'padding-left:1.25rem', 'padding-right:1.5rem', 'font-family:var(--font-mono,ui-monospace,monospace)', 'font-size:0.875rem', 'line-height:1.7']
-  if (isFirst) parts.push('border-top:1px solid var(--code-border)', 'border-top-left-radius:8px', 'border-top-right-radius:8px', 'padding-top:1.25rem')
-  if (isLast) parts.push('border-bottom:1px solid var(--code-border)', 'border-bottom-left-radius:8px', 'border-bottom-right-radius:8px', 'padding-bottom:1.25rem')
-  return [{ from, to: from, deco: Decoration.line({ attributes: { style: parts.join(';') } }) }]
+  const result: PendingDeco[] = []
+
+  // Line decoration: background + borders on ALL lines (including fence lines)
+  const lineParts = [
+    'background-color:var(--code-bg)',
+    'border-left:1px solid var(--code-border)',
+    'border-right:1px solid var(--code-border)',
+    'padding-left:1.5rem',
+    'padding-right:1.5rem',
+    'font-family:var(--font-mono,ui-monospace,monospace)',
+    'font-size:0.875rem',
+    'line-height:1.7',
+  ]
+  if (isFirst) lineParts.push('border-top:1px solid var(--code-border)', 'border-top-left-radius:8px', 'border-top-right-radius:8px', 'padding-top:1.25rem')
+  if (isLast) lineParts.push('border-bottom:1px solid var(--code-border)', 'border-bottom-left-radius:8px', 'border-bottom-right-radius:8px', 'padding-bottom:1.25rem')
+  result.push({ from, to: from, deco: Decoration.line({ attributes: { style: lineParts.join(';') } }) })
+
+  // Replace fence markers with label / hidden
+  if (isFirst) {
+    result.push({ from, to: from + text.length, deco: Decoration.replace({ widget: new CodeFenceLabelWidget(block.lang) }) })
+  } else if (isLast) {
+    result.push({ from, to: from + text.length, deco: Decoration.replace({ widget: new CodeFenceLabelWidget('') }) })
+  }
+
+  return result
 }
 
 function mathBlockDecos(text: string, from: number, block: MathBlock, ln: number): PendingDeco[] {
@@ -251,9 +287,15 @@ function calloutDecos(text: string, from: number, block: CalloutBlock, ln: numbe
   const icon = CALLOUT_ICONS[block.calloutType] ?? '📝'
   const result: PendingDeco[] = []
   const isFirst = ln === block.startLine, isLast = ln === block.endLine
-  const lineParts = [`border-left:4px solid ${color}`, `background-color:color-mix(in srgb, ${color} 6%, transparent)`, 'padding-left:0.5rem']
-  if (isFirst) lineParts.push('border-radius:8px 0 0 0', 'padding-top:0.5rem')
-  if (isLast) lineParts.push('border-radius:0 0 0 8px', 'padding-bottom:0.5rem')
+  const lineParts = [
+    `border-left:4px solid ${color}`,
+    `border-right:1px solid color-mix(in srgb, ${color} 20%, transparent)`,
+    `background-color:color-mix(in srgb, ${color} 6%, transparent)`,
+    'padding-left:1rem',
+    'padding-right:1rem',
+  ]
+  if (isFirst) lineParts.push('border-top:1px solid color-mix(in srgb, ' + color + ' 20%, transparent)', 'border-top-left-radius:8px', 'border-top-right-radius:8px', 'padding-top:0.75rem')
+  if (isLast) lineParts.push('border-bottom:1px solid color-mix(in srgb, ' + color + ' 20%, transparent)', 'border-bottom-left-radius:8px', 'border-bottom-right-radius:8px', 'padding-bottom:0.75rem')
   result.push({ from, to: from, deco: Decoration.line({ attributes: { style: lineParts.join(';') } }) })
   if (isFirst) {
     const hm = text.match(/^>\s*\[!(\w+)\]\s?(.*)$/)
@@ -263,7 +305,7 @@ function calloutDecos(text: string, from: number, block: CalloutBlock, ln: numbe
       const bracketEnd = text.indexOf(']')
       const prefixEnd = bracketEnd + 1 + (text[bracketEnd + 1] === ' ' ? 1 : 0)
       result.push({ from, to: from + prefixEnd, deco: Decoration.replace({ widget: new CalloutHeaderWidget(type, color, icon) }) })
-      if (titleText.trim()) result.push({ from: from + prefixEnd, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'font-weight:600;color:var(--text-primary);text-decoration:none' } }) })
+      if (titleText.trim()) result.push({ from: from + prefixEnd, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'font-weight:600;font-size:0.9375rem;color:var(--text-primary)' } }) })
     } else {
       const m = text.match(/^>\s?/)
       if (m) result.push({ from, to: from + m[0].length, deco: Decoration.replace({}) })
