@@ -16,7 +16,7 @@ interface LineMarker {
   number?: number   // for ordered lists
 }
 
-interface ParsedLine {
+export interface ParsedLine {
   markers: LineMarker[]
   /** Everything after the prefix markers (may be empty) */
   content: string
@@ -133,7 +133,7 @@ function isInsideBlock(text: string, upToLineStart: number): boolean {
  *
  * Returns null if no syntax markers are found.
  */
-function parseLinePrefix(line: string): ParsedLine | null {
+export function parseLinePrefix(line: string): ParsedLine | null {
   let pos = 0
   const markers: LineMarker[] = []
 
@@ -196,7 +196,7 @@ function finishParse(line: string, prefixEnd: number, markers: LineMarker[]): Pa
  * Build the prefix string for the next line.
  * Ordered list numbers are incremented, task items are always unchecked.
  */
-function buildContinuation(parsed: ParsedLine): string {
+export function buildContinuation(parsed: ParsedLine): string {
   // Extract leading whitespace from rawPrefix
   const leadingWs = parsed.rawPrefix.match(/^(\s*)/)?.[1] ?? ''
   let result = leadingWs

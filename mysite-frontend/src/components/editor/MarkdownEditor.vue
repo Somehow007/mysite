@@ -530,9 +530,7 @@ onMounted(() => {
       bracketMatching(),
 
       // ── Keymaps ──
-      defaultKeymap,
-      historyKeymap,
-      indentWithTab,
+      keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
       customKeymap,
       enterContinuationKeymap,
       autoConvertKeymap,
