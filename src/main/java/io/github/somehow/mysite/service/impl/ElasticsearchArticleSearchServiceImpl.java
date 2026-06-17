@@ -9,12 +9,16 @@ import io.github.somehow.mysite.commons.context.UserContext;
 import io.github.somehow.mysite.config.ElasticsearchProperties;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.dao.entity.CategoryDO;
+import io.github.somehow.mysite.dao.entity.CollectionArticleDO;
+import io.github.somehow.mysite.dao.entity.CollectionDO;
 import io.github.somehow.mysite.dao.entity.TagDO;
 import io.github.somehow.mysite.dao.entity.UserDO;
 import io.github.somehow.mysite.dao.entity.UserFavoriteArticleDO;
 import io.github.somehow.mysite.elasticsearch.repository.ArticleEsRepository;
 import io.github.somehow.mysite.dao.mapper.ArticleMapper;
 import io.github.somehow.mysite.dao.mapper.CategoryMapper;
+import io.github.somehow.mysite.dao.mapper.CollectionArticleMapper;
+import io.github.somehow.mysite.dao.mapper.CollectionMapper;
 import io.github.somehow.mysite.dao.mapper.TagMapper;
 import io.github.somehow.mysite.dao.mapper.UserFavoriteArticleMapper;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
@@ -48,6 +52,8 @@ public class ElasticsearchArticleSearchServiceImpl implements ArticleSearchServi
     private final CategoryMapper categoryMapper;
     private final TagMapper tagMapper;
     private final UserFavoriteArticleMapper userFavoriteArticleMapper;
+    private final CollectionMapper collectionMapper;
+    private final CollectionArticleMapper collectionArticleMapper;
     private final ElasticsearchProperties elasticsearchProperties;
 
     @Override
@@ -248,6 +254,45 @@ public class ElasticsearchArticleSearchServiceImpl implements ArticleSearchServi
                 })
                 .collect(Collectors.toList());
 
+        // 批量查询文章所属合集信息
+        List<Long> esArticleIds = articles.stream().map(ArticleDO::getId).collect(Collectors.toList());
+        if (!esArticleIds.isEmpty()) {
+            List<CollectionArticleDO> collectionArticles = collectionArticleMapper.selectList(
+                    Wrappers.<CollectionArticleDO>lambdaQuery()
+                            .in(CollectionArticleDO::getArticleId, esArticleIds)
+                            .eq(CollectionArticleDO::getDelFlag, 0));
+            if (!CollectionUtils.isEmpty(collectionArticles)) {
+                List<Long> collectionIds = collectionArticles.stream()
+                        .map(CollectionArticleDO::getCollectionId)
+                        .distinct()
+                        .collect(Collectors.toList());
+                Map<Long, CollectionDO> collectionMap = new HashMap<>();
+                if (!collectionIds.isEmpty()) {
+                    collectionMapper.selectList(Wrappers.<CollectionDO>lambdaQuery()
+                            .in(CollectionDO::getId, collectionIds)
+                            .eq(CollectionDO::getDelFlag, 0))
+                            .forEach(c -> collectionMap.put(c.getId(), c));
+                }
+
+                Map<Long, CollectionArticleDO> articleCollectionMap = new HashMap<>();
+                for (CollectionArticleDO ca : collectionArticles) {
+                    articleCollectionMap.putIfAbsent(ca.getArticleId(), ca);
+                }
+
+                for (ArticlePageQueryRespDTO rec : records) {
+                    CollectionArticleDO ca = articleCollectionMap.get(rec.getId());
+                    if (ca != null) {
+                        rec.setCollectionId(ca.getCollectionId());
+                        rec.setCollectionSortOrder(ca.getSortOrder());
+                        CollectionDO col = collectionMap.get(ca.getCollectionId());
+                        if (col != null) {
+                            rec.setCollectionTitle(col.getTitle());
+                        }
+                    }
+                }
+            }
+        }
+
         String currentUserId = UserContext.getUserId();
         if (currentUserId != null && !records.isEmpty()) {
             List<String> articleIdStrs = records.stream()
@@ -326,6 +371,23 @@ public class ElasticsearchArticleSearchServiceImpl implements ArticleSearchServi
     }
 
     private ArticleDocument convertToDocument(ArticleDO article) {
+        // 查询文章所属合集
+        String collectionId = null;
+        String collectionTitle = null;
+        CollectionArticleDO ca = collectionArticleMapper.selectOne(Wrappers.<CollectionArticleDO>lambdaQuery()
+                .eq(CollectionArticleDO::getArticleId, article.getId())
+                .eq(CollectionArticleDO::getDelFlag, 0)
+                .last("LIMIT 1"));
+        if (ca != null) {
+            collectionId = ca.getCollectionId().toString();
+            CollectionDO collection = collectionMapper.selectOne(Wrappers.<CollectionDO>lambdaQuery()
+                    .eq(CollectionDO::getId, ca.getCollectionId())
+                    .eq(CollectionDO::getDelFlag, 0));
+            if (collection != null) {
+                collectionTitle = collection.getTitle();
+            }
+        }
+
         return ArticleDocument.builder()
                 .id(article.getId().toString())
                 .title(article.getTitle())
@@ -333,6 +395,8 @@ public class ElasticsearchArticleSearchServiceImpl implements ArticleSearchServi
                 .summary(article.getSummary())
                 .authorId(article.getAuthorId().toString())
                 .categoryId(article.getCategoryId() != null ? article.getCategoryId().toString() : null)
+                .collectionId(collectionId)
+                .collectionTitle(collectionTitle)
                 .createTime(article.getCreateTime())
                 .build();
     }

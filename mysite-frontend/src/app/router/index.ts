@@ -50,6 +50,11 @@ const router = createRouter({
           component: () => import('@/views/SearchView.vue'),
         },
         {
+          path: 'collection/:id',
+          name: 'collection',
+          component: () => import('@/views/CollectionView.vue'),
+        },
+        {
           path: 'favorites',
           name: 'favorites',
           component: () => import('@/views/FavoritesView.vue'),
@@ -119,6 +124,24 @@ const router = createRouter({
           meta: { requiresDeveloper: true },
         },
         {
+          path: 'collections',
+          name: 'collections',
+          component: () => import('@/views/CollectionManageView.vue'),
+          meta: { requiresDeveloper: true },
+        },
+        {
+          path: 'collections/new',
+          name: 'collection-new',
+          component: () => import('@/views/CollectionEditView.vue'),
+          meta: { requiresDeveloper: true },
+        },
+        {
+          path: 'collections/:id/edit',
+          name: 'collection-edit',
+          component: () => import('@/views/CollectionEditView.vue'),
+          meta: { requiresDeveloper: true },
+        },
+        {
           path: 'settings',
           name: 'settings',
           component: () => import('@/views/SettingsView.vue'),
@@ -148,11 +171,9 @@ router.beforeEach(async (to, _from, next) => {
 
   if (to.meta.requiresDeveloper && token) {
     const storedRole = getItem<string>('user_role')
-    if (storedRole) {
-      if (storedRole !== 'DEVELOPER') {
-        next({ name: 'dashboard' })
-        return
-      }
+    if (storedRole !== 'DEVELOPER') {
+      next({ name: 'dashboard' })
+      return
     }
   }
 

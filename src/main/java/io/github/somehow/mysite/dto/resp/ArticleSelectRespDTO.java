@@ -32,6 +32,12 @@ public class ArticleSelectRespDTO {
     private Date updateTime;
     private List<TagInfo> tags;
 
+    // 合集相关字段
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long collectionId;
+    private String collectionTitle;
+    private Integer collectionSortOrder;
+
     @Data
     public static class TagInfo {
         @JsonSerialize(using = ToStringSerializer.class)

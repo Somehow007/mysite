@@ -5,15 +5,18 @@ import io.github.somehow.mysite.commons.context.UserInfoDTO;
 import io.github.somehow.mysite.commons.enums.UserRole;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
+import io.github.somehow.mysite.dao.entity.CollectionArticleDO;
 import io.github.somehow.mysite.dao.entity.UserFavoriteArticleDO;
 import io.github.somehow.mysite.dao.mapper.ArticleMapper;
 import io.github.somehow.mysite.dao.mapper.ArticleTagMapper;
 import io.github.somehow.mysite.dao.mapper.CategoryMapper;
+import io.github.somehow.mysite.dao.mapper.CollectionArticleMapper;
 import io.github.somehow.mysite.dao.mapper.TagMapper;
 import io.github.somehow.mysite.dao.mapper.UserFavoriteArticleMapper;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
 import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.CategoryService;
+import io.github.somehow.mysite.service.CollectionService;
 import io.github.somehow.mysite.service.TagService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +25,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -56,6 +61,12 @@ class ArticleServiceImplDeleteTest {
 
     @Mock
     private UserMapper userMapper;
+
+    @Mock
+    private CollectionService collectionService;
+
+    @Mock
+    private CollectionArticleMapper collectionArticleMapper;
 
     @InjectMocks
     private ArticleServiceImpl articleService;
@@ -188,11 +199,35 @@ class ArticleServiceImplDeleteTest {
         when(articleMapper.delete(any())).thenReturn(1);
         when(articleTagMapper.physicalDeleteByArticleId(ARTICLE_ID)).thenReturn(3);
         when(userFavoriteArticleMapper.delete(any())).thenReturn(2);
+        when(collectionArticleMapper.selectList(any())).thenReturn(Collections.emptyList());
 
         articleService.deleteArticle(ARTICLE_ID);
 
         verify(articleTagMapper).physicalDeleteByArticleId(ARTICLE_ID);
         verify(userFavoriteArticleMapper).delete(any());
         verify(articleSearchService).deleteArticle(ARTICLE_ID);
+        verify(collectionArticleMapper).selectList(any());
+    }
+
+    @Test
+    void deleteArticle_shouldCleanupCollectionAssociations() {
+        ArticleDO article = createArticleDO(ARTICLE_ID, AUTHOR_ID, 0);
+        when(articleMapper.selectOne(any())).thenReturn(article);
+        when(articleMapper.delete(any())).thenReturn(1);
+        when(articleTagMapper.physicalDeleteByArticleId(ARTICLE_ID)).thenReturn(0);
+        when(userFavoriteArticleMapper.delete(any())).thenReturn(0);
+
+        // 模拟文章属于一个合集
+        CollectionArticleDO ca = new CollectionArticleDO();
+        ca.setId(1L);
+        ca.setCollectionId(100L);
+        ca.setArticleId(ARTICLE_ID);
+        when(collectionArticleMapper.selectList(any())).thenReturn(java.util.List.of(ca));
+        when(collectionArticleMapper.physicalDeleteByArticleId(ARTICLE_ID)).thenReturn(1);
+
+        articleService.deleteArticle(ARTICLE_ID);
+
+        verify(collectionArticleMapper).physicalDeleteByArticleId(ARTICLE_ID);
+        verify(collectionService).evictCollectionCache();
     }
 }

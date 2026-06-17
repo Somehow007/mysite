@@ -1,24 +1,20 @@
 /**
  * CodeMirror 6 Live Preview / WYSIWYG extension.
  *
- * Obsidian-style: hides Markdown syntax, replacing it with styled visual
- * representations that match the published browser output.
+ * Design principles:
+ *   1. NEVER use Decoration.replace({ block: true }) — it causes crashes
+ *   2. NEVER mix Decoration.line with Decoration.replace on the same line
+ *      when the replace covers the entire line content
+ *   3. Use Decoration.line for line-level styling (backgrounds, borders)
+ *   4. Use Decoration.replace({}) (without block) for hiding syntax markers
+ *   5. Use Decoration.replace({ widget }) (without block) for inline widgets
+ *   6. Use Decoration.set(ranges, true) for auto-sorting
+ *   7. Wrap build() in try-catch for graceful degradation
  *
- * Key behaviour:
- *   - Block-level elements (code/callout/math): when cursor is inside the
- *     block, the entire block shows raw syntax
- *   - Line-level elements (headings/lists/blockquotes): when cursor is on
- *     that line, the line shows raw syntax
- *   - Inline elements (bold/italic/code/links/LaTeX): when cursor is INSIDE
- *     a specific inline span, only THAT span shows raw syntax; all other
- *     inline spans on the same line are still rendered
- *
- * Architecture:
- *   1. computeBlocks()  — single-pass block detection
- *   2. *Decos()         — pure functions returning PendingDeco[]
- *   3. parseInlineSpans — returns spans with {from,to} for cursor filtering
- *   4. build()          — collects, filters by cursor, sorts, writes builder
- *   5. InlineDecoCache  — LRU cache keyed by line text hash
+ * Cursor behaviour:
+ *   - Block-level (code/callout/math): cursor in block → entire block raw
+ *   - Line-level (heading/list/bq): cursor on line → line raw
+ *   - Inline (bold/italic/code/link/LaTeX): cursor in span → only that span raw
  */
 
 import {
@@ -27,8 +23,9 @@ import {
   Decoration,
   WidgetType,
   EditorView,
+  type DecorationSet,
 } from '@codemirror/view'
-import { RangeSetBuilder, Text } from '@codemirror/state'
+import { Text } from '@codemirror/state'
 import katex from 'katex'
 
 // ═══════════════════════════════════════════════════════════════
@@ -40,18 +37,8 @@ interface CalloutBlock { type: 'callout'; startLine: number; endLine: number; ca
 interface MathBlock { type: 'math'; startLine: number; endLine: number; content: string }
 type Block = CodeBlock | CalloutBlock | MathBlock
 
-interface PendingDeco {
-  from: number
-  to: number
-  deco: Decoration
-}
-
-/** An inline syntax span with its absolute position range. */
-interface InlineSpan {
-  from: number
-  to: number
-  decos: PendingDeco[]
-}
+interface PendingDeco { from: number; to: number; deco: Decoration }
+interface InlineSpan { from: number; to: number; decos: PendingDeco[] }
 
 // ═══════════════════════════════════════════════════════════════
 // Callout maps
@@ -74,7 +61,7 @@ const CALLOUT_ICONS: Record<string, string> = {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Widgets
+// Widgets (all inline — NO block:true anywhere)
 // ═══════════════════════════════════════════════════════════════
 
 class BulletWidget extends WidgetType {
@@ -108,7 +95,17 @@ class CalloutHeaderWidget extends WidgetType {
 }
 class CodeFenceLabelWidget extends WidgetType {
   constructor(private lang: string) { super() }
-  toDOM() { const s = document.createElement('span'); s.className = 'cm-lp-fence-label'; if (this.lang) { s.textContent = this.lang; s.style.cssText = 'font-size:0.7em;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:500' } else { s.style.cssText = 'display:inline-block;height:0.4em' }; return s }
+  toDOM() {
+    const s = document.createElement('span')
+    s.className = 'cm-lp-fence-label'
+    if (this.lang) {
+      s.textContent = this.lang
+      s.style.cssText = 'font-size:0.7em;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:500'
+    } else {
+      s.style.cssText = 'display:inline-block;height:0.4em'
+    }
+    return s
+  }
 }
 class KaTeXInlineWidget extends WidgetType {
   constructor(private latex: string) { super() }
@@ -123,28 +120,18 @@ class KaTeXDisplayWidget extends WidgetType {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Inline decoration cache — keyed by line text
+// Inline decoration cache
 // ═══════════════════════════════════════════════════════════════
 
 class InlineDecoCache {
   private cache = new Map<string, InlineSpan[]>()
   private static MAX_SIZE = 256
-
-  get(text: string): InlineSpan[] | undefined {
-    return this.cache.get(text)
-  }
-
+  get(text: string): InlineSpan[] | undefined { return this.cache.get(text) }
   set(text: string, spans: InlineSpan[]): void {
-    if (this.cache.size >= InlineDecoCache.MAX_SIZE) {
-      const firstKey = this.cache.keys().next().value
-      if (firstKey !== undefined) this.cache.delete(firstKey)
-    }
+    if (this.cache.size >= InlineDecoCache.MAX_SIZE) { const k = this.cache.keys().next().value; if (k !== undefined) this.cache.delete(k) }
     this.cache.set(text, spans)
   }
-
-  invalidate(): void {
-    this.cache.clear()
-  }
+  invalidate(): void { this.cache.clear() }
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -204,7 +191,7 @@ function findBlock(lineNum: number, blocks: Block[]): Block | null {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Per-line decoration — pure functions returning PendingDeco[]
+// Per-line decoration functions
 // ═══════════════════════════════════════════════════════════════
 
 const HEADING_SIZES = [1.875, 1.5, 1.25, 1.125, 1.0, 0.875]
@@ -217,9 +204,8 @@ function headingDecos(text: string, from: number): PendingDeco[] {
   const size = HEADING_SIZES[level - 1]!
   const markParts = [`font-size:${size}rem`, 'font-weight:600', 'color:var(--text-primary)', 'line-height:1.3', 'font-family:var(--font-sans,sans-serif)', 'text-decoration:none', 'border-bottom:none']
   if (level === 2) markParts.push('padding-bottom:0.3rem', 'border-bottom:1px solid var(--border)')
-  const lineParts = ['margin-top:2em', 'margin-bottom:0.5em']
   return [
-    { from, to: from, deco: Decoration.line({ attributes: { style: lineParts.join(';') } }) },
+    { from, to: from, deco: Decoration.line({ attributes: { style: 'margin-top:2em;margin-bottom:0.5em' } }) },
     { from, to: from + markerLen, deco: Decoration.replace({}) },
     { from: from + markerLen, to: from + text.length, deco: Decoration.mark({ attributes: { style: markParts.join(';') } }) },
   ]
@@ -246,11 +232,22 @@ function blockquoteDecos(text: string, from: number): PendingDeco[] {
   ]
 }
 
+/**
+ * Code block decorations.
+ *
+ * Strategy: ALL lines (including fence lines) get Decoration.line for
+ * background/borders. Fence lines additionally get Decoration.replace
+ * to hide the ``` markers and show a language label widget instead.
+ *
+ * This is safe because Decoration.replace without block:true keeps the
+ * content within the line element, so Decoration.line styling applies.
+ */
 function codeBlockDecos(text: string, from: number, block: CodeBlock, ln: number): PendingDeco[] {
-  const isFirst = ln === block.startLine, isLast = ln === block.endLine
+  const isFirst = ln === block.startLine
+  const isLast = ln === block.endLine
   const result: PendingDeco[] = []
 
-  // Line decoration: background + borders on ALL lines (including fence lines)
+  // Line decoration for ALL lines in the code block
   const lineParts = [
     'background-color:var(--code-bg)',
     'border-left:1px solid var(--code-border)',
@@ -265,7 +262,7 @@ function codeBlockDecos(text: string, from: number, block: CodeBlock, ln: number
   if (isLast) lineParts.push('border-bottom:1px solid var(--code-border)', 'border-bottom-left-radius:8px', 'border-bottom-right-radius:8px', 'padding-bottom:1.25rem')
   result.push({ from, to: from, deco: Decoration.line({ attributes: { style: lineParts.join(';') } }) })
 
-  // Replace fence markers with label / hidden
+  // Replace fence markers with label widget (inline replace — no block:true)
   if (isFirst) {
     result.push({ from, to: from + text.length, deco: Decoration.replace({ widget: new CodeFenceLabelWidget(block.lang) }) })
   } else if (isLast) {
@@ -275,10 +272,31 @@ function codeBlockDecos(text: string, from: number, block: CodeBlock, ln: number
   return result
 }
 
+/**
+ * Math block decorations.
+ *
+ * Single-line $$ E=mc^2 $$: replace entire line with KaTeX widget.
+ * Multi-line: hide $$ fence lines, render content on first content line.
+ * All uses inline replace (no block:true).
+ */
 function mathBlockDecos(text: string, from: number, block: MathBlock, ln: number): PendingDeco[] {
-  if (block.startLine === block.endLine) return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new KaTeXDisplayWidget(block.content) }) }]
-  if (ln === block.startLine || ln === block.endLine) return [{ from, to: from + text.length, deco: Decoration.replace({}) }]
-  if (ln === block.startLine + 1) return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new KaTeXDisplayWidget(block.content) }) }]
+  if (block.startLine === block.endLine) {
+    return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new KaTeXDisplayWidget(block.content) }) }]
+  }
+  // 2-line math block: $$ \n $$ — no content, render empty KaTeX on startLine
+  if (block.startLine + 1 === block.endLine) {
+    if (ln === block.startLine) {
+      return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new KaTeXDisplayWidget(block.content) }) }]
+    }
+    return [{ from, to: from + text.length, deco: Decoration.replace({}) }]
+  }
+  // 3+ line math block
+  if (ln === block.startLine || ln === block.endLine) {
+    return [{ from, to: from + text.length, deco: Decoration.replace({}) }]
+  }
+  if (ln === block.startLine + 1) {
+    return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new KaTeXDisplayWidget(block.content) }) }]
+  }
   return [{ from, to: from + text.length, deco: Decoration.replace({}) }]
 }
 
@@ -287,6 +305,7 @@ function calloutDecos(text: string, from: number, block: CalloutBlock, ln: numbe
   const icon = CALLOUT_ICONS[block.calloutType] ?? '📝'
   const result: PendingDeco[] = []
   const isFirst = ln === block.startLine, isLast = ln === block.endLine
+
   const lineParts = [
     `border-left:4px solid ${color}`,
     `border-right:1px solid color-mix(in srgb, ${color} 20%, transparent)`,
@@ -297,6 +316,7 @@ function calloutDecos(text: string, from: number, block: CalloutBlock, ln: numbe
   if (isFirst) lineParts.push('border-top:1px solid color-mix(in srgb, ' + color + ' 20%, transparent)', 'border-top-left-radius:8px', 'border-top-right-radius:8px', 'padding-top:0.75rem')
   if (isLast) lineParts.push('border-bottom:1px solid color-mix(in srgb, ' + color + ' 20%, transparent)', 'border-bottom-left-radius:8px', 'border-bottom-right-radius:8px', 'padding-bottom:0.75rem')
   result.push({ from, to: from, deco: Decoration.line({ attributes: { style: lineParts.join(';') } }) })
+
   if (isFirst) {
     const hm = text.match(/^>\s*\[!(\w+)\]\s?(.*)$/)
     if (hm) {
@@ -321,88 +341,61 @@ function calloutDecos(text: string, from: number, block: CalloutBlock, ln: numbe
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Inline span parsing — returns spans with absolute positions
+// Inline span parsing
 // ═══════════════════════════════════════════════════════════════
 
 function parseInlineSpans(text: string, lineFrom: number): InlineSpan[] {
   const spans: InlineSpan[] = []
 
-  // Bold: **text**
   for (const m of text.matchAll(/\*\*(.+?)\*\*/g)) {
-    const s = lineFrom + m.index!
-    const e = s + m[0].length
-    spans.push({
-      from: s, to: e,
-      decos: [
-        { from: s, to: s + 2, deco: Decoration.replace({}) },
-        { from: s + 2, to: e - 2, deco: Decoration.mark({ attributes: { style: 'font-weight:600;color:var(--text-primary)' } }) },
-        { from: e - 2, to: e, deco: Decoration.replace({}) },
-      ],
-    })
+    const s = lineFrom + m.index!, e = s + m[0].length
+    spans.push({ from: s, to: e, decos: [
+      { from: s, to: s + 2, deco: Decoration.replace({}) },
+      { from: s + 2, to: e - 2, deco: Decoration.mark({ attributes: { style: 'font-weight:600;color:var(--text-primary)' } }) },
+      { from: e - 2, to: e, deco: Decoration.replace({}) },
+    ] })
   }
 
-  // Italic: *text*
   for (const m of text.matchAll(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g)) {
-    const s = lineFrom + m.index!
-    const e = s + m[0].length
-    spans.push({
-      from: s, to: e,
-      decos: [
-        { from: s, to: s + 1, deco: Decoration.replace({}) },
-        { from: s + 1, to: e - 1, deco: Decoration.mark({ attributes: { style: 'font-style:italic' } }) },
-        { from: e - 1, to: e, deco: Decoration.replace({}) },
-      ],
-    })
+    const s = lineFrom + m.index!, e = s + m[0].length
+    spans.push({ from: s, to: e, decos: [
+      { from: s, to: s + 1, deco: Decoration.replace({}) },
+      { from: s + 1, to: e - 1, deco: Decoration.mark({ attributes: { style: 'font-style:italic' } }) },
+      { from: e - 1, to: e, deco: Decoration.replace({}) },
+    ] })
   }
 
-  // Inline code: `code`
   for (const m of text.matchAll(/`([^`]+)`/g)) {
-    const s = lineFrom + m.index!
-    const e = s + m[0].length
-    spans.push({
-      from: s, to: e,
-      decos: [
-        { from: s, to: s + 1, deco: Decoration.replace({}) },
-        { from: s + 1, to: e - 1, deco: Decoration.mark({ attributes: { style: 'font-family:var(--font-mono,ui-monospace,monospace);font-size:0.875em;padding:0.2em 0.4em;border-radius:4px;background-color:var(--bg-code)' } }) },
-        { from: e - 1, to: e, deco: Decoration.replace({}) },
-      ],
-    })
+    const s = lineFrom + m.index!, e = s + m[0].length
+    spans.push({ from: s, to: e, decos: [
+      { from: s, to: s + 1, deco: Decoration.replace({}) },
+      { from: s + 1, to: e - 1, deco: Decoration.mark({ attributes: { style: 'font-family:var(--font-mono,ui-monospace,monospace);font-size:0.875em;padding:0.2em 0.4em;border-radius:4px;background-color:var(--bg-code)' } }) },
+      { from: e - 1, to: e, deco: Decoration.replace({}) },
+    ] })
   }
 
-  // Links: [text](url)
   for (const m of text.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)) {
-    const s = lineFrom + m.index!
-    const e = s + m[0].length
-    const textStart = s + 1
-    const textEnd = textStart + m[1]!.length
-    spans.push({
-      from: s, to: e,
-      decos: [
-        { from: s, to: s + 1, deco: Decoration.replace({}) },
-        { from: textStart, to: textEnd, deco: Decoration.mark({ attributes: { style: 'text-decoration:underline;text-underline-offset:2px;text-decoration-color:var(--border);color:var(--accent)' } }) },
-        { from: textEnd, to: e, deco: Decoration.replace({}) },
-      ],
-    })
+    const s = lineFrom + m.index!, e = s + m[0].length
+    const ts = s + 1, te = ts + m[1]!.length
+    spans.push({ from: s, to: e, decos: [
+      { from: s, to: s + 1, deco: Decoration.replace({}) },
+      { from: ts, to: te, deco: Decoration.mark({ attributes: { style: 'text-decoration:underline;text-underline-offset:2px;text-decoration-color:var(--border);color:var(--accent)' } }) },
+      { from: te, to: e, deco: Decoration.replace({}) },
+    ] })
   }
 
-  // Inline math: $...$
   for (const m of text.matchAll(/(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g)) {
-    const s = lineFrom + m.index!
-    const e = s + m[0].length
-    spans.push({
-      from: s, to: e,
-      decos: [
-        { from: s, to: e, deco: Decoration.replace({ widget: new KaTeXInlineWidget(m[1]!) }) },
-      ],
-    })
+    const s = lineFrom + m.index!, e = s + m[0].length
+    spans.push({ from: s, to: e, decos: [
+      { from: s, to: e, deco: Decoration.replace({ widget: new KaTeXInlineWidget(m[1]!) }) },
+    ] })
   }
 
   return spans
 }
 
-/** Check if cursor position is inside an inline span (with 1-char padding for markers). */
 function cursorInSpan(cursor: number, span: InlineSpan): boolean {
-  return cursor >= span.from && cursor <= span.to
+  return cursor >= span.from && cursor < span.to
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -412,10 +405,11 @@ function cursorInSpan(cursor: number, span: InlineSpan): boolean {
 export function livePreview() {
   return ViewPlugin.fromClass(
     class {
-      decorations: RangeSet<Decoration>
+      decorations: DecorationSet = Decoration.none
       private _blocks: Block[] = []
-      private _docId = -1
+      private _lastDoc: Text | null = null
       private _inlineCache = new InlineDecoCache()
+      private _errorCount = 0
 
       constructor(view: EditorView) {
         this.decorations = this.build(view)
@@ -424,27 +418,39 @@ export function livePreview() {
       update(update: ViewUpdate) {
         if (update.docChanged) {
           this._inlineCache.invalidate()
+          this._lastDoc = null // force recompute blocks
         }
         if (update.docChanged || update.selectionSet || update.viewportChanged) {
           this.decorations = this.build(update.view)
         }
       }
 
-      build(view: EditorView): RangeSet<Decoration> {
+      build(view: EditorView): DecorationSet {
+        try {
+          const result = this._build(view)
+          this._errorCount = 0
+          return result
+        } catch (e) {
+          this._errorCount++
+          if (this._errorCount <= 3) console.warn('[livePreview] build error:', e)
+          if (this._errorCount >= 5) return Decoration.none // too many errors, disable
+          return this.decorations
+        }
+      }
+
+      _build(view: EditorView): DecorationSet {
         const doc = view.state.doc
         const cursor = view.state.selection.main.head
         const cursorLine = doc.lineAt(cursor).number
 
-        // Recompute blocks only when document changes
-        const docId = doc.length * 1000003 + doc.lines
-        if (this._docId !== docId) {
+        // Recompute blocks whenever doc reference changes (covers all content changes)
+        if (this._lastDoc !== doc) {
           this._blocks = computeBlocks(doc)
-          this._docId = docId
+          this._lastDoc = doc
         }
 
         const cursorBlock = findBlock(cursorLine, this._blocks)
 
-        // Determine visible range
         const vr = view.visibleRanges
         let visStart = 1, visEnd = doc.lines
         if (vr.length > 0) {
@@ -461,7 +467,6 @@ export function livePreview() {
           const { from, text } = line
           const block = findBlock(ln, this._blocks)
 
-          // If cursor is inside this block, show raw syntax for the entire block
           if (block && cursorBlock && block === cursorBlock) continue
 
           if (block) {
@@ -473,61 +478,31 @@ export function livePreview() {
             continue
           }
 
-          // ── Line-level patterns: skip entire line if cursor is here ──
           if (ln !== cursorLine) {
             let matched = false
             const hd = headingDecos(text, from)
             if (hd.length > 0) { pending.push(...hd); matched = true }
-            if (!matched) {
-              const ld = listDecos(text, from)
-              if (ld.length > 0) { pending.push(...ld); matched = true }
-            }
-            if (!matched) {
-              const bd = blockquoteDecos(text, from)
-              if (bd.length > 0) { pending.push(...bd); matched = true }
-            }
+            if (!matched) { const ld = listDecos(text, from); if (ld.length > 0) { pending.push(...ld); matched = true } }
+            if (!matched) { const bd = blockquoteDecos(text, from); if (bd.length > 0) { pending.push(...bd); matched = true } }
             if (matched) continue
           }
 
-          // ── Inline patterns: cursor-aware span filtering ──
-          // On the cursor line, only render spans that DON'T contain the cursor.
-          // On other lines, render all spans.
           const isCursorLine = ln === cursorLine
-
-          // Use cache for inline span parsing (text-based, position-independent)
           let spans = this._inlineCache.get(text)
-          if (!spans) {
-            // Parse with offset 0, then adjust — cache is text-based
-            const rawSpans = parseInlineSpans(text, 0)
-            spans = rawSpans
-            this._inlineCache.set(text, rawSpans)
-          }
+          if (!spans) { spans = parseInlineSpans(text, 0); this._inlineCache.set(text, spans) }
 
-          // Rebase spans from cached (offset 0) to actual line position
           for (const span of spans) {
-            if (isCursorLine && cursorInSpan(cursor, { from: span.from + from, to: span.to + from })) {
-              // Cursor is inside this span — show raw syntax, skip decoration
-              continue
-            }
-            // Add decorations with rebased positions
+            if (isCursorLine && cursorInSpan(cursor, { from: span.from + from, to: span.to + from })) continue
             for (const d of span.decos) {
-              pending.push({
-                from: d.from + from,
-                to: d.to + from,
-                deco: d.deco,
-              })
+              pending.push({ from: d.from + from, to: d.to + from, deco: d.deco })
             }
           }
         }
 
-        // ── Sort by position, then write to builder ──
-        pending.sort((a, b) => a.from - b.from || a.to - b.to)
-
-        const builder = new RangeSetBuilder<Decoration>()
-        for (const p of pending) {
-          builder.add(p.from, p.to, p.deco)
-        }
-        return builder.finish()
+        return Decoration.set(
+          pending.map(p => p.deco.range(p.from, p.to)),
+          true,
+        )
       }
     },
     { decorations: (v) => v.decorations },

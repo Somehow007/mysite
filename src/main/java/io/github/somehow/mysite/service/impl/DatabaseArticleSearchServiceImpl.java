@@ -10,12 +10,16 @@ import io.github.somehow.mysite.config.ElasticsearchProperties;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.dao.entity.ArticleTagDO;
 import io.github.somehow.mysite.dao.entity.CategoryDO;
+import io.github.somehow.mysite.dao.entity.CollectionArticleDO;
+import io.github.somehow.mysite.dao.entity.CollectionDO;
 import io.github.somehow.mysite.dao.entity.TagDO;
 import io.github.somehow.mysite.dao.entity.UserDO;
 import io.github.somehow.mysite.dao.entity.UserFavoriteArticleDO;
 import io.github.somehow.mysite.dao.mapper.ArticleMapper;
 import io.github.somehow.mysite.dao.mapper.ArticleTagMapper;
 import io.github.somehow.mysite.dao.mapper.CategoryMapper;
+import io.github.somehow.mysite.dao.mapper.CollectionArticleMapper;
+import io.github.somehow.mysite.dao.mapper.CollectionMapper;
 import io.github.somehow.mysite.dao.mapper.TagMapper;
 import io.github.somehow.mysite.dao.mapper.UserFavoriteArticleMapper;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
@@ -47,6 +51,8 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
     private final TagMapper tagMapper;
     private final ArticleTagMapper articleTagMapper;
     private final UserFavoriteArticleMapper userFavoriteArticleMapper;
+    private final CollectionMapper collectionMapper;
+    private final CollectionArticleMapper collectionArticleMapper;
     private final ElasticsearchProperties elasticsearchProperties;
 
     @Override
@@ -202,6 +208,45 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
                     return dto;
                 })
                 .collect(Collectors.toList());
+
+        // 批量查询文章所属合集信息
+        List<Long> articleIds = articles.stream().map(ArticleDO::getId).collect(Collectors.toList());
+        if (!articleIds.isEmpty()) {
+            List<CollectionArticleDO> collectionArticles = collectionArticleMapper.selectList(
+                    Wrappers.<CollectionArticleDO>lambdaQuery()
+                            .in(CollectionArticleDO::getArticleId, articleIds)
+                            .eq(CollectionArticleDO::getDelFlag, 0));
+            if (!CollectionUtils.isEmpty(collectionArticles)) {
+                List<Long> collectionIds = collectionArticles.stream()
+                        .map(CollectionArticleDO::getCollectionId)
+                        .distinct()
+                        .collect(Collectors.toList());
+                Map<Long, CollectionDO> collectionMap = new HashMap<>();
+                if (!collectionIds.isEmpty()) {
+                    collectionMapper.selectList(Wrappers.<CollectionDO>lambdaQuery()
+                            .in(CollectionDO::getId, collectionIds)
+                            .eq(CollectionDO::getDelFlag, 0))
+                            .forEach(c -> collectionMap.put(c.getId(), c));
+                }
+
+                Map<Long, CollectionArticleDO> articleCollectionMap = new HashMap<>();
+                for (CollectionArticleDO ca : collectionArticles) {
+                    articleCollectionMap.putIfAbsent(ca.getArticleId(), ca);
+                }
+
+                for (ArticlePageQueryRespDTO rec : records) {
+                    CollectionArticleDO ca = articleCollectionMap.get(rec.getId());
+                    if (ca != null) {
+                        rec.setCollectionId(ca.getCollectionId());
+                        rec.setCollectionSortOrder(ca.getSortOrder());
+                        CollectionDO col = collectionMap.get(ca.getCollectionId());
+                        if (col != null) {
+                            rec.setCollectionTitle(col.getTitle());
+                        }
+                    }
+                }
+            }
+        }
 
         String currentUserId = UserContext.getUserId();
         if (currentUserId != null && !records.isEmpty()) {

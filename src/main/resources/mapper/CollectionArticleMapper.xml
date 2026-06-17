@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.somehow.mysite.dao.mapper.CollectionArticleMapper">
+    <insert id="batchInsert" parameterType="java.util.List">
+        INSERT INTO t_collection_article (id, collection_id, article_id, sort_order, create_time, update_time, del_flag)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.id}, #{item.collectionId}, #{item.articleId}, #{item.sortOrder}, #{item.createTime}, #{item.updateTime}, 0)
+        </foreach>
+    </insert>
+</mapper>

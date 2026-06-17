@@ -163,6 +163,44 @@ CREATE TABLE IF NOT EXISTS `t_user_operation_log` (
     KEY `idx_create_time` (`create_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户操作日志表';
 
+-- ==============================================
+-- 12. 文章合集表 (t_collection)
+-- ==============================================
+CREATE TABLE IF NOT EXISTS `t_collection` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `title` VARCHAR(200) NOT NULL COMMENT '合集标题',
+    `description` VARCHAR(500) DEFAULT NULL COMMENT '合集描述',
+    `cover_image` VARCHAR(500) DEFAULT NULL COMMENT '合集封面图片URL',
+    `author_id` BIGINT NOT NULL COMMENT '创建者ID',
+    `article_count` INT NOT NULL DEFAULT 0 COMMENT '合集内文章数量',
+    `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序序号',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '删除标识 0:未删除 1:已删除',
+    PRIMARY KEY (`id`),
+    KEY `idx_author_id` (`author_id`),
+    KEY `idx_sort_order` (`sort_order`),
+    KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文章合集表';
+
+-- ==============================================
+-- 13. 合集-文章关联表 (t_collection_article)
+-- ==============================================
+CREATE TABLE IF NOT EXISTS `t_collection_article` (
+    `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `collection_id` BIGINT NOT NULL COMMENT '合集ID',
+    `article_id` BIGINT NOT NULL COMMENT '文章ID',
+    `sort_order` INT NOT NULL DEFAULT 0 COMMENT '在合集内的排序序号',
+    `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '删除标识 0:未删除 1:已删除',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_collection_article` (`collection_id`, `article_id`),
+    KEY `idx_collection_id` (`collection_id`),
+    KEY `idx_article_id` (`article_id`),
+    KEY `idx_collection_sort` (`collection_id`, `sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='合集文章关联表';
+
 SELECT '表结构创建完成' AS message;
 
 -- ==============================================

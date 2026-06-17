@@ -97,6 +97,24 @@ VALUES
     (8, 14)   -- Docker -> Git
 ON DUPLICATE KEY UPDATE `article_id` = `article_id`;
 
+-- ==============================================
+-- 7. 示例合集数据
+-- ==============================================
+INSERT INTO `t_collection` (`title`, `description`, `cover_image`, `author_id`, `article_count`, `sort_order`)
+VALUES
+    ('Spring Boot 系列', '从入门到精通的 Spring Boot 系列教程', 'https://picsum.photos/800/400?random=10', 1, 1, 0),
+    ('前端技术精选', '前端开发核心技术深度解析', 'https://picsum.photos/800/400?random=11', 1, 1, 1)
+ON DUPLICATE KEY UPDATE `title` = `title`;
+
+-- ==============================================
+-- 8. 合集-文章关联数据
+-- ==============================================
+INSERT INTO `t_collection_article` (`collection_id`, `article_id`, `sort_order`)
+VALUES
+    (1, 3, 0),
+    (2, 2, 0)
+ON DUPLICATE KEY UPDATE `collection_id` = `collection_id`;
+
 ALTER TABLE `t_user` ADD COLUMN IF NOT EXISTS `avatar` VARCHAR(500) DEFAULT NULL COMMENT '头像URL' AFTER `follower_count`;
 
 SELECT '初始化数据插入完成' AS message;

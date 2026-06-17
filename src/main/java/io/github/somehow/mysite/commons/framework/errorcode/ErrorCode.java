@@ -107,6 +107,14 @@ public enum ErrorCode implements IErrorCode {
     COMMENT_PARENT_NOT_FOUND("A090108", "父评论不存在"),
     COMMENT_STATUS_INVALID("A090109", "无效的评论状态"),
 
+    // ---------- A10: 合集模块错误 ----------
+    COLLECTION_ERROR("A100001", "合集模块错误"),
+    COLLECTION_NOT_FOUND("A100100", "合集不存在"),
+    COLLECTION_TITLE_REQUIRED("A100101", "合集标题不能为空"),
+    COLLECTION_ARTICLE_ALREADY_EXISTS("A100102", "文章已在该合集中"),
+    COLLECTION_ARTICLE_NOT_IN_COLLECTION("A100103", "文章不在该合集中"),
+    COLLECTION_PERMISSION_DENIED("A100104", "权限不足，只能操作自己的合集"),
+
     // ==================== B: 服务端错误 ====================
     SERVICE_ERROR("B000001", "系统执行出错"),
     SERVICE_TIMEOUT_ERROR("B000100", "系统执行超时"),

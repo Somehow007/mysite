@@ -22,11 +22,13 @@ import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
 import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.ArticleService;
 import io.github.somehow.mysite.service.CategoryService;
+import io.github.somehow.mysite.service.CollectionService;
 import io.github.somehow.mysite.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -53,9 +55,12 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     private final TagService tagService;
     private final TagMapper tagMapper;
     private final ArticleTagMapper articleTagMapper;
+    private final CollectionService collectionService;
+    private final CollectionArticleMapper collectionArticleMapper;
 
     @Override
     @Transactional
+    @CacheEvict(value = "article_nav", allEntries = true)
     public void createArticle(ArticleCreateReqDTO requestParam) {
         if (Objects.isNull(requestParam)) {
             throw new ClientException(ErrorCode.ARTICLE_PARAM_REQUIRED);
@@ -95,6 +100,15 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             articleTagMapper.batchInsert(tagList);
         }
 
+        // 如果指定了合集ID，将文章加入合集
+        if (requestParam.getCollectionId() != null) {
+            try {
+                collectionService.addArticleToCollection(requestParam.getCollectionId(), articleDO.getId());
+            } catch (ClientException e) {
+                log.warn("新建文章加入合集失败, articleId={}, collectionId={}", articleDO.getId(), requestParam.getCollectionId(), e);
+            }
+        }
+
         articleSearchService.indexArticle(articleDO);
         categoryService.evictCategoryCache();
         tagService.evictTagCache();
@@ -102,7 +116,10 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
     @Override
     @Transactional
-    @CacheEvict(value = "article_detail", key = "#requestParam.id")
+    @Caching(evict = {
+            @CacheEvict(value = "article_detail", key = "#requestParam.id"),
+            @CacheEvict(value = "article_nav", allEntries = true)
+    })
     public void updateArticle(ArticleUpdateReqDTO requestParam) {
         if (Objects.isNull(requestParam)) {
             throw new ClientException(ErrorCode.ARTICLE_PARAM_REQUIRED);
@@ -156,7 +173,10 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
     @Override
     @Transactional
-    @CacheEvict(value = "article_detail", key = "#id")
+    @Caching(evict = {
+            @CacheEvict(value = "article_detail", key = "#id"),
+            @CacheEvict(value = "article_nav", allEntries = true)
+    })
     public void deleteArticle(Long id) {
         checkArticleOwnership(id);
 
@@ -169,6 +189,21 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         }
 
         articleTagMapper.physicalDeleteByArticleId(id);
+
+        // 清理合集关联记录并递减合集文章计数
+        List<CollectionArticleDO> collectionRelations = collectionArticleMapper.selectList(
+                Wrappers.lambdaQuery(CollectionArticleDO.class)
+                        .eq(CollectionArticleDO::getArticleId, id)
+                        .eq(CollectionArticleDO::getDelFlag, 0));
+        if (!CollectionUtils.isEmpty(collectionRelations)) {
+            Set<Long> affectedCollectionIds = collectionRelations.stream()
+                    .map(CollectionArticleDO::getCollectionId)
+                    .collect(Collectors.toSet());
+            collectionArticleMapper.physicalDeleteByArticleId(id);
+            for (Long collectionId : affectedCollectionIds) {
+                collectionService.evictCollectionCache();
+            }
+        }
 
         userFavoriteArticleMapper.delete(Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
                 .eq(UserFavoriteArticleDO::getArticleId, id));
@@ -248,6 +283,21 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                 tagInfo.setSlug(tag.getSlug());
                 return tagInfo;
             }).collect(Collectors.toList()));
+        }
+
+        // 查询文章所属合集信息
+        CollectionDO collection = collectionService.getCollectionByArticleId(id);
+        if (collection != null) {
+            result.setCollectionId(collection.getId());
+            result.setCollectionTitle(collection.getTitle());
+            // 查询在合集中的排序
+            CollectionArticleDO ca = collectionArticleMapper.selectOne(Wrappers.lambdaQuery(CollectionArticleDO.class)
+                    .eq(CollectionArticleDO::getArticleId, id)
+                    .eq(CollectionArticleDO::getCollectionId, collection.getId())
+                    .eq(CollectionArticleDO::getDelFlag, 0));
+            if (ca != null) {
+                result.setCollectionSortOrder(ca.getSortOrder());
+            }
         }
 
         return result;

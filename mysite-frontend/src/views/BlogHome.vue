@@ -3,12 +3,14 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getArticles } from '@/api/article'
 import { getCategories } from '@/api/category'
+import { getCollections } from '@/api/collection'
 import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
 import { useFavorite } from '@/composables/useFavorite'
-import { ArrowUpDown, ArrowUp, ArrowDown, Tag, X, Loader2 } from 'lucide-vue-next'
+import { ArrowUpDown, ArrowUp, ArrowDown, Tag, X, Loader2, BookOpen } from 'lucide-vue-next'
 import ArticleList from '@/components/article/ArticleList.vue'
-import type { ArticleListItem, Pagination, Category } from '@/types'
+import CollectionCard from '@/components/collection/CollectionCard.vue'
+import type { ArticleListItem, Pagination, Category, Collection } from '@/types'
 
 type SortField = 'createTime' | 'viewCount'
 type SortOrder = 'desc' | 'asc'
@@ -24,6 +26,8 @@ const pagination = ref<Pagination | null>(null)
 const loading = ref(false)
 const categories = ref<Category[]>([])
 const categoriesLoading = ref(false)
+const collections = ref<Collection[]>([])
+const collectionsLoading = ref(false)
 
 const sortField = ref<SortField>('createTime')
 const sortOrder = ref<SortOrder>('desc')
@@ -96,6 +100,18 @@ async function fetchCategories() {
   }
 }
 
+async function fetchCollections() {
+  collectionsLoading.value = true
+  try {
+    const res = await getCollections({ page: 1, size: 6 })
+    collections.value = res.list
+  } catch {
+    collections.value = []
+  } finally {
+    collectionsLoading.value = false
+  }
+}
+
 function handlePageChange(page: number) {
   router.push(page === 1 ? '/' : `/page/${page}`)
 }
@@ -126,6 +142,7 @@ onMounted(() => {
   const page = route.params.page ? Number(route.params.page) : 1
   fetchArticles(page)
   fetchCategories()
+  fetchCollections()
 })
 </script>
 
@@ -205,6 +222,21 @@ onMounted(() => {
         >
           <X :size="10" />
         </button>
+      </div>
+    </section>
+
+    <!-- 合集展示 -->
+    <section v-if="collections.length > 0" class="mb-10">
+      <div class="flex items-center gap-2 mb-4">
+        <BookOpen :size="18" class="text-accent" />
+        <h2 class="text-lg font-semibold text-text-primary">合集</h2>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <CollectionCard
+          v-for="collection in collections"
+          :key="collection.id"
+          :collection="collection"
+        />
       </div>
     </section>
 

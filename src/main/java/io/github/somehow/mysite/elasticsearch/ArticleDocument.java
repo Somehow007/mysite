@@ -40,6 +40,12 @@ public class ArticleDocument {
     @Field(type = FieldType.Keyword)
     private String categoryId;
 
+    @Field(type = FieldType.Keyword)
+    private String collectionId;
+
+    @Field(type = FieldType.Text, analyzer = "ik_max_word", searchAnalyzer = "ik_smart")
+    private String collectionTitle;
+
     @Field(type = FieldType.Date, format = DateFormat.date_optional_time)
     private Date createTime;
 }
