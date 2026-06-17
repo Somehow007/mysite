@@ -124,6 +124,26 @@ public class WebSecurityConfig {
                         .requestMatchers(
                                 "/v1/admin/comments/**"
                         ).hasRole("DEVELOPER")
+                        // 合集公开读接口：允许未登录读者浏览合集和文章导航
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/v1/collections",
+                                "/v1/collections/{id}"
+                        ).permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/v1/articles/{id}/navigation"
+                        ).permitAll()
+                        // 合集管理接口：仅 DEVELOPER 角色可操作
+                        .requestMatchers(
+                                HttpMethod.POST, "/v1/collections"
+                        ).hasRole("DEVELOPER")
+                        .requestMatchers(
+                                HttpMethod.PUT, "/v1/collections/**"
+                        ).hasRole("DEVELOPER")
+                        .requestMatchers(
+                                HttpMethod.DELETE, "/v1/collections/**"
+                        ).hasRole("DEVELOPER")
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {

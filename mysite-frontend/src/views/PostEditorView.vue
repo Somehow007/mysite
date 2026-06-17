@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
 import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X, Plus, Search, TrendingUp } from 'lucide-vue-next'
@@ -36,6 +36,8 @@ const categories = ref<Category[]>([])
 const tags = ref<Tag[]>([])
 const collections = ref<Collection[]>([])
 const selectedCollectionId = ref<string>('')
+// 记录编辑时的原始合集ID，用于判断是否需要切换合集
+const originalCollectionId = ref<string>('')
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -43,6 +45,7 @@ const error = ref('')
 const showMetaPanel = ref(false)
 const showSummaryHint = ref(false)
 const coverUploading = ref(false)
+let summaryHintTimer: ReturnType<typeof setTimeout> | null = null
 
 const tagSearchQuery = ref('')
 const newTagName = ref('')
@@ -76,6 +79,13 @@ onMounted(async () => {
     tags.value = tagsRes
     collections.value = collectionsRes.list
 
+    // 从合集编辑页跳转来新建文章时，自动选中目标合集
+    const collectionQuery = route.query.collection as string
+    if (collectionQuery && !isEdit.value) {
+      selectedCollectionId.value = collectionQuery
+      showMetaPanel.value = true
+    }
+
     if (isEdit.value && route.params.id) {
       const article = await getArticleById(route.params.id as string)
       title.value = article.title
@@ -88,6 +98,7 @@ onMounted(async () => {
       }
       if (article.collectionId) {
         selectedCollectionId.value = article.collectionId
+        originalCollectionId.value = article.collectionId
       }
       if (summary.value || categoryId.value || coverImage.value || selectedTagIds.value.length > 0 || selectedCollectionId.value) {
         showMetaPanel.value = true
@@ -98,6 +109,10 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+})
+
+onUnmounted(() => {
+  if (summaryHintTimer) clearTimeout(summaryHintTimer)
 })
 
 async function handleSave(isPublish: boolean) {
@@ -114,7 +129,8 @@ async function handleSave(isPublish: boolean) {
     showMetaPanel.value = true
     showSummaryHint.value = true
     error.value = '发布文章前，建议填写文章摘要'
-    setTimeout(() => {
+    if (summaryHintTimer) clearTimeout(summaryHintTimer)
+    summaryHintTimer = setTimeout(() => {
       showSummaryHint.value = false
     }, 3000)
     return
@@ -141,13 +157,30 @@ async function handleSave(isPublish: boolean) {
         tagIds: selectedTagIds.value.length > 0 ? selectedTagIds.value : undefined,
         published: isPublish ? 1 : 0,
       })
-      // 更新合集关联
+      // 处理合集关联变更
       const articleId = route.params.id as string
-      if (selectedCollectionId.value) {
-        try {
-          await addArticleToCollection(selectedCollectionId.value, articleId)
-        } catch {
-          // 文章可能已在合集中，忽略错误
+      const newCollectionId = selectedCollectionId.value
+      const oldCollectionId = originalCollectionId.value
+
+      if (newCollectionId !== oldCollectionId) {
+        // 合集发生了变化
+        // 先从旧合集移除
+        if (oldCollectionId) {
+          try {
+            await removeArticleFromCollection(oldCollectionId, articleId)
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : '未知错误'
+            toast.error(`文章已保存，但从旧合集移除失败: ${msg}`)
+          }
+        }
+        // 添加到新合集
+        if (newCollectionId) {
+          try {
+            await addArticleToCollection(newCollectionId, articleId)
+          } catch (e) {
+            const msg = e instanceof Error ? e.message : '加入合集失败'
+            toast.error(`文章已保存，但加入合集失败: ${msg}`)
+          }
         }
       }
     } else {
@@ -160,6 +193,7 @@ async function handleSave(isPublish: boolean) {
         categoryId: categoryId.value || undefined,
         tagIds: selectedTagIds.value.length > 0 ? selectedTagIds.value : undefined,
         published: isPublish ? 1 : 0,
+        collectionId: selectedCollectionId.value || undefined,
       })
     }
 
@@ -222,7 +256,10 @@ async function handleCoverUpload(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
-  if (!file.type.startsWith('image/')) return
+  if (!file.type.startsWith('image/')) {
+    toast.error('请选择图片文件')
+    return
+  }
   
   if (file.size > MAX_IMAGE_FILE_SIZE) {
     const maxSizeMB = MAX_IMAGE_FILE_SIZE / (1024 * 1024)
@@ -338,11 +375,7 @@ function removeCover() {
         </div>
       </div>
 
-      <transition
-        name="slide"
-        @enter="showMetaPanel = true"
-        @leave="showMetaPanel = false"
-      >
+      <transition name="slide">
         <div
           v-show="showMetaPanel"
           class="w-80 flex-shrink-0 space-y-6 overflow-y-auto max-h-[calc(100vh-200px)]"

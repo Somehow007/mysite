@@ -35,6 +35,11 @@ public class CacheConfig {
         cacheConfigurations.put("category_tree", defaultConfig.entryTtl(Duration.ofHours(1)));
         cacheConfigurations.put("article_detail", defaultConfig.entryTtl(Duration.ofMinutes(30)));
         cacheConfigurations.put("tags", defaultConfig.entryTtl(Duration.ofHours(1)));
+        // 合集相关缓存：按实施计划 8.2 节配置 TTL
+        cacheConfigurations.put("collection_detail", defaultConfig.entryTtl(Duration.ofMinutes(30)));
+        cacheConfigurations.put("collection_articles", defaultConfig.entryTtl(Duration.ofMinutes(30)));
+        cacheConfigurations.put("article_nav", defaultConfig.entryTtl(Duration.ofMinutes(30)));
+        cacheConfigurations.put("home_collections", defaultConfig.entryTtl(Duration.ofMinutes(10)));
 
         return RedisCacheManager.builder(connectionFactory)
                 .cacheDefaults(defaultConfig)

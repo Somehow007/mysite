@@ -14,6 +14,7 @@ import io.github.somehow.mysite.dto.resp.collection.CollectionPageQueryRespDTO;
 import io.github.somehow.mysite.service.CollectionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -26,13 +27,13 @@ public class CollectionController {
 
     @Operation(summary = "创建合集")
     @PostMapping("/v1/collections")
-    public Result<Long> createCollection(@RequestBody CollectionCreateReqDTO requestParam) {
+    public Result<Long> createCollection(@Valid @RequestBody CollectionCreateReqDTO requestParam) {
         return Results.success(collectionService.createCollection(requestParam));
     }
 
     @Operation(summary = "更新合集")
     @PutMapping("/v1/collections/{id}")
-    public Result<Void> updateCollection(@PathVariable Long id, @RequestBody CollectionUpdateReqDTO requestParam) {
+    public Result<Void> updateCollection(@PathVariable Long id, @Valid @RequestBody CollectionUpdateReqDTO requestParam) {
         collectionService.updateCollection(id, requestParam);
         return Results.success();
     }
@@ -75,14 +76,14 @@ public class CollectionController {
 
     @Operation(summary = "批量添加文章到合集")
     @PostMapping("/v1/collections/{collectionId}/articles/batch")
-    public Result<Void> batchAddArticles(@PathVariable Long collectionId, @RequestBody CollectionArticleBatchReqDTO requestParam) {
+    public Result<Void> batchAddArticles(@PathVariable Long collectionId, @Valid @RequestBody CollectionArticleBatchReqDTO requestParam) {
         collectionService.batchAddArticles(collectionId, requestParam);
         return Results.success();
     }
 
     @Operation(summary = "调整合集中文章排序")
     @PutMapping("/v1/collections/{collectionId}/articles/sort")
-    public Result<Void> updateArticleSort(@PathVariable Long collectionId, @RequestBody CollectionArticleSortReqDTO requestParam) {
+    public Result<Void> updateArticleSort(@PathVariable Long collectionId, @Valid @RequestBody CollectionArticleSortReqDTO requestParam) {
         collectionService.updateArticleSort(collectionId, requestParam);
         return Results.success();
     }

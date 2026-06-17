@@ -2,8 +2,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { ArrowLeft, Save, Loader2, Plus, X, GripVertical, AlertCircle, BookOpen } from 'lucide-vue-next'
-import { createCollection, updateCollection, getCollectionById, addArticleToCollection, removeArticleFromCollection, updateArticleSort } from '@/api/collection'
+import { ArrowLeft, Save, Loader2, Plus, X, GripVertical, AlertCircle, BookOpen, FilePlus, ChevronUp, ChevronDown } from 'lucide-vue-next'
+import { createCollection, updateCollection, getCollectionById, addArticleToCollection, removeArticleFromCollection, updateArticleSort, batchAddArticles } from '@/api/collection'
 import { getArticles } from '@/api/article'
 import { uploadImage, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useToast } from '@/composables/useToast'
@@ -29,6 +29,10 @@ const coverUploading = ref(false)
 
 // 合集中的文章列表（可拖拽排序）
 const articles = ref<CollectionArticleItem[]>([])
+// 记录原始文章ID集合，用于保存时判断新增/移除
+const originalArticleIds = ref<Set<string>>(new Set())
+// 记录原始排序顺序，用于判断排序是否变更
+const originalSortOrder = ref<string[]>([])
 
 // 添加文章相关
 const showAddArticle = ref(false)
@@ -41,12 +45,27 @@ const existingArticleIds = computed(() => new Set(articles.value.map(a => a.id))
 async function fetchCollectionDetail(id: string) {
   loading.value = true
   try {
-    const detail = await getCollectionById(id, 1, 100)
-    title.value = detail.title
-    description.value = detail.description || ''
-    coverImage.value = detail.coverImage || ''
-    sortOrder.value = detail.sortOrder
-    articles.value = detail.articles || []
+    // 分页加载所有文章，避免超过100篇时数据丢失
+    const allArticles: CollectionArticleItem[] = []
+    let currentPage = 1
+    const pageSize = 100
+    let hasMore = true
+    while (hasMore) {
+      const detail = await getCollectionById(id, currentPage, pageSize)
+      if (currentPage === 1) {
+        title.value = detail.title
+        description.value = detail.description || ''
+        coverImage.value = detail.coverImage || ''
+        sortOrder.value = detail.sortOrder
+      }
+      const pageArticles = detail.articles || []
+      allArticles.push(...pageArticles)
+      hasMore = pageArticles.length === pageSize && allArticles.length < (detail.articleCount ?? 0)
+      currentPage++
+    }
+    articles.value = allArticles
+    originalArticleIds.value = new Set(articles.value.map(a => a.id))
+    originalSortOrder.value = articles.value.map(a => a.id)
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : '加载失败'
   } finally {
@@ -77,7 +96,7 @@ function addArticle(article: ArticleListItem) {
     authorId: article.authorId,
     viewCount: article.viewCount,
     favoriteCount: article.favoriteCount,
-    readingTime: article.readingTime || null,
+    readingTime: article.readingTime ?? null,
     sortOrder: articles.value.length,
     createTime: article.createTime,
   }
@@ -88,6 +107,29 @@ function removeArticle(index: number) {
   articles.value.splice(index, 1)
   // 重新编号 sortOrder
   articles.value.forEach((a, i) => { a.sortOrder = i })
+}
+
+// 拖拽排序相关
+const draggedIndex = ref<number | null>(null)
+
+function onDragStart(index: number) {
+  draggedIndex.value = index
+}
+
+function onDragOver(e: DragEvent, index: number) {
+  e.preventDefault()
+  if (draggedIndex.value === null || draggedIndex.value === index) return
+  const arr = articles.value
+  const draggedItem = arr[draggedIndex.value]
+  if (!draggedItem) return
+  arr.splice(draggedIndex.value, 1)
+  arr.splice(index, 0, draggedItem)
+  draggedIndex.value = index
+  arr.forEach((a, i) => { a.sortOrder = i })
+}
+
+function onDragEnd() {
+  draggedIndex.value = null
 }
 
 // 简单的上下移动排序
@@ -111,6 +153,15 @@ function moveDown(index: number) {
   arr[index] = next
   arr[index + 1] = temp
   arr.forEach((a, i) => { a.sortOrder = i })
+}
+
+// 跳转到文章编辑器新建文章，并通过 query 参数关联当前合集
+function goToNewArticle() {
+  if (!isEdit.value) {
+    toast.info('请先保存合集后再新建文章')
+    return
+  }
+  router.push({ name: 'post-new', query: { collection: route.params.id as string } })
 }
 
 async function handleSave() {
@@ -142,11 +193,70 @@ async function handleSave() {
       })
     }
 
-    // 更新文章排序
-    const articleIds = articles.value.map(a => a.id)
-    await updateArticleSort(collectionId, articleIds)
+    // 计算新增和移除的文章
+    const currentArticleIds = new Set(articles.value.map(a => a.id))
+    const addedArticleIds: string[] = []
+    const removedArticleIds: string[] = []
 
-    toast.success(isEdit.value ? '合集已更新' : '合集已创建')
+    for (const id of currentArticleIds) {
+      if (!originalArticleIds.value.has(id)) {
+        addedArticleIds.push(id)
+      }
+    }
+    for (const id of originalArticleIds.value) {
+      if (!currentArticleIds.has(id)) {
+        removedArticleIds.push(id)
+      }
+    }
+
+    let failedCount = 0
+
+    // 移除文章（先移除，避免排序冲突）
+    for (const articleId of removedArticleIds) {
+      try {
+        await removeArticleFromCollection(collectionId, articleId)
+      } catch (e) {
+        failedCount++
+        console.warn('移除文章失败:', articleId, e)
+      }
+    }
+
+    // 新增文章 - 使用批量接口提升性能
+    if (addedArticleIds.length > 0) {
+      try {
+        await batchAddArticles(collectionId, addedArticleIds)
+      } catch (e) {
+        // 批量失败时回退到逐个添加，统计成功数
+        console.warn('批量添加失败，尝试逐个添加:', e)
+        for (const articleId of addedArticleIds) {
+          try {
+            await addArticleToCollection(collectionId, articleId)
+          } catch (e2) {
+            failedCount++
+            console.warn('添加文章失败:', articleId, e2)
+          }
+        }
+      }
+    }
+
+    // 更新文章排序 - 仅在排序变更时调用
+    const currentSortOrder = articles.value.map(a => a.id)
+    const sortChanged = currentSortOrder.length === originalSortOrder.value.length
+      && currentSortOrder.some((id, i) => id !== originalSortOrder.value[i])
+    if (sortChanged && currentSortOrder.length > 0) {
+      try {
+        await updateArticleSort(collectionId, currentSortOrder)
+      } catch (e) {
+        failedCount++
+        console.warn('更新排序失败:', e)
+      }
+    }
+
+    if (failedCount > 0) {
+      toast.info(`合集已保存，但 ${failedCount} 项操作失败，请检查文章列表`)
+    } else {
+      toast.success(isEdit.value ? '合集已更新' : '合集已创建')
+    }
     router.push('/dashboard/collections')
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : '保存失败'
@@ -159,10 +269,14 @@ async function handleCoverUpload(e: Event) {
   const input = e.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
-  if (!file.type.startsWith('image/')) return
+  if (!file.type.startsWith('image/')) {
+    toast.error('请选择图片文件')
+    return
+  }
 
   if (file.size > MAX_IMAGE_FILE_SIZE) {
-    toast.error('图片文件过大')
+    const maxSizeMB = MAX_IMAGE_FILE_SIZE / (1024 * 1024)
+    toast.error(`图片文件过大（限制: ${maxSizeMB}MB）`)
     return
   }
 
@@ -207,6 +321,12 @@ onMounted(() => {
     </div>
 
     <div v-if="loading" class="py-16 text-center text-text-muted">加载中...</div>
+
+    <div v-else-if="error && isEdit" class="py-16 text-center">
+      <AlertCircle :size="32" class="mx-auto text-red-400 mb-3" />
+      <p class="text-text-muted mb-4">{{ error }}</p>
+      <button @click="fetchCollectionDetail(route.params.id as string)" class="btn-secondary text-sm">重试</button>
+    </div>
 
     <div v-else class="space-y-6">
       <!-- 基本信息 -->
@@ -254,10 +374,16 @@ onMounted(() => {
             文章列表
             <span class="text-sm font-normal text-text-muted">({{ articles.length }} 篇)</span>
           </h2>
-          <button @click="showAddArticle = !showAddArticle" class="btn-secondary text-sm">
-            <Plus :size="14" />
-            添加文章
-          </button>
+          <div class="flex items-center gap-2">
+            <button v-if="isEdit" @click="goToNewArticle" class="btn-secondary text-sm">
+              <FilePlus :size="14" />
+              新建文章
+            </button>
+            <button @click="showAddArticle = !showAddArticle" class="btn-secondary text-sm">
+              <Plus :size="14" />
+              添加文章
+            </button>
+          </div>
         </div>
 
         <!-- 添加文章面板 -->
@@ -297,12 +423,17 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- 文章排序列表 -->
+        <!-- 文章排序列表（支持拖拽） -->
         <div v-if="articles.length > 0" class="space-y-2">
           <div
             v-for="(article, index) in articles"
             :key="article.id"
-            class="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-accent/20 transition-all duration-200 group"
+            draggable="true"
+            @dragstart="onDragStart(index)"
+            @dragover="onDragOver($event, index)"
+            @dragend="onDragEnd"
+            class="flex items-center gap-3 p-3 rounded-lg border border-border hover:border-accent/20 transition-all duration-200 group cursor-move"
+            :class="{ 'border-accent bg-accent-subtle/30': draggedIndex === index }"
           >
             <div class="flex flex-col gap-0.5 shrink-0">
               <button
@@ -311,8 +442,20 @@ onMounted(() => {
                 class="p-0.5 text-text-muted hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 title="上移"
               >
-                <GripVertical :size="14" />
+                <ChevronUp :size="14" />
               </button>
+              <button
+                @click="moveDown(index)"
+                :disabled="index === articles.length - 1"
+                class="p-0.5 text-text-muted hover:text-accent disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="下移"
+              >
+                <ChevronDown :size="14" />
+              </button>
+            </div>
+
+            <div class="shrink-0 text-text-muted/40 cursor-grab" title="拖拽排序">
+              <GripVertical :size="14" />
             </div>
 
             <span class="text-xs text-text-muted w-6 text-center shrink-0">{{ index + 1 }}</span>

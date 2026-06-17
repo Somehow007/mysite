@@ -15,19 +15,22 @@ useHead(() => ({ title: '合集管理 - MySite' }))
 const collections = ref<Collection[]>([])
 const pagination = ref<Pagination | null>(null)
 const loading = ref(false)
+const loadError = ref('')
 const keyword = ref('')
 const currentPage = ref(1)
 
 async function fetchCollections(page = 1) {
   loading.value = true
+  loadError.value = ''
   try {
     const res = await getCollections({ page, size: 10, keyword: keyword.value || undefined })
     collections.value = res.list
     pagination.value = res.pagination
     currentPage.value = page
-  } catch {
+  } catch (e: unknown) {
     collections.value = []
     pagination.value = null
+    loadError.value = e instanceof Error ? e.message : '加载合集列表失败'
   } finally {
     loading.value = false
   }
@@ -42,11 +45,16 @@ function handlePageChange(page: number) {
 }
 
 async function handleDelete(id: string, title: string) {
-  if (!confirm(`确定要删除合集「${title}」吗？此操作不可撤销。`)) return
+  if (!confirm(`确定要删除合集「${title}」吗？\n\n注意：删除合集不会删除其中的文章，文章将恢复为普通文章展示。此操作不可撤销。`)) return
   try {
     await deleteCollection(id)
     toast.success('合集已删除')
-    fetchCollections(currentPage.value)
+    // 删除后若当前页已无数据，回退到上一页
+    const remaining = pagination.value ? pagination.value.total - 1 : 0
+    const pageSize = 10
+    const maxPage = Math.max(1, Math.ceil(remaining / pageSize))
+    const targetPage = currentPage.value > maxPage ? maxPage : currentPage.value
+    fetchCollections(targetPage)
   } catch (e: unknown) {
     toast.error(e instanceof Error ? e.message : '删除失败')
   }
@@ -82,10 +90,15 @@ onMounted(() => {
       <Loader2 :size="24" class="animate-spin mx-auto text-text-muted" />
     </div>
 
+    <div v-else-if="loadError" class="py-16 text-center">
+      <p class="text-red-500 mb-4">{{ loadError }}</p>
+      <button @click="fetchCollections(currentPage)" class="btn-secondary">重试</button>
+    </div>
+
     <div v-else-if="collections.length === 0" class="py-16 text-center">
       <BookOpen :size="48" class="mx-auto mb-4 text-text-muted opacity-30" />
-      <p class="text-text-muted mb-4">暂无合集</p>
-      <button @click="router.push('/dashboard/collections/new')" class="btn-secondary">
+      <p class="text-text-muted mb-4">{{ keyword ? '没有匹配的合集' : '暂无合集' }}</p>
+      <button v-if="!keyword" @click="router.push('/dashboard/collections/new')" class="btn-secondary">
         <Plus :size="14" />
         创建第一个合集
       </button>

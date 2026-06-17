@@ -118,6 +118,7 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
     }
 
     @Override
+    @Transactional(readOnly = true)
     @Cacheable(value = CACHE_HOME, key = "'page:' + #requestParam.current + ':' + #requestParam.size + ':' + #requestParam.keyword + ':' + #requestParam.authorId")
     public IPage<CollectionPageQueryRespDTO> pageQueryCollection(CollectionPageQueryReqDTO requestParam) {
         LambdaQueryWrapper<CollectionDO> queryWrapper = Wrappers.<CollectionDO>lambdaQuery()
@@ -165,7 +166,8 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
     }
 
     @Override
-    @Cacheable(value = CACHE_DETAIL, key = "#id")
+    @Transactional(readOnly = true)
+    @Cacheable(value = CACHE_DETAIL, key = "#id + ':' + #current + ':' + #size")
     public CollectionDetailRespDTO getCollectionDetail(Long id, Integer current, Integer size) {
         CollectionDO collection = getCollectionOrThrow(id);
 
@@ -309,11 +311,8 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
             throw new ClientException(ErrorCode.COLLECTION_ARTICLE_NOT_IN_COLLECTION);
         }
 
-        // 软删除关联记录
-        CollectionArticleDO updateDO = new CollectionArticleDO();
-        updateDO.setId(existing.getId());
-        updateDO.setDelFlag(1);
-        collectionArticleMapper.updateById(updateDO);
+        // 物理删除关联记录，避免唯一索引(collection_id, article_id)冲突导致无法重新添加
+        collectionArticleMapper.deleteById(existing.getId());
 
         // 更新文章计数
         decrementArticleCount(collectionId);
@@ -330,20 +329,24 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
             return;
         }
 
+        // 批量查询已在合集中的文章，避免 N+1 查询
+        List<CollectionArticleDO> existingRelations = collectionArticleMapper.selectList(
+                Wrappers.<CollectionArticleDO>lambdaQuery()
+                        .eq(CollectionArticleDO::getCollectionId, collectionId)
+                        .in(CollectionArticleDO::getArticleId, requestParam.getArticleIds())
+                        .eq(CollectionArticleDO::getDelFlag, 0));
+        Set<Long> existingArticleIds = existingRelations.stream()
+                .map(CollectionArticleDO::getArticleId)
+                .collect(Collectors.toSet());
+
         Integer maxSortOrder = getMaxSortOrder(collectionId);
         List<CollectionArticleDO> toInsert = new ArrayList<>();
         int order = maxSortOrder + 1;
 
         for (Long articleId : requestParam.getArticleIds()) {
-            // 跳过已在合集中的文章
-            CollectionArticleDO existing = collectionArticleMapper.selectOne(Wrappers.<CollectionArticleDO>lambdaQuery()
-                    .eq(CollectionArticleDO::getCollectionId, collectionId)
-                    .eq(CollectionArticleDO::getArticleId, articleId)
-                    .eq(CollectionArticleDO::getDelFlag, 0));
-            if (existing != null) {
+            if (existingArticleIds.contains(articleId)) {
                 continue;
             }
-
             toInsert.add(CollectionArticleDO.builder()
                     .id(IdUtil.getSnowflakeNextId())
                     .collectionId(collectionId)
@@ -354,11 +357,7 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
 
         if (!toInsert.isEmpty()) {
             collectionArticleMapper.batchInsert(toInsert);
-            // 更新文章计数
-            CollectionDO updateDO = new CollectionDO();
-            updateDO.setId(collectionId);
-            updateDO.setArticleCount(collection.getArticleCount() + toInsert.size());
-            collectionMapper.updateById(updateDO);
+            collectionMapper.updateArticleCount(collectionId, toInsert.size());
         }
     }
 
@@ -373,23 +372,27 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
             return;
         }
 
+        // 一次性查询所有相关关联记录，避免 N+1 查询
+        List<CollectionArticleDO> existingRelations = collectionArticleMapper.selectList(
+                Wrappers.<CollectionArticleDO>lambdaQuery()
+                        .eq(CollectionArticleDO::getCollectionId, collectionId)
+                        .in(CollectionArticleDO::getArticleId, requestParam.getArticleIds())
+                        .eq(CollectionArticleDO::getDelFlag, 0));
+        Map<Long, Long> articleIdToRelationId = existingRelations.stream()
+                .collect(Collectors.toMap(CollectionArticleDO::getArticleId, CollectionArticleDO::getId));
+
         // 按新顺序更新 sort_order
         for (int i = 0; i < requestParam.getArticleIds().size(); i++) {
             Long articleId = requestParam.getArticleIds().get(i);
-            CollectionArticleDO existing = collectionArticleMapper.selectOne(Wrappers.<CollectionArticleDO>lambdaQuery()
-                    .eq(CollectionArticleDO::getCollectionId, collectionId)
-                    .eq(CollectionArticleDO::getArticleId, articleId)
-                    .eq(CollectionArticleDO::getDelFlag, 0));
-            if (existing != null) {
-                CollectionArticleDO updateDO = new CollectionArticleDO();
-                updateDO.setId(existing.getId());
-                updateDO.setSortOrder(i);
-                collectionArticleMapper.updateById(updateDO);
+            Long relationId = articleIdToRelationId.get(articleId);
+            if (relationId != null) {
+                collectionArticleMapper.updateSortOrder(relationId, i);
             }
         }
     }
 
     @Override
+    @Transactional(readOnly = true)
     @Cacheable(value = CACHE_NAV, key = "#articleId")
     public ArticleNavInfoRespDTO getArticleNavigation(Long articleId) {
         ArticleNavInfoRespDTO navInfo = new ArticleNavInfoRespDTO();
@@ -431,8 +434,9 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
                 Long prevArticleId = allArticles.get(currentIndex - 1).getArticleId();
                 ArticleDO prevArticle = articleMapper.selectOne(Wrappers.<ArticleDO>lambdaQuery()
                         .eq(ArticleDO::getId, prevArticleId)
-                        .eq(ArticleDO::getDelFlag, 0));
-                if (prevArticle != null) {
+                        .eq(ArticleDO::getDelFlag, 0)
+                        .eq(ArticleDO::getPublished, 1));
+                if (prevArticle != null && Integer.valueOf(1).equals(prevArticle.getPublished())) {
                     ArticleNavInfoRespDTO.NavArticle prev = new ArticleNavInfoRespDTO.NavArticle();
                     prev.setId(prevArticleId.toString());
                     prev.setTitle(prevArticle.getTitle());
@@ -444,8 +448,9 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
                 Long nextArticleId = allArticles.get(currentIndex + 1).getArticleId();
                 ArticleDO nextArticle = articleMapper.selectOne(Wrappers.<ArticleDO>lambdaQuery()
                         .eq(ArticleDO::getId, nextArticleId)
-                        .eq(ArticleDO::getDelFlag, 0));
-                if (nextArticle != null) {
+                        .eq(ArticleDO::getDelFlag, 0)
+                        .eq(ArticleDO::getPublished, 1));
+                if (nextArticle != null && Integer.valueOf(1).equals(nextArticle.getPublished())) {
                     ArticleNavInfoRespDTO.NavArticle next = new ArticleNavInfoRespDTO.NavArticle();
                     next.setId(nextArticleId.toString());
                     next.setTitle(nextArticle.getTitle());
@@ -544,35 +549,14 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
     }
 
     private Integer getMaxSortOrder(Long collectionId) {
-        List<CollectionArticleDO> existing = collectionArticleMapper.selectList(
-                Wrappers.<CollectionArticleDO>lambdaQuery()
-                        .eq(CollectionArticleDO::getCollectionId, collectionId)
-                        .eq(CollectionArticleDO::getDelFlag, 0)
-                        .orderByDesc(CollectionArticleDO::getSortOrder)
-                        .last("LIMIT 1"));
-        if (CollectionUtils.isEmpty(existing)) {
-            return -1;
-        }
-        return existing.get(0).getSortOrder();
+        return collectionArticleMapper.selectMaxSortOrder(collectionId);
     }
 
     private void incrementArticleCount(Long collectionId) {
-        CollectionDO collection = collectionMapper.selectById(collectionId);
-        if (collection != null) {
-            CollectionDO updateDO = new CollectionDO();
-            updateDO.setId(collectionId);
-            updateDO.setArticleCount(collection.getArticleCount() + 1);
-            collectionMapper.updateById(updateDO);
-        }
+        collectionMapper.updateArticleCount(collectionId, 1);
     }
 
     private void decrementArticleCount(Long collectionId) {
-        CollectionDO collection = collectionMapper.selectById(collectionId);
-        if (collection != null && collection.getArticleCount() > 0) {
-            CollectionDO updateDO = new CollectionDO();
-            updateDO.setId(collectionId);
-            updateDO.setArticleCount(collection.getArticleCount() - 1);
-            collectionMapper.updateById(updateDO);
-        }
+        collectionMapper.updateArticleCount(collectionId, -1);
     }
 }
