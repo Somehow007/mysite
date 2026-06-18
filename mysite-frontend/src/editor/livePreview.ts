@@ -93,20 +93,6 @@ class CalloutHeaderWidget extends WidgetType {
     return s
   }
 }
-class CodeFenceLabelWidget extends WidgetType {
-  constructor(private lang: string) { super() }
-  toDOM() {
-    const s = document.createElement('span')
-    s.className = 'cm-lp-fence-label'
-    if (this.lang) {
-      s.textContent = this.lang
-      s.style.cssText = 'font-size:0.7em;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:500'
-    } else {
-      s.style.cssText = 'display:inline-block;height:0.4em'
-    }
-    return s
-  }
-}
 class KaTeXInlineWidget extends WidgetType {
   constructor(private latex: string) { super() }
   eq(other: KaTeXInlineWidget) { return this.latex === other.latex }
@@ -138,7 +124,8 @@ class InlineDecoCache {
 // Block precomputation
 // ═══════════════════════════════════════════════════════════════
 
-function computeBlocks(doc: Text): Block[] {
+/** Exported for unit testing. */
+export function computeBlocks(doc: Text): Block[] {
   const blocks: Block[] = []
   let inCode = false, codeStart = 0, codeLang = ''
   let inMath = false, mathStart = 0, mathLines: string[] = []
@@ -149,7 +136,7 @@ function computeBlocks(doc: Text): Block[] {
     const trimmed = text.trim()
 
     if (inCode) {
-      if (/^\s*```/.test(text)) { blocks.push({ type: 'code', startLine: codeStart, endLine: i, lang: codeLang }); inCode = false }
+      if (/^\s*(```|~~~)/.test(text)) { blocks.push({ type: 'code', startLine: codeStart, endLine: i, lang: codeLang }); inCode = false }
       continue
     }
     if (inMath) {
@@ -158,7 +145,7 @@ function computeBlocks(doc: Text): Block[] {
       continue
     }
     if (inCallout) {
-      if (/^>/.test(text)) {
+      if (text.startsWith('>')) {
         const nc = text.match(/^>\s*\[!(\w+)\]/)
         if (nc) { blocks.push({ type: 'callout', startLine: calloutStart, endLine: i - 1, calloutType }); calloutStart = i; calloutType = nc[1]!.toUpperCase() }
         continue
@@ -166,8 +153,8 @@ function computeBlocks(doc: Text): Block[] {
       blocks.push({ type: 'callout', startLine: calloutStart, endLine: i - 1, calloutType }); inCallout = false
     }
 
-    const fm = text.match(/^\s*```(\w*)\s*$/)
-    if (fm) { codeStart = i; codeLang = fm[1] ?? ''; inCode = true; continue }
+    const fm = text.match(/^\s*(```|~~~)(\w*)\s*$/)
+    if (fm) { codeStart = i; codeLang = fm[2] ?? ''; inCode = true; continue }
     const sm = text.match(/^\$\$\s+(.+?)\s+\$\$$/)
     if (sm) { blocks.push({ type: 'math', startLine: i, endLine: i, content: sm[1]! }); continue }
     if (trimmed === '$$') { mathStart = i; inMath = true; mathLines = []; continue }
@@ -235,14 +222,22 @@ function blockquoteDecos(text: string, from: number): PendingDeco[] {
 /**
  * Code block decorations.
  *
- * Strategy: ALL lines (including fence lines) get Decoration.line for
- * background/borders. Fence lines additionally get Decoration.replace
- * to hide the ``` markers and show a language label widget instead.
+ * SAFETY (crash fix): NEVER combine Decoration.line with a Decoration.replace
+ * that covers the ENTIRE line content — CM6 produces an empty line element that
+ * conflicts with the line decoration and crashes on input. Fence lines (```js)
+ * are entirely marker text, so replacing them wholly is the dangerous case.
  *
- * This is safe because Decoration.replace without block:true keeps the
- * content within the line element, so Decoration.line styling applies.
+ * Strategy:
+ *   - ALL lines (including fences) get Decoration.line for background/borders.
+ *   - Opening fence: hide only the ```/~~~ backticks via PARTIAL replace (the
+ *     remaining language token keeps the line non-empty → safe), and style the
+ *     language as a label via Decoration.mark.
+ *   - Closing fence / lang-less opening fence: dim the marker via Decoration.mark
+ *     (no replace at all) so the line always retains content.
+ *   - No Decoration.replace ever covers an entire fence line.
  */
-function codeBlockDecos(text: string, from: number, block: CodeBlock, ln: number): PendingDeco[] {
+/** Exported for unit testing. */
+export function codeBlockDecos(text: string, from: number, block: CodeBlock, ln: number): PendingDeco[] {
   const isFirst = ln === block.startLine
   const isLast = ln === block.endLine
   const result: PendingDeco[] = []
@@ -262,11 +257,42 @@ function codeBlockDecos(text: string, from: number, block: CodeBlock, ln: number
   if (isLast) lineParts.push('border-bottom:1px solid var(--code-border)', 'border-bottom-left-radius:8px', 'border-bottom-right-radius:8px', 'padding-bottom:1.25rem')
   result.push({ from, to: from, deco: Decoration.line({ attributes: { style: lineParts.join(';') } }) })
 
-  // Replace fence markers with label widget (inline replace — no block:true)
+  const fenceLabelStyle = 'font-size:0.7em;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:500'
+  const dimMarkerStyle = 'color:var(--text-muted);opacity:0.45'
+
   if (isFirst) {
-    result.push({ from, to: from + text.length, deco: Decoration.replace({ widget: new CodeFenceLabelWidget(block.lang) }) })
+    // Opening fence: ```lang  or  ~~~lang
+    const fm = text.match(/^(\s*)(```+|~~~+)(\w*)/)
+    if (fm) {
+      const leadingLen = fm[1]!.length
+      const fenceLen = fm[2]!.length
+      const langLen = fm[3]!.length
+      const fenceStart = from + leadingLen
+      if (langLen > 0) {
+        // Partial replace of backticks only — line still has the lang token, safe.
+        result.push({ from: fenceStart, to: fenceStart + fenceLen, deco: Decoration.replace({}) })
+        result.push({ from: fenceStart + fenceLen, to: fenceStart + fenceLen + langLen, deco: Decoration.mark({ attributes: { style: fenceLabelStyle } }) })
+      } else {
+        // No lang: dim the marker (mark, not replace) so the line keeps content.
+        result.push({ from: fenceStart, to: fenceStart + fenceLen, deco: Decoration.mark({ attributes: { style: dimMarkerStyle } }) })
+      }
+    }
   } else if (isLast) {
-    result.push({ from, to: from + text.length, deco: Decoration.replace({ widget: new CodeFenceLabelWidget('') }) })
+    // Closing fence: ``` or ~~~
+    const fm = text.match(/^(\s*)(```+|~~~+)/)
+    if (fm) {
+      const leadingLen = fm[1]!.length
+      const fenceLen = fm[2]!.length
+      const fenceStart = from + leadingLen
+      const trailingLen = text.length - leadingLen - fenceLen
+      if (trailingLen > 0) {
+        // Trailing content exists → partial replace is safe.
+        result.push({ from: fenceStart, to: fenceStart + fenceLen, deco: Decoration.replace({}) })
+      } else {
+        // Entire line is the closing fence → dim it (mark, not replace).
+        result.push({ from: fenceStart, to: fenceStart + fenceLen, deco: Decoration.mark({ attributes: { style: dimMarkerStyle } }) })
+      }
+    }
   }
 
   return result
@@ -394,7 +420,7 @@ function parseInlineSpans(text: string, lineFrom: number): InlineSpan[] {
   return spans
 }
 
-function cursorInSpan(cursor: number, span: InlineSpan): boolean {
+function cursorInSpan(cursor: number, span: { from: number; to: number }): boolean {
   return cursor >= span.from && cursor < span.to
 }
 
@@ -410,6 +436,10 @@ export function livePreview() {
       private _lastDoc: Text | null = null
       private _inlineCache = new InlineDecoCache()
       private _errorCount = 0
+      // Cursor-aware rebuild skip: avoid full rebuild when the cursor moves
+      // within the same line without crossing an inline span boundary.
+      private _lastCursorLine = -1
+      private _lastCursorInSpan = false
 
       constructor(view: EditorView) {
         this.decorations = this.build(view)
@@ -419,9 +449,32 @@ export function livePreview() {
         if (update.docChanged) {
           this._inlineCache.invalidate()
           this._lastDoc = null // force recompute blocks
-        }
-        if (update.docChanged || update.selectionSet || update.viewportChanged) {
+          this._lastCursorLine = -1
           this.decorations = this.build(update.view)
+          return
+        }
+        if (update.viewportChanged) {
+          this.decorations = this.build(update.view)
+          return
+        }
+        if (update.selectionSet) {
+          const cursor = update.state.selection.main.head
+          const doc = update.state.doc
+          const cursorLine = doc.lineAt(cursor).number
+          if (cursorLine !== this._lastCursorLine) {
+            // Cursor moved to a different line — block/line context may differ.
+            this.decorations = this.build(update.view)
+            return
+          }
+          // Same line: only rebuild if cursor crossed into/out of an inline span.
+          const line = doc.line(cursorLine)
+          const spans = this._inlineCache.get(line.text)
+          const inSpan = spans
+            ? spans.some(s => cursor >= line.from + s.from && cursor < line.from + s.to)
+            : false
+          if (inSpan !== this._lastCursorInSpan) {
+            this.decorations = this.build(update.view)
+          }
         }
       }
 
@@ -450,6 +503,14 @@ export function livePreview() {
         }
 
         const cursorBlock = findBlock(cursorLine, this._blocks)
+
+        // Record cursor-line span membership for the rebuild-skip optimisation.
+        const cursorLineObj = doc.line(cursorLine)
+        const cursorSpans = this._inlineCache.get(cursorLineObj.text)
+        this._lastCursorLine = cursorLine
+        this._lastCursorInSpan = cursorSpans
+          ? cursorSpans.some(s => cursor >= cursorLineObj.from + s.from && cursor < cursorLineObj.from + s.to)
+          : false
 
         const vr = view.visibleRanges
         let visStart = 1, visEnd = doc.lines

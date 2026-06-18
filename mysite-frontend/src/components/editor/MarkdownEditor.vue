@@ -176,9 +176,14 @@ const shortcuts = computed(() => [
 ])
 
 // ── Sync: external modelValue → CM6 ──
+// Track the last value emitted by us so we can short-circuit the echo that
+// comes back when the parent re-sets the same value. This avoids an O(n)
+// doc.toString() comparison on every keystroke.
+let lastEmittedValue = ''
 watch(
   () => props.modelValue,
   (newVal) => {
+    if (newVal === lastEmittedValue) return // ignore echo from our own emit
     const view = editorView.value
     if (!view) return
     const current = view.state.doc.toString()
@@ -204,11 +209,17 @@ function updateCursorStats(view: EditorView) {
   // Word count is handled by updateWordCount (only on docChanged)
 }
 
-// Separate word-count update (heavier, called only on doc change)
+// Separate word-count update (heavier, debounced so rapid typing doesn't
+// trigger an O(n) doc.toString() + regex scan on every keystroke).
+let wordCountTimer: ReturnType<typeof setTimeout> | null = null
 function updateWordCount(view: EditorView) {
-  const text = view.state.doc.toString()
-  const words = text.trim().split(/\s+/).filter(Boolean)
-  wordCount.value = words.length
+  if (wordCountTimer) clearTimeout(wordCountTimer)
+  wordCountTimer = setTimeout(() => {
+    if (!editorView.value) return
+    const text = view.state.doc.toString()
+    const words = text.trim().split(/\s+/).filter(Boolean)
+    wordCount.value = words.length
+  }, 300)
 }
 
 // ── Autocomplete detection ──
@@ -512,9 +523,21 @@ const customKeymap = keymap.of([
 onMounted(() => {
   if (!cmContainer.value) return
 
+  try {
+    initEditor()
+  } catch (e) {
+    console.error('[MarkdownEditor] init failed, falling back to textarea:', e)
+    initFallback()
+  }
+})
+
+function initEditor() {
+  if (!cmContainer.value) return
+
   const updateListener = EditorView.updateListener.of((update) => {
     if (update.docChanged) {
       const text = update.state.doc.toString()
+      lastEmittedValue = text
       emit('update:modelValue', text)
       checkAutocomplete(update.view)
       updateWordCount(update.view)
@@ -610,24 +633,44 @@ onMounted(() => {
   updateCursorStats(view)
   updateWordCount(view)
 
-  // Handle paste/drop for images
+  // Handle paste/drop for images (store refs so we can remove on unmount)
   const cmDom = view.dom
   cmDom.addEventListener('paste', handlePaste)
   cmDom.addEventListener('drop', handleDrop)
   cmDom.addEventListener('dragover', handleDragOver)
+  boundCmDom = cmDom
 
   // Autocomplete keyboard: listen on the container to intercept keys
   // when the autocomplete panel is visible (CM6 keymaps won't see our panel)
   cmContainer.value.addEventListener('keydown', handleAutocompleteKeydown, true)
-})
+}
+
+// Error-boundary fallback: if CM6 fails to initialise, mount a plain textarea
+// so the user can still edit content instead of facing a blank/broken editor.
+const fallbackMode = ref(false)
+function initFallback() {
+  fallbackMode.value = true
+}
+
+let boundCmDom: HTMLElement | null = null
 
 onUnmounted(() => {
+  // Cancel any pending word-count timer
+  if (wordCountTimer) { clearTimeout(wordCountTimer); wordCountTimer = null }
+  // Remove DOM event listeners to avoid leaks
+  if (boundCmDom) {
+    boundCmDom.removeEventListener('paste', handlePaste)
+    boundCmDom.removeEventListener('drop', handleDrop)
+    boundCmDom.removeEventListener('dragover', handleDragOver)
+    boundCmDom = null
+  }
   // Remove autocomplete keydown listener from container
   if (cmContainer.value) {
     cmContainer.value.removeEventListener('keydown', handleAutocompleteKeydown, true)
   }
   editorView.value?.destroy()
   editorView.value = null
+  lastEmittedValue = ''
 })
 
 // ── Image upload ──
@@ -861,7 +904,14 @@ function handleAutocompleteKeydown(e: KeyboardEvent) {
 
     <!-- CM6 Editor -->
     <div class="editor-content flex-1 min-h-0 overflow-hidden bg-bg-secondary">
-      <div ref="cmContainer" class="cm-editor-container h-full w-full" />
+      <div v-if="!fallbackMode" ref="cmContainer" class="cm-editor-container h-full w-full" />
+      <textarea
+        v-else
+        :value="modelValue"
+        @input="$emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
+        class="fallback-textarea h-full w-full resize-none border-0 outline-none p-3 bg-transparent text-sm font-mono"
+        :placeholder="placeholder"
+      />
     </div>
 
     <!-- Status bar -->

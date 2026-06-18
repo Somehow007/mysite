@@ -113,7 +113,7 @@ function isInsideBlock(text: string, upToLineStart: number): boolean {
     }
 
     // Display math block: $$ at start of trimmed line (not inside code block)
-    if (!inCode && /^\$\$/.test(trimmed)) {
+    if (!inCode && trimmed.startsWith('$$')) {
       inMath = !inMath
     }
   }
