@@ -9,7 +9,7 @@ import {
 } from 'lucide-vue-next'
 
 // ── CodeMirror 6 ──
-import { EditorView, keymap, lineNumbers, drawSelection, dropCursor, highlightActiveLine, highlightSpecialChars } from '@codemirror/view'
+import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine, highlightSpecialChars } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab, redo, undo } from '@codemirror/commands'
 import { markdown } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from '@codemirror/language'
@@ -293,7 +293,6 @@ function applyAutocomplete() {
   const selected = autocompleteItems.value[selectedIndex.value]
   const pos = view.state.selection.main.head
   const line = view.state.doc.lineAt(pos)
-  const afterCursor = view.state.sliceDoc(pos, line.to)
 
   // Replace current line prefix with the selected item
   view.dispatch({
@@ -542,6 +541,12 @@ function initEditor() {
       checkAutocomplete(update.view)
       updateWordCount(update.view)
     }
+    if (update.selectionSet && !update.docChanged) {
+      // Close autocomplete on click or non-typing cursor movement.
+      // Without this, the panel stays open and handleAutocompleteKeydown
+      // keeps intercepting arrow keys, breaking cursor movement.
+      showAutocomplete.value = false
+    }
     if (update.docChanged || update.selectionSet) {
       updateCursorStats(update.view)
     }
@@ -552,7 +557,6 @@ function initEditor() {
     parent: cmContainer.value,
     extensions: [
       // ── Basic editing ──
-      lineNumbers(),
       drawSelection(),
       dropCursor(),
       highlightActiveLine(),
@@ -597,21 +601,14 @@ function initEditor() {
         '.cm-scroller': {
           overflow: 'auto',
           lineHeight: '1.7',
+          overscrollBehavior: 'contain',
         },
         '.cm-content': {
           padding: '0.75rem',
           caretColor: 'var(--text-primary)',
         },
-        '.cm-gutters': {
-          backgroundColor: 'transparent',
-          borderRight: '1px solid var(--border)',
-          color: 'var(--text-muted)',
-        },
         '.cm-activeLine': {
           backgroundColor: 'transparent',
-        },
-        '.cm-activeLineGutter': {
-          backgroundColor: 'var(--bg-code)',
         },
         '.cm-cursor': {
           borderLeftColor: 'var(--text-primary)',
@@ -624,6 +621,7 @@ function initEditor() {
         },
         '.cm-line': {
           padding: '0 0.25rem',
+          transition: 'background-color 0.12s ease-out, border-color 0.12s ease-out',
         },
       }),
     ],
@@ -638,11 +636,20 @@ function initEditor() {
   cmDom.addEventListener('paste', handlePaste)
   cmDom.addEventListener('drop', handleDrop)
   cmDom.addEventListener('dragover', handleDragOver)
+  // Close autocomplete on any mouse click inside the editor. This is a
+  // safety net alongside the selectionSet listener — it guarantees the
+  // panel closes even if the click doesn't change the cursor position
+  // (e.g. clicking on a Decoration.replace widget at the current pos).
+  cmDom.addEventListener('mousedown', handleEditorMousedown)
   boundCmDom = cmDom
 
   // Autocomplete keyboard: listen on the container to intercept keys
   // when the autocomplete panel is visible (CM6 keymaps won't see our panel)
   cmContainer.value.addEventListener('keydown', handleAutocompleteKeydown, true)
+}
+
+function handleEditorMousedown() {
+  showAutocomplete.value = false
 }
 
 // Error-boundary fallback: if CM6 fails to initialise, mount a plain textarea
@@ -662,6 +669,7 @@ onUnmounted(() => {
     boundCmDom.removeEventListener('paste', handlePaste)
     boundCmDom.removeEventListener('drop', handleDrop)
     boundCmDom.removeEventListener('dragover', handleDragOver)
+    boundCmDom.removeEventListener('mousedown', handleEditorMousedown)
     boundCmDom = null
   }
   // Remove autocomplete keydown listener from container
@@ -783,7 +791,11 @@ function handlePaste(e: ClipboardEvent) {
 // ── Autocomplete keyboard ──
 
 function handleAutocompleteKeydown(e: KeyboardEvent) {
-  if (!showAutocomplete.value) return
+  // Only intercept keys when the panel is actually visible with items.
+  // Without the autocompleteItems check, the panel could be in a stale
+  // "open but empty" state that swallows arrow keys, breaking cursor
+  // movement (especially Up arrow jumping to document top).
+  if (!showAutocomplete.value || autocompleteItems.value.length === 0) return
   if (e.key === 'ArrowDown') {
     e.preventDefault()
     e.stopPropagation()
@@ -1124,6 +1136,24 @@ function handleAutocompleteKeydown(e: KeyboardEvent) {
   font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, 'Liberation Mono', monospace;
   line-height: 1.7;
   tab-size: 4;
+  overscroll-behavior: contain;
+}
+
+/* Smooth decoration transitions for Obsidian-like rendering feel.
+   Only transition inexpensive properties to avoid layout thrashing. */
+.cm-editor-container :deep(.cm-line) {
+  transition: background-color 0.12s ease-out, border-color 0.12s ease-out;
+}
+
+/* Ensure widgets don't block mouse events — clicks pass through to the
+   underlying line element so CM6 can place the cursor correctly. */
+.cm-editor-container :deep(.cm-lp-katex-inline),
+.cm-editor-container :deep(.cm-lp-katex-display),
+.cm-editor-container :deep(.cm-lp-callout-hdr),
+.cm-editor-container :deep(.cm-lp-bullet),
+.cm-editor-container :deep(.cm-lp-ol),
+.cm-editor-container :deep(.cm-lp-task) {
+  pointer-events: none;
 }
 
 .toolbar-btn {
