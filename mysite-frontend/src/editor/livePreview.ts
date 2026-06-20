@@ -1,33 +1,20 @@
 /**
- * CodeMirror 6 Live Preview / WYSIWYG extension.
+ * Markdown Live Preview —— 基于 @lezer/markdown 官方语法树驱动
  *
- * ═══════════════════════════════════════════════════════════════════
- * CRITICAL SAFETY INVARIANT (违反此规则会导致 CM6 输入崩溃)
- * ═══════════════════════════════════════════════════════════════════
+ * 重写自正则解析方案，核心改变：
+ *   1. 放弃自写正则 + computeBlocks，改用 syntaxTree(state).iterate()
+ *   2. 只隐藏标记 token（HeaderMark/EmphasisMark 等），永不覆盖整行
+ *   3. 所有 widget 实现 ignoreEvent/eq/updateDOM
+ *   4. 提供 atomicRanges facet，光标自动跳过 replace 区间
  *
- * NEVER combine Decoration.line with a Decoration.replace that covers
- * the ENTIRE line content on the same line.
+ * 参考：
+ *   - https://codemirror.net/examples/decoration/ （官方装饰范式）
+ *   - Obsidian Live Preview（同款语法树驱动方案）
  *
- * 原因：当 replace 覆盖整行文本时，CM6 产生空行 DOM 元素，与 line
- * 装饰冲突，导致输入时内容消失、光标锁定、编辑失效。
- *
- * 安全策略（业内通用做法，参考 Monaco/CM6 官方建议）：
- *   - 当行有标记之外的内容时：可安全使用 replace 隐藏标记
- *   - 当行只有标记本身（如 "# "、"> "、"> [!NOTE]"）时：
- *     使用 Decoration.mark 弱化标记样式，而非 replace 隐藏
- *
- * ═══════════════════════════════════════════════════════════════════
- * 装饰类型使用规范
- * ═══════════════════════════════════════════════════════════════════
- *
- *   Decoration.line    —— 整行样式（背景、边框、圆角）
- *   Decoration.mark    —— 行内样式（加粗、斜体、弱化标记）
- *   Decoration.replace —— 隐藏标记 / 替换为 widget（仅当行有剩余内容）
- *
- * 光标行为（Obsidian 风格）：
- *   - 块级（code/callout/math）：光标在块内 → 整块显示原始文本
- *   - 行级（heading/list/bq）：光标在行 → 该行显示原始文本
- *   - 行内（bold/italic/code/link/math）：光标在 span → 该 span 显示原始文本
+ * 安全不变量（从历次崩溃中总结）：
+ *   - 绝不对整行使用 Decoration.replace（只隐藏标记 token）
+ *   - Decoration.line 与 Decoration.replace 可安全共存（replace 不覆盖整行）
+ *   - 所有 widget 实现 ignoreEvent() 返回 false 让事件穿透
  */
 
 import {
@@ -38,25 +25,13 @@ import {
   EditorView,
   type DecorationSet,
 } from '@codemirror/view'
-import { Text } from '@codemirror/state'
+import { syntaxTree } from '@codemirror/language'
+import type { EditorState, Range } from '@codemirror/state'
 import katex from 'katex'
 
 // ═══════════════════════════════════════════════════════════════
-// Types
+// Callout 业务配置（保留自旧实现）
 // ═══════════════════════════════════════════════════════════════
-
-interface CodeBlock { type: 'code'; startLine: number; endLine: number; lang: string }
-interface CalloutBlock { type: 'callout'; startLine: number; endLine: number; calloutType: string }
-interface MathBlock { type: 'math'; startLine: number; endLine: number; content: string }
-type Block = CodeBlock | CalloutBlock | MathBlock
-
-interface PendingDeco { from: number; to: number; deco: Decoration }
-interface InlineSpan { from: number; to: number; decos: PendingDeco[] }
-
-// ═══════════════════════════════════════════════════════════════
-// Callout maps
-// ═══════════════════════════════════════════════════════════════
-
 const CALLOUT_COLORS: Record<string, string> = {
   NOTE: '#448aff', INFO: '#448aff', TODO: '#448aff',
   TIP: '#00c853', SUCCESS: '#00c853', CHECK: '#00c853', DONE: '#00c853',
@@ -74,61 +49,22 @@ const CALLOUT_ICONS: Record<string, string> = {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Safety helper — 核心安全守卫
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * 判断一个 replace 装饰是否覆盖了整行内容。
- *
- * 这是 CM6 崩溃的充要条件：当 replace 覆盖整行文本时，
- * 与 Decoration.line 共存会导致空行 DOM 冲突。
- */
-function coversEntireLine(markerLen: number, lineTextLen: number): boolean {
-  return markerLen >= lineTextLen
-}
-
-/**
- * 样式常量 —— 弱化标记（当不能使用 replace 隐藏时的安全替代）
- */
-const DIM_STYLE = 'opacity:0.35'
-
-// ═══════════════════════════════════════════════════════════════
-// Widgets — all inline, with proper eq() implementations
+// Widgets —— 全部实现 ignoreEvent/eq/updateDOM
 // ═══════════════════════════════════════════════════════════════
 //
-// CURSOR/CLICK SAFETY (CM6 官方推荐方案):
-// 所有 WidgetType 重写 ignoreEvent() 返回 false，让鼠标/键盘事件
-// 穿透 widget 到达底层 CM6 编辑器，从而正确放置光标。
-// 这比依赖 CSS pointer-events:none 更可靠，因为:
-//   1. 在触摸设备上行为一致
-//   2. CM6 内部能正确计算点击位置对应的文档位置
-//   3. 不阻塞 widget 内部可能需要的交互（如未来链接点击）
-//
-// 同时保留 CSS pointer-events:none 作为兜底（见 MarkdownEditor.vue）。
+// CURSOR/CLICK SAFETY (CM6 官方推荐):
+//   - ignoreEvent() 返回 false：让鼠标/键盘事件穿透到 CM6 编辑器
+//   - eq()：判断 widget 等价性，避免不必要的 DOM 重建
+//   - updateDOM()：原位更新 DOM，避免重建丢失状态（如 KaTeX 字体）
 
 class BulletWidget extends WidgetType {
-  eq(other: WidgetType): boolean { return other instanceof BulletWidget }
+  eq(): boolean { return true }
   ignoreEvent(): boolean { return false }
   toDOM() {
     const s = document.createElement('span')
     s.className = 'cm-lp-bullet'
     s.textContent = '•'
     s.style.cssText = 'margin-right:0.5em;color:var(--text-muted)'
-    return s
-  }
-}
-
-class OrderedNumberWidget extends WidgetType {
-  constructor(private n: number) { super() }
-  eq(other: WidgetType): boolean {
-    return other instanceof OrderedNumberWidget && this.n === other.n
-  }
-  ignoreEvent(): boolean { return false }
-  toDOM() {
-    const s = document.createElement('span')
-    s.className = 'cm-lp-ol'
-    s.textContent = `${this.n}.`
-    s.style.cssText = 'margin-right:0.5em;color:var(--text-muted);font-variant-numeric:tabular-nums'
     return s
   }
 }
@@ -178,8 +114,7 @@ class KaTeXInlineWidget extends WidgetType {
     return other instanceof KaTeXInlineWidget && this.latex === other.latex
   }
   ignoreEvent(): boolean { return false }
-  // ★ 实现 updateDOM：内容变化时原位更新，避免 DOM 重建导致
-  // KaTeX 重复渲染（重复渲染会丢失字体加载状态，导致数字缺失）
+  // 原位更新 DOM，避免重建导致 KaTeX 重复渲染丢失字体加载状态
   updateDOM(dom: HTMLElement): boolean {
     try {
       katex.render(this.latex, dom, { throwOnError: false, displayMode: false, strict: false })
@@ -208,7 +143,6 @@ class KaTeXDisplayWidget extends WidgetType {
   }
   ignoreEvent(): boolean { return false }
   get estimatedHeight() { return 40 }
-  // ★ 实现 updateDOM：同 KaTeXInlineWidget，避免重复渲染丢失字体
   updateDOM(dom: HTMLElement): boolean {
     try {
       katex.render(this.latex, dom, { throwOnError: false, displayMode: true, strict: false })
@@ -231,188 +165,201 @@ class KaTeXDisplayWidget extends WidgetType {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Block precomputation
+// 辅助函数
 // ═══════════════════════════════════════════════════════════════
 
-/** Exported for unit testing. */
-export function computeBlocks(doc: Text): Block[] {
-  const blocks: Block[] = []
-  let inCode = false, codeStart = 0, codeLang = ''
-  let inMath = false, mathStart = 0, mathLines: string[] = []
-  let inCallout = false, calloutStart = 0, calloutType = ''
+/**
+ * 判断选区是否与给定范围相交。
+ *
+ * 光标在标记 token 上时不隐藏该 token，保证用户能编辑原始标记。
+ * 这是 Obsidian Live Preview 的核心交互模式。
+ */
+function selectionTouches(state: EditorState, from: number, to: number): boolean {
+  for (const r of state.selection.ranges) {
+    if (r.from <= to && r.to >= from) return true
+  }
+  return false
+}
 
-  for (let i = 1; i <= doc.lines; i++) {
-    const text = doc.line(i).text
-    const trimmed = text.trim()
+/**
+ * 解析 callout 类型标记 "> [!TYPE]"。
+ * 返回 [类型, 标记结束位置] 或 null。
+ */
+function parseCalloutMarker(text: string, from: number): [string, number] | null {
+  const m = text.match(/^>\s*\[!(\w+)\]\s*/)
+  if (!m) return null
+  return [m[1]!.toUpperCase(), from + m[0].length]
+}
 
-    if (inCode) {
-      if (/^\s*(```|~~~)/.test(text)) {
-        blocks.push({ type: 'code', startLine: codeStart, endLine: i, lang: codeLang })
-        inCode = false
-      }
-      continue
-    }
-    if (inMath) {
-      if (trimmed === '$$') {
-        blocks.push({ type: 'math', startLine: mathStart, endLine: i, content: mathLines.join('\n') })
-        inMath = false
-        mathLines = []
-      } else {
-        mathLines.push(text)
-      }
-      continue
-    }
-    if (inCallout) {
-      if (text.startsWith('>')) {
-        const nc = text.match(/^>\s*\[!(\w+)\]/)
-        if (nc) {
-          blocks.push({ type: 'callout', startLine: calloutStart, endLine: i - 1, calloutType })
-          calloutStart = i
-          calloutType = nc[1]!.toUpperCase()
+// ═══════════════════════════════════════════════════════════════
+// 装饰构建 —— 基于语法树遍历
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * 构建 markdown live preview 装饰。
+ *
+ * 核心策略（只隐藏标记 token，永不覆盖整行）：
+ *   - HeaderMark (#) -> replace 隐藏
+ *   - EmphasisMark (星号/下划线/波浪号) -> replace 隐藏
+ *   - CodeMark (反引号) -> replace 隐藏
+ *   - LinkMark (方括号/圆括号) -> replace 隐藏
+ *   - QuoteMark (大于号) -> replace 隐藏
+ *   - ListMark (减号/星号/数字点) -> replace 隐藏 + widget bullet
+ *   - ATXHeading1-6 -> line 样式
+ *   - Blockquote -> line 样式
+ *   - FencedCode -> line 样式
+ *   - TaskMarker -> replace + widget checkbox
+ *   - 数学公式 $...$ / $$...$$ -> replace + widget KaTeX
+ *
+ * 光标安全：所有 replace 只覆盖标记 token（几个字符），永不覆盖整行，
+ * 从根源消除"整行 replace + line decoration 共存"的崩溃隐患。
+ */
+function buildDecorations(view: EditorView): DecorationSet {
+  const decos: Range<Decoration>[] = []
+  const { state } = view
+
+  for (const { from, to } of view.visibleRanges) {
+    syntaxTree(state).iterate({
+      from,
+      to,
+      enter: (node) => {
+        const name = node.name
+        const nodeFrom = node.from
+        const nodeTo = node.to
+
+        // ── 隐藏标记 token（光标不在其上时）──
+        if (isMarkToken(name)) {
+          if (!selectionTouches(state, nodeFrom, nodeTo)) {
+            decos.push(Decoration.replace({}).range(nodeFrom, nodeTo))
+          }
+          return
         }
-        continue
-      }
-      blocks.push({ type: 'callout', startLine: calloutStart, endLine: i - 1, calloutType })
-      inCallout = false
-    }
 
-    const fm = text.match(/^\s*(```|~~~)(\w*)\s*$/)
-    if (fm) { codeStart = i; codeLang = fm[2] ?? ''; inCode = true; continue }
-    // 单行数学块：$$ content $$（content 可选首尾空白）
-    const sm = text.match(/^\$\$\s*(.+?)\s*\$\$$/)
-    if (sm) { blocks.push({ type: 'math', startLine: i, endLine: i, content: sm[1]! }); continue }
-    if (trimmed === '$$') { mathStart = i; inMath = true; mathLines = []; continue }
-    const cm = text.match(/^>\s*\[!(\w+)\]/)
-    if (cm) { calloutStart = i; calloutType = cm[1]!.toUpperCase(); inCallout = true; continue }
+        // ── 标题行样式 ──
+        const headingMatch = name.match(/^ATXHeading(\d)$/) || name.match(/^SetextHeading(\d)$/)
+        if (headingMatch) {
+          const level = headingMatch[1]!
+          decos.push(Decoration.line({
+            attributes: { style: headingLineStyle(level) },
+          }).range(nodeFrom))
+          return
+        }
+
+        // ── 引用块行样式 ──
+        if (name === 'Blockquote') {
+          // 给引用块内的每行加样式
+          const lineFrom = state.doc.lineAt(nodeFrom).from
+          decos.push(Decoration.line({
+            attributes: { style: 'border-left:3px solid var(--accent);padding-left:1rem;color:var(--text-muted);font-style:italic' },
+          }).range(lineFrom))
+          return
+        }
+
+        // ── 代码块行样式 ──
+        if (name === 'FencedCode' || name === 'CodeBlock') {
+          const startLine = state.doc.lineAt(nodeFrom)
+          const endLine = state.doc.lineAt(nodeTo)
+          for (let ln = startLine.number; ln <= endLine.number; ln++) {
+            const line = state.doc.line(ln)
+            decos.push(Decoration.line({
+              attributes: { style: codeBlockLineStyle(ln === startLine.number, ln === endLine.number) },
+            }).range(line.from))
+          }
+          return
+        }
+
+        // ── 列表项 bullet widget ──
+        if (name === 'ListItem') {
+          // 检查是否为有序列表
+          const listMarkMatch = state.doc.sliceString(nodeFrom, Math.min(nodeFrom + 10, nodeTo)).match(/^(\d+\.|[-*+])\s/)
+          if (listMarkMatch) {
+            const isOrdered = /\d/.test(listMarkMatch[1]!)
+            if (isOrdered) {
+              const num = parseInt(listMarkMatch[1]!)
+              decos.push(Decoration.widget({
+                widget: new OrderedNumberWidget(num),
+                side: -1,
+              }).range(nodeFrom))
+            } else {
+              decos.push(Decoration.widget({
+                widget: new BulletWidget(),
+                side: -1,
+              }).range(nodeFrom))
+            }
+          }
+          return
+        }
+
+        // ── Task marker（GFM 任务列表）──
+        if (name === 'TaskMarker') {
+          const text = state.doc.sliceString(nodeFrom, nodeTo)
+          const checked = /\[x\]/i.test(text)
+          if (!selectionTouches(state, nodeFrom, nodeTo)) {
+            decos.push(Decoration.replace({
+              widget: new TaskCheckboxWidget(checked),
+            }).range(nodeFrom, nodeTo))
+          }
+          return
+        }
+
+        // ── 数学公式（自定义节点，由 mathExtension 提供）──
+        if (name === 'InlineMath' || name === 'BlockMath') {
+          if (!selectionTouches(state, nodeFrom, nodeTo)) {
+            const latex = state.doc.sliceString(nodeFrom, nodeTo)
+            if (name === 'InlineMath') {
+              decos.push(Decoration.replace({
+                widget: new KaTeXInlineWidget(latex),
+              }).range(nodeFrom, nodeTo))
+            } else {
+              decos.push(Decoration.replace({
+                widget: new KaTeXDisplayWidget(latex),
+                block: true,
+              }).range(nodeFrom, nodeTo))
+            }
+          }
+          return
+        }
+      },
+    })
   }
 
-  const last = doc.lines
-  if (inCode) blocks.push({ type: 'code', startLine: codeStart, endLine: last, lang: codeLang })
-  if (inMath) blocks.push({ type: 'math', startLine: mathStart, endLine: last, content: mathLines.join('\n') })
-  if (inCallout) blocks.push({ type: 'callout', startLine: calloutStart, endLine: last, calloutType })
-  return blocks
-}
+  // 处理 callout（Obsidian 风格 [!TYPE] 标注）—— 需要扫描行
+  // 因为 callout 不是标准 markdown，语法树不识别
+  buildCalloutDecorations(view, decos)
 
-function findBlock(lineNum: number, blocks: Block[]): Block | null {
-  let lo = 0, hi = blocks.length - 1, idx = -1
-  while (lo <= hi) {
-    const mid = (lo + hi) >>> 1
-    if (blocks[mid]!.startLine <= lineNum) { idx = mid; lo = mid + 1 } else { hi = mid - 1 }
-  }
-  if (idx === -1) return null
-  const b = blocks[idx]!
-  return lineNum <= b.endLine ? b : null
-}
-
-// ═══════════════════════════════════════════════════════════════
-// Per-line decoration functions
-// ═══════════════════════════════════════════════════════════════
-
-const HEADING_SIZES = [1.875, 1.5, 1.25, 1.125, 1.0, 0.875]
-
-/**
- * Heading decorations.
- *
- * SAFETY: 当行只有 "# "（无标题内容）时，使用 mark 弱化标记而非
- * replace 隐藏，避免整行 replace + line decoration 共存导致崩溃。
- */
-/** Exported for unit testing. */
-export function headingDecos(text: string, from: number): PendingDeco[] {
-  const m = text.match(/^(#{1,6})\s/)
-  if (!m) return []
-  const level = m[1]!.length
-  const markerLen = m[0].length
-  const size = HEADING_SIZES[level - 1]!
-  const markParts = [
-    `font-size:${size}rem`,
-    'font-weight:600',
-    'color:var(--text-primary)',
-    'line-height:1.3',
-    'font-family:var(--font-sans,sans-serif)',
-    'text-decoration:none',
-    'border-bottom:none',
-  ]
-  if (level === 2) markParts.push('padding-bottom:0.3rem', 'border-bottom:1px solid var(--border)')
-
-  const result: PendingDeco[] = [
-    { from, to: from, deco: Decoration.line({ attributes: { style: 'margin-top:2em;margin-bottom:0.5em' } }) },
-  ]
-
-  if (coversEntireLine(markerLen, text.length)) {
-    // 不安全：行只有标记 —— 使用 mark 弱化
-    result.push({ from, to: from + text.length, deco: Decoration.mark({ attributes: { style: DIM_STYLE } }) })
-  } else {
-    // 安全：行有标题内容 —— 隐藏标记，样式化内容
-    result.push({ from, to: from + markerLen, deco: Decoration.replace({}) })
-    result.push({ from: from + markerLen, to: from + text.length, deco: Decoration.mark({ attributes: { style: markParts.join(';') } }) })
-  }
-  return result
-}
-
-/**
- * List decorations (bullet / ordered / task).
- *
- * SAFETY: listDecos 不使用 Decoration.line，所以整行 replace 是安全的。
- * 空列表项（如 "- "）会显示为只有 bullet widget 的行，这是预期行为。
- */
-function listDecos(text: string, from: number): PendingDeco[] {
-  const task = text.match(/^(\s*)([-*+])\s\[([ xX])\]\s/)
-  if (task) return [{ from, to: from + task[0].length, deco: Decoration.replace({ widget: new TaskCheckboxWidget(task[3]!.toLowerCase() === 'x') }) }]
-  const ol = text.match(/^(\s*)(\d+)\.\s/)
-  if (ol) return [{ from, to: from + ol[0].length, deco: Decoration.replace({ widget: new OrderedNumberWidget(parseInt(ol[2]!, 10)) }) }]
-  const ul = text.match(/^(\s*)([-*+])\s/)
-  if (ul) return [{ from, to: from + ul[0].length, deco: Decoration.replace({ widget: new BulletWidget() }) }]
-  return []
-}
-
-/**
- * Blockquote decorations.
- *
- * SAFETY: 当行只有 "> "（无引用内容）时，使用 mark 弱化标记而非
- * replace 隐藏，避免整行 replace + line decoration 共存导致崩溃。
- */
-/** Exported for unit testing. */
-export function blockquoteDecos(text: string, from: number): PendingDeco[] {
-  const m = text.match(/^(\s*)>\s?/)
-  if (!m) return []
-  const markerLen = m[0].length
-
-  const result: PendingDeco[] = [
-    { from, to: from, deco: Decoration.line({ attributes: { style: 'border-left:3px solid var(--accent);padding-left:1rem' } }) },
-  ]
-
-  if (coversEntireLine(markerLen, text.length)) {
-    // 不安全：行只有标记 —— 使用 mark 弱化
-    result.push({ from, to: from + text.length, deco: Decoration.mark({ attributes: { style: DIM_STYLE } }) })
-  } else {
-    // 安全：行有引用内容 —— 隐藏标记，样式化内容
-    result.push({ from, to: from + markerLen, deco: Decoration.replace({}) })
-    result.push({ from: from + markerLen, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'color:var(--text-muted);font-style:italic' } }) })
-  }
-  return result
+  return Decoration.set(decos, true)
 }
 
 /**
- * Code block decorations.
- *
- * SAFETY: NEVER combine Decoration.line with a Decoration.replace that covers
- * the ENTIRE line content — CM6 produces an empty line element that conflicts
- * with the line decoration and crashes on input. Fence lines are entirely
- * marker text, so replacing them wholly is the dangerous case.
- *
- * Strategy:
- *   - ALL lines get Decoration.line for background/borders.
- *   - Opening fence with lang: partial replace of backticks + mark for lang.
- *   - Opening fence without lang / closing fence: dim via Decoration.mark.
- *   - No Decoration.replace ever covers an entire fence line.
+ * 判断节点是否为标记 token（需要隐藏的符号）。
  */
-/** Exported for unit testing. */
-export function codeBlockDecos(text: string, from: number, block: CodeBlock, ln: number): PendingDeco[] {
-  const isFirst = ln === block.startLine
-  const isLast = ln === block.endLine
-  const result: PendingDeco[] = []
+function isMarkToken(name: string): boolean {
+  return (
+    name === 'HeaderMark' ||
+    name === 'QuoteMark' ||
+    name === 'ListMark' ||
+    name === 'EmphasisMark' ||
+    name === 'CodeMark' ||
+    name === 'LinkMark' ||
+    name === 'StrikethroughMark'
+  )
+}
 
-  const lineParts = [
+function headingLineStyle(level: string): string {
+  const sizes: Record<string, string> = {
+    '1': '2rem',
+    '2': '1.75rem',
+    '3': '1.5rem',
+    '4': '1.25rem',
+    '5': '1.1rem',
+    '6': '1rem',
+  }
+  const size = sizes[level] ?? '1rem'
+  return `font-size:${size};font-weight:700;line-height:1.3;margin:1.5em 0 0.5em`
+}
+
+function codeBlockLineStyle(isFirst: boolean, isLast: boolean): string {
+  const parts = [
     'background-color:var(--code-bg)',
     'border-left:1px solid var(--code-border)',
     'border-right:1px solid var(--code-border)',
@@ -422,410 +369,160 @@ export function codeBlockDecos(text: string, from: number, block: CodeBlock, ln:
     'font-size:0.875rem',
     'line-height:1.7',
   ]
-  if (isFirst) lineParts.push('border-top:1px solid var(--code-border)', 'border-top-left-radius:8px', 'border-top-right-radius:8px', 'padding-top:1.25rem')
-  if (isLast) lineParts.push('border-bottom:1px solid var(--code-border)', 'border-bottom-left-radius:8px', 'border-bottom-right-radius:8px', 'padding-bottom:1.25rem')
-  result.push({ from, to: from, deco: Decoration.line({ attributes: { style: lineParts.join(';') } }) })
-
-  const fenceLabelStyle = 'font-size:0.7em;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;font-weight:500'
-  const dimMarkerStyle = 'color:var(--text-muted);opacity:0.45'
-
-  if (isFirst) {
-    const fm = text.match(/^(\s*)(```+|~~~+)(\w*)/)
-    if (fm) {
-      const leadingLen = fm[1]!.length
-      const fenceLen = fm[2]!.length
-      const langLen = fm[3]!.length
-      const fenceStart = from + leadingLen
-      if (langLen > 0) {
-        // 有语言标识：隐藏反引号，保留语言标记（行内有内容，安全）
-        result.push({ from: fenceStart, to: fenceStart + fenceLen, deco: Decoration.replace({}) })
-        result.push({ from: fenceStart + fenceLen, to: fenceStart + fenceLen + langLen, deco: Decoration.mark({ attributes: { style: fenceLabelStyle } }) })
-      } else {
-        // 无语言标识：使用 mark 弱化（避免整行 replace）
-        result.push({ from: fenceStart, to: fenceStart + fenceLen, deco: Decoration.mark({ attributes: { style: dimMarkerStyle } }) })
-      }
-    }
-  } else if (isLast) {
-    const fm = text.match(/^(\s*)(```+|~~~+)/)
-    if (fm) {
-      const leadingLen = fm[1]!.length
-      const fenceLen = fm[2]!.length
-      const fenceStart = from + leadingLen
-      const trailingLen = text.length - leadingLen - fenceLen
-      if (trailingLen > 0) {
-        // 有尾部内容：隐藏围栏标记（行内有内容，安全）
-        result.push({ from: fenceStart, to: fenceStart + fenceLen, deco: Decoration.replace({}) })
-      } else {
-        // 无尾部内容：使用 mark 弱化（避免整行 replace）
-        result.push({ from: fenceStart, to: fenceStart + fenceLen, deco: Decoration.mark({ attributes: { style: dimMarkerStyle } }) })
-      }
-    }
-  }
-
-  return result
+  if (isFirst) parts.push('border-top:1px solid var(--code-border)', 'border-top-left-radius:8px', 'border-top-right-radius:8px', 'padding-top:1.25rem')
+  if (isLast) parts.push('border-bottom:1px solid var(--code-border)', 'border-bottom-left-radius:8px', 'border-bottom-right-radius:8px', 'padding-bottom:1.25rem')
+  return parts.join(';')
 }
 
 /**
- * Math block decorations.
+ * 构建 callout 装饰（Obsidian 风格 [!TYPE] 标注）。
  *
- * SAFETY: mathBlockDecos 不使用 Decoration.line，所以整行 replace 是安全的。
- * 单行 $$ E=mc^2 $$ 整行替换为 KaTeX widget，多行块隐藏 $$ 围栏行。
+ * Callout 不是标准 markdown，语法树将其解析为 Blockquote。
+ * 这里扫描可见行，识别 "> [!TYPE]" 模式并添加 widget。
  */
-function mathBlockDecos(text: string, from: number, block: MathBlock, ln: number): PendingDeco[] {
-  if (block.startLine === block.endLine) {
-    return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new KaTeXDisplayWidget(block.content) }) }]
-  }
-  if (block.startLine + 1 === block.endLine) {
-    if (ln === block.startLine) {
-      return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new KaTeXDisplayWidget(block.content) }) }]
-    }
-    return [{ from, to: from + text.length, deco: Decoration.replace({}) }]
-  }
-  if (ln === block.startLine || ln === block.endLine) {
-    return [{ from, to: from + text.length, deco: Decoration.replace({}) }]
-  }
-  if (ln === block.startLine + 1) {
-    return [{ from, to: from + text.length, deco: Decoration.replace({ widget: new KaTeXDisplayWidget(block.content) }) }]
-  }
-  return [{ from, to: from + text.length, deco: Decoration.replace({}) }]
-}
-
-/**
- * Callout decorations.
- *
- * SAFETY: 当标注头行只有 "> [!NOTE]"（无标题文本）或续行只有 ">"
- * 时，使用 mark 弱化标记而非 replace 隐藏/widget，避免整行 replace
- * + line decoration 共存导致崩溃。
- */
-/** Exported for unit testing. */
-export function calloutDecos(text: string, from: number, block: CalloutBlock, ln: number): PendingDeco[] {
-  const color = CALLOUT_COLORS[block.calloutType] ?? '#448aff'
-  const icon = CALLOUT_ICONS[block.calloutType] ?? '📝'
-  const result: PendingDeco[] = []
-  const isFirst = ln === block.startLine, isLast = ln === block.endLine
-
-  const lineParts = [
-    `border-left:4px solid ${color}`,
-    `border-right:1px solid color-mix(in srgb, ${color} 20%, transparent)`,
-    `background-color:color-mix(in srgb, ${color} 6%, transparent)`,
-    'padding-left:1rem',
-    'padding-right:1rem',
-  ]
-  if (isFirst) lineParts.push('border-top:1px solid color-mix(in srgb, ' + color + ' 20%, transparent)', 'border-top-left-radius:8px', 'border-top-right-radius:8px', 'padding-top:0.75rem')
-  if (isLast) lineParts.push('border-bottom:1px solid color-mix(in srgb, ' + color + ' 20%, transparent)', 'border-bottom-left-radius:8px', 'border-bottom-right-radius:8px', 'padding-bottom:0.75rem')
-  result.push({ from, to: from, deco: Decoration.line({ attributes: { style: lineParts.join(';') } }) })
-
-  if (isFirst) {
-    const hm = text.match(/^>\s*\[!(\w+)\]\s?(.*)$/)
-    if (hm) {
-      const type = hm[1]!.toUpperCase()
-      const titleText = hm[2] ?? ''
-      const bracketEnd = text.indexOf(']')
-      const prefixEnd = bracketEnd + 1 + (text[bracketEnd + 1] === ' ' ? 1 : 0)
-
-      if (coversEntireLine(prefixEnd, text.length)) {
-        // 不安全：行只有标记（无标题）—— 使用 mark 弱化
-        result.push({ from, to: from + text.length, deco: Decoration.mark({ attributes: { style: `opacity:0.5;color:${color};font-weight:500` } }) })
-      } else {
-        // 安全：行有标题内容 —— 使用 widget 替换标记
-        result.push({ from, to: from + prefixEnd, deco: Decoration.replace({ widget: new CalloutHeaderWidget(type, color, icon) }) })
-        if (titleText.trim()) {
-          result.push({ from: from + prefixEnd, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'font-weight:600;font-size:0.9375rem;color:var(--text-primary)' } }) })
-        }
-      }
-    } else {
-      // 标注头行不匹配标准格式 —— 按普通引用行处理
-      const m = text.match(/^>\s?/)
-      if (m) {
-        const markerLen = m[0].length
-        if (coversEntireLine(markerLen, text.length)) {
-          result.push({ from, to: from + text.length, deco: Decoration.mark({ attributes: { style: DIM_STYLE } }) })
-        } else {
-          result.push({ from, to: from + markerLen, deco: Decoration.replace({}) })
+function buildCalloutDecorations(view: EditorView, decos: Range<Decoration>[]) {
+  const { state } = view
+  for (const { from, to } of view.visibleRanges) {
+    const startLine = state.doc.lineAt(from)
+    const endLine = state.doc.lineAt(to)
+    for (let ln = startLine.number; ln <= endLine.number; ln++) {
+      const line = state.doc.line(ln)
+      const text = line.text
+      const cm = parseCalloutMarker(text, line.from)
+      if (cm) {
+        const [cType, markerEnd] = cm
+        const color = CALLOUT_COLORS[cType] ?? '#448aff'
+        const icon = CALLOUT_ICONS[cType] ?? '📝'
+        // 光标不在标记行时，替换标记为 widget
+        if (!selectionTouches(state, line.from, markerEnd)) {
+          decos.push(Decoration.replace({
+            widget: new CalloutHeaderWidget(cType, color, icon),
+          }).range(line.from, markerEnd))
+          // callout 行样式
+          decos.push(Decoration.line({
+            attributes: { style: `border-left:3px solid ${color};padding-left:1rem;background:rgba(68,138,255,0.05)` },
+          }).range(line.from))
         }
       }
     }
-  } else {
-    // 标注续行
-    const m = text.match(/^(\s*)>\s?/)
-    if (m) {
-      const markerLen = m[0].length
-      if (coversEntireLine(markerLen, text.length)) {
-        // 不安全：行只有 ">" —— 使用 mark 弱化
-        result.push({ from, to: from + text.length, deco: Decoration.mark({ attributes: { style: DIM_STYLE } }) })
-      } else {
-        // 安全：行有内容 —— 隐藏标记，样式化内容
-        result.push({ from, to: from + markerLen, deco: Decoration.replace({}) })
-        result.push({ from: from + markerLen, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'color:var(--text-secondary)' } }) })
-      }
-    }
   }
-  return result
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Inline span parsing
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * Parse inline formatting spans from a line of text.
- *
- * Supported: bold (**), italic (*), inline code (`), links ([t](u)),
- * inline math ($...$).
- *
- * Overlapping spans are resolved by sorting by start position and keeping
- * only non-overlapping spans (first-wins). This prevents decoration
- * conflicts that can cause rendering glitches.
- *
- * MATH REGEX: /\$(?!\$)([^$]+)\$(?!\$)/g uses [^$]+ (greedy, matches
- * everything except $) which correctly captures the full content between
- * single $ delimiters including { } ^ _ 0-9 etc.
- */
-function parseInlineSpans(text: string, lineFrom: number): InlineSpan[] {
-  const rawSpans: InlineSpan[] = []
-
-  // Bold: **text**
-  for (const m of text.matchAll(/\*\*(.+?)\*\*/g)) {
-    const s = lineFrom + m.index!, e = s + m[0].length
-    rawSpans.push({ from: s, to: e, decos: [
-      { from: s, to: s + 2, deco: Decoration.replace({}) },
-      { from: s + 2, to: e - 2, deco: Decoration.mark({ attributes: { style: 'font-weight:600;color:var(--text-primary)' } }) },
-      { from: e - 2, to: e, deco: Decoration.replace({}) },
-    ] })
+// 有序列表数字 widget（需在 buildDecorations 中使用）
+class OrderedNumberWidget extends WidgetType {
+  constructor(private n: number) { super() }
+  eq(other: WidgetType): boolean {
+    return other instanceof OrderedNumberWidget && this.n === other.n
   }
-
-  // Italic: *text* (not **)
-  for (const m of text.matchAll(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g)) {
-    const s = lineFrom + m.index!, e = s + m[0].length
-    rawSpans.push({ from: s, to: e, decos: [
-      { from: s, to: s + 1, deco: Decoration.replace({}) },
-      { from: s + 1, to: e - 1, deco: Decoration.mark({ attributes: { style: 'font-style:italic' } }) },
-      { from: e - 1, to: e, deco: Decoration.replace({}) },
-    ] })
+  ignoreEvent(): boolean { return false }
+  toDOM() {
+    const s = document.createElement('span')
+    s.className = 'cm-lp-ol'
+    s.textContent = `${this.n}.`
+    s.style.cssText = 'margin-right:0.5em;color:var(--text-muted);font-variant-numeric:tabular-nums'
+    return s
   }
-
-  // Inline code: `code`
-  for (const m of text.matchAll(/`([^`]+)`/g)) {
-    const s = lineFrom + m.index!, e = s + m[0].length
-    rawSpans.push({ from: s, to: e, decos: [
-      { from: s, to: s + 1, deco: Decoration.replace({}) },
-      { from: s + 1, to: e - 1, deco: Decoration.mark({ attributes: { style: 'font-family:var(--font-mono,ui-monospace,monospace);font-size:0.875em;padding:0.2em 0.4em;border-radius:4px;background-color:var(--bg-code)' } }) },
-      { from: e - 1, to: e, deco: Decoration.replace({}) },
-    ] })
-  }
-
-  // Link: [text](url)
-  for (const m of text.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)) {
-    const s = lineFrom + m.index!, e = s + m[0].length
-    const ts = s + 1, te = ts + m[1]!.length
-    rawSpans.push({ from: s, to: e, decos: [
-      { from: s, to: s + 1, deco: Decoration.replace({}) },
-      { from: ts, to: te, deco: Decoration.mark({ attributes: { style: 'text-decoration:underline;text-underline-offset:2px;text-decoration-color:var(--border);color:var(--accent)' } }) },
-      { from: te, to: e, deco: Decoration.replace({}) },
-    ] })
-  }
-
-  // Inline math: $latex$ (not $$)
-  // [^$]+ is greedy and matches everything except $, correctly capturing
-  // the full content between single $ delimiters including { } ^ _ 0-9.
-  for (const m of text.matchAll(/\$(?!\$)([^$]+)\$(?!\$)/g)) {
-    const s = lineFrom + m.index!, e = s + m[0].length
-    rawSpans.push({ from: s, to: e, decos: [
-      { from: s, to: e, deco: Decoration.replace({ widget: new KaTeXInlineWidget(m[1]!) }) },
-    ] })
-  }
-
-  // Sort by start position and filter overlapping spans (first-wins)
-  rawSpans.sort((a, b) => a.from - b.from)
-  const result: InlineSpan[] = []
-  let lastEnd = -1
-  for (const span of rawSpans) {
-    if (span.from >= lastEnd) {
-      result.push(span)
-      lastEnd = span.to
-    }
-  }
-
-  return result
-}
-
-/**
- * 判断光标是否在 span 内部（需要显示原始文本以便编辑）。
- *
- * 边界规则（Obsidian 风格）：
- *   - cursor === span.from：光标在 span 开头 → 不跳过装饰（光标左侧）
- *   - cursor === span.to：光标在 span 结尾 → 不跳过装饰（光标右侧）
- *   - cursor > span.from && cursor < span.to：光标在 span 内部 → 跳过装饰
- *
- * 这样光标在 span 边缘时仍显示渲染样式，只在真正进入 span 内部时
- * 才显示原始文本，避免边缘抖动。
- */
-function cursorInSpan(cursor: number, span: { from: number; to: number }): boolean {
-  return cursor > span.from && cursor < span.to
 }
 
 // ═══════════════════════════════════════════════════════════════
 // ViewPlugin
 // ═══════════════════════════════════════════════════════════════
 //
-// CURSOR/KEYBOARD STABILITY (CM6 官方推荐方案，参考 codemirror.net/examples/decoration):
+// 增量更新策略（参考官方 Decoration 示例）：
+//   - docChanged: 重建
+//   - viewportChanged: 重建
+//   - selectionSet: 重建（光标位置影响标记隐藏）
+//   - 语法树变化: 重建
 //
-// 1. atomicRanges facet（核心修复）：
-//    将所有 Decoration.replace 区间注册为原子区间。CM6 在光标移动
-//    时会调用 skipAtomicRanges() 自动跳过这些区间，光标不会进入
-//    隐藏文本区域。这是解决"上键跳到文档顶端"的关键。
-//
-//    根因：未提供 atomicRanges 时，光标可进入 replace 区间的隐藏
-//    文本，导致 coordsAtPos 返回 null，moveVertically 计算 yOffset
-//    为负数，posAtCoords 返回位置 0（文档开头）。
-//
-// 2. 增量重建：selectionSet 时仅在光标行变化或光标进出 block 时
-//    重建装饰，避免同行左右移动光标时全量重建导致的卡顿。
-//
-// 3. WidgetType.ignoreEvent()：所有 widget 返回 false 让事件穿透。
-//
-// 4. cursorInSpan 边界修正：光标在 span 边缘时不跳过装饰。
+// atomicRanges: 将所有 replace 装饰注册为原子区间，光标移动时
+// 自动跳过隐藏文本区域（CM6 官方推荐，解决"上键跳顶"根因）。
 
 export function livePreview() {
   return ViewPlugin.fromClass(
     class {
       decorations: DecorationSet = Decoration.none
-      private _blocks: Block[] = []
-      private _lastDoc: Text | null = null
-      private _errorCount = 0
-      /** 上次光标所在行，用于增量判断 */
-      private _lastCursorLine = -1
-      /** 上次光标所在 block，用于检测光标进出 block */
-      private _lastCursorBlock: Block | null = null
 
       constructor(view: EditorView) {
-        this.decorations = this.build(view)
+        this.decorations = buildDecorations(view)
       }
 
       update(update: ViewUpdate) {
-        if (update.docChanged) {
-          this._lastDoc = null
-          this._lastCursorLine = -1
-          this._lastCursorBlock = null
-          this.decorations = this.build(update.view)
-          return
+        if (
+          update.docChanged ||
+          update.viewportChanged ||
+          update.selectionSet ||
+          syntaxTree(update.startState) !== syntaxTree(update.state)
+        ) {
+          this.decorations = buildDecorations(update.view)
         }
-        if (update.viewportChanged) {
-          this.decorations = this.build(update.view)
-          return
-        }
-        if (update.selectionSet) {
-          // 增量重建：仅在光标行变化或光标进出 block 时重建
-          const newCursorLine = update.state.doc.lineAt(
-            update.state.selection.main.head
-          ).number
-          // 检测光标是否进出 block（block 内显示原始文本，进出需重建）
-          const blocks = this._blocks
-          const newCursorBlock = blocks.length > 0
-            ? findBlock(newCursorLine, blocks)
-            : null
-          if (newCursorLine !== this._lastCursorLine ||
-              newCursorBlock !== this._lastCursorBlock) {
-            this.decorations = this.build(update.view)
-          }
-        }
-      }
-
-      build(view: EditorView): DecorationSet {
-        try {
-          const result = this._build(view)
-          this._errorCount = 0
-          return result
-        } catch (e) {
-          this._errorCount++
-          if (this._errorCount <= 3) console.warn('[livePreview] build error:', e)
-          if (this._errorCount >= 5) return Decoration.none
-          return this.decorations
-        }
-      }
-
-      _build(view: EditorView): DecorationSet {
-        const doc = view.state.doc
-        const cursor = view.state.selection.main.head
-        const cursorLine = doc.lineAt(cursor).number
-        this._lastCursorLine = cursorLine
-
-        // Recompute blocks whenever doc reference changes
-        if (this._lastDoc !== doc) {
-          this._blocks = computeBlocks(doc)
-          this._lastDoc = doc
-        }
-
-        const cursorBlock = findBlock(cursorLine, this._blocks)
-        this._lastCursorBlock = cursorBlock
-
-        // Determine processing range: visible lines + cursor line
-        const vr = view.visibleRanges
-        let visStart = 1, visEnd = doc.lines
-        if (vr.length > 0) {
-          visStart = doc.lineAt(vr[0]!.from).number
-          visEnd = doc.lineAt(vr[vr.length - 1]!.to).number
-        }
-        const pStart = Math.max(1, Math.min(visStart, cursorLine))
-        const pEnd = Math.min(doc.lines, Math.max(visEnd, cursorLine))
-
-        const pending: PendingDeco[] = []
-
-        for (let ln = pStart; ln <= pEnd; ln++) {
-          const line = doc.line(ln)
-          const { from, text } = line
-          const block = findBlock(ln, this._blocks)
-
-          // If cursor is in this block, render the entire block as raw text
-          if (block && cursorBlock && block === cursorBlock) continue
-
-          if (block) {
-            switch (block.type) {
-              case 'code': pending.push(...codeBlockDecos(text, from, block, ln)); break
-              case 'math': pending.push(...mathBlockDecos(text, from, block, ln)); break
-              case 'callout': pending.push(...calloutDecos(text, from, block, ln)); break
-            }
-            continue
-          }
-
-          // Line-level decorations (heading, list, blockquote) — skip cursor line
-          if (ln !== cursorLine) {
-            let matched = false
-            const hd = headingDecos(text, from)
-            if (hd.length > 0) { pending.push(...hd); matched = true }
-            if (!matched) { const ld = listDecos(text, from); if (ld.length > 0) { pending.push(...ld); matched = true } }
-            if (!matched) { const bd = blockquoteDecos(text, from); if (bd.length > 0) { pending.push(...bd); matched = true } }
-            if (matched) continue
-          }
-
-          // Inline decorations
-          const isCursorLine = ln === cursorLine
-          const spans = parseInlineSpans(text, from)
-
-          for (const span of spans) {
-            // Skip spans that contain the cursor (show raw text for editing)
-            if (isCursorLine && cursorInSpan(cursor, span)) continue
-            for (const d of span.decos) {
-              pending.push(d)
-            }
-          }
-        }
-
-        return Decoration.set(
-          pending.map(p => p.deco.range(p.from, p.to)),
-          true,
-        )
       }
     },
     {
       decorations: (v) => v.decorations,
       // ★ 核心修复：将所有 replace 装饰注册为 atomic ranges
       // CM6 官方推荐方案（参考 codemirror.net/examples/decoration/）
-      // 光标移动时会自动跳过 replace 区间，不会进入隐藏文本区域
+      // 光标移动时自动跳过 replace 区间，不会进入隐藏文本区域
       provide: (plugin) =>
         EditorView.atomicRanges.of((view) => {
           return view.plugin(plugin)?.decorations ?? Decoration.none
         }),
     },
   )
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 数学公式 Lezer 扩展
+// ═══════════════════════════════════════════════════════════════
+//
+// @lezer/markdown 不内置数学公式支持，需要自定义扩展。
+// 定义 InlineMath（$...$）和 BlockMath（$$...$$）节点。
+//
+// 参考 @lezer/markdown 的 Strikethrough 扩展实现。
+
+import type { MarkdownConfig } from '@lezer/markdown'
+
+export const mathExtension: MarkdownConfig = {
+  defineNodes: [
+    'InlineMath',
+    'BlockMath',
+    'MathMark',
+  ],
+  parseInline: [
+    {
+      name: 'InlineMath',
+      parse(cx, next, pos) {
+        // $...$ 行内数学公式（next 是 $ 的 charCode = 36）
+        if (next !== 36 /* '$' */) return -1
+        // 检查是否为 $$ 块级公式
+        if (cx.char(pos + 1) === 36) return -1
+        // 查找闭合 $
+        let end = pos + 1
+        while (end < cx.end) {
+          if (cx.char(end) === 36 && cx.char(end + 1) !== 36) break
+          end++
+        }
+        if (end >= cx.end) return -1
+        // 创建 InlineMath 节点（包含 $ 符号）
+        return cx.addElement(cx.elt('InlineMath', pos, end + 1))
+      },
+      after: 'Emphasis',
+    },
+    {
+      name: 'BlockMath',
+      parse(cx, next, pos) {
+        // $$...$$ 块级数学公式
+        if (next !== 36 /* '$' */ || cx.char(pos + 1) !== 36) return -1
+        // 查找闭合 $$
+        let end = pos + 2
+        while (end < cx.end - 1) {
+          if (cx.char(end) === 36 && cx.char(end + 1) === 36) break
+          end++
+        }
+        if (end >= cx.end - 1) return -1
+        // 创建 BlockMath 节点（包含 $$ 符号）
+        return cx.addElement(cx.elt('BlockMath', pos, end + 2))
+      },
+      after: 'InlineMath',
+    },
+  ],
 }

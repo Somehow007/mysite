@@ -11,11 +11,11 @@ import {
 // ── CodeMirror 6 ──
 import { EditorView, keymap, drawSelection, dropCursor, highlightActiveLine, highlightSpecialChars } from '@codemirror/view'
 import { history, historyKeymap, defaultKeymap, indentWithTab, redo, undo } from '@codemirror/commands'
-import { markdown } from '@codemirror/lang-markdown'
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput } from '@codemirror/language'
 
 // ── Custom editor extensions ──
-import { livePreview } from '@/editor/livePreview'
+import { livePreview, mathExtension } from '@/editor/livePreview'
 import { autoConvertKeymap } from '@/editor/autoConvert'
 import { enterContinuationKeymap } from '@/editor/enterContinuation'
 
@@ -579,8 +579,13 @@ function initEditor() {
       enterContinuationKeymap,
       autoConvertKeymap,
 
-      // ── Markdown language ──
-      markdown(),
+      // ── Markdown language（含数学公式扩展）──
+      markdown({
+        base: markdownLanguage,
+        codeLanguages: [],
+        addKeymap: true,
+        extensions: [mathExtension],
+      }),
 
       // ── Syntax highlighting ──
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
