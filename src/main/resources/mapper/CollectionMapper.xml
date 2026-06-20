@@ -8,4 +8,39 @@
         WHERE author_id = #{authorId} AND del_flag = 0
         ORDER BY sort_order ASC, create_time DESC
     </select>
+
+    <select id="selectCollectionsPage" resultType="io.github.somehow.mysite.dto.resp.collection.CollectionPageQueryRespDTO">
+        SELECT
+            c.id,
+            c.title,
+            c.description,
+            c.cover_image,
+            c.author_id,
+            c.article_count,
+            c.sort_order,
+            c.create_time,
+            c.update_time,
+            u.username AS author_name,
+            COALESCE(SUM(a.view_count), 0) AS total_view_count
+        FROM t_collection c
+        LEFT JOIN t_user u ON u.id = c.author_id
+        LEFT JOIN t_collection_article ca ON ca.collection_id = c.id AND ca.del_flag = 0
+        LEFT JOIN t_article a ON a.id = ca.article_id AND a.del_flag = 0
+        WHERE c.del_flag = 0
+        <if test="keyword != null and keyword != ''">
+            AND c.title LIKE CONCAT('%', #{keyword}, '%')
+        </if>
+        <if test="authorId != null">
+            AND c.author_id = #{authorId}
+        </if>
+        GROUP BY c.id, u.username
+        <choose>
+            <when test="sortBy == 'viewCount'">
+                ORDER BY total_view_count DESC, c.sort_order ASC, c.create_time DESC
+            </when>
+            <otherwise>
+                ORDER BY c.sort_order ASC, c.create_time DESC
+            </otherwise>
+        </choose>
+    </select>
 </mapper>

@@ -222,6 +222,7 @@ export interface Collection {
   authorName: string
   articleCount: number
   sortOrder: number
+  totalViewCount?: number
   createTime: string
   updateTime: string
 }

@@ -107,11 +107,9 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
         CollectionDO existing = getCollectionOrThrow(id);
         checkCollectionOwnership(existing);
 
-        // 软删除合集
-        CollectionDO updateDO = new CollectionDO();
-        updateDO.setId(id);
-        updateDO.setDelFlag(1);
-        collectionMapper.updateById(updateDO);
+        // 软删除合集：使用 deleteById 触发 MyBatis-Plus 逻辑删除
+        // 注意：updateById 不会更新 logic-delete-field(delFlag)，必须使用 deleteById
+        collectionMapper.deleteById(id);
 
         // 物理删除关联记录
         collectionArticleMapper.physicalDeleteByCollectionId(id);
@@ -119,49 +117,29 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = CACHE_HOME, key = "'page:' + #requestParam.current + ':' + #requestParam.size + ':' + #requestParam.keyword + ':' + #requestParam.authorId")
+    @Cacheable(value = CACHE_HOME, key = "'page:' + #requestParam.current + ':' + #requestParam.size + ':' + #requestParam.keyword + ':' + #requestParam.authorId + ':' + #requestParam.sortBy")
     public IPage<CollectionPageQueryRespDTO> pageQueryCollection(CollectionPageQueryReqDTO requestParam) {
-        LambdaQueryWrapper<CollectionDO> queryWrapper = Wrappers.<CollectionDO>lambdaQuery()
-                .eq(CollectionDO::getDelFlag, 0);
+        Page<CollectionPageQueryRespDTO> page = new Page<>(requestParam.getCurrent(), requestParam.getSize());
+        IPage<CollectionPageQueryRespDTO> result = collectionMapper.selectCollectionsPage(
+                page,
+                requestParam.getKeyword(),
+                requestParam.getAuthorId(),
+                requestParam.getSortBy());
 
-        if (StrUtil.isNotBlank(requestParam.getKeyword())) {
-            queryWrapper.like(CollectionDO::getTitle, requestParam.getKeyword());
-        }
-        if (requestParam.getAuthorId() != null) {
-            queryWrapper.eq(CollectionDO::getAuthorId, requestParam.getAuthorId());
-        }
-
-        queryWrapper.orderByAsc(CollectionDO::getSortOrder)
-                .orderByDesc(CollectionDO::getCreateTime);
-
-        Page<CollectionDO> page = new Page<>(requestParam.getCurrent(), requestParam.getSize());
-        Page<CollectionDO> collectionPage = collectionMapper.selectPage(page, queryWrapper);
-
-        if (CollectionUtils.isEmpty(collectionPage.getRecords())) {
+        if (result == null || CollectionUtils.isEmpty(result.getRecords())) {
             return new Page<>();
         }
 
-        // 批量查询作者名
-        List<Long> authorIds = collectionPage.getRecords().stream()
-                .map(CollectionDO::getAuthorId)
-                .distinct()
-                .collect(Collectors.toList());
-        Map<Long, String> authorNameMap = new HashMap<>();
-        if (!authorIds.isEmpty()) {
-            userMapper.selectList(Wrappers.<UserDO>lambdaQuery().in(UserDO::getId, authorIds))
-                    .forEach(u -> authorNameMap.put(u.getId(), u.getUsername()));
-        }
+        // 确保 totalViewCount 不为 null（无文章的合集）
+        result.getRecords().forEach(c -> {
+            if (c.getTotalViewCount() == null) {
+                c.setTotalViewCount(0L);
+            }
+            if (c.getAuthorName() == null) {
+                c.setAuthorName("");
+            }
+        });
 
-        List<CollectionPageQueryRespDTO> records = collectionPage.getRecords().stream()
-                .map(collection -> {
-                    CollectionPageQueryRespDTO dto = BeanUtil.toBean(collection, CollectionPageQueryRespDTO.class);
-                    dto.setAuthorName(authorNameMap.getOrDefault(collection.getAuthorId(), ""));
-                    return dto;
-                })
-                .collect(Collectors.toList());
-
-        IPage<CollectionPageQueryRespDTO> result = new Page<>(collectionPage.getCurrent(), collectionPage.getSize(), collectionPage.getTotal());
-        result.setRecords(records);
         return result;
     }
 

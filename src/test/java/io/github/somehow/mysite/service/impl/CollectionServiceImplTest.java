@@ -179,7 +179,7 @@ class CollectionServiceImplTest {
         when(collectionMapper.selectOne(any())).thenReturn(existing);
 
         assertDoesNotThrow(() -> collectionService.deleteCollection(COLLECTION_ID));
-        verify(collectionMapper).updateById(any(CollectionDO.class));
+        verify(collectionMapper).deleteById(COLLECTION_ID);
         verify(collectionArticleMapper).physicalDeleteByCollectionId(COLLECTION_ID);
     }
 

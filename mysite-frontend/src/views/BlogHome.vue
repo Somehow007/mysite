@@ -7,7 +7,7 @@ import { getCollections } from '@/api/collection'
 import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
 import { useFavorite } from '@/composables/useFavorite'
-import { ArrowUpDown, ArrowUp, ArrowDown, Tag, X, Loader2, BookOpen } from 'lucide-vue-next'
+import { ArrowUpDown, ArrowUp, ArrowDown, Tag, X, Loader2, BookOpen, ChevronRight } from 'lucide-vue-next'
 import ArticleList from '@/components/article/ArticleList.vue'
 import CollectionCard from '@/components/collection/CollectionCard.vue'
 import type { ArticleListItem, Pagination, Category, Collection } from '@/types'
@@ -103,7 +103,8 @@ async function fetchCategories() {
 async function fetchCollections() {
   collectionsLoading.value = true
   try {
-    const res = await getCollections({ page: 1, size: 6 })
+    // 按文章总浏览量降序取前 3 个合集
+    const res = await getCollections({ page: 1, size: 3, sortBy: 'viewCount' })
     collections.value = res.list
   } catch {
     collections.value = []
@@ -226,12 +227,24 @@ onMounted(() => {
     </section>
 
     <!-- 合集展示 -->
-    <section v-if="collections.length > 0" class="mb-10">
-      <div class="flex items-center gap-2 mb-4">
-        <BookOpen :size="18" class="text-accent" />
-        <h2 class="text-lg font-semibold text-text-primary">合集</h2>
+    <section v-if="collections.length > 0 || collectionsLoading" class="mb-10">
+      <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+          <BookOpen :size="18" class="text-accent" />
+          <h2 class="text-lg font-semibold text-text-primary">合集</h2>
+        </div>
+        <RouterLink
+          to="/collections"
+          class="inline-flex items-center gap-0.5 text-xs font-medium text-text-muted hover:text-accent transition-colors duration-200"
+        >
+          查看全部
+          <ChevronRight :size="12" />
+        </RouterLink>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div v-if="collectionsLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div v-for="i in 3" :key="i" class="h-48 rounded-xl border border-border bg-bg-secondary animate-pulse" />
+      </div>
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <CollectionCard
           v-for="collection in collections"
           :key="collection.id"

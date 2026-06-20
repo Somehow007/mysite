@@ -27,8 +27,9 @@ public class CollectionController {
 
     @Operation(summary = "创建合集")
     @PostMapping("/v1/collections")
-    public Result<Long> createCollection(@Valid @RequestBody CollectionCreateReqDTO requestParam) {
-        return Results.success(collectionService.createCollection(requestParam));
+    public Result<String> createCollection(@Valid @RequestBody CollectionCreateReqDTO requestParam) {
+        // 返回 String 避免 Long 在前端 JS 中精度丢失（雪花算法 ID 超过 2^53）
+        return Results.success(String.valueOf(collectionService.createCollection(requestParam)));
     }
 
     @Operation(summary = "更新合集")
