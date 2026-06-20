@@ -27,10 +27,8 @@ import io.github.somehow.mysite.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.cache.annotation.Caching;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -230,7 +228,6 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     }
 
     @Override
-    @Cacheable(value = "article_detail", key = "#id", unless = "#result == null")
     public ArticleSelectRespDTO selectOneArticle(Long id) {
         LambdaQueryWrapper<ArticleDO> queryWrapper = Wrappers.lambdaQuery(ArticleDO.class)
                 .eq(ArticleDO::getId, id)
@@ -239,9 +236,11 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         if (Objects.isNull(articleDO)) {
             throw new ClientException(ErrorCode.ARTICLE_NOT_FOUND);
         }
-        asyncIncrementViewCount(id);
+        incrementViewCount(id);
 
         ArticleSelectRespDTO result = BeanUtil.toBean(articleDO, ArticleSelectRespDTO.class);
+        // 手动更新浏览量，避免缓存导致不一致
+        result.setViewCount(articleDO.getViewCount() + 1);
 
         String currentUserId = UserContext.getUserId();
         if (currentUserId != null) {
@@ -303,12 +302,11 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         return result;
     }
 
-    @Async
-    public void asyncIncrementViewCount(Long articleId) {
+    private void incrementViewCount(Long articleId) {
         try {
             baseMapper.incrementViewCount(articleId, 1);
         } catch (Exception e) {
-            log.warn("异步更新浏览量失败, articleId={}", articleId, e);
+            log.warn("更新浏览量失败, articleId={}", articleId, e);
         }
     }
 
