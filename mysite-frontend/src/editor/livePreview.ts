@@ -178,6 +178,16 @@ class KaTeXInlineWidget extends WidgetType {
     return other instanceof KaTeXInlineWidget && this.latex === other.latex
   }
   ignoreEvent(): boolean { return false }
+  // ★ 实现 updateDOM：内容变化时原位更新，避免 DOM 重建导致
+  // KaTeX 重复渲染（重复渲染会丢失字体加载状态，导致数字缺失）
+  updateDOM(dom: HTMLElement): boolean {
+    try {
+      katex.render(this.latex, dom, { throwOnError: false, displayMode: false, strict: false })
+      return true
+    } catch {
+      return false
+    }
+  }
   toDOM() {
     const s = document.createElement('span')
     s.className = 'cm-lp-katex-inline'
@@ -198,6 +208,15 @@ class KaTeXDisplayWidget extends WidgetType {
   }
   ignoreEvent(): boolean { return false }
   get estimatedHeight() { return 40 }
+  // ★ 实现 updateDOM：同 KaTeXInlineWidget，避免重复渲染丢失字体
+  updateDOM(dom: HTMLElement): boolean {
+    try {
+      katex.render(this.latex, dom, { throwOnError: false, displayMode: true, strict: false })
+      return true
+    } catch {
+      return false
+    }
+  }
   toDOM() {
     const d = document.createElement('div')
     d.className = 'cm-lp-katex-display'
@@ -259,7 +278,8 @@ export function computeBlocks(doc: Text): Block[] {
 
     const fm = text.match(/^\s*(```|~~~)(\w*)\s*$/)
     if (fm) { codeStart = i; codeLang = fm[2] ?? ''; inCode = true; continue }
-    const sm = text.match(/^\$\$\s+(.+?)\s+\$\$$/)
+    // 单行数学块：$$ content $$（content 可选首尾空白）
+    const sm = text.match(/^\$\$\s*(.+?)\s*\$\$$/)
     if (sm) { blocks.push({ type: 'math', startLine: i, endLine: i, content: sm[1]! }); continue }
     if (trimmed === '$$') { mathStart = i; inMath = true; mathLines = []; continue }
     const cm = text.match(/^>\s*\[!(\w+)\]/)
@@ -648,17 +668,23 @@ function cursorInSpan(cursor: number, span: { from: number; to: number }): boole
 // ViewPlugin
 // ═══════════════════════════════════════════════════════════════
 //
-// CURSOR/KEYBOARD STABILITY (借鉴 Obsidian CM6 实现策略):
+// CURSOR/KEYBOARD STABILITY (CM6 官方推荐方案，参考 codemirror.net/examples/decoration):
 //
-// 1. 增量重建：selectionSet 时仅在光标行变化时重建装饰，避免同行
-//    左右移动光标时全量重建导致的卡顿和光标抖动。
+// 1. atomicRanges facet（核心修复）：
+//    将所有 Decoration.replace 区间注册为原子区间。CM6 在光标移动
+//    时会调用 skipAtomicRanges() 自动跳过这些区间，光标不会进入
+//    隐藏文本区域。这是解决"上键跳到文档顶端"的关键。
 //
-// 2. cursorInSpan 边界修正：光标在 span 边缘时不跳过装饰，仅在
-//    真正进入 span 内部时显示原始文本。
+//    根因：未提供 atomicRanges 时，光标可进入 replace 区间的隐藏
+//    文本，导致 coordsAtPos 返回 null，moveVertically 计算 yOffset
+//    为负数，posAtCoords 返回位置 0（文档开头）。
 //
-// 3. WidgetType.ignoreEvent()：所有 widget 返回 false 让事件穿透，
-//    配合 CM6 对 Decoration.replace 的默认光标行为（光标被推到
-//    replace 区间两端，不会卡在不可见区域内部）。
+// 2. 增量重建：selectionSet 时仅在光标行变化或光标进出 block 时
+//    重建装饰，避免同行左右移动光标时全量重建导致的卡顿。
+//
+// 3. WidgetType.ignoreEvent()：所有 widget 返回 false 让事件穿透。
+//
+// 4. cursorInSpan 边界修正：光标在 span 边缘时不跳过装饰。
 
 export function livePreview() {
   return ViewPlugin.fromClass(
@@ -669,6 +695,8 @@ export function livePreview() {
       private _errorCount = 0
       /** 上次光标所在行，用于增量判断 */
       private _lastCursorLine = -1
+      /** 上次光标所在 block，用于检测光标进出 block */
+      private _lastCursorBlock: Block | null = null
 
       constructor(view: EditorView) {
         this.decorations = this.build(view)
@@ -678,6 +706,7 @@ export function livePreview() {
         if (update.docChanged) {
           this._lastDoc = null
           this._lastCursorLine = -1
+          this._lastCursorBlock = null
           this.decorations = this.build(update.view)
           return
         }
@@ -686,12 +715,17 @@ export function livePreview() {
           return
         }
         if (update.selectionSet) {
-          // 增量重建：仅在光标行变化时重建，避免同行左右移动光标时
-          // 全量重建导致的卡顿和光标抖动。
+          // 增量重建：仅在光标行变化或光标进出 block 时重建
           const newCursorLine = update.state.doc.lineAt(
             update.state.selection.main.head
           ).number
-          if (newCursorLine !== this._lastCursorLine) {
+          // 检测光标是否进出 block（block 内显示原始文本，进出需重建）
+          const blocks = this._blocks
+          const newCursorBlock = blocks.length > 0
+            ? findBlock(newCursorLine, blocks)
+            : null
+          if (newCursorLine !== this._lastCursorLine ||
+              newCursorBlock !== this._lastCursorBlock) {
             this.decorations = this.build(update.view)
           }
         }
@@ -723,6 +757,7 @@ export function livePreview() {
         }
 
         const cursorBlock = findBlock(cursorLine, this._blocks)
+        this._lastCursorBlock = cursorBlock
 
         // Determine processing range: visible lines + cursor line
         const vr = view.visibleRanges
@@ -782,6 +817,15 @@ export function livePreview() {
         )
       }
     },
-    { decorations: (v) => v.decorations },
+    {
+      decorations: (v) => v.decorations,
+      // ★ 核心修复：将所有 replace 装饰注册为 atomic ranges
+      // CM6 官方推荐方案（参考 codemirror.net/examples/decoration/）
+      // 光标移动时会自动跳过 replace 区间，不会进入隐藏文本区域
+      provide: (plugin) =>
+        EditorView.atomicRanges.of((view) => {
+          return view.plugin(plugin)?.decorations ?? Decoration.none
+        }),
+    },
   )
 }
