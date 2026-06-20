@@ -95,9 +95,20 @@ const DIM_STYLE = 'opacity:0.35'
 // ═══════════════════════════════════════════════════════════════
 // Widgets — all inline, with proper eq() implementations
 // ═══════════════════════════════════════════════════════════════
+//
+// CURSOR/CLICK SAFETY (CM6 官方推荐方案):
+// 所有 WidgetType 重写 ignoreEvent() 返回 false，让鼠标/键盘事件
+// 穿透 widget 到达底层 CM6 编辑器，从而正确放置光标。
+// 这比依赖 CSS pointer-events:none 更可靠，因为:
+//   1. 在触摸设备上行为一致
+//   2. CM6 内部能正确计算点击位置对应的文档位置
+//   3. 不阻塞 widget 内部可能需要的交互（如未来链接点击）
+//
+// 同时保留 CSS pointer-events:none 作为兜底（见 MarkdownEditor.vue）。
 
 class BulletWidget extends WidgetType {
   eq(other: WidgetType): boolean { return other instanceof BulletWidget }
+  ignoreEvent(): boolean { return false }
   toDOM() {
     const s = document.createElement('span')
     s.className = 'cm-lp-bullet'
@@ -112,6 +123,7 @@ class OrderedNumberWidget extends WidgetType {
   eq(other: WidgetType): boolean {
     return other instanceof OrderedNumberWidget && this.n === other.n
   }
+  ignoreEvent(): boolean { return false }
   toDOM() {
     const s = document.createElement('span')
     s.className = 'cm-lp-ol'
@@ -126,6 +138,7 @@ class TaskCheckboxWidget extends WidgetType {
   eq(other: WidgetType): boolean {
     return other instanceof TaskCheckboxWidget && this.checked === other.checked
   }
+  ignoreEvent(): boolean { return false }
   toDOM() {
     const s = document.createElement('span')
     s.className = 'cm-lp-task' + (this.checked ? ' checked' : '')
@@ -141,6 +154,7 @@ class CalloutHeaderWidget extends WidgetType {
     return other instanceof CalloutHeaderWidget &&
       this.cType === other.cType && this.color === other.color && this.icon === other.icon
   }
+  ignoreEvent(): boolean { return false }
   toDOM() {
     const s = document.createElement('span')
     s.className = 'cm-lp-callout-hdr'
@@ -163,6 +177,7 @@ class KaTeXInlineWidget extends WidgetType {
   eq(other: WidgetType): boolean {
     return other instanceof KaTeXInlineWidget && this.latex === other.latex
   }
+  ignoreEvent(): boolean { return false }
   toDOM() {
     const s = document.createElement('span')
     s.className = 'cm-lp-katex-inline'
@@ -181,6 +196,7 @@ class KaTeXDisplayWidget extends WidgetType {
   eq(other: WidgetType): boolean {
     return other instanceof KaTeXDisplayWidget && this.latex === other.latex
   }
+  ignoreEvent(): boolean { return false }
   get estimatedHeight() { return 40 }
   toDOM() {
     const d = document.createElement('div')
@@ -613,13 +629,36 @@ function parseInlineSpans(text: string, lineFrom: number): InlineSpan[] {
   return result
 }
 
+/**
+ * 判断光标是否在 span 内部（需要显示原始文本以便编辑）。
+ *
+ * 边界规则（Obsidian 风格）：
+ *   - cursor === span.from：光标在 span 开头 → 不跳过装饰（光标左侧）
+ *   - cursor === span.to：光标在 span 结尾 → 不跳过装饰（光标右侧）
+ *   - cursor > span.from && cursor < span.to：光标在 span 内部 → 跳过装饰
+ *
+ * 这样光标在 span 边缘时仍显示渲染样式，只在真正进入 span 内部时
+ * 才显示原始文本，避免边缘抖动。
+ */
 function cursorInSpan(cursor: number, span: { from: number; to: number }): boolean {
-  return cursor >= span.from && cursor < span.to
+  return cursor > span.from && cursor < span.to
 }
 
 // ═══════════════════════════════════════════════════════════════
 // ViewPlugin
 // ═══════════════════════════════════════════════════════════════
+//
+// CURSOR/KEYBOARD STABILITY (借鉴 Obsidian CM6 实现策略):
+//
+// 1. 增量重建：selectionSet 时仅在光标行变化时重建装饰，避免同行
+//    左右移动光标时全量重建导致的卡顿和光标抖动。
+//
+// 2. cursorInSpan 边界修正：光标在 span 边缘时不跳过装饰，仅在
+//    真正进入 span 内部时显示原始文本。
+//
+// 3. WidgetType.ignoreEvent()：所有 widget 返回 false 让事件穿透，
+//    配合 CM6 对 Decoration.replace 的默认光标行为（光标被推到
+//    replace 区间两端，不会卡在不可见区域内部）。
 
 export function livePreview() {
   return ViewPlugin.fromClass(
@@ -628,6 +667,8 @@ export function livePreview() {
       private _blocks: Block[] = []
       private _lastDoc: Text | null = null
       private _errorCount = 0
+      /** 上次光标所在行，用于增量判断 */
+      private _lastCursorLine = -1
 
       constructor(view: EditorView) {
         this.decorations = this.build(view)
@@ -636,6 +677,7 @@ export function livePreview() {
       update(update: ViewUpdate) {
         if (update.docChanged) {
           this._lastDoc = null
+          this._lastCursorLine = -1
           this.decorations = this.build(update.view)
           return
         }
@@ -644,10 +686,14 @@ export function livePreview() {
           return
         }
         if (update.selectionSet) {
-          // Rebuild on cursor movement to update cursor-aware decorations.
-          // build() is cheap (visible-lines-only) and CM6 diffs decoration
-          // sets efficiently.
-          this.decorations = this.build(update.view)
+          // 增量重建：仅在光标行变化时重建，避免同行左右移动光标时
+          // 全量重建导致的卡顿和光标抖动。
+          const newCursorLine = update.state.doc.lineAt(
+            update.state.selection.main.head
+          ).number
+          if (newCursorLine !== this._lastCursorLine) {
+            this.decorations = this.build(update.view)
+          }
         }
       }
 
@@ -668,6 +714,7 @@ export function livePreview() {
         const doc = view.state.doc
         const cursor = view.state.selection.main.head
         const cursorLine = doc.lineAt(cursor).number
+        this._lastCursorLine = cursorLine
 
         // Recompute blocks whenever doc reference changes
         if (this._lastDoc !== doc) {
