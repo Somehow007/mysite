@@ -1,23 +1,33 @@
 /**
  * CodeMirror 6 Live Preview / WYSIWYG extension.
  *
- * Rewritten version with fixes for:
- * - LaTeX inline math rendering ($2^{30}$ was rendering as $2^3$)
- * - Widget eq() methods (proper instanceof checks)
- * - Inline span overlap handling (sort + filter)
+ * ═══════════════════════════════════════════════════════════════════
+ * CRITICAL SAFETY INVARIANT (违反此规则会导致 CM6 输入崩溃)
+ * ═══════════════════════════════════════════════════════════════════
  *
- * Design principles:
- *   1. NEVER use Decoration.replace({ block: true })
- *   2. Use Decoration.line for line-level styling (backgrounds, borders)
- *   3. Use Decoration.replace({}) for hiding syntax markers
- *   4. Use Decoration.replace({ widget }) for inline widgets
- *   5. Use Decoration.set(ranges, true) for auto-sorting
- *   6. Wrap build() in try-catch for graceful degradation
+ * NEVER combine Decoration.line with a Decoration.replace that covers
+ * the ENTIRE line content on the same line.
  *
- * Cursor behaviour:
- *   - Block-level (code/callout/math): cursor in block → entire block raw
- *   - Line-level (heading/list/bq): cursor on line → line raw
- *   - Inline (bold/italic/code/link/LaTeX): cursor in span → only that span raw
+ * 原因：当 replace 覆盖整行文本时，CM6 产生空行 DOM 元素，与 line
+ * 装饰冲突，导致输入时内容消失、光标锁定、编辑失效。
+ *
+ * 安全策略（业内通用做法，参考 Monaco/CM6 官方建议）：
+ *   - 当行有标记之外的内容时：可安全使用 replace 隐藏标记
+ *   - 当行只有标记本身（如 "# "、"> "、"> [!NOTE]"）时：
+ *     使用 Decoration.mark 弱化标记样式，而非 replace 隐藏
+ *
+ * ═══════════════════════════════════════════════════════════════════
+ * 装饰类型使用规范
+ * ═══════════════════════════════════════════════════════════════════
+ *
+ *   Decoration.line    —— 整行样式（背景、边框、圆角）
+ *   Decoration.mark    —— 行内样式（加粗、斜体、弱化标记）
+ *   Decoration.replace —— 隐藏标记 / 替换为 widget（仅当行有剩余内容）
+ *
+ * 光标行为（Obsidian 风格）：
+ *   - 块级（code/callout/math）：光标在块内 → 整块显示原始文本
+ *   - 行级（heading/list/bq）：光标在行 → 该行显示原始文本
+ *   - 行内（bold/italic/code/link/math）：光标在 span → 该 span 显示原始文本
  */
 
 import {
@@ -62,6 +72,25 @@ const CALLOUT_ICONS: Record<string, string> = {
   ERROR: '❌', DANGER: '⚡', FAILURE: '🚫', BUG: '🐛',
   EXAMPLE: '📋', QUOTE: '💬', CITE: '📖', ABSTRACT: '📄', SUMMARY: '📊', TLDR: '⚡',
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Safety helper — 核心安全守卫
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * 判断一个 replace 装饰是否覆盖了整行内容。
+ *
+ * 这是 CM6 崩溃的充要条件：当 replace 覆盖整行文本时，
+ * 与 Decoration.line 共存会导致空行 DOM 冲突。
+ */
+function coversEntireLine(markerLen: number, lineTextLen: number): boolean {
+  return markerLen >= lineTextLen
+}
+
+/**
+ * 样式常量 —— 弱化标记（当不能使用 replace 隐藏时的安全替代）
+ */
+const DIM_STYLE = 'opacity:0.35'
 
 // ═══════════════════════════════════════════════════════════════
 // Widgets — all inline, with proper eq() implementations
@@ -167,24 +196,6 @@ class KaTeXDisplayWidget extends WidgetType {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Inline decoration cache
-// ═══════════════════════════════════════════════════════════════
-
-class InlineDecoCache {
-  private cache = new Map<string, InlineSpan[]>()
-  private static MAX_SIZE = 256
-  get(text: string): InlineSpan[] | undefined { return this.cache.get(text) }
-  set(text: string, spans: InlineSpan[]): void {
-    if (this.cache.size >= InlineDecoCache.MAX_SIZE) {
-      const k = this.cache.keys().next().value
-      if (k !== undefined) this.cache.delete(k)
-    }
-    this.cache.set(text, spans)
-  }
-  invalidate(): void { this.cache.clear() }
-}
-
-// ═══════════════════════════════════════════════════════════════
 // Block precomputation
 // ═══════════════════════════════════════════════════════════════
 
@@ -263,7 +274,14 @@ function findBlock(lineNum: number, blocks: Block[]): Block | null {
 
 const HEADING_SIZES = [1.875, 1.5, 1.25, 1.125, 1.0, 0.875]
 
-function headingDecos(text: string, from: number): PendingDeco[] {
+/**
+ * Heading decorations.
+ *
+ * SAFETY: 当行只有 "# "（无标题内容）时，使用 mark 弱化标记而非
+ * replace 隐藏，避免整行 replace + line decoration 共存导致崩溃。
+ */
+/** Exported for unit testing. */
+export function headingDecos(text: string, from: number): PendingDeco[] {
   const m = text.match(/^(#{1,6})\s/)
   if (!m) return []
   const level = m[1]!.length
@@ -279,13 +297,28 @@ function headingDecos(text: string, from: number): PendingDeco[] {
     'border-bottom:none',
   ]
   if (level === 2) markParts.push('padding-bottom:0.3rem', 'border-bottom:1px solid var(--border)')
-  return [
+
+  const result: PendingDeco[] = [
     { from, to: from, deco: Decoration.line({ attributes: { style: 'margin-top:2em;margin-bottom:0.5em' } }) },
-    { from, to: from + markerLen, deco: Decoration.replace({}) },
-    { from: from + markerLen, to: from + text.length, deco: Decoration.mark({ attributes: { style: markParts.join(';') } }) },
   ]
+
+  if (coversEntireLine(markerLen, text.length)) {
+    // 不安全：行只有标记 —— 使用 mark 弱化
+    result.push({ from, to: from + text.length, deco: Decoration.mark({ attributes: { style: DIM_STYLE } }) })
+  } else {
+    // 安全：行有标题内容 —— 隐藏标记，样式化内容
+    result.push({ from, to: from + markerLen, deco: Decoration.replace({}) })
+    result.push({ from: from + markerLen, to: from + text.length, deco: Decoration.mark({ attributes: { style: markParts.join(';') } }) })
+  }
+  return result
 }
 
+/**
+ * List decorations (bullet / ordered / task).
+ *
+ * SAFETY: listDecos 不使用 Decoration.line，所以整行 replace 是安全的。
+ * 空列表项（如 "- "）会显示为只有 bullet widget 的行，这是预期行为。
+ */
 function listDecos(text: string, from: number): PendingDeco[] {
   const task = text.match(/^(\s*)([-*+])\s\[([ xX])\]\s/)
   if (task) return [{ from, to: from + task[0].length, deco: Decoration.replace({ widget: new TaskCheckboxWidget(task[3]!.toLowerCase() === 'x') }) }]
@@ -296,15 +329,31 @@ function listDecos(text: string, from: number): PendingDeco[] {
   return []
 }
 
-function blockquoteDecos(text: string, from: number): PendingDeco[] {
+/**
+ * Blockquote decorations.
+ *
+ * SAFETY: 当行只有 "> "（无引用内容）时，使用 mark 弱化标记而非
+ * replace 隐藏，避免整行 replace + line decoration 共存导致崩溃。
+ */
+/** Exported for unit testing. */
+export function blockquoteDecos(text: string, from: number): PendingDeco[] {
   const m = text.match(/^(\s*)>\s?/)
   if (!m) return []
   const markerLen = m[0].length
-  return [
+
+  const result: PendingDeco[] = [
     { from, to: from, deco: Decoration.line({ attributes: { style: 'border-left:3px solid var(--accent);padding-left:1rem' } }) },
-    { from, to: from + markerLen, deco: Decoration.replace({}) },
-    { from: from + markerLen, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'color:var(--text-muted);font-style:italic' } }) },
   ]
+
+  if (coversEntireLine(markerLen, text.length)) {
+    // 不安全：行只有标记 —— 使用 mark 弱化
+    result.push({ from, to: from + text.length, deco: Decoration.mark({ attributes: { style: DIM_STYLE } }) })
+  } else {
+    // 安全：行有引用内容 —— 隐藏标记，样式化内容
+    result.push({ from, to: from + markerLen, deco: Decoration.replace({}) })
+    result.push({ from: from + markerLen, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'color:var(--text-muted);font-style:italic' } }) })
+  }
+  return result
 }
 
 /**
@@ -352,9 +401,11 @@ export function codeBlockDecos(text: string, from: number, block: CodeBlock, ln:
       const langLen = fm[3]!.length
       const fenceStart = from + leadingLen
       if (langLen > 0) {
+        // 有语言标识：隐藏反引号，保留语言标记（行内有内容，安全）
         result.push({ from: fenceStart, to: fenceStart + fenceLen, deco: Decoration.replace({}) })
         result.push({ from: fenceStart + fenceLen, to: fenceStart + fenceLen + langLen, deco: Decoration.mark({ attributes: { style: fenceLabelStyle } }) })
       } else {
+        // 无语言标识：使用 mark 弱化（避免整行 replace）
         result.push({ from: fenceStart, to: fenceStart + fenceLen, deco: Decoration.mark({ attributes: { style: dimMarkerStyle } }) })
       }
     }
@@ -366,8 +417,10 @@ export function codeBlockDecos(text: string, from: number, block: CodeBlock, ln:
       const fenceStart = from + leadingLen
       const trailingLen = text.length - leadingLen - fenceLen
       if (trailingLen > 0) {
+        // 有尾部内容：隐藏围栏标记（行内有内容，安全）
         result.push({ from: fenceStart, to: fenceStart + fenceLen, deco: Decoration.replace({}) })
       } else {
+        // 无尾部内容：使用 mark 弱化（避免整行 replace）
         result.push({ from: fenceStart, to: fenceStart + fenceLen, deco: Decoration.mark({ attributes: { style: dimMarkerStyle } }) })
       }
     }
@@ -379,8 +432,8 @@ export function codeBlockDecos(text: string, from: number, block: CodeBlock, ln:
 /**
  * Math block decorations.
  *
- * Single-line $$ E=mc^2 $$: replace entire line with KaTeX widget.
- * Multi-line: hide $$ fence lines, render content on first content line.
+ * SAFETY: mathBlockDecos 不使用 Decoration.line，所以整行 replace 是安全的。
+ * 单行 $$ E=mc^2 $$ 整行替换为 KaTeX widget，多行块隐藏 $$ 围栏行。
  */
 function mathBlockDecos(text: string, from: number, block: MathBlock, ln: number): PendingDeco[] {
   if (block.startLine === block.endLine) {
@@ -401,7 +454,15 @@ function mathBlockDecos(text: string, from: number, block: MathBlock, ln: number
   return [{ from, to: from + text.length, deco: Decoration.replace({}) }]
 }
 
-function calloutDecos(text: string, from: number, block: CalloutBlock, ln: number): PendingDeco[] {
+/**
+ * Callout decorations.
+ *
+ * SAFETY: 当标注头行只有 "> [!NOTE]"（无标题文本）或续行只有 ">"
+ * 时，使用 mark 弱化标记而非 replace 隐藏/widget，避免整行 replace
+ * + line decoration 共存导致崩溃。
+ */
+/** Exported for unit testing. */
+export function calloutDecos(text: string, from: number, block: CalloutBlock, ln: number): PendingDeco[] {
   const color = CALLOUT_COLORS[block.calloutType] ?? '#448aff'
   const icon = CALLOUT_ICONS[block.calloutType] ?? '📝'
   const result: PendingDeco[] = []
@@ -425,17 +486,42 @@ function calloutDecos(text: string, from: number, block: CalloutBlock, ln: numbe
       const titleText = hm[2] ?? ''
       const bracketEnd = text.indexOf(']')
       const prefixEnd = bracketEnd + 1 + (text[bracketEnd + 1] === ' ' ? 1 : 0)
-      result.push({ from, to: from + prefixEnd, deco: Decoration.replace({ widget: new CalloutHeaderWidget(type, color, icon) }) })
-      if (titleText.trim()) result.push({ from: from + prefixEnd, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'font-weight:600;font-size:0.9375rem;color:var(--text-primary)' } }) })
+
+      if (coversEntireLine(prefixEnd, text.length)) {
+        // 不安全：行只有标记（无标题）—— 使用 mark 弱化
+        result.push({ from, to: from + text.length, deco: Decoration.mark({ attributes: { style: `opacity:0.5;color:${color};font-weight:500` } }) })
+      } else {
+        // 安全：行有标题内容 —— 使用 widget 替换标记
+        result.push({ from, to: from + prefixEnd, deco: Decoration.replace({ widget: new CalloutHeaderWidget(type, color, icon) }) })
+        if (titleText.trim()) {
+          result.push({ from: from + prefixEnd, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'font-weight:600;font-size:0.9375rem;color:var(--text-primary)' } }) })
+        }
+      }
     } else {
+      // 标注头行不匹配标准格式 —— 按普通引用行处理
       const m = text.match(/^>\s?/)
-      if (m) result.push({ from, to: from + m[0].length, deco: Decoration.replace({}) })
+      if (m) {
+        const markerLen = m[0].length
+        if (coversEntireLine(markerLen, text.length)) {
+          result.push({ from, to: from + text.length, deco: Decoration.mark({ attributes: { style: DIM_STYLE } }) })
+        } else {
+          result.push({ from, to: from + markerLen, deco: Decoration.replace({}) })
+        }
+      }
     }
   } else {
+    // 标注续行
     const m = text.match(/^(\s*)>\s?/)
     if (m) {
-      result.push({ from, to: from + m[0].length, deco: Decoration.replace({}) })
-      result.push({ from: from + m[0].length, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'color:var(--text-secondary)' } }) })
+      const markerLen = m[0].length
+      if (coversEntireLine(markerLen, text.length)) {
+        // 不安全：行只有 ">" —— 使用 mark 弱化
+        result.push({ from, to: from + text.length, deco: Decoration.mark({ attributes: { style: DIM_STYLE } }) })
+      } else {
+        // 安全：行有内容 —— 隐藏标记，样式化内容
+        result.push({ from, to: from + markerLen, deco: Decoration.replace({}) })
+        result.push({ from: from + markerLen, to: from + text.length, deco: Decoration.mark({ attributes: { style: 'color:var(--text-secondary)' } }) })
+      }
     }
   }
   return result
@@ -455,11 +541,9 @@ function calloutDecos(text: string, from: number, block: CalloutBlock, ln: numbe
  * only non-overlapping spans (first-wins). This prevents decoration
  * conflicts that can cause rendering glitches.
  *
- * MATH REGEX FIX: The previous regex /(?<!\$)\$(?!\$)(.+?)(?<!\$)\$(?!\$)/g
- * used lazy .+? with lookbehind, which could truncate content like 2^{30}
- * to 2^3. The new regex /\$(?!\$)([^$]+)\$(?!\$)/g uses [^$]+ (greedy,
- * matches everything except $) which correctly captures the full content
- * between single $ delimiters.
+ * MATH REGEX: /\$(?!\$)([^$]+)\$(?!\$)/g uses [^$]+ (greedy, matches
+ * everything except $) which correctly captures the full content between
+ * single $ delimiters including { } ^ _ 0-9 etc.
  */
 function parseInlineSpans(text: string, lineFrom: number): InlineSpan[] {
   const rawSpans: InlineSpan[] = []
@@ -506,10 +590,8 @@ function parseInlineSpans(text: string, lineFrom: number): InlineSpan[] {
   }
 
   // Inline math: $latex$ (not $$)
-  // FIXED: Use [^$]+ instead of .+? with lookbehind.
-  // [^$]+ is greedy and matches everything except $, so it correctly
-  // captures the full content between single $ delimiters including
-  // { } ^ _ 0-9 etc. The (?!\$) lookaheads prevent matching $$...$$.
+  // [^$]+ is greedy and matches everything except $, correctly capturing
+  // the full content between single $ delimiters including { } ^ _ 0-9.
   for (const m of text.matchAll(/\$(?!\$)([^$]+)\$(?!\$)/g)) {
     const s = lineFrom + m.index!, e = s + m[0].length
     rawSpans.push({ from: s, to: e, decos: [
@@ -545,7 +627,6 @@ export function livePreview() {
       decorations: DecorationSet = Decoration.none
       private _blocks: Block[] = []
       private _lastDoc: Text | null = null
-      private _inlineCache = new InlineDecoCache()
       private _errorCount = 0
 
       constructor(view: EditorView) {
@@ -554,7 +635,6 @@ export function livePreview() {
 
       update(update: ViewUpdate) {
         if (update.docChanged) {
-          this._inlineCache.invalidate()
           this._lastDoc = null
           this.decorations = this.build(update.view)
           return
@@ -564,12 +644,9 @@ export function livePreview() {
           return
         }
         if (update.selectionSet) {
-          // Always rebuild on cursor movement (clicks, arrow keys, etc.).
-          // This ensures:
-          //   - Clicks on rendered blocks switch to raw edit mode
-          //   - Arrow key navigation updates block/inline decorations
-          // The build() is cheap (visible-lines-only + cached inline spans)
-          // and CM6 diffs decoration sets efficiently.
+          // Rebuild on cursor movement to update cursor-aware decorations.
+          // build() is cheap (visible-lines-only) and CM6 diffs decoration
+          // sets efficiently.
           this.decorations = this.build(update.view)
         }
       }
@@ -641,17 +718,13 @@ export function livePreview() {
 
           // Inline decorations
           const isCursorLine = ln === cursorLine
-          let spans = this._inlineCache.get(text)
-          if (!spans) {
-            spans = parseInlineSpans(text, 0)
-            this._inlineCache.set(text, spans)
-          }
+          const spans = parseInlineSpans(text, from)
 
           for (const span of spans) {
             // Skip spans that contain the cursor (show raw text for editing)
-            if (isCursorLine && cursorInSpan(cursor, { from: span.from + from, to: span.to + from })) continue
+            if (isCursorLine && cursorInSpan(cursor, span)) continue
             for (const d of span.decos) {
-              pending.push({ from: d.from + from, to: d.to + from, deco: d.deco })
+              pending.push(d)
             }
           }
         }
