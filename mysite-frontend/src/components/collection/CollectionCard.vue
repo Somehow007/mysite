@@ -1,11 +1,18 @@
 <script setup lang="ts">
-import { BookOpen, Library } from 'lucide-vue-next'
+import { BookOpen, Library, Eye } from 'lucide-vue-next'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
 import type { Collection } from '@/types'
 
 defineProps<{
   collection: Collection
 }>()
+
+function formatViewCount(count?: number): string {
+  if (!count || count <= 0) return '0'
+  if (count >= 10000) return (count / 10000).toFixed(1) + '万'
+  if (count >= 1000) return (count / 1000).toFixed(1) + 'k'
+  return String(count)
+}
 </script>
 
 <template>
@@ -45,7 +52,10 @@ defineProps<{
           <BookOpen :size="10" />
           {{ collection.articleCount ?? 0 }} 篇文章
         </span>
-        <span>{{ collection.authorName || '未知作者' }}</span>
+        <span class="inline-flex items-center gap-1">
+          <Eye :size="10" />
+          {{ formatViewCount(collection.totalViewCount) }}
+        </span>
       </div>
     </div>
   </RouterLink>

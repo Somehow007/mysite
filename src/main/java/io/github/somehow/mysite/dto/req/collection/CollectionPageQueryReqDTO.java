@@ -15,4 +15,7 @@ public class CollectionPageQueryReqDTO extends Page {
 
     @Schema(description = "按作者筛选")
     private Long authorId;
+
+    @Schema(description = "排序方式：viewCount 表示按文章总浏览量降序，留空则按 sort_order、创建时间排序")
+    private String sortBy;
 }

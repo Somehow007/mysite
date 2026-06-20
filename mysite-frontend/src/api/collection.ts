@@ -6,12 +6,14 @@ export function getCollections(params?: {
   size?: number
   keyword?: string
   authorId?: string
+  sortBy?: 'viewCount'
 }): Promise<PaginatedResponse<Collection>> {
   return getPaginated<Collection>('/v1/collections', {
     current: params?.page || 1,
     size: params?.size || 10,
     keyword: params?.keyword,
     authorId: params?.authorId,
+    sortBy: params?.sortBy,
   })
 }
 

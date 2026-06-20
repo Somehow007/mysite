@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X, Plus, Search, TrendingUp } from 'lucide-vue-next'
+import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X, Plus, Search, TrendingUp, Library, Check, ChevronDown } from 'lucide-vue-next'
 import { createArticle, updateArticle, getArticleById } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { getTags, createTag } from '@/api/tag'
@@ -52,6 +52,30 @@ const newTagName = ref('')
 const newTagSlug = ref('')
 const creatingTag = ref(false)
 
+// 合集下拉框
+const collectionDropdownOpen = ref(false)
+const collectionDropdownRef = ref<HTMLElement | null>(null)
+
+const selectedCollectionTitle = computed(() => {
+  if (!selectedCollectionId.value) return ''
+  return collections.value.find(c => c.id === selectedCollectionId.value)?.title || ''
+})
+
+function toggleCollectionDropdown() {
+  collectionDropdownOpen.value = !collectionDropdownOpen.value
+}
+
+function selectCollection(id: string) {
+  selectedCollectionId.value = id
+  collectionDropdownOpen.value = false
+}
+
+function closeCollectionDropdown(e: MouseEvent) {
+  if (collectionDropdownRef.value && !collectionDropdownRef.value.contains(e.target as Node)) {
+    collectionDropdownOpen.value = false
+  }
+}
+
 const filteredTags = computed(() => {
   if (!tagSearchQuery.value.trim()) return tags.value
   const q = tagSearchQuery.value.trim().toLowerCase()
@@ -68,6 +92,7 @@ const hotTags = computed(() =>
 )
 
 onMounted(async () => {
+  document.addEventListener('click', closeCollectionDropdown)
   loading.value = true
   try {
     const [catsRes, tagsRes, collectionsRes] = await Promise.all([
@@ -113,6 +138,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (summaryHintTimer) clearTimeout(summaryHintTimer)
+  document.removeEventListener('click', closeCollectionDropdown)
 })
 
 async function handleSave(isPublish: boolean) {
@@ -507,12 +533,71 @@ function removeCover() {
             <label class="block text-sm font-medium text-text-primary mb-1.5">
               合集
             </label>
-            <select v-model="selectedCollectionId" class="input-base">
-              <option value="">未选择合集</option>
-              <option v-for="col in collections" :key="col.id" :value="col.id">
-                {{ col.title }}
-              </option>
-            </select>
+            <div ref="collectionDropdownRef" class="relative">
+              <button
+                type="button"
+                @click="toggleCollectionDropdown"
+                class="input-base flex items-center justify-between cursor-pointer text-left"
+                :class="{ 'ring-2 ring-accent/20 border-accent': collectionDropdownOpen }"
+              >
+                <span class="flex items-center gap-1.5 min-w-0">
+                  <Library :size="14" class="text-accent shrink-0" />
+                  <span v-if="selectedCollectionTitle" class="text-text-primary truncate">{{ selectedCollectionTitle }}</span>
+                  <span v-else class="text-text-muted">未选择合集</span>
+                </span>
+                <ChevronDown
+                  :size="14"
+                  class="text-text-muted shrink-0 transition-transform duration-200"
+                  :class="{ 'rotate-180': collectionDropdownOpen }"
+                />
+              </button>
+
+              <transition
+                enter-active-class="transition duration-150 ease-out"
+                enter-from-class="opacity-0 -translate-y-1"
+                enter-to-class="opacity-100 translate-y-0"
+                leave-active-class="transition duration-100 ease-in"
+                leave-from-class="opacity-100 translate-y-0"
+                leave-to-class="opacity-0 -translate-y-1"
+              >
+                <div
+                  v-if="collectionDropdownOpen"
+                  class="absolute z-30 left-0 right-0 mt-1 rounded-lg border border-border bg-bg-elevated shadow-lg overflow-hidden max-h-60 overflow-y-auto scrollbar-thin"
+                >
+                  <button
+                    type="button"
+                    @click="selectCollection('')"
+                    class="w-full flex items-center justify-between px-3 py-2 text-sm text-text-muted hover:bg-accent-subtle transition-colors duration-150"
+                    :class="{ 'bg-accent-subtle text-accent': !selectedCollectionId }"
+                  >
+                    <span>未选择合集</span>
+                    <Check v-if="!selectedCollectionId" :size="14" />
+                  </button>
+                  <div v-if="collections.length > 0" class="border-t border-border-subtle">
+                    <button
+                      v-for="col in collections"
+                      :key="col.id"
+                      type="button"
+                      @click="selectCollection(col.id)"
+                      class="w-full flex items-center justify-between gap-2 px-3 py-2 text-sm hover:bg-accent-subtle transition-colors duration-150"
+                      :class="selectedCollectionId === col.id ? 'text-accent bg-accent-subtle' : 'text-text-primary'"
+                    >
+                      <span class="flex items-center gap-1.5 min-w-0">
+                        <Library :size="13" class="shrink-0 opacity-60" />
+                        <span class="truncate">{{ col.title }}</span>
+                      </span>
+                      <span class="flex items-center gap-1.5 shrink-0">
+                        <span class="text-xs text-text-muted">{{ col.articleCount ?? 0 }} 篇</span>
+                        <Check v-if="selectedCollectionId === col.id" :size="14" />
+                      </span>
+                    </button>
+                  </div>
+                  <div v-else class="px-3 py-3 text-xs text-text-muted text-center border-t border-border-subtle">
+                    暂无合集，请先创建合集
+                  </div>
+                </div>
+              </transition>
+            </div>
           </div>
 
           <div>

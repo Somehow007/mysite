@@ -55,6 +55,11 @@ const router = createRouter({
           component: () => import('@/views/CollectionView.vue'),
         },
         {
+          path: 'collections',
+          name: 'collections-list',
+          component: () => import('@/views/CollectionsView.vue'),
+        },
+        {
           path: 'favorites',
           name: 'favorites',
           component: () => import('@/views/FavoritesView.vue'),
