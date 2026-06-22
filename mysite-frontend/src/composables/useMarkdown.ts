@@ -27,6 +27,7 @@ export interface TocItem {
   id: string
   text: string
   level: number
+  hasChildren?: boolean
 }
 
 // ── LaTeX math protection ──────────────────────────────────────────────
@@ -305,6 +306,12 @@ export function useMarkdown() {
         id: match[2] ?? '',
         text: (match[3] ?? '').replace(/<[^>]*>/g, ''),
       })
+    }
+    // Mark items that have children (next item has a deeper level)
+    for (let i = 0; i < items.length - 1; i++) {
+      if (items[i + 1].level > items[i].level) {
+        items[i].hasChildren = true
+      }
     }
     return items
   }
