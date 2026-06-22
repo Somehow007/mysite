@@ -53,8 +53,11 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
     private static final Map<String, byte[]> MAGIC_NUMBERS = Map.of(
             "image/jpeg", new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF},
             "image/png", new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47},
-            "image/gif", new byte[]{0x47, 0x49, 0x46, 0x38}
+            "image/gif", new byte[]{0x47, 0x49, 0x46, 0x38},
+            "image/webp", new byte[]{0x52, 0x49, 0x46, 0x46}
     );
+
+    private static final byte[] WEBP_SUFFIX = {0x57, 0x45, 0x42, 0x50};
 
     private static final Map<String, String> EXTENSION_MAP = Map.of(
             "image/jpeg", ".jpg",
@@ -97,7 +100,15 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
 
         validateMagicNumberFromBytes(fileBytes, contentType);
 
-        String extension = EXTENSION_MAP.getOrDefault(contentType, ".jpg");
+        // Use detected format for extension if content type doesn't match
+        String actualContentType = contentType;
+        String detectedType = detectImageType(fileBytes);
+        if (detectedType != null && !detectedType.equals(contentType)
+                && imageUploadConfig.getAllowedTypes().contains(detectedType)) {
+            actualContentType = detectedType;
+        }
+
+        String extension = EXTENSION_MAP.getOrDefault(actualContentType, ".jpg");
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM"));
         String dayOfMonth = String.valueOf(LocalDate.now().getDayOfMonth());
         String randomHex = HexUtil.encodeHexStr(IdUtil.fastSimpleUUID().substring(0, 8).getBytes());
@@ -125,7 +136,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
         Integer width = null;
         Integer height = null;
 
-        if (!"image/svg+xml".equals(contentType)) {
+        if (!"image/svg+xml".equals(actualContentType)) {
             try {
                 BufferedImage image = ImageIO.read(new ByteArrayInputStream(fileBytes));
                 if (image != null) {
@@ -148,7 +159,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
                 .filePath(relativePath)
                 .url(url)
                 .fileSize(file.getSize())
-                .contentType(contentType)
+                .contentType(actualContentType)
                 .width(width)
                 .height(height)
                 .sourceType(0)
@@ -246,7 +257,15 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
 
         validateMagicNumberFromBytes(imageBytes, baseContentType);
 
-        String extension = EXTENSION_MAP.getOrDefault(baseContentType, ".jpg");
+        // Use detected format for extension if content type doesn't match
+        String actualContentType = baseContentType;
+        String detectedType = detectImageType(imageBytes);
+        if (detectedType != null && !detectedType.equals(baseContentType)
+                && imageUploadConfig.getAllowedTypes().contains(detectedType)) {
+            actualContentType = detectedType;
+        }
+
+        String extension = EXTENSION_MAP.getOrDefault(actualContentType, ".jpg");
         String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM"));
         String dayOfMonth = String.valueOf(LocalDate.now().getDayOfMonth());
         String randomHex = HexUtil.encodeHexStr(IdUtil.fastSimpleUUID().substring(0, 8).getBytes());
@@ -274,7 +293,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
         Integer width = null;
         Integer height = null;
 
-        if (!"image/svg+xml".equals(baseContentType)) {
+        if (!"image/svg+xml".equals(actualContentType)) {
             try {
                 BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageBytes));
                 if (image != null) {
@@ -298,7 +317,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
                 .filePath(relativePath)
                 .url(url)
                 .fileSize((long) imageBytes.length)
-                .contentType(baseContentType)
+                .contentType(actualContentType)
                 .width(width)
                 .height(height)
                 .sourceType(1)
@@ -421,37 +440,54 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
             return;
         }
 
-        if ("image/webp".equals(contentType)) {
-            if (data.length < 12) {
-                throw new ClientException(ErrorCode.IMAGE_FILE_INVALID);
-            }
-            byte[] riffHeader = new byte[]{0x52, 0x49, 0x46, 0x46};
-            byte[] webpHeader = new byte[]{0x57, 0x45, 0x42, 0x50};
-            for (int i = 0; i < 4; i++) {
-                if (data[i] != riffHeader[i]) {
-                    throw new ClientException(ErrorCode.IMAGE_FILE_INVALID);
-                }
-                if (data[i + 8] != webpHeader[i]) {
-                    throw new ClientException(ErrorCode.IMAGE_FILE_INVALID);
-                }
-            }
-            return;
-        }
-
-        byte[] magic = MAGIC_NUMBERS.get(contentType);
-        if (magic == null) {
-            return;
-        }
-
-        if (data.length < magic.length) {
+        if (data.length < 4) {
             throw new ClientException(ErrorCode.IMAGE_FILE_INVALID);
         }
 
-        for (int i = 0; i < magic.length; i++) {
-            if (data[i] != magic[i]) {
-                throw new ClientException(ErrorCode.IMAGE_FILE_INVALID);
+        // Detect actual image format from magic number
+        String detectedType = detectImageType(data);
+        if (detectedType == null) {
+            throw new ClientException(ErrorCode.IMAGE_FILE_INVALID);
+        }
+
+        // If content type doesn't match detected type, but detected type is valid, accept it
+        // This handles cases where file extension doesn't match actual format (e.g., JPEG renamed to .png)
+        if (!detectedType.equals(contentType) && imageUploadConfig.getAllowedTypes().contains(detectedType)) {
+            log.info("Image format mismatch: reported={}, detected={}. Accepting detected format.",
+                    contentType, detectedType);
+        }
+    }
+
+    private String detectImageType(byte[] data) {
+        if (data.length < 4) {
+            return null;
+        }
+
+        // Check JPEG: FF D8 FF
+        if ((data[0] & 0xFF) == 0xFF && (data[1] & 0xFF) == 0xD8 && (data[2] & 0xFF) == 0xFF) {
+            return "image/jpeg";
+        }
+
+        // Check PNG: 89 50 4E 47
+        if ((data[0] & 0xFF) == 0x89 && (data[1] & 0xFF) == 0x50 && (data[2] & 0xFF) == 0x4E && (data[3] & 0xFF) == 0x47) {
+            return "image/png";
+        }
+
+        // Check GIF: 47 49 46 38
+        if ((data[0] & 0xFF) == 0x47 && (data[1] & 0xFF) == 0x49 && (data[2] & 0xFF) == 0x46 && (data[3] & 0xFF) == 0x38) {
+            return "image/gif";
+        }
+
+        // Check WebP: RIFF + WEBP (need at least 12 bytes)
+        if (data.length >= 12) {
+            if ((data[0] & 0xFF) == 0x52 && (data[1] & 0xFF) == 0x49 && (data[2] & 0xFF) == 0x46 && (data[3] & 0xFF) == 0x46) {
+                if ((data[8] & 0xFF) == 0x57 && (data[9] & 0xFF) == 0x45 && (data[10] & 0xFF) == 0x42 && (data[11] & 0xFF) == 0x50) {
+                    return "image/webp";
+                }
             }
         }
+
+        return null;
     }
 
     private void checkSsrf(URI uri) {
