@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useHead } from '@unhead/vue'
-import { Search, Shield, ShieldCheck, UserCog, Trash2, Eye, FileText, ChevronLeft, ChevronRight, X, Loader2 } from 'lucide-vue-next'
+import { Search, Shield, ShieldCheck, UserCog, Trash2, Eye, FileText, ChevronLeft, ChevronRight, X, Loader2, SortAsc, SortDesc } from 'lucide-vue-next'
 import { getAdminUsers, updateUserRole, updateUserStatus, deleteUser, getOperationLogs } from '@/api/admin'
 import type { AdminUser, UserOperationLog, AdminUserPage, OperationLogPage } from '@/api/admin'
 import { formatDate } from '@/utils/date'
@@ -14,6 +14,8 @@ const users = ref<AdminUser[]>([])
 const userPage = ref<AdminUserPage | null>(null)
 const userLoading = ref(false)
 const keyword = ref('')
+const sortField = ref('createTime')
+const sortOrder = ref('desc')
 
 const logs = ref<UserOperationLog[]>([])
 const logPage = ref<OperationLogPage | null>(null)
@@ -29,7 +31,12 @@ const confirmDialog = ref<{ show: boolean; title: string; message: string; actio
 async function fetchUsers(current = 1) {
   userLoading.value = true
   try {
-    const params: { current: number; size: number; keyword?: string } = { current, size: 10 }
+    const params: { current: number; size: number; keyword?: string; sortField?: string; sortOrder?: string } = {
+      current,
+      size: 10,
+      sortField: sortField.value,
+      sortOrder: sortOrder.value,
+    }
     if (keyword.value.trim()) params.keyword = keyword.value.trim()
     const res = await getAdminUsers(params)
     users.value = res.records || []
@@ -57,6 +64,11 @@ async function fetchLogs(current = 1) {
 }
 
 function handleSearch() {
+  fetchUsers(1)
+}
+
+function toggleSortOrder() {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
   fetchUsers(1)
 }
 
@@ -188,8 +200,8 @@ onMounted(() => {
       </button>
     </div>
 
-    <div class="mb-4 flex gap-2">
-      <div class="relative flex-1 max-w-md">
+    <div class="mb-4 flex gap-2 flex-wrap">
+      <div class="relative flex-1 min-w-[200px]">
         <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
           v-model="keyword"
@@ -199,6 +211,24 @@ onMounted(() => {
           @keyup.enter="handleSearch"
         />
       </div>
+      <select
+        v-model="sortField"
+        class="px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+        @change="fetchUsers(1)"
+      >
+        <option value="createTime">按注册时间</option>
+        <option value="username">按用户名</option>
+        <option value="lastLoginTime">按最后登录</option>
+      </select>
+      <button
+        @click="toggleSortOrder"
+        class="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary hover:bg-surface-secondary transition-colors"
+        title="切换排序方向"
+      >
+        <SortAsc v-if="sortOrder === 'asc'" :size="14" />
+        <SortDesc v-else :size="14" />
+        {{ sortOrder === 'asc' ? '升序' : '降序' }}
+      </button>
       <button
         @click="handleSearch"
         class="btn-primary"

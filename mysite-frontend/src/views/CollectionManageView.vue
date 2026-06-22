@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useRouter } from 'vue-router'
-import { Plus, Trash2, Edit3, BookOpen, Loader2, Search } from 'lucide-vue-next'
+import { Plus, Trash2, Edit3, BookOpen, Loader2, Search, SortAsc, SortDesc } from 'lucide-vue-next'
 import { getCollections, deleteCollection } from '@/api/collection'
 import { useToast } from '@/composables/useToast'
 import type { Collection, Pagination } from '@/types'
@@ -18,12 +18,20 @@ const loading = ref(false)
 const loadError = ref('')
 const keyword = ref('')
 const currentPage = ref(1)
+const sortField = ref('createTime')
+const sortOrder = ref('desc')
 
 async function fetchCollections(page = 1) {
   loading.value = true
   loadError.value = ''
   try {
-    const res = await getCollections({ page, size: 10, keyword: keyword.value || undefined })
+    const res = await getCollections({
+      page,
+      size: 10,
+      keyword: keyword.value || undefined,
+      sortField: sortField.value,
+      sortOrder: sortOrder.value,
+    })
     collections.value = res.list
     pagination.value = res.pagination
     currentPage.value = page
@@ -42,6 +50,11 @@ function handleSearch() {
 
 function handlePageChange(page: number) {
   fetchCollections(page)
+}
+
+function toggleSortOrder() {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+  fetchCollections(1)
 }
 
 async function handleDelete(id: string, title: string) {
@@ -75,15 +88,38 @@ onMounted(() => {
       </button>
     </div>
 
-    <div class="mb-6 relative">
-      <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-      <input
-        v-model="keyword"
-        type="text"
-        placeholder="搜索合集..."
-        class="input-base pl-10"
-        @keydown.enter="handleSearch"
-      />
+    <div class="mb-6 flex items-center gap-3 flex-wrap">
+      <div class="relative flex-1 min-w-[200px]">
+        <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+        <input
+          v-model="keyword"
+          type="text"
+          placeholder="搜索合集..."
+          class="input-base pl-10"
+          @keydown.enter="handleSearch"
+        />
+      </div>
+      <select
+        v-model="sortField"
+        class="px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+        @change="fetchCollections(1)"
+      >
+        <option value="createTime">按创建时间</option>
+        <option value="title">按标题</option>
+        <option value="articleCount">按文章数</option>
+      </select>
+      <button
+        @click="toggleSortOrder"
+        class="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary hover:bg-surface-secondary transition-colors"
+        title="切换排序方向"
+      >
+        <SortAsc v-if="sortOrder === 'asc'" :size="14" />
+        <SortDesc v-else :size="14" />
+        {{ sortOrder === 'asc' ? '升序' : '降序' }}
+      </button>
+      <button @click="handleSearch" class="btn-primary">
+        搜索
+      </button>
     </div>
 
     <div v-if="loading" class="py-16 text-center">
