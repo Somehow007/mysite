@@ -40,6 +40,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 500,
   },
   server: {
+    host: true,
     proxy: {
       '/v1': {
         target: 'http://localhost:8081',

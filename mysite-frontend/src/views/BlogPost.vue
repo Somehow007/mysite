@@ -11,6 +11,7 @@ import { useFavorite } from '@/composables/useFavorite'
 import { useSiteStore } from '@/stores/site'
 import ArticleContent from '@/components/article/ArticleContent.vue'
 import ArticleToc from '@/components/article/ArticleToc.vue'
+import MobileTocDrawer from '@/components/article/MobileTocDrawer.vue'
 import FavoriteButton from '@/components/article/FavoriteButton.vue'
 import CommentSection from '@/components/comment/CommentSection.vue'
 import ArticleNav from '@/components/collection/ArticleNav.vue'
@@ -219,6 +220,8 @@ onMounted(() => {
           <ArticleToc :items="tocItems" />
         </aside>
       </div>
+
+      <MobileTocDrawer :items="tocItems" />
     </template>
   </div>
 </template>

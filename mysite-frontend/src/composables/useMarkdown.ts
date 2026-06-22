@@ -309,8 +309,10 @@ export function useMarkdown() {
     }
     // Mark items that have children (next item has a deeper level)
     for (let i = 0; i < items.length - 1; i++) {
-      if (items[i + 1].level > items[i].level) {
-        items[i].hasChildren = true
+      const current = items[i]
+      const next = items[i + 1]
+      if (current && next && next.level > current.level) {
+        current.hasChildren = true
       }
     }
     return items
