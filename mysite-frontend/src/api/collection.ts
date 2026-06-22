@@ -7,6 +7,8 @@ export function getCollections(params?: {
   keyword?: string
   authorId?: string
   sortBy?: 'viewCount'
+  sortField?: string
+  sortOrder?: string
 }): Promise<PaginatedResponse<Collection>> {
   return getPaginated<Collection>('/v1/collections', {
     current: params?.page || 1,
@@ -14,6 +16,8 @@ export function getCollections(params?: {
     keyword: params?.keyword,
     authorId: params?.authorId,
     sortBy: params?.sortBy,
+    sortField: params?.sortField,
+    sortOrder: params?.sortOrder,
   })
 }
 

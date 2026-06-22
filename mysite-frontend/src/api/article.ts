@@ -31,6 +31,7 @@ export function getArticles(params?: {
   searchType?: string
   categorySlug?: string
   tagSlug?: string
+  collectionId?: string
   published?: number | null
   sortField?: string
   sortOrder?: string
@@ -42,6 +43,7 @@ export function getArticles(params?: {
     searchType: params?.searchType,
     categorySlug: params?.categorySlug,
     tagSlug: params?.tagSlug,
+    collectionId: params?.collectionId,
     published: params?.published,
     sortField: params?.sortField,
     sortOrder: params?.sortOrder,
