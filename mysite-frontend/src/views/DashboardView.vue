@@ -5,10 +5,11 @@ import { useRouter } from 'vue-router'
 import { FileText, Plus, Trash2, Edit, Eye, Search, SortAsc, SortDesc, Heart, Clock } from 'lucide-vue-next'
 import { getArticles, deleteArticle } from '@/api/article'
 import { getCategories } from '@/api/category'
+import { getCollections } from '@/api/collection'
 import { useUserStore } from '@/stores/user'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
-import type { ArticleListItem, Pagination, Category } from '@/types'
+import type { ArticleListItem, Pagination, Category, Collection } from '@/types'
 
 useHead(() => ({
   title: '文章管理 - MySite',
@@ -24,12 +25,14 @@ const pagination = ref<Pagination | null>(null)
 const loading = ref(false)
 const deleting = ref<string | null>(null)
 const categories = ref<Category[]>([])
+const collections = ref<Collection[]>([])
 
 // 筛选和排序参数
 const keyword = ref('')
 const searchType = ref<'title' | 'content' | 'author'>('title')
 const publishedFilter = ref<number | undefined>(undefined)
 const categoryFilter = ref('')
+const collectionFilter = ref('')
 const sortField = ref('createTime')
 const sortOrder = ref('desc')
 
@@ -45,6 +48,15 @@ async function fetchCategories() {
   }
 }
 
+async function fetchCollections() {
+  try {
+    const res = await getCollections({ size: 100 })
+    collections.value = res.list
+  } catch (error) {
+    console.error('获取合集列表失败:', error)
+  }
+}
+
 async function fetchArticles(page = 1) {
   loading.value = true
   try {
@@ -54,6 +66,7 @@ async function fetchArticles(page = 1) {
       keyword: keyword.value || undefined,
       searchType: searchType.value,
       categorySlug: categoryFilter.value || undefined,
+      collectionId: collectionFilter.value || undefined,
       published: publishedFilter.value,
       sortField: sortField.value,
       sortOrder: sortOrder.value,
@@ -103,6 +116,7 @@ function handleReset() {
   searchType.value = 'title'
   publishedFilter.value = undefined
   categoryFilter.value = ''
+  collectionFilter.value = ''
   sortField.value = 'createTime'
   sortOrder.value = 'desc'
   fetchArticles(1)
@@ -119,6 +133,7 @@ function canModify(article: ArticleListItem): boolean {
 
 onMounted(() => {
   fetchCategories()
+  fetchCollections()
   fetchArticles()
 })
 </script>
@@ -178,6 +193,16 @@ onMounted(() => {
           <option value="">全部分类</option>
           <option v-for="cat in categories" :key="cat.id" :value="cat.slug">
             {{ cat.name }}
+          </option>
+        </select>
+        <select
+          v-model="collectionFilter"
+          class="px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+          @change="handleSearch"
+        >
+          <option value="">全部合集</option>
+          <option v-for="col in collections" :key="col.id" :value="col.id">
+            {{ col.title }}
           </option>
         </select>
       </div>

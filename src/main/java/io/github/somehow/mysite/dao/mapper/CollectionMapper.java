@@ -24,5 +24,7 @@ public interface CollectionMapper extends BaseMapper<CollectionDO> {
             Page<CollectionPageQueryRespDTO> page,
             @Param("keyword") String keyword,
             @Param("authorId") Long authorId,
-            @Param("sortBy") String sortBy);
+            @Param("sortBy") String sortBy,
+            @Param("sortField") String sortField,
+            @Param("sortOrder") String sortOrder);
 }

@@ -29,6 +29,8 @@ export function getAdminComments(params?: {
   articleId?: number
   status?: number
   keyword?: string
+  sortField?: string
+  sortOrder?: string
 }): Promise<PaginatedResponse<CommentAdmin>> {
   return getPaginated<CommentAdmin>('/v1/admin/comments/list', {
     current: params?.page || 1,
@@ -36,6 +38,8 @@ export function getAdminComments(params?: {
     articleId: params?.articleId,
     status: params?.status,
     keyword: params?.keyword,
+    sortField: params?.sortField,
+    sortOrder: params?.sortOrder,
   })
 }
 

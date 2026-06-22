@@ -38,6 +38,24 @@
             <when test="sortBy == 'viewCount'">
                 ORDER BY total_view_count DESC, c.sort_order ASC, c.create_time DESC
             </when>
+            <when test="sortField == 'title'">
+                <choose>
+                    <when test="sortOrder == 'asc'">ORDER BY c.title ASC</when>
+                    <otherwise>ORDER BY c.title DESC</otherwise>
+                </choose>
+            </when>
+            <when test="sortField == 'articleCount'">
+                <choose>
+                    <when test="sortOrder == 'asc'">ORDER BY c.article_count ASC</when>
+                    <otherwise>ORDER BY c.article_count DESC</otherwise>
+                </choose>
+            </when>
+            <when test="sortField == 'createTime'">
+                <choose>
+                    <when test="sortOrder == 'asc'">ORDER BY c.create_time ASC</when>
+                    <otherwise>ORDER BY c.create_time DESC</otherwise>
+                </choose>
+            </when>
             <otherwise>
                 ORDER BY c.sort_order ASC, c.create_time DESC
             </otherwise>
