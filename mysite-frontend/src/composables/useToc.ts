@@ -27,14 +27,16 @@ export function useToc(items: () => TocItem[]) {
       const node: TocNode = { ...item, children: [], parent: null }
       nodeMap.set(node.id, node)
 
-      while (stack.length > 0 && stack[stack.length - 1].level >= node.level) {
+      let top = stack[stack.length - 1]
+      while (top && top.level >= node.level) {
         stack.pop()
+        top = stack[stack.length - 1]
       }
 
       if (stack.length === 0) {
         root.push(node)
       } else {
-        const parent = stack[stack.length - 1]
+        const parent = stack[stack.length - 1]!
         node.parent = parent
         parent.children.push(node)
       }
