@@ -310,7 +310,7 @@ onUnmounted(() => {
     v-if="items.length > 0"
     ref="tocNavRef"
     aria-label="文章目录"
-    class="toc hidden lg:flex flex-col h-full min-h-0"
+    class="toc hidden lg:flex flex-col flex-1 min-h-0"
     @wheel="handleWheel"
   >
     <div class="flex items-center justify-between mb-3 px-1 shrink-0">
