@@ -216,7 +216,7 @@ onMounted(() => {
           />
         </article>
 
-        <aside class="hidden lg:block w-56 shrink-0 sticky top-20 h-[calc(100vh-6rem)]">
+        <aside class="hidden lg:flex flex-col w-56 shrink-0 sticky top-20 h-[calc(100vh-6rem)]">
           <ArticleToc :items="tocItems" />
         </aside>
       </div>
