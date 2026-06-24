@@ -310,7 +310,7 @@ onUnmounted(() => {
     v-if="items.length > 0"
     ref="tocNavRef"
     aria-label="文章目录"
-    class="toc hidden lg:flex flex-col flex-1 min-h-0"
+    class="toc hidden lg:flex flex-col flex-1 min-h-0 overflow-y-auto scrollbar-thin"
     @wheel="handleWheel"
   >
     <div class="flex items-center justify-between mb-3 px-1 shrink-0">
@@ -328,7 +328,7 @@ onUnmounted(() => {
       </button>
     </div>
     <ul
-      class="text-sm border-l border-border overflow-y-auto flex-1 min-h-0 max-h-[calc(100vh-10rem)] scrollbar-thin pr-1"
+      class="text-sm border-l border-border pr-1"
       role="list"
     >
       <template v-for="(node, idx0) in tocTree" :key="node.id">
