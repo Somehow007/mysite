@@ -328,7 +328,7 @@ onUnmounted(() => {
       </button>
     </div>
     <ul
-      class="text-sm border-l border-border overflow-y-auto flex-1 min-h-0 scrollbar-thin pr-1"
+      class="text-sm border-l border-border overflow-y-auto flex-1 min-h-0 max-h-[calc(100vh-10rem)] scrollbar-thin pr-1"
       role="list"
     >
       <template v-for="(node, idx0) in tocTree" :key="node.id">
