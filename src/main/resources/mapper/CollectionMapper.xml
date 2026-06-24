@@ -36,7 +36,7 @@
         GROUP BY c.id, u.username
         <choose>
             <when test="sortBy == 'viewCount'">
-                ORDER BY total_view_count DESC, c.sort_order ASC, c.create_time DESC
+                ORDER BY c.sort_order ASC, total_view_count DESC, c.create_time DESC
             </when>
             <when test="sortField == 'title'">
                 <choose>
