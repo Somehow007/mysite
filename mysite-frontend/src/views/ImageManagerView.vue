@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { getImages, deleteImage, type ImageItem } from '@/api/image'
 import { useToast } from '@/composables/useToast'
 import { useHead } from '@unhead/vue'
-import { Image as ImageIcon, Trash2, Search, Loader2, ChevronLeft, ChevronRight, ExternalLink, Upload } from 'lucide-vue-next'
+import { Image as ImageIcon, Trash2, Search, Loader2, ChevronLeft, ChevronRight, ExternalLink, Upload, SortAsc, SortDesc } from 'lucide-vue-next'
 
 useHead({ title: '图片管理 - MySite' })
 
@@ -16,6 +16,8 @@ const totalPages = ref(1)
 const total = ref(0)
 const keyword = ref('')
 const sourceType = ref<number | undefined>(undefined)
+const sortField = ref('createTime')
+const sortOrder = ref('desc')
 
 const confirmDialog = ref<{ show: boolean; image: ImageItem | null }>({
   show: false,
@@ -54,7 +56,12 @@ const sourceTypeOptions = computed(() => [
 async function fetchImages(page: number = 1) {
   loading.value = true
   try {
-    const params: Record<string, unknown> = { current: page, size: 12 }
+    const params: Record<string, unknown> = {
+      current: page,
+      size: 12,
+      sortField: sortField.value,
+      sortOrder: sortOrder.value,
+    }
     if (keyword.value) params.keyword = keyword.value
     if (sourceType.value !== undefined) params.sourceType = sourceType.value
     const result = await getImages(params)
@@ -74,6 +81,11 @@ function handleSearch() {
 }
 
 function handleSourceTypeChange() {
+  fetchImages(1)
+}
+
+function toggleSortOrder() {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
   fetchImages(1)
 }
 
@@ -110,8 +122,8 @@ onMounted(() => {
       </span>
     </div>
 
-    <div class="flex items-center gap-3 mb-6">
-      <div class="relative flex-1 max-w-sm">
+    <div class="flex items-center gap-3 mb-6 flex-wrap">
+      <div class="relative flex-1 min-w-[200px]">
         <Search :size="14" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
           v-model="keyword"
@@ -128,6 +140,24 @@ onMounted(() => {
       >
         <option v-for="opt in sourceTypeOptions" :key="String(opt.value)" :value="opt.value">{{ opt.label }}</option>
       </select>
+      <select
+        v-model="sortField"
+        class="px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+        @change="fetchImages(1)"
+      >
+        <option value="createTime">按创建时间</option>
+        <option value="size">按文件大小</option>
+        <option value="name">按文件名</option>
+      </select>
+      <button
+        @click="toggleSortOrder"
+        class="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary hover:bg-surface-secondary transition-colors"
+        title="切换排序方向"
+      >
+        <SortAsc v-if="sortOrder === 'asc'" :size="14" />
+        <SortDesc v-else :size="14" />
+        {{ sortOrder === 'asc' ? '升序' : '降序' }}
+      </button>
       <button @click="handleSearch" class="btn-primary text-sm">
         <Search :size="14" />
         搜索

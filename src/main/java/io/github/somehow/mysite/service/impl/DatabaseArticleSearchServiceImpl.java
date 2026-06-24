@@ -99,6 +99,22 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
             }
         }
 
+        Long collectionId = requestParam.getCollectionId();
+        if (collectionId != null) {
+            List<CollectionArticleDO> collectionArticles = collectionArticleMapper.selectList(
+                    Wrappers.<CollectionArticleDO>lambdaQuery()
+                            .eq(CollectionArticleDO::getCollectionId, collectionId)
+                            .eq(CollectionArticleDO::getDelFlag, 0));
+            if (!CollectionUtils.isEmpty(collectionArticles)) {
+                List<Long> articleIds = collectionArticles.stream()
+                        .map(CollectionArticleDO::getArticleId)
+                        .collect(Collectors.toList());
+                queryWrapper.in(ArticleDO::getId, articleIds);
+            } else {
+                return new Page<>();
+            }
+        }
+
         if (StrUtil.isNotBlank(keyword)) {
             keyword = keyword.toLowerCase();
             switch (searchType) {

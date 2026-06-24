@@ -18,4 +18,10 @@ public class CollectionPageQueryReqDTO extends Page {
 
     @Schema(description = "排序方式：viewCount 表示按文章总浏览量降序，留空则按 sort_order、创建时间排序")
     private String sortBy;
+
+    @Schema(description = "排序字段: createTime-创建时间, title-标题, articleCount-文章数", example = "createTime")
+    private String sortField;
+
+    @Schema(description = "排序方向: asc-升序, desc-降序", example = "desc")
+    private String sortOrder;
 }

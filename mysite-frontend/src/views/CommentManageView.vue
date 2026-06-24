@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useHead } from '@unhead/vue'
-import { MessageSquare, Trash2, CheckCircle, XCircle, Clock, Search } from 'lucide-vue-next'
+import { MessageSquare, Trash2, CheckCircle, XCircle, Clock, Search, SortAsc, SortDesc } from 'lucide-vue-next'
 import { getAdminComments, updateCommentStatus, deleteComment } from '@/api/comment'
 import { useToast } from '@/composables/useToast'
 import type { CommentAdmin, Pagination } from '@/types'
@@ -17,6 +17,8 @@ const pagination = ref<Pagination | null>(null)
 const loading = ref(false)
 const keyword = ref('')
 const statusFilter = ref<number | undefined>(undefined)
+const sortField = ref('createTime')
+const sortOrder = ref('desc')
 
 const statusMap: Record<number, { label: string; class: string; icon: typeof CheckCircle }> = {
   0: { label: '待审核', class: 'bg-amber-50 text-amber-600', icon: Clock },
@@ -32,6 +34,8 @@ async function fetchComments(page = 1) {
       size: 20,
       keyword: keyword.value || undefined,
       status: statusFilter.value,
+      sortField: sortField.value,
+      sortOrder: sortOrder.value,
     })
     comments.value = res.list
     pagination.value = res.pagination
@@ -69,6 +73,11 @@ function handleSearch() {
   fetchComments(1)
 }
 
+function toggleSortOrder() {
+  sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
+  fetchComments(1)
+}
+
 onMounted(() => {
   fetchComments()
 })
@@ -83,8 +92,8 @@ onMounted(() => {
     </div>
 
     <!-- 筛选栏 -->
-    <div class="flex items-center gap-3 mb-6">
-      <div class="relative flex-1 max-w-xs">
+    <div class="flex items-center gap-3 mb-6 flex-wrap">
+      <div class="relative flex-1 min-w-[200px]">
         <Search :size="14" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
           v-model="keyword"
@@ -104,6 +113,24 @@ onMounted(() => {
         <option :value="1">已通过</option>
         <option :value="2">已拒绝</option>
       </select>
+      <select
+        v-model="sortField"
+        class="px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+        @change="fetchComments(1)"
+      >
+        <option value="createTime">按创建时间</option>
+        <option value="likeCount">按点赞数</option>
+        <option value="replyCount">按回复数</option>
+      </select>
+      <button
+        @click="toggleSortOrder"
+        class="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary hover:bg-surface-secondary transition-colors"
+        title="切换排序方向"
+      >
+        <SortAsc v-if="sortOrder === 'asc'" :size="14" />
+        <SortDesc v-else :size="14" />
+        {{ sortOrder === 'asc' ? '升序' : '降序' }}
+      </button>
       <button @click="handleSearch" class="btn-primary text-sm">
         搜索
       </button>

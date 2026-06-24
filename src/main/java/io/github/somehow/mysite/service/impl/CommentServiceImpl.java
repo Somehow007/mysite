@@ -277,8 +277,35 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, CommentDO> im
                 .eq(CommentDO::getDelFlag, 0)
                 .eq(requestParam.getArticleId() != null, CommentDO::getArticleId, requestParam.getArticleId())
                 .eq(requestParam.getStatus() != null, CommentDO::getStatus, requestParam.getStatus())
-                .like(StrUtil.isNotBlank(requestParam.getKeyword()), CommentDO::getContent, requestParam.getKeyword())
-                .orderByDesc(CommentDO::getCreateTime);
+                .like(StrUtil.isNotBlank(requestParam.getKeyword()), CommentDO::getContent, requestParam.getKeyword());
+
+        // 排序逻辑
+        String sortField = StrUtil.blankToDefault(requestParam.getSortField(), "createTime");
+        String sortOrder = StrUtil.blankToDefault(requestParam.getSortOrder(), "desc");
+
+        switch (sortField) {
+            case "likeCount":
+                if ("asc".equalsIgnoreCase(sortOrder)) {
+                    queryWrapper.orderByAsc(CommentDO::getLikeCount);
+                } else {
+                    queryWrapper.orderByDesc(CommentDO::getLikeCount);
+                }
+                break;
+            case "replyCount":
+                if ("asc".equalsIgnoreCase(sortOrder)) {
+                    queryWrapper.orderByAsc(CommentDO::getReplyCount);
+                } else {
+                    queryWrapper.orderByDesc(CommentDO::getReplyCount);
+                }
+                break;
+            default:
+                if ("asc".equalsIgnoreCase(sortOrder)) {
+                    queryWrapper.orderByAsc(CommentDO::getCreateTime);
+                } else {
+                    queryWrapper.orderByDesc(CommentDO::getCreateTime);
+                }
+                break;
+        }
 
         Page<CommentDO> page = new Page<>(requestParam.getCurrent(), requestParam.getSize());
         IPage<CommentDO> result = commentMapper.selectPage(page, queryWrapper);

@@ -20,4 +20,10 @@ public class CommentPageQueryReqDTO {
 
     @Schema(description = "关键词搜索")
     private String keyword;
+
+    @Schema(description = "排序字段: createTime-创建时间, likeCount-点赞数, replyCount-回复数", example = "createTime")
+    private String sortField;
+
+    @Schema(description = "排序方向: asc-升序, desc-降序", example = "desc")
+    private String sortOrder;
 }

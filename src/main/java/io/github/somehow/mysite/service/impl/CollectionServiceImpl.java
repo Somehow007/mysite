@@ -117,14 +117,16 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = CACHE_HOME, key = "'page:' + #requestParam.current + ':' + #requestParam.size + ':' + #requestParam.keyword + ':' + #requestParam.authorId + ':' + #requestParam.sortBy")
+    @Cacheable(value = CACHE_HOME, key = "'page:' + #requestParam.current + ':' + #requestParam.size + ':' + #requestParam.keyword + ':' + #requestParam.authorId + ':' + #requestParam.sortBy + ':' + #requestParam.sortField + ':' + #requestParam.sortOrder")
     public IPage<CollectionPageQueryRespDTO> pageQueryCollection(CollectionPageQueryReqDTO requestParam) {
         Page<CollectionPageQueryRespDTO> page = new Page<>(requestParam.getCurrent(), requestParam.getSize());
         IPage<CollectionPageQueryRespDTO> result = collectionMapper.selectCollectionsPage(
                 page,
                 requestParam.getKeyword(),
                 requestParam.getAuthorId(),
-                requestParam.getSortBy());
+                requestParam.getSortBy(),
+                requestParam.getSortField(),
+                requestParam.getSortOrder());
 
         if (result == null || CollectionUtils.isEmpty(result.getRecords())) {
             return new Page<>();
