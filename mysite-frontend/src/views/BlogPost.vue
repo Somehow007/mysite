@@ -66,15 +66,14 @@ async function fetchArticle(id: string) {
   loading.value = true
   error.value = false
   try {
-    article.value = await getArticleById(id)
+    const [articleData, navData] = await Promise.all([
+      getArticleById(id),
+      getArticleNavigation(id).catch(() => null),
+    ])
+    article.value = articleData
+    navInfo.value = navData
     if (article.value && article.value.isFavorited !== undefined) {
       setFavoriteStatus(id, article.value.isFavorited)
-    }
-    // 获取导航信息
-    try {
-      navInfo.value = await getArticleNavigation(id)
-    } catch {
-      navInfo.value = null
     }
   } catch {
     error.value = true

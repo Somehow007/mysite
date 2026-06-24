@@ -27,7 +27,6 @@ import io.github.somehow.mysite.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +54,8 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     private final ArticleTagMapper articleTagMapper;
     private final CollectionService collectionService;
     private final CollectionArticleMapper collectionArticleMapper;
+    private final ArticleViewCountService articleViewCountService;
+    private final ArticleCacheService articleCacheService;
 
     @Override
     @Transactional
@@ -114,10 +115,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
     @Override
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(value = "article_detail", key = "#requestParam.id"),
-            @CacheEvict(value = "article_nav", allEntries = true)
-    })
+    @CacheEvict(value = "article_nav", allEntries = true)
     public void updateArticle(ArticleUpdateReqDTO requestParam) {
         if (Objects.isNull(requestParam)) {
             throw new ClientException(ErrorCode.ARTICLE_PARAM_REQUIRED);
@@ -167,14 +165,12 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         }
         categoryService.evictCategoryCache();
         tagService.evictTagCache();
+        articleCacheService.evictArticleDetail(requestParam.getId());
     }
 
     @Override
     @Transactional
-    @Caching(evict = {
-            @CacheEvict(value = "article_detail", key = "#id"),
-            @CacheEvict(value = "article_nav", allEntries = true)
-    })
+    @CacheEvict(value = "article_nav", allEntries = true)
     public void deleteArticle(Long id) {
         checkArticleOwnership(id);
 
@@ -209,6 +205,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         articleSearchService.deleteArticle(id);
         categoryService.evictCategoryCache();
         tagService.evictTagCache();
+        articleCacheService.evictArticleDetail(id);
     }
 
     @Override
@@ -229,19 +226,13 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
     @Override
     public ArticleSelectRespDTO selectOneArticle(Long id) {
-        LambdaQueryWrapper<ArticleDO> queryWrapper = Wrappers.lambdaQuery(ArticleDO.class)
-                .eq(ArticleDO::getId, id)
-                .eq(ArticleDO::getDelFlag, 0);
-        ArticleDO articleDO = baseMapper.selectOne(queryWrapper);
-        if (Objects.isNull(articleDO)) {
-            throw new ClientException(ErrorCode.ARTICLE_NOT_FOUND);
-        }
-        incrementViewCount(id);
+        ArticleSelectRespDTO result = articleCacheService.getArticleDetail(id);
 
-        ArticleSelectRespDTO result = BeanUtil.toBean(articleDO, ArticleSelectRespDTO.class);
-        // 手动更新浏览量，避免缓存导致不一致
-        result.setViewCount(articleDO.getViewCount() + 1);
+        // 浏览量：从 Redis 获取未刷盘的增量，叠加到基础值
+        long pendingViews = articleViewCountService.getPendingViewCount(id);
+        result.setViewCount(result.getViewCount() + (int) pendingViews);
 
+        // 用户收藏状态（每次请求实时查询，不缓存）
         String currentUserId = UserContext.getUserId();
         if (currentUserId != null) {
             UserFavoriteArticleDO fav = userFavoriteArticleMapper.selectOne(Wrappers.lambdaQuery(UserFavoriteArticleDO.class)
@@ -253,66 +244,11 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             result.setIsFavorited(false);
         }
 
-        // 批量查询作者、分类、标签，减少独立查询次数
-        if (articleDO.getAuthorId() != null) {
-            UserDO author = userMapper.selectById(articleDO.getAuthorId());
-            if (author != null) {
-                result.setAuthorName(author.getUsername());
-            }
-        }
-
-        if (articleDO.getCategoryId() != null) {
-            CategoryDO category = categoryMapper.selectById(articleDO.getCategoryId());
-            if (category != null) {
-                result.setCategoryName(category.getName());
-                result.setCategorySlug(category.getSlug());
-            }
-        }
-
-        List<ArticleTagDO> articleTags = articleTagMapper.selectList(Wrappers.lambdaQuery(ArticleTagDO.class)
-                .eq(ArticleTagDO::getArticleId, id)
-                .eq(ArticleTagDO::getDelFlag, 0));
-        if (!CollectionUtils.isEmpty(articleTags)) {
-            List<Long> tagIds = articleTags.stream().map(ArticleTagDO::getTagId).collect(Collectors.toList());
-            List<TagDO> tags = tagMapper.selectBatchIds(tagIds);
-            result.setTags(tags.stream().map(tag -> {
-                ArticleSelectRespDTO.TagInfo tagInfo = new ArticleSelectRespDTO.TagInfo();
-                tagInfo.setId(tag.getId());
-                tagInfo.setName(tag.getName());
-                tagInfo.setSlug(tag.getSlug());
-                return tagInfo;
-            }).collect(Collectors.toList()));
-        }
-
-        // 查询文章所属合集信息
-        CollectionDO collection = collectionService.getCollectionByArticleId(id);
-        if (collection != null) {
-            result.setCollectionId(collection.getId());
-            result.setCollectionTitle(collection.getTitle());
-            // 查询在合集中的排序
-            CollectionArticleDO ca = collectionArticleMapper.selectOne(Wrappers.lambdaQuery(CollectionArticleDO.class)
-                    .eq(CollectionArticleDO::getArticleId, id)
-                    .eq(CollectionArticleDO::getCollectionId, collection.getId())
-                    .eq(CollectionArticleDO::getDelFlag, 0));
-            if (ca != null) {
-                result.setCollectionSortOrder(ca.getSortOrder());
-            }
-        }
-
         return result;
-    }
-
-    private void incrementViewCount(Long articleId) {
-        try {
-            baseMapper.incrementViewCount(articleId, 1);
-        } catch (Exception e) {
-            log.warn("更新浏览量失败, articleId={}", articleId, e);
-        }
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = "article_detail", key = "#requestParam.articleId")
     public ArticleFavoriteRespDTO favoriteArticle(ArticleFavoriteReqDTO requestParam) {
         if (StrUtil.isBlank(requestParam.getArticleId()) || StrUtil.isBlank(requestParam.getUserId())) {
             throw new ClientException(ErrorCode.ARTICLE_FAVORITE_PARAM_INCOMPLETE);

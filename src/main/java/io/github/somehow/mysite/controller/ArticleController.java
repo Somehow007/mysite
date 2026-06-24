@@ -10,6 +10,7 @@ import io.github.somehow.mysite.dto.resp.ArticlePageQueryRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleSelectRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
 import io.github.somehow.mysite.service.ArticleService;
+import io.github.somehow.mysite.service.impl.ArticleViewCountService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ import java.util.Map;
 public class ArticleController {
 
     private final ArticleService articleService;
+    private final ArticleViewCountService articleViewCountService;
 
     @Operation(summary = "创建文章")
     @PostMapping("/v1/articles")
@@ -64,6 +66,7 @@ public class ArticleController {
     @Operation(summary = "查询单个文章信息")
     @GetMapping("/v1/articles/{id}")
     public Result<ArticleSelectRespDTO> selectArticle(@PathVariable Long id) {
+        articleViewCountService.incrementViewCount(id);
         return Results.success(articleService.selectOneArticle(id));
     }
 

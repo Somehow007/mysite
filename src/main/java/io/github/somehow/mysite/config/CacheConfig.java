@@ -11,6 +11,7 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.time.Duration;
 import java.util.HashMap;
@@ -19,6 +20,7 @@ import java.util.Map;
 @Configuration
 @EnableCaching
 @EnableAsync
+@EnableScheduling
 public class CacheConfig {
 
     @Bean
