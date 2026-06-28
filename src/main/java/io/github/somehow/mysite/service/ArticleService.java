@@ -17,6 +17,7 @@ public interface ArticleService extends IService<ArticleDO> {
     void createArticle(ArticleCreateReqDTO requestParam);
     void updateArticle(ArticleUpdateReqDTO requestParam);
     void deleteArticle(Long id);
+    void batchDeleteArticles(List<Long> ids);
     IPage<ArticlePageQueryRespDTO> pageQueryArticle(ArticlePageQueryReqDTO requestParam);
     IPage<ArticlePageQueryRespDTO> pageQueryFavoriteArticle(ArticleFavoritePageQueryReqDTO requestParam);
     ArticleSelectRespDTO selectOneArticle(Long id);
