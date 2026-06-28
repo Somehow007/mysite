@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 
@@ -46,6 +47,13 @@ public class ArticleController {
     @DeleteMapping("/v1/articles/{id}")
     public Result<Void> deleteArticle(@PathVariable Long id) {
         articleService.deleteArticle(id);
+        return Results.success();
+    }
+
+    @Operation(summary = "批量删除文章")
+    @DeleteMapping("/v1/articles/batch")
+    public Result<Void> batchDeleteArticles(@Valid @RequestBody ArticleBatchDeleteReqDTO requestParam) {
+        articleService.batchDeleteArticles(requestParam.getIds());
         return Results.success();
     }
 

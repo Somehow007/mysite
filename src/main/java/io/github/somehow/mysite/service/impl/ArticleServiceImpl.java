@@ -209,6 +209,20 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     }
 
     @Override
+    public void batchDeleteArticles(List<Long> ids) {
+        if (CollectionUtils.isEmpty(ids)) {
+            return;
+        }
+        for (Long id : ids) {
+            try {
+                deleteArticle(id);
+            } catch (Exception e) {
+                log.warn("批量删除文章失败, articleId: {}, error: {}", id, e.getMessage());
+            }
+        }
+    }
+
+    @Override
     public IPage<ArticlePageQueryRespDTO> pageQueryArticle(ArticlePageQueryReqDTO requestParam) {
         return articleSearchService.searchArticles(requestParam);
     }

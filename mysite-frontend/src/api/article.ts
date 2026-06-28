@@ -66,6 +66,10 @@ export function deleteArticle(id: string): Promise<void> {
   return del<void>(`/v1/articles/${id}`)
 }
 
+export function batchDeleteArticles(ids: string[]): Promise<void> {
+  return del<void>('/v1/articles/batch', { ids })
+}
+
 export interface FavoriteResult {
   favorited: boolean
   favoriteCount: number

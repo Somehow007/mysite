@@ -68,6 +68,12 @@ class ArticleServiceImplDeleteTest {
     @Mock
     private CollectionArticleMapper collectionArticleMapper;
 
+    @Mock
+    private ArticleCacheService articleCacheService;
+
+    @Mock
+    private ArticleViewCountService articleViewCountService;
+
     @InjectMocks
     private ArticleServiceImpl articleService;
 
