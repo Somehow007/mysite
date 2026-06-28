@@ -10,7 +10,7 @@ import { getCollections, addArticleToCollection, removeArticleFromCollection } f
 import { uploadImage, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useUserStore } from '@/stores/user'
 import { useToast } from '@/composables/useToast'
-import MarkdownEditor from '@/components/editor/MarkdownEditor.vue'
+import SimpleMarkdownEditor from '@/components/editor/SimpleMarkdownEditor.vue'
 import type { Category, Tag, Collection } from '@/types'
 
 const route = useRoute()
@@ -393,9 +393,9 @@ function removeCover() {
         />
 
         <div class="flex-1 min-h-[500px] rounded-xl border border-border overflow-hidden bg-bg-secondary card-shadow">
-          <MarkdownEditor
+          <SimpleMarkdownEditor
             v-model="content"
-            placeholder="用 Markdown 写文章..."
+            placeholder="将写好的 Markdown 内容粘贴到这里..."
             @save="handleSave(false)"
           />
         </div>
@@ -628,10 +628,10 @@ function removeCover() {
 
           <div class="p-4 rounded-lg bg-bg-code">
             <p class="text-xs text-text-muted leading-relaxed mb-2">
-              编辑器支持丰富的Markdown快捷键，点击工具栏的 <strong>?</strong> 按钮查看所有快捷键。
+              编辑区目前为精简模式：将写好的内容<strong>粘贴</strong>到编辑框即可，右侧实时渲染预览。
             </p>
             <p class="text-xs text-text-muted leading-relaxed">
-              支持实时预览、语法高亮和自动补全功能。
+              支持 Markdown 语法、代码高亮、数学公式与标注；可在编辑 / 分屏 / 预览之间切换。
             </p>
           </div>
         </div>
