@@ -83,6 +83,9 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         if (articleDO.getPublished() == null) {
             articleDO.setPublished(1);
         }
+        if (articleDO.getVisibility() == null) {
+            articleDO.setVisibility(0);
+        }
         articleDO.setViewCount(0);
         articleDO.setFavoriteCount(0);
         articleDO.setReadingTime(calculateReadingTime(requestParam.getContent()));
@@ -132,6 +135,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
                         StrUtil.isBlank(requestParam.getCoverImage()) ? null : requestParam.getCoverImage())
                 .set(requestParam.getCategoryId() != null, ArticleDO::getCategoryId, requestParam.getCategoryId())
                 .set(!Objects.isNull(requestParam.getPublished()), ArticleDO::getPublished, requestParam.getPublished())
+                .set(requestParam.getVisibility() != null, ArticleDO::getVisibility, requestParam.getVisibility())
                 .eq(ArticleDO::getDelFlag, 0);
         if (StrUtil.isNotBlank(requestParam.getContent())) {
             updateWrapper.set(ArticleDO::getReadingTime, calculateReadingTime(requestParam.getContent()));
@@ -242,6 +246,17 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     public ArticleSelectRespDTO selectOneArticle(Long id) {
         ArticleSelectRespDTO result = articleCacheService.getArticleDetail(id);
 
+        // 可见性检查：私有文章仅作者和 Developer 可见
+        if (result.getVisibility() != null && result.getVisibility() == 1) {
+            String currentUserId = UserContext.getUserId();
+            boolean isAuthor = currentUserId != null && currentUserId.equals(
+                    result.getAuthorId() != null ? result.getAuthorId().toString() : null);
+            boolean isDev = UserContext.isDeveloper();
+            if (!isAuthor && !isDev) {
+                throw new ClientException(ErrorCode.ARTICLE_NOT_FOUND);
+            }
+        }
+
         // 浏览量：从 Redis 获取未刷盘的增量，叠加到基础值
         long pendingViews = articleViewCountService.getPendingViewCount(id);
         result.setViewCount(result.getViewCount() + (int) pendingViews);
@@ -272,6 +287,12 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
         ArticleDO article = articleMapper.selectById(articleId);
         if (article == null || article.getDelFlag() != 0) {
+            throw new ClientException(ErrorCode.ARTICLE_NOT_FOUND);
+        }
+
+        // 可见性检查：不允许收藏他人的私有文章
+        if (article.getVisibility() != null && article.getVisibility() == 1
+                && !userId.equals(article.getAuthorId())) {
             throw new ClientException(ErrorCode.ARTICLE_NOT_FOUND);
         }
 
@@ -355,6 +376,16 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         if (!authorIds.isEmpty()) {
             userMapper.selectBatchIds(authorIds).forEach(user ->
                     authorNameMap.put(user.getId(), user.getUsername()));
+        }
+
+        // 过滤掉非公开且非作者的私有文章
+        String currentUserId = UserContext.getUserId();
+        boolean isDev = UserContext.isDeveloper();
+        if (!isDev) {
+            articles = articles.stream()
+                    .filter(a -> a.getVisibility() == null || a.getVisibility() == 0
+                            || (currentUserId != null && currentUserId.equals(a.getAuthorId().toString())))
+                    .collect(Collectors.toList());
         }
 
         Map<String, Map<String, List<ArchiveRespDTO.ArchiveArticle>>> grouped = new LinkedHashMap<>();

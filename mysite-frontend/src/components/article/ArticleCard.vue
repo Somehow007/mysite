@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { BookOpen } from 'lucide-vue-next'
+import { BookOpen, Lock } from 'lucide-vue-next'
 import ArticleMeta from './ArticleMeta.vue'
 import FavoriteButton from './FavoriteButton.vue'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
@@ -29,6 +29,11 @@ function handleLoginRequired() {
 
 <template>
   <article class="group relative">
+    <!-- 私有文章角标 -->
+    <div v-if="article.visibility === 1" class="absolute top-3 right-3 z-10 flex items-center gap-1 px-2 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 text-xs font-medium border border-amber-200 dark:border-amber-700/50">
+      <Lock :size="10" />
+      <span class="hidden sm:inline">仅自己可见</span>
+    </div>
     <div class="flex items-start justify-between gap-3">
       <RouterLink :to="`/post/${article.id}`" class="flex-1 min-w-0">
         <div

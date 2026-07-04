@@ -2,7 +2,7 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { ArrowLeft, Calendar, Eye, Clock, Tag } from 'lucide-vue-next'
+import { ArrowLeft, Calendar, Eye, Clock, Tag, Lock } from 'lucide-vue-next'
 import { getArticleById } from '@/api/article'
 import { getArticleNavigation } from '@/api/collection'
 import { formatDate, calculateReadingTime } from '@/utils/date'
@@ -191,6 +191,11 @@ onMounted(() => {
               </RouterLink>
             </div>
           </header>
+
+          <div v-if="article.visibility === 1" class="mb-6 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 text-amber-800 dark:text-amber-200 text-sm flex items-center gap-2">
+            <Lock :size="14" />
+            <span>这篇文章仅自己可见</span>
+          </div>
 
           <ArticleContent :content="article.content" @toc-ready="handleTocReady" />
 

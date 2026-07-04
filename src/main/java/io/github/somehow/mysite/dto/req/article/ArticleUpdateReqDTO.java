@@ -20,5 +20,6 @@ public class ArticleUpdateReqDTO {
     private String coverImage;
     private Long categoryId;
     private Integer published;
+    private Integer visibility;
     private List<Long> tagIds;
 }

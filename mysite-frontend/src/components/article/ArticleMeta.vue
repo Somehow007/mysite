@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Calendar, Eye, Clock, Tag, Heart } from 'lucide-vue-next'
+import { Calendar, Eye, Clock, Tag, Heart, Lock } from 'lucide-vue-next'
 import { formatDate, calculateReadingTime } from '@/utils/date'
 import type { ArticleListItem } from '@/types'
 
@@ -41,5 +41,9 @@ const readingTime = computed(() =>
       <Tag :size="12" />
       <span>{{ article.categoryName }}</span>
     </RouterLink>
+    <span v-if="article.visibility === 1" class="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+      <Lock :size="12" />
+      <span class="hidden sm:inline">仅自己可见</span>
+    </span>
   </div>
 </template>

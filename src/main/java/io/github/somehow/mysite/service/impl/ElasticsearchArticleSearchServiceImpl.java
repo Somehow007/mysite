@@ -194,6 +194,16 @@ public class ElasticsearchArticleSearchServiceImpl implements ArticleSearchServi
                 .in(ArticleDO::getId, articleIds)
                 .eq(ArticleDO::getDelFlag, 0));
 
+        // 可见性过滤：非 Developer 用户只能看到公开文章或自己的私有文章
+        String currentUserId = UserContext.getUserId();
+        boolean isDev = UserContext.isDeveloper();
+        if (!isDev) {
+            articles = articles.stream()
+                    .filter(a -> a.getVisibility() == null || a.getVisibility() == 0
+                            || (currentUserId != null && a.getAuthorId().toString().equals(currentUserId)))
+                    .collect(Collectors.toList());
+        }
+
         List<Long> authorIds = articles.stream()
                 .map(ArticleDO::getAuthorId)
                 .distinct()
@@ -225,6 +235,7 @@ public class ElasticsearchArticleSearchServiceImpl implements ArticleSearchServi
                     dto.setFavoriteCount(article.getFavoriteCount());
                     dto.setReadingTime(article.getReadingTime());
                     dto.setPublished(article.getPublished());
+                    dto.setVisibility(article.getVisibility());
                     dto.setAuthorId(article.getAuthorId());
                     dto.setCreateTime(article.getCreateTime());
                     dto.setUpdateTime(article.getUpdateTime());
@@ -293,7 +304,6 @@ public class ElasticsearchArticleSearchServiceImpl implements ArticleSearchServi
             }
         }
 
-        String currentUserId = UserContext.getUserId();
         if (currentUserId != null && !records.isEmpty()) {
             List<String> articleIdStrs = records.stream()
                     .map(r -> r.getId().toString())
@@ -397,6 +407,7 @@ public class ElasticsearchArticleSearchServiceImpl implements ArticleSearchServi
                 .categoryId(article.getCategoryId() != null ? article.getCategoryId().toString() : null)
                 .collectionId(collectionId)
                 .collectionTitle(collectionTitle)
+                .visibility(article.getVisibility())
                 .createTime(article.getCreateTime())
                 .build();
     }

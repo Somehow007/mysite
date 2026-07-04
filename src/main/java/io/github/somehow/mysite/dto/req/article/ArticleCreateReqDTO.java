@@ -36,6 +36,9 @@ public class ArticleCreateReqDTO {
     @Schema(description = "是否发布: 0-草稿, 1-发布")
     private Integer published;
 
+    @Schema(description = "可见性: 0-公开, 1-仅自己可见")
+    private Integer visibility;
+
     @Schema(description = "所属合集ID（可选，新建文章时自动加入指定合集）")
     private Long collectionId;
 }

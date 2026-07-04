@@ -24,6 +24,7 @@ public class ArticleDO extends BaseDO {
     private Long categoryId;
     private Long authorId;
     private Integer published;
+    private Integer visibility;
     private Integer viewCount;
     private Integer favoriteCount;
     private Integer readingTime;

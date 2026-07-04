@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X, Plus, Search, TrendingUp, Library, Check, ChevronDown } from 'lucide-vue-next'
+import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X, Plus, Search, TrendingUp, Library, Check, ChevronDown, Lock, Globe } from 'lucide-vue-next'
 import { createArticle, updateArticle, getArticleById } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { getTags, createTag } from '@/api/tag'
@@ -38,6 +38,7 @@ const collections = ref<Collection[]>([])
 const selectedCollectionId = ref<string>('')
 // 记录编辑时的原始合集ID，用于判断是否需要切换合集
 const originalCollectionId = ref<string>('')
+const visibility = ref<number>(0)
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
@@ -125,6 +126,9 @@ onMounted(async () => {
         selectedCollectionId.value = article.collectionId
         originalCollectionId.value = article.collectionId
       }
+      if (article.visibility !== undefined) {
+        visibility.value = article.visibility
+      }
       if (summary.value || categoryId.value || coverImage.value || selectedTagIds.value.length > 0 || selectedCollectionId.value) {
         showMetaPanel.value = true
       }
@@ -189,6 +193,7 @@ async function handleSave(isPublish: boolean) {
         categoryId: categoryId.value || undefined,
         tagIds: selectedTagIds.value.length > 0 ? selectedTagIds.value : undefined,
         published: isPublish ? 1 : 0,
+        visibility: visibility.value,
       })
       // 处理合集关联变更
       const newCollectionId = selectedCollectionId.value
@@ -225,6 +230,7 @@ async function handleSave(isPublish: boolean) {
         categoryId: categoryId.value || undefined,
         tagIds: selectedTagIds.value.length > 0 ? selectedTagIds.value : undefined,
         published: isPublish ? 1 : 0,
+        visibility: visibility.value,
         collectionId: selectedCollectionId.value || undefined,
       })
     }
@@ -603,6 +609,36 @@ function removeCover() {
                   </div>
                 </div>
               </transition>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-text-primary mb-1.5">
+              可见性
+            </label>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                @click="visibility = 0"
+                class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-all duration-200"
+                :class="visibility === 0
+                  ? 'border-accent bg-accent text-text-inverse'
+                  : 'border-border text-text-muted hover:border-accent hover:text-accent'"
+              >
+                <Globe :size="14" />
+                公开
+              </button>
+              <button
+                type="button"
+                @click="visibility = 1"
+                class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-all duration-200"
+                :class="visibility === 1
+                  ? 'border-accent bg-accent text-text-inverse'
+                  : 'border-border text-text-muted hover:border-accent hover:text-accent'"
+              >
+                <Lock :size="14" />
+                仅自己可见
+              </button>
             </div>
           </div>
 
