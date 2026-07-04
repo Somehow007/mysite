@@ -864,6 +864,7 @@ onMounted(() => {
   border: 1px solid var(--border);
   background: var(--surface-primary);
   overflow: hidden;
+  overflow-x: auto;
 }
 .article-table {
   width: 100%;
