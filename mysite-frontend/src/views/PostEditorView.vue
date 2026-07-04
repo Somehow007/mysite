@@ -111,7 +111,7 @@ onMounted(async () => {
       showMetaPanel.value = true
     }
 
-    if (editing && articleId) {
+    if (isEdit.value && route.params.id) {
       const article = await getArticleById(route.params.id as string)
       title.value = article.title
       content.value = article.content || ''
@@ -179,7 +179,7 @@ async function handleSave(isPublish: boolean) {
       return
     }
 
-    if (editing && articleId) {
+    if (isEdit.value && route.params.id) {
       await updateArticle({
         id: articleId,
         title: title.value.trim(),
