@@ -192,7 +192,7 @@ onMounted(() => {
             </div>
           </header>
 
-          <div v-if="article.visibility === 1" class="mb-6 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/30 text-amber-800 dark:text-amber-200 text-sm flex items-center gap-2">
+          <div v-if="article.visibility === 1" class="mb-6 p-3 rounded-lg bg-accent-subtle border border-accent/30 text-accent text-sm flex items-center gap-2">
             <Lock :size="14" />
             <span>这篇文章仅自己可见</span>
           </div>

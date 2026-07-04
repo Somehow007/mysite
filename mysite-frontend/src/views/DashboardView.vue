@@ -470,7 +470,7 @@ onMounted(() => {
                     <span :class="article.published === 1 ? 'tag tag-published' : 'tag tag-draft'">
                       {{ article.published === 1 ? '已发布' : '草稿' }}
                     </span>
-                    <Lock v-if="article.visibility === 1" :size="12" class="text-amber-500 ml-1" title="仅自己可见" />
+                    <Lock v-if="article.visibility === 1" :size="12" class="text-accent ml-1" title="仅自己可见" />
                   </div>
                 </div>
               </div>

@@ -41,7 +41,7 @@ const readingTime = computed(() =>
       <Tag :size="12" />
       <span>{{ article.categoryName }}</span>
     </RouterLink>
-    <span v-if="article.visibility === 1" class="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+    <span v-if="article.visibility === 1" class="inline-flex items-center gap-1 text-accent">
       <Lock :size="12" />
       <span class="hidden sm:inline">仅自己可见</span>
     </span>

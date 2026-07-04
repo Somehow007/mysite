@@ -60,7 +60,7 @@ function handleLoginRequired() {
 
         <span
           v-if="article.visibility === 1"
-          class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/50 mb-2 ml-2"
+          class="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-accent-subtle text-accent border border-accent/30 mb-2 ml-2"
         >
           <Lock :size="10" />
           仅自己可见
