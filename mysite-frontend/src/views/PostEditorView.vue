@@ -111,7 +111,7 @@ onMounted(async () => {
       showMetaPanel.value = true
     }
 
-    if (isEdit.value && route.params.id) {
+    if (editing && articleId) {
       const article = await getArticleById(route.params.id as string)
       title.value = article.title
       content.value = article.content || ''
@@ -142,6 +142,9 @@ onUnmounted(() => {
 })
 
 async function handleSave(isPublish: boolean) {
+  // 防止并发保存（双击、Ctrl+S 在保存未完成时再次触发等）
+  if (saving.value) return
+
   if (!title.value.trim()) {
     error.value = '请输入文章标题'
     return
@@ -162,6 +165,10 @@ async function handleSave(isPublish: boolean) {
     return
   }
 
+  // 在异步操作开始前捕获编辑模式，避免 reactive 状态在 async 过程中变化导致误判
+  const editing = isEdit.value && !!route.params.id
+  const articleId = editing ? (route.params.id as string) : undefined
+
   saving.value = true
   error.value = ''
 
@@ -172,9 +179,9 @@ async function handleSave(isPublish: boolean) {
       return
     }
 
-    if (isEdit.value && route.params.id) {
+    if (editing && articleId) {
       await updateArticle({
-        id: route.params.id as string,
+        id: articleId,
         title: title.value.trim(),
         content: content.value,
         summary: summary.value.trim() || undefined,
@@ -184,7 +191,6 @@ async function handleSave(isPublish: boolean) {
         published: isPublish ? 1 : 0,
       })
       // 处理合集关联变更
-      const articleId = route.params.id as string
       const newCollectionId = selectedCollectionId.value
       const oldCollectionId = originalCollectionId.value
 
