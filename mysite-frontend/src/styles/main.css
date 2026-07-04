@@ -128,8 +128,7 @@
       background-color 400ms var(--ease-out),
       color 400ms var(--ease-out),
       border-color 400ms var(--ease-out),
-      box-shadow 400ms var(--ease-out),
-      backdrop-filter 400ms var(--ease-out) !important;
+      box-shadow 400ms var(--ease-out) !important;
   }
 
   @media (prefers-reduced-motion: reduce) {

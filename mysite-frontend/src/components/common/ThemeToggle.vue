@@ -12,6 +12,16 @@ const menuStyle = ref<Record<string, string>>({})
 
 const uniqueThemes = THEME_REGISTRY.filter(t => !t.id.includes('-dark') || t.group === 'glass')
 
+function isThemeActive(theme: (typeof THEME_REGISTRY)[number]): boolean {
+  if (currentTheme.value === theme.id) return true
+  // For themes with a dark variant, show as active when the dark variant is selected,
+  // but only if the dark variant card isn't also displayed in the grid
+  if (currentTheme.value === theme.darkVariant) {
+    return !uniqueThemes.some(t => t.id === theme.darkVariant)
+  }
+  return false
+}
+
 function handleSelect(id: ThemeId) {
   setTheme(id)
   open.value = false
@@ -119,10 +129,10 @@ onUnmounted(() => {
               :key="theme.id"
               @click="handleSelect(theme.id)"
               role="menuitem"
-              :aria-current="currentTheme === theme.id || currentTheme === theme.darkVariant ? 'true' : undefined"
+              :aria-current="isThemeActive(theme) ? 'true' : undefined"
               class="group flex flex-col items-center gap-1.5 p-2.5 rounded-lg border transition-all duration-200 hover:scale-[1.02]"
               :class="[
-                currentTheme === theme.id || currentTheme === theme.darkVariant
+                isThemeActive(theme)
                   ? 'border-accent bg-accent-subtle'
                   : 'border-border hover:border-accent/40'
               ]"
@@ -140,7 +150,7 @@ onUnmounted(() => {
                 {{ theme.name }}
               </span>
               <Check
-                v-if="currentTheme === theme.id || currentTheme === theme.darkVariant"
+                v-if="isThemeActive(theme)"
                 :size="12"
                 class="text-accent"
               />
