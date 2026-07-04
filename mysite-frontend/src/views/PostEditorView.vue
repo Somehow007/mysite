@@ -179,7 +179,7 @@ async function handleSave(isPublish: boolean) {
       return
     }
 
-    if (isEdit.value && route.params.id) {
+    if (editing && articleId) {
       await updateArticle({
         id: articleId,
         title: title.value.trim(),
