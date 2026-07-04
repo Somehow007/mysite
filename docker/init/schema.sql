@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS `t_article` (
     `category_id` BIGINT DEFAULT NULL COMMENT '分类ID',
     `author_id` BIGINT NOT NULL COMMENT '作者ID',
     `published` TINYINT NOT NULL DEFAULT 0 COMMENT '是否发布 0:草稿 1:已发布',
+    `visibility` TINYINT NOT NULL DEFAULT 0 COMMENT '可见性 0:公开 1:仅自己可见',
     `view_count` INT DEFAULT 0 COMMENT '阅读量',
     `favorite_count` INT DEFAULT 0 COMMENT '收藏量',
     `reading_time` INT DEFAULT 0 COMMENT '阅读时间（分钟）',
@@ -94,6 +95,7 @@ CREATE TABLE IF NOT EXISTS `t_article` (
     PRIMARY KEY (`id`),
     KEY `idx_author_id` (`author_id`),
     KEY `idx_published` (`published`),
+    KEY `idx_visibility` (`visibility`),
     KEY `idx_create_time` (`create_time`),
     KEY `idx_category_id` (`category_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文章表';

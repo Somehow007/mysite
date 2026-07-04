@@ -10,6 +10,7 @@ export interface CreateArticleRequest {
   categoryId?: string
   tagIds?: string[]
   published?: number
+  visibility?: number
   collectionId?: string
 }
 
@@ -22,6 +23,7 @@ export interface UpdateArticleRequest {
   categoryId?: string
   tagIds?: string[]
   published?: number
+  visibility?: number
 }
 
 export function getArticles(params?: {

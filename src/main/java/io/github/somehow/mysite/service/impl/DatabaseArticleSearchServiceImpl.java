@@ -64,6 +64,21 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
         Page<ArticleDO> page = new Page<>(requestParam.getCurrent(), requestParam.getSize());
         LambdaQueryWrapper<ArticleDO> queryWrapper = Wrappers.<ArticleDO>lambdaQuery()
                 .eq(ArticleDO::getDelFlag, 0);
+
+        // 可见性过滤：非 Developer 用户只能看到公开文章或自己的私有文章
+        String currentUserId = UserContext.getUserId();
+        boolean isDev = UserContext.isDeveloper();
+        if (!isDev) {
+            if (currentUserId != null) {
+                queryWrapper.and(w -> w
+                        .eq(ArticleDO::getVisibility, 0)
+                        .or()
+                        .eq(ArticleDO::getAuthorId, Long.parseLong(currentUserId)));
+            } else {
+                queryWrapper.eq(ArticleDO::getVisibility, 0);
+            }
+        }
+
         if (requestParam.getPublished() != null) {
             queryWrapper.eq(ArticleDO::getPublished, requestParam.getPublished());
         }
@@ -202,6 +217,7 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
                     dto.setFavoriteCount(article.getFavoriteCount());
                     dto.setReadingTime(article.getReadingTime());
                     dto.setPublished(article.getPublished());
+                    dto.setVisibility(article.getVisibility());
                     dto.setAuthorId(article.getAuthorId());
                     dto.setCreateTime(article.getCreateTime());
                     dto.setUpdateTime(article.getUpdateTime());
@@ -311,7 +327,8 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
     public long count() {
         return articleMapper.selectCount(Wrappers.<ArticleDO>lambdaQuery()
                 .eq(ArticleDO::getDelFlag, 0)
-                .eq(ArticleDO::getPublished, 1));
+                .eq(ArticleDO::getPublished, 1)
+                .eq(ArticleDO::getVisibility, 0));
     }
 
     @Override

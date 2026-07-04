@@ -19,6 +19,7 @@ import {
   MoreHorizontal,
   ChevronLeft,
   ChevronRight,
+  Lock,
 } from 'lucide-vue-next'
 import { getArticles, deleteArticle, batchDeleteArticles } from '@/api/article'
 import { getCategories } from '@/api/category'
@@ -469,6 +470,7 @@ onMounted(() => {
                     <span :class="article.published === 1 ? 'tag tag-published' : 'tag tag-draft'">
                       {{ article.published === 1 ? '已发布' : '草稿' }}
                     </span>
+                    <Lock v-if="article.visibility === 1" :size="12" class="text-amber-500 ml-1" title="仅自己可见" />
                   </div>
                 </div>
               </div>
@@ -483,6 +485,7 @@ onMounted(() => {
               <span :class="article.published === 1 ? 'tag tag-published' : 'tag tag-draft'">
                 {{ article.published === 1 ? '已发布' : '草稿' }}
               </span>
+              <Lock v-if="article.visibility === 1" :size="12" class="text-amber-500 ml-1" title="仅自己可见" />
             </td>
             <td class="col-stats">
               <div class="stats-row">
