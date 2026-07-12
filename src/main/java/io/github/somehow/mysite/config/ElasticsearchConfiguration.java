@@ -7,7 +7,7 @@ import org.springframework.data.elasticsearch.repository.config.EnableElasticsea
 
 @Slf4j
 @Configuration
-@EnableElasticsearchRepositories(basePackages = "io.github.somehow.mysite.dao.mapper")
+@EnableElasticsearchRepositories(basePackages = "io.github.somehow.mysite.elasticsearch.repository")
 @ConditionalOnProperty(prefix = "elasticsearch", name = "enabled", havingValue = "true", matchIfMissing = false)
 public class ElasticsearchConfiguration {
 

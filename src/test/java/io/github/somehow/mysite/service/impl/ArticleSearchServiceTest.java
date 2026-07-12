@@ -1,7 +1,6 @@
 package io.github.somehow.mysite.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import io.github.somehow.mysite.config.ElasticsearchProperties;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.dto.req.article.ArticlePageQueryReqDTO;
 import io.github.somehow.mysite.dto.resp.ArticlePageQueryRespDTO;
@@ -27,9 +26,6 @@ class ArticleSearchServiceTest {
     @Mock
     private DatabaseArticleSearchServiceImpl databaseService;
 
-    @Mock
-    private ElasticsearchProperties elasticsearchProperties;
-
     private ArticlePageQueryReqDTO requestParam;
 
     @BeforeEach
@@ -44,7 +40,6 @@ class ArticleSearchServiceTest {
     @Test
     @DisplayName("ES启用状态测试")
     void testElasticsearchEnabled() {
-        when(elasticsearchProperties.isEnabled()).thenReturn(true);
         when(elasticsearchService.isEnabled()).thenReturn(true);
 
         assertTrue(elasticsearchService.isEnabled(), "ES应该处于启用状态");
@@ -53,7 +48,6 @@ class ArticleSearchServiceTest {
     @Test
     @DisplayName("ES禁用状态测试")
     void testElasticsearchDisabled() {
-        when(elasticsearchProperties.isEnabled()).thenReturn(false);
         when(databaseService.isEnabled()).thenReturn(false);
 
         assertFalse(databaseService.isEnabled(), "ES应该处于禁用状态");

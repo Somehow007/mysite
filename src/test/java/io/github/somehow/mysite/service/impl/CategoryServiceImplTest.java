@@ -89,7 +89,7 @@ class CategoryServiceImplTest {
 
         assertDoesNotThrow(() -> categoryService.createCategory(createReqDTO));
 
-        verify(categoryMapper, times(1)).selectOne(any());
+        verify(categoryMapper, times(2)).selectOne(any());
     }
 
     @Test
@@ -168,7 +168,6 @@ class CategoryServiceImplTest {
     @Test
     void testDeleteCategory_HasChildren_ThrowsException() {
         when(categoryMapper.selectOne(any())).thenReturn(testCategory);
-        when(articleMapper.selectCount(any())).thenReturn(0L);
         when(categoryMapper.selectCount(any())).thenReturn(2L);
 
         assertThrows(ClientException.class, () -> categoryService.deleteCategory(1L));
@@ -179,7 +178,7 @@ class CategoryServiceImplTest {
         List<CategoryDO> categories = Arrays.asList(testCategory);
 
         when(categoryMapper.selectList(any())).thenReturn(categories);
-        when(articleMapper.selectCount(any())).thenReturn(0L);
+        when(articleMapper.selectMaps(any())).thenReturn(Collections.emptyList());
 
         List<CategoryRespDTO> result = categoryService.listCategories();
 
@@ -226,7 +225,7 @@ class CategoryServiceImplTest {
         List<CategoryDO> categories = Arrays.asList(testCategory);
 
         when(categoryMapper.selectList(any())).thenReturn(categories);
-        when(articleMapper.selectCount(any())).thenReturn(0L);
+        when(articleMapper.selectMaps(any())).thenReturn(Collections.emptyList());
 
         List<CategoryRespDTO> result = categoryService.queryCategories(queryReqDTO);
 
@@ -250,12 +249,12 @@ class CategoryServiceImplTest {
         batchReqDTO.setIds(Arrays.asList(1L, 2L));
         batchReqDTO.setStatus(0);
 
-        when(categoryMapper.selectOne(any())).thenReturn(testCategory);
-        when(categoryMapper.updateById(any(CategoryDO.class))).thenReturn(1);
+        when(categoryMapper.selectCount(any())).thenReturn(2L);
+        when(categoryMapper.update(isNull(), any())).thenReturn(1);
 
         assertDoesNotThrow(() -> categoryService.batchUpdateStatus(batchReqDTO));
 
-        verify(categoryMapper, times(2)).updateById(any(CategoryDO.class));
+        verify(categoryMapper, times(1)).update(isNull(), any());
     }
 
     @Test
@@ -300,7 +299,7 @@ class CategoryServiceImplTest {
         List<CategoryDO> categories = Arrays.asList(testCategory, childCategory);
 
         when(categoryMapper.selectList(any())).thenReturn(categories);
-        when(articleMapper.selectCount(any())).thenReturn(0L);
+        when(articleMapper.selectMaps(any())).thenReturn(Collections.emptyList());
 
         List<CategoryRespDTO> result = categoryService.getCategoryTree();
 
@@ -323,7 +322,7 @@ class CategoryServiceImplTest {
         List<CategoryDO> children = Arrays.asList(childCategory);
 
         when(categoryMapper.selectList(any())).thenReturn(children);
-        when(articleMapper.selectCount(any())).thenReturn(0L);
+        when(articleMapper.selectMaps(any())).thenReturn(Collections.emptyList());
 
         List<CategoryRespDTO> result = categoryService.getChildrenByParentId(1L);
 

@@ -27,10 +27,10 @@ class ElasticsearchConfigurationTest {
     }
 
     @Test
-    @DisplayName("默认启用状态测试")
-    void testDefaultEnabled() {
+    @DisplayName("默认禁用状态测试")
+    void testDefaultDisabled() {
         if (elasticsearchProperties != null) {
-            assertTrue(elasticsearchProperties.isEnabled(), "默认应该启用ES");
+            assertFalse(elasticsearchProperties.isEnabled(), "默认应该禁用ES");
         }
     }
 
