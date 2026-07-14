@@ -38,6 +38,48 @@ services:
     networks:
       - mysite-network
 
+  # ============ RAG 新增 ============
+  postgres:
+    container_name: mysite-pgvector
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ragent
+      POSTGRES_PASSWORD: ${RAGENT_PG_PASSWORD:-ragent123}
+      POSTGRES_DB: ragent
+    volumes:
+      - ./pgvector_data:/var/lib/postgresql/data
+      - ./init/ragent-schema.sql:/docker-entrypoint-initdb.d/01-ragent-schema.sql
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - mysite-network
+
+  # Ollama —— 可选，仅当你需要本地模型兜底时启用
+#  ollama:
+#    container_name: mysite-ollama
+#    image: ollama/ollama:latest
+#    restart: unless-stopped
+#    ports:
+#      - "11434:11434"
+#    volumes:
+#      - ./ollama_data:/root/.ollama
+#    environment:
+#      - OLLAMA_KEEP_ALIVE=24h
+#      - OLLAMA_HOST=0.0.0.0
+#    deploy:
+#      resources:
+#        limits:
+#          memory: 8G
+#    networks:
+#      - mysite-network
+#    profiles:
+#      - ollama    # 默认不启动，需要时加 --profile ollama
+
 # volumes:
 #   mysql_data:
 #   redis_data:
