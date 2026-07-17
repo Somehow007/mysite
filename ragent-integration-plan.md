@@ -5,6 +5,9 @@
 > 当前 mysite 代码库实际结构，制定的详细落地计划。
 >
 > 编写日期：2026-07-12
+> 最近修订：2026-07-17 —— 对照仓库现状全面修订：Phase 0 已完成部分如实标注；
+> 修复若干设计问题（路由自注入、对话记忆不闭环、sources 事件无生产者、embedding
+> 维度跨供应商冲突、百炼 rerank 接口格式、双数据源绑定坑等），详见 3.5 节"关键设计决策"。
 
 ---
 
@@ -19,7 +22,9 @@
 7. [Phase 3：RAG 问答核心链路 —— 理解 Agent 的"思考"（第 10-14 天）](#phase-3rag-问答核心链路--理解-agent-的思考)
 8. [Phase 4：前端聊天组件 —— 理解 Agent 的"脸面"（第 15-18 天）](#phase-4前端聊天组件--理解-agent-的脸面)
 9. [Phase 5：知识库管理与部署（第 19-22 天）](#phase-5知识库管理与部署)
-10. [后续扩展路线](#十后续扩展路线)
+10. [学习检查清单（面试可用）](#六学习检查清单面试可用)
+11. [后续扩展路线](#七后续扩展路线)
+12. [关键文件对照表](#八关键文件对照表)
 
 ---
 
@@ -53,46 +58,53 @@
 ### 2.1 已有的基础设施（可直接复用）
 
 ```
-✅ Spring Boot 3.0.7 + Java 17        → Phase 0 升级到 3.5.7
-✅ MyBatis-Plus 3.5.7                  → RAG 实体也用 MyBatis-Plus
-✅ MySQL 8.4 (docker)                  → 博客数据不动，新增 PG 存向量
-✅ Redis 7 (docker)                    → 会话缓存、断路器状态存储
-✅ JWT + Spring Security               → RAG 端点复用现有认证体系
-✅ WebFlux (已引入依赖)                 → SSE 流式响应直接用
-✅ Elasticsearch (条件启用)            → 后期可选开启关键词检索通道
-✅ TransmittableThreadLocal (已引入)   → 异步上下文透传
-✅ PostgreSQL 驱动 (已引入依赖)        → 直接用，只需加 pgvector 扩展
-✅ Hutool 5.8.27                       → 工具类
-✅ Vue 3 + TypeScript + Tailwind CSS   → 聊天组件技术栈一致
-✅ Vite proxy /v1/* → localhost:8081   → 新 API 自动代理
+✅ Spring Boot 3.5.7 + Java 17          → 已升级完成（pom.xml，2026-07 核对）
+✅ MyBatis-Plus 3.5.14                   → 已升级：mybatis-plus-spring-boot3-starter
+                                           + mybatis-plus-jsqlparser（3.5.9+ 分页插件
+                                           拆分为独立模块，必须单独引入，否则分页失效）
+✅ MySQL 8.4 (docker)                    → 博客数据不动，新增 PG 存向量
+✅ Redis 7 (docker)                      → 会话缓存、限流计数、断路器状态存储
+✅ JWT + Spring Security                 → RAG 端点复用现有认证体系
+✅ WebFlux (已引入依赖)                   → SSE 流式响应直接用
+✅ Elasticsearch (条件启用)               → 后期可选开启关键词检索通道
+✅ TransmittableThreadLocal (已引入)      → 异步上下文透传
+✅ PostgreSQL 驱动 + pgvector 0.1.6       → 均已引入 pom.xml
+✅ Hutool 5.8.27                         → 工具类
+✅ Vue 3 + TypeScript + Tailwind CSS     → 聊天组件技术栈一致
+✅ marked 18 / katex / pinia             → 前端 package.json 已有，无需新增
+✅ Vite proxy /v1/* → localhost:8081     → 新 API 自动代理
 ```
 
 ### 2.2 需要新增的
 
 ```
-🔧 PostgreSQL + pgvector 容器           → docker-compose.yml 新增
-🔧 双数据源配置                          → RagentDataSourceConfig.java
-🔧 LLM 调用层 (WebClient/OkHttp)        → ragent/llm/ 包
-🔧 断路器                                → CircuitBreaker.java
+🔧 PostgreSQL + pgvector 容器           → 已加入 docker-compose.yml ✅（ollama 段已注释预留）
+🔧 双数据源配置                          → PrimaryDataSourceConfig（新增，主库 @Primary）
+                                           + ragent/config/RagentDataSourceConfig（骨架已建，待实现）
+                                           ⚠ config/ 下另有一个误建的同名空壳，Phase 2 时删除
+🔧 LLM 调用层 (WebClient)               → ragent/llm/ 包（骨架已建 ✅：7 个接口/类，实现待写）
+🔧 断路器                                → CircuitBreaker.java（骨架已建，待按 1.2.1 实现）
 🔧 向量存储抽象 + pgvector 实现          → ragent/vector/ 包
 🔧 文档分块器                            → ragent/ingestion/ 包
-🔧 RAG 问答服务                          → ragent/service/ 包
+🔧 RAG 问答服务 + 限流器                 → ragent/service/ 包（含 ChatRateLimiter，见 3.7）
 🔧 SSE 流式 Controller                  → ragent/controller/ 包
 🔧 前端聊天浮窗组件                      → components/chat/ 包
-🔧 前端聊天 composable + store           → composables/useChat.ts + stores/chat.ts
+🔧 前端聊天 composable                  → composables/useChat.ts
 ```
 
 ### 2.3 现有代码中需要小幅修改的地方
 
 | 文件 | 修改内容 | 影响范围 |
 |------|---------|---------|
-| `pom.xml` | 升级 Spring Boot 3.0.7→3.5.7，加 pgvector 依赖 | 全局 |
-| `docker/docker-compose.yml` | 新增 postgres + ollama(可选) 服务 | 基础设施 |
+| `pom.xml` | ✅ 已完成：Spring Boot 3.5.7、MyBatis-Plus 3.5.14（boot3 starter + jsqlparser）、pgvector 0.1.6 | 全局 |
+| `docker/docker-compose.yml` | ✅ 已完成：postgres 服务（ollama 段已注释预留） | 基础设施 |
+| `application.yaml` | 部分完成：`rag.datasource` 已配；llm providers 需按 Step 0.4 修订（删 first-packet-timeout、embedding 锁定说明、新增 rate-limit 段） | 配置 |
+| `MysiteApplication.java` | `@MapperScan` 增加 `sqlSessionFactoryRef`（双数据源消歧，见 2.1） | 启动类 |
+| `config/RagentDataSourceConfig.java` | 删除误建空壳（正确位置在 `ragent/config/`） | 清理 |
+| `config/PrimaryDataSourceConfig.java` | 新增：主数据源显式声明 + `@Primary`（见 2.1） | 数据源 |
 | `WebSecurityConfig.java` | `/v1/rag/chat/stream` 加入 permitAll 列表 | 安全配置 |
-| `MysiteApplication.java` | 无需修改（新包自动扫描，用现有 `@MapperScan` 互补） | 无 |
-| `application.yaml` | 新增 `rag.*` 配置段 | 配置 |
 | `ArticleServiceImpl.java` | 发布/更新文章后发布 Spring Event | 事件发布 |
-| `app/router/index.ts` | 添加 `/dashboard/knowledge` 路由 | 前端路由 |
+| `app/router/index.ts` | 添加 `/dashboard/knowledge` 路由（Phase 5） | 前端路由 |
 | `DefaultLayout.vue` | 嵌入 `<ChatWidget />` 浮窗组件 | 全局布局 |
 
 ---
@@ -104,7 +116,8 @@
 ```
 src/main/java/io/github/somehow/mysite/
 │
-├── config/                    # ★ 修改：加 RagentDataSourceConfig
+├── config/                    # ★ 修改：删除误建的 RagentDataSourceConfig 空壳，
+│                              #        新增 PrimaryDataSourceConfig（主库 @Primary）
 ├── controller/                # 不变
 ├── service/                   # ★ 微小修改：ArticleServiceImpl 发事件
 ├── dao/                       # 不变（Blog 实体 + Mapper）
@@ -120,12 +133,13 @@ src/main/java/io/github/somehow/mysite/
     │
     ├── llm/                                  # LLM 抽象层
     │   ├── LLMService.java                   # 统一聊天接口
-    │   ├── EmbeddingService.java             # 统一嵌入接口
-    │   ├── RerankService.java               # 统一重排序接口
+    │   ├── LLMProvider.java                  # 供应商标记接口（防路由自注入，见 1.2.5）
+    │   ├── EmbeddingService.java             # 统一嵌入接口（锁定百炼，不降级，见 1.2.7）
+    │   ├── RerankService.java               # 统一重排序接口（百炼原生格式，见 3.2）
     │   ├── RoutingLLMService.java           # 模型路由器
     │   ├── CircuitBreaker.java              # 三态断路器
-    │   ├── ChatRequest.java                 # 聊天请求 DTO
-    │   ├── ChatResponse.java               # 聊天响应 DTO
+    │   ├── ChatRequest.java                 # 聊天请求 DTO（含 ChatMessage）
+    │   ├── ChatEvent.java                   # SSE 事件模型（meta/sources/content/error/done）
     │   └── provider/
     │       ├── AbstractOpenAIProvider.java   # OpenAI 兼容基类
     │       ├── BaiLianProvider.java          # 阿里百炼
@@ -154,6 +168,7 @@ src/main/java/io/github/somehow/mysite/
     │
     ├── service/                               # RAG 业务服务
     │   ├── RagChatService.java              # RAG 问答核心服务
+    │   ├── ChatRateLimiter.java             # 成本保护：IP 限流 + 长度上限（见 3.7）
     │   ├── KnowledgeBaseService.java        # 知识库管理
     │   └── KnowledgeDocumentService.java    # 文档管理
     │
@@ -199,14 +214,14 @@ src/main/java/io/github/somehow/mysite/
 │ └──────────────────────────────────────────────────────┘ │
 │         │                                                 │
 │         │ EventSource GET /v1/rag/chat/stream            │
-│         │ ?q=...&conversationId=...                       │
+│         │ ?q=...&conversationId=...&visitorId=...         │
 └─────────┼─────────────────────────────────────────────────┘
           │
           ▼
 ┌──────────────────────────────────────────────────────────┐
 │ RagChatController.chatStream()                            │
-│   ├── 1. 从 JWT/SecurityContext 获取当前用户               │
-│   └── 2. 调用 ragChatService.chat(request)                 │
+│   ├── 1. 从请求取 visitorId + 客户端 IP（限流用）          │
+│   └── 2. 调用 ragChatService.chat(q, convId, visitorId, ip)│
 └─────────┬────────────────────────────────────────────────┘
           │
           ▼
@@ -216,7 +231,7 @@ src/main/java/io/github/somehow/mysite/
 │   Step 1: 加载对话记忆                                    │
 │   ┌──────────────────────────────────────┐               │
 │   │ ConversationManager.loadHistory()    │               │
-│   │ └── MySQL t_conversation_message     │               │
+│   │ └── PG t_conversation_message        │               │
 │   │     查询最近 6 轮对话                  │               │
 │   └──────────────────────────────────────┘               │
 │         │                                                 │
@@ -230,7 +245,7 @@ src/main/java/io/github/somehow/mysite/
 │   Step 3: 向量检索                                        │
 │   ┌──────────────────────────────────────┐               │
 │   │ RetrievalEngine.retrieve()           │               │
-│   │ ├── PgVectorStore.search(            │               │
+│   │ ├── PgvectorVectorStore.search(      │               │
 │   │ │     embedding, topK=10)            │               │
 │   │ │   └── PostgreSQL:                  │               │
 │   │ │       SELECT ... FROM               │               │
@@ -281,24 +296,26 @@ src/main/java/io/github/somehow/mysite/
 │   │ │   └── SSE 流式解析 → Flux<String>  │               │
 │   │ │                                    │               │
 │   │ └── 如果百炼挂了：                    │               │
-│   │     ├── SiliconFlow GLM-4.7 (P2)    │               │
-│   │     └── AIHubMix gpt-5.4 (P3)      │               │
+│   │     ├── SiliconFlow (P2)             │               │
+│   │     └── AIHubMix (P3)                │               │
+│   │     （型号以实施时实际可用为准）        │               │
 │   └──────────────────────────────────────┘               │
 │         │                                                 │
 │   Step 6: 保存对话记录                                    │
 │   ┌──────────────────────────────────────┐               │
 │   │ ConversationManager.saveMessage()    │               │
-│   │ └── MySQL t_conversation_message     │               │
+│   │ └── PG t_conversation_message        │               │
 │   └──────────────────────────────────────┘               │
 │                                                           │
 │   返回: SseEmitter (Spring MVC) / Flux<ServerSentEvent>   │
 └─────────┬─────────────────────────────────────────────────┘
           │
-          ▼  SSE 事件流：data: {"delta":"J","type":"content"}
-                        data: {"delta":"WT","type":"content"}
-                        data: {"delta":"过滤器","type":"content"}
+          ▼  SSE 事件流：data: {"type":"meta","conversationId":123}
+                        data: {"type":"sources","sources":[...]}
+                        data: {"type":"content","delta":"J"}
+                        data: {"type":"content","delta":"WT"}
+                        data: {"type":"content","delta":"过滤器"}
                         ...
-                        data: {"sources":[...],"type":"sources"}
                         data: {"type":"done"}
 ┌──────────────────────────────────────────────────────────┐
 │ ChatStreamWriter.vue                                      │
@@ -315,10 +332,10 @@ src/main/java/io/github/somehow/mysite/
 | 表名 | 用途 | 关键字段 |
 |------|------|---------|
 | `t_knowledge_base` | 知识库定义 | name, collection_name, embedding_model, chunk_size |
-| `t_knowledge_document` | 文档记录 | kb_id, title, source_type(ARTICLE/UPLOAD), status, chunk_count |
+| `t_knowledge_document` | 文档记录 | kb_id, title, source_type(ARTICLE/UPLOAD), status, fail_reason, chunk_count |
 | `t_knowledge_chunk` | 文档分块 | doc_id, chunk_index, content, char_count |
 | `t_knowledge_vector` | 向量数据 | chunk_id, embedding vector(1024), HNSW 索引 |
-| `t_conversation` | 对话会话 | user_id, title, message_count |
+| `t_conversation` | 对话会话 | user_id(可空), visitor_id, title, message_count |
 | `t_conversation_message` | 对话消息 | conversation_id, role(USER/ASSISTANT), content, sources(JSONB) |
 
 ### 3.4 数据库新增表概览（MySQL，0 张表）
@@ -327,6 +344,30 @@ src/main/java/io/github/somehow/mysite/
 
 **为什么连对话也存 PG？** 保持 RAG 模块的数据独立性 — 如果未来要拆成独立服务，PG 数据是自包含的。
 
+### 3.5 关键设计决策（2026-07-17 修订时明确）
+
+以下几条是修订时发现原方案会导致启动失败 / 功能不闭环 / 成本失控的地方，
+先在这里给结论，后文各 Phase 有对应落地细节：
+
+1. **Embedding 不做多供应商降级**：向量检索要求查询向量与入库向量**同模型、同维度**。
+   各供应商 embedding 维度不同（百炼 text-embedding-v4 = 1024，text-embedding-3-small = 1536），
+   降级后往 `vector(1024)` 列里插直接报错。因此 embedding 锁定百炼 text-embedding-v4；
+   更换 embedding 模型 = 全量重建向量，属于运维操作而非运行时降级。
+2. **流式降级边界**：只有"**尚未输出任何 token**"时才允许降级到下一个供应商；
+   一旦已有 token 输出，失败直接给前端发 error 事件
+   （否则用户会看到两段拼接的回答）。见 1.2.6。
+3. **匿名会话 + visitorId**：聊天端点 permitAll（读者无需登录即可提问），
+   会话用前端生成并存于 localStorage 的 visitorId（UUID）归属，
+   后端校验会话归属防 IDOR；登录用户后续可再绑定 user_id。见 3.3、3.5、Phase 4。
+4. **成本保护必须前置**：permitAll + 付费 LLM API 意味着任何人都能烧你的额度。
+   IP 限流（Redis 计数）+ 问题长度上限是 Phase 3 的必做项，不是优化项。见 3.7。
+5. **Rerank 不套用 OpenAI 兼容基类**：百炼 gte-rerank 走 DashScope 原生接口
+   （compatible-mode 不含 rerank），请求/响应格式不同，需单独实现
+   BaiLianRerankProvider；rerank 固定使用主供应商，不做跨供应商降级。见 3.2。
+6. **sources / conversationId 走正式 SSE 事件**：`RagChatService` 返回
+   `Flux<ChatEvent>`（meta/sources/content/error/done 五种事件），而不是裸 token 流，
+   否则"引用来源"和"会话 ID 回传"无处安放。见 3.5、3.6。
+
 ---
 
 ## Phase 0：开发环境准备
@@ -334,20 +375,18 @@ src/main/java/io/github/somehow/mysite/
 > **目标**：基础设施就绪，Spring Boot 升级完成，编译通过。
 > **预计时间**：1-2 天（业余时间）
 > **验收标准**：`./mvnw compile` + `./mvnw test` 全部通过
+>
+> **进度（2026-07-17 核对）**：
+> - Step 0.1 ✅ 已完成（pom.xml 已是 Spring Boot 3.5.7 + MyBatis-Plus 3.5.14）
+> - Step 0.2 postgres 服务 ✅ 已加入 docker-compose.yml（ollama 段已注释预留）；schema SQL 待按本文创建
+> - Step 0.3 ✅ 已完成（pgvector 0.1.6 已在 pom.xml）
+> - Step 0.4 `rag.datasource` 段 ✅ 已配；llm providers 段需按本文修订
 
-### Step 0.1：升级 Spring Boot 3.0.7 → 3.5.7
+### Step 0.1：升级 Spring Boot → 3.5.7 ✅ 已完成
 
-**文件**：`pom.xml`
+**文件**：`pom.xml`（现状已到位，无需再改）
 
 ```xml
-<!-- 修改前 -->
-<parent>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-parent</artifactId>
-    <version>3.0.7</version>
-</parent>
-
-<!-- 修改后 -->
 <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
@@ -355,14 +394,14 @@ src/main/java/io/github/somehow/mysite/
 </parent>
 ```
 
-**需要同步调整的依赖**：
+**已同步调整的依赖**（历史记录，供追溯）：
 
-| 依赖 | 当前版本 | 调整 |
-|------|---------|------|
-| `mybatis-plus-boot-starter` | 3.5.7 | **升级到 3.5.14**（Spring Boot 3.5.x 兼容） |
-| `knife4j-openapi3-jakarta-spring-boot-starter` | 4.5.0 | 可不动，Spring Boot 3.5.x 兼容 |
-| `mysql-connector-j` | managed | 不用动，Spring Boot 管理版本 |
-| `postgresql` | managed | 不用动 |
+| 依赖 | 调整 | 说明 |
+|------|------|------|
+| `mybatis-plus-spring-boot3-starter` | 升级到 3.5.14 | 注意 artifact 名：Spring Boot 3 必须用 `mybatis-plus-spring-boot3-starter`，`mybatis-plus-boot-starter` 是 Boot 2 的 |
+| `mybatis-plus-jsqlparser` | 3.5.14，单独引入 | **3.5.9+ 起分页插件（JSqlParser）拆成独立模块**，不单独引入则 `PaginationInnerInterceptor` 类找不到、分页静默失效。`DataBaseConfiguration` 里配了分页插件，这个依赖不能少 |
+| `knife4j-openapi3-jakarta-spring-boot-starter` | 4.5.0 不动 | 与 Spring Boot 3.5.x 兼容；升级后打开 /doc.html 验证过一次 |
+| `mysql-connector-j` / `postgresql` | managed | Spring Boot 管理版本 |
 
 **验证命令**：
 ```bash
@@ -370,13 +409,13 @@ src/main/java/io/github/somehow/mysite/
 ./mvnw test      # 必须通过
 ```
 
-**可能遇到的问题**：
-- MyBatis-Plus 3.5.7 在 Spring Boot 3.5.x 上可能有兼容问题 → 升级到 3.5.14
-- 如有编译错误，查看具体是哪个依赖版本不兼容 → 逐依赖调整
+> 注：升级带来的兼容问题（MyBatis-Plus 旧版、JSqlParser 拆分）已在升级时处理完毕，
+> 此处仅保留验证命令作为回归基线。
 
-### Step 0.2：Docker 环境新增 PostgreSQL + pgvector
+### Step 0.2：Docker 环境新增 PostgreSQL + pgvector（compose ✅ 已含，schema 待建）
 
-**文件**：`docker/docker-compose.yml`，在 `services:` 下新增：
+**文件**：`docker/docker-compose.yml` —— postgres 服务已在其中（ollama 段已注释预留，
+需要本地模型兜底时取消注释即可）。配置参考：
 
 ```yaml
   # ============ RAG 新增 ============
@@ -450,10 +489,13 @@ CREATE TABLE IF NOT EXISTS t_knowledge_document (
     source_type VARCHAR(20) NOT NULL,
     source_ref VARCHAR(500),
     file_type VARCHAR(20),
-    status VARCHAR(20) DEFAULT 'PENDING',
+    status VARCHAR(20) DEFAULT 'PENDING',   -- PENDING/CHUNKING/READY/FAILED
+    fail_reason TEXT,                        -- 摄取失败原因（embedding API 挂了就记录在这里）
     chunk_count INT DEFAULT 0,
     char_count INT DEFAULT 0,
-    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- 同一来源只对应一份文档，防止并发的创建/更新事件插入重复记录
+    CONSTRAINT uk_doc_source UNIQUE (kb_id, source_type, source_ref)
 );
 
 -- 分块
@@ -485,11 +527,14 @@ CREATE INDEX IF NOT EXISTS idx_vector_embedding ON t_knowledge_vector
 -- 对话会话
 CREATE TABLE IF NOT EXISTS t_conversation (
     id BIGINT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
+    user_id BIGINT,                          -- 可空：匿名聊天不强制登录（见 3.5 节决策 3）
+    visitor_id VARCHAR(64),                  -- 匿名访客标识（前端 localStorage UUID），防 IDOR
     title VARCHAR(200),
     message_count INT DEFAULT 0,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    -- 注意：PG 没有 MySQL 的 ON UPDATE CURRENT_TIMESTAMP，
+    -- update_time 由应用层（MyBatis-Plus 填充或 service 显式 set）维护
 );
 
 -- 对话消息
@@ -509,6 +554,7 @@ CREATE INDEX IF NOT EXISTS idx_chunk_kb_id ON t_knowledge_chunk(kb_id);
 CREATE INDEX IF NOT EXISTS idx_vector_chunk_id ON t_knowledge_vector(chunk_id);
 CREATE INDEX IF NOT EXISTS idx_vector_kb_id ON t_knowledge_vector(kb_id);
 CREATE INDEX IF NOT EXISTS idx_conv_user_id ON t_conversation(user_id);
+CREATE INDEX IF NOT EXISTS idx_conv_visitor_id ON t_conversation(visitor_id);
 CREATE INDEX IF NOT EXISTS idx_conv_msg_conv_id ON t_conversation_message(conversation_id);
 ```
 
@@ -525,9 +571,9 @@ docker compose -f docker/docker-compose.yml --profile ollama up -d ollama
 docker exec mysite-ollama ollama pull qwen3:8b
 ```
 
-### Step 0.3：引入 pgvector JDBC 依赖
+### Step 0.3：引入 pgvector JDBC 依赖 ✅ 已完成
 
-**文件**：`pom.xml`，在 `<dependencies>` 中新增：
+**文件**：`pom.xml`（已存在，无需再改）：
 
 ```xml
 <!-- pgvector JDBC 支持 (MyBatis-Plus 原生 SQL 操作向量) -->
@@ -557,31 +603,33 @@ rag:
       maximum-pool-size: 5
       minimum-idle: 1
 
-  # LLM 供应商配置（优先级从高到低）
+  # LLM 供应商配置（chat 按优先级降级；embedding/rerank 锁定百炼，见 3.5 节决策 1/5）
   llm:
     providers:
       # P1: 阿里百炼 —— 国内首选，延迟低，中文能力强
+      # chat + embedding + rerank 都走它
       bailian:
         enabled: true
         priority: 1
         base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
         api-key: ${BAILIAN_API_KEY:}
         chat-model: qwen3-max
-        embedding-model: text-embedding-v4
-        rerank-model: gte-rerank
+        embedding-model: text-embedding-v4   # 1024 维，与 PG vector(1024) 绑定；更换 = 全量重建向量
+        rerank-model: gte-rerank             # 走 DashScope 原生接口，非 OpenAI 兼容（见 3.2）
         chat-timeout: 120s
         embedding-timeout: 30s
 
       # P2: SiliconFlow —— 备选，模型选择丰富
+      # 降级供应商只接管 chat，故意不配 embedding-model：
+      # 维度与百炼不一致（如 bge-large-zh 也是 1024 但语义空间不同），
+      # 查询与入库的向量必须出自同一模型，embedding 降级没有意义（见 3.5 节决策 1）
       siliconflow:
         enabled: false
         priority: 2
         base-url: https://api.siliconflow.cn/v1
         api-key: ${SILICONFLOW_API_KEY:}
-        chat-model: glm-4.7
-        embedding-model: BAAI/bge-large-zh-v1.5
+        chat-model: glm-4.7        # 型号以实施时实际可用为准
         chat-timeout: 120s
-        embedding-timeout: 30s
 
       # P3: AIHubMix —— 国际模型代理
       aihubmix:
@@ -589,27 +637,22 @@ rag:
         priority: 3
         base-url: https://aihubmix.com/v1
         api-key: ${AIHUBMIX_API_KEY:}
-        chat-model: gpt-5.4
-        embedding-model: text-embedding-3-small
+        chat-model: gpt-5.4        # 型号以实施时实际可用为准
         chat-timeout: 120s
-        embedding-timeout: 30s
 
-      # P9: 本地 Ollama —— 最低优先级兜底
+      # P9: 本地 Ollama —— 最低优先级兜底（仅 chat）
       ollama:
         enabled: false
         priority: 9
         base-url: http://localhost:11434/v1
         api-key: ""
         chat-model: qwen3:8b
-        embedding-model: qwen3-embedding
         chat-timeout: 180s
-        embedding-timeout: 60s
 
     # 断路器全局参数
     circuit-breaker:
       failure-threshold: 2       # 连续失败 N 次 → 熔断
       cooldown-seconds: 30       # 熔断后冷却 N 秒 → 半开
-      first-packet-timeout: 60   # 首包探测超时（秒）
 
   # 分块参数
   chunk:
@@ -629,6 +672,12 @@ rag:
     summary-turns: 10
     summary-enabled: false   # Phase 3 先不做摘要，保持简单
 
+  # 成本保护（必做项，见 3.5 节决策 4 与 3.7 节）：
+  # 聊天端点 permitAll，不限流任何人都能烧你的付费 API 额度
+  rate-limit:
+    max-per-hour: 20           # 每 IP 每小时最多提问次数
+    max-question-length: 500   # 单次问题最大字符数
+
   # 异步线程池
   async:
     core-pool-size: 2
@@ -636,7 +685,113 @@ rag:
     queue-capacity: 100
 ```
 
-### Step 0.5：获取百炼 API Key
+### Step 0.5：`RagProperties` 配置类（被 Phase 1/2/3 共享）
+
+后续很多组件都会读取 `rag.*` 配置（断路器参数、供应商列表、限流阈值等）。
+建一个统一的 `@ConfigurationProperties` 类收口，避免各组件自己解析 yaml。
+
+```java
+package io.github.somehow.mysite.ragent.config;
+
+import lombok.Data;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
+
+@Data
+@Component
+@ConfigurationProperties(prefix = "rag")
+public class RagProperties {
+
+    private DatasourceProperties datasource = new DatasourceProperties();
+    private LlmProperties llm = new LlmProperties();
+    private ChunkProperties chunk = new ChunkProperties();
+    private RetrievalProperties retrieval = new RetrievalProperties();
+    private MemoryProperties memory = new MemoryProperties();
+    private AsyncProperties async = new AsyncProperties();
+    private RateLimitProperties rateLimit = new RateLimitProperties();
+
+    public boolean isProviderEnabled(String name) {
+        Provider p = llm.getProviders().get(name);
+        return p != null && p.isEnabled();
+    }
+
+    public int getProviderPriority(String name) {
+        Provider p = llm.getProviders().get(name);
+        return p != null ? p.getPriority() : Integer.MAX_VALUE;
+    }
+
+    public CircuitBreakerProperties getCircuitBreaker() {
+        return llm.getCircuitBreaker();
+    }
+
+    @Data public static class DatasourceProperties {
+        private String driverClassName;
+        private String url;
+        private String username;
+        private String password;
+    }
+
+    @Data public static class LlmProperties {
+        private Map<String, Provider> providers = new HashMap<>();
+        private CircuitBreakerProperties circuitBreaker = new CircuitBreakerProperties();
+    }
+
+    @Data public static class Provider {
+        private boolean enabled;
+        private int priority;
+        private String baseUrl;
+        private String apiKey;
+        private String chatModel;
+        private String embeddingModel;
+        private String rerankModel;
+        private Duration chatTimeout = Duration.ofSeconds(120);
+        private Duration embeddingTimeout = Duration.ofSeconds(30);
+    }
+
+    @Data public static class CircuitBreakerProperties {
+        private int failureThreshold = 2;
+        private long cooldownSeconds = 30;
+    }
+
+    @Data public static class ChunkProperties {
+        private int size = 800;
+        private int overlap = 100;
+        private int maxChunksPerDoc = 50;
+    }
+
+    @Data public static class RetrievalProperties {
+        private int topK = 10;
+        private int rerankTopK = 5;
+        private double scoreThreshold = 0.3;
+    }
+
+    @Data public static class MemoryProperties {
+        private int keepTurns = 6;
+        private int summaryTurns = 10;
+        private boolean summaryEnabled = false;
+    }
+
+    @Data public static class AsyncProperties {
+        private int corePoolSize = 2;
+        private int maxPoolSize = 4;
+        private int queueCapacity = 100;
+    }
+
+    @Data public static class RateLimitProperties {
+        private int maxPerHour = 20;
+        private int maxQuestionLength = 500;
+    }
+}
+```
+
+> 提示：`spring-boot-configuration-processor` 由 `spring-boot-starter-parent` 自带，
+> 写好这个类后可以在 IDE 里享受到 yaml 自动补全。
+
+### Step 0.6：获取百炼 API Key
 
 1. 访问 [阿里云百炼控制台](https://bailian.console.aliyun.com/)
 2. 开通百炼服务（有免费额度）
@@ -648,11 +803,15 @@ export BAILIAN_API_KEY="sk-xxxxxxxx"
 
 ### Phase 0 验收清单
 
-- [ ] `./mvnw compile` 通过
-- [ ] `./mvnw test` 通过
+- [x] `./mvnw compile` 通过
+- [x] `./mvnw test` 通过
+- [x] postgres 服务已加入 docker-compose.yml（ollama 段注释预留）
+- [ ] `docker/init/ragent-schema.sql` 按本文（含 visitor_id / fail_reason / 唯一约束）创建
 - [ ] `docker compose up -d postgres` 成功
 - [ ] `docker exec mysite-pgvector psql -U ragent -d ragent -c "\dt"` 显示 6 张表
+- [ ] 创建 `RagProperties.java` 与 `application.yaml` 结构对应
 - [ ] `BAILIAN_API_KEY` 环境变量已设置
+- [ ] application.yaml 按 Step 0.4 修订（删 first-packet-timeout、加 rate-limit 段、非百炼供应商删 embedding-model）
 - [ ] 打 git tag: `git tag pre-ragent-integration`
 
 ---
@@ -663,6 +822,11 @@ export BAILIAN_API_KEY="sk-xxxxxxxx"
 > **预计时间**：3-5 天
 > **学习重点**：OpenAI 兼容协议、SSE 流式解析、断路器模式、WebClient 非阻塞调用
 > **验收标准**：写一个 main 方法或单元测试，能调用百炼 `qwen3-max` 做一次对话并打印回复。
+>
+> **进度（2026-07-17 核对）**：`ragent/llm/` 骨架已建（LLMService / EmbeddingService /
+> RerankService / ChatRequest / ChatResponse / CircuitBreaker / RoutingLLMService 均为空壳），
+> `ragent/config/` 两个配置类为空壳，`KnowledgeBaseDO` 已建。按本节实现填充即可
+> （ChatResponse 不需要，可删；ChatMessage 并入 ChatRequest.java）。
 
 ### 1.1 理解：为什么需要抽象层？
 
@@ -721,7 +885,8 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public class CircuitBreaker {
 
-    private enum State { CLOSED, OPEN, HALF_OPEN }
+    /** public：路由器的健康检查（getHealthStatus）需要向外部暴露这个类型 */
+    public enum State { CLOSED, OPEN, HALF_OPEN }
 
     private final String name;
     private final int failureThreshold;      // 连续失败 N 次 → 熔断
@@ -770,13 +935,14 @@ public class CircuitBreaker {
 
     /** 调用失败后回调 */
     public void recordFailure() {
-        int failures = consecutiveFailures.incrementAndGet();
-        if (failures >= failureThreshold) {
+        // HALF_OPEN 状态下的失败：探测没通过，直接重新熔断并重新计时
+        if (state.get() == State.HALF_OPEN) {
             state.set(State.OPEN);
             openedAt = System.currentTimeMillis();
+            return;
         }
-        // HALF_OPEN 状态下的失败：直接回到 OPEN
-        if (state.get() == State.HALF_OPEN) {
+        int failures = consecutiveFailures.incrementAndGet();
+        if (failures >= failureThreshold) {
             state.set(State.OPEN);
             openedAt = System.currentTimeMillis();
         }
@@ -859,7 +1025,7 @@ public class ChatRequest {
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-class ChatMessage {
+public class ChatMessage {   // 必须 public：core/memory、core/prompt、service 包都要引用它
     private String role;     // "system" / "user" / "assistant"
     private String content;
 
@@ -1019,14 +1185,36 @@ public abstract class AbstractOpenAIProvider implements LLMService {
 }
 ```
 
-#### 1.2.5 各供应商实现（只需提供 baseUrl + apiKey + model）
+#### 1.2.5 `LLMProvider` 标记接口与各供应商实现
+
+**为什么需要这个标记接口？** 下一节的 `RoutingLLMService` 本身也 `implements LLMService`，
+如果它的构造函数注入 `List<LLMService>`，Spring 会把路由器**自己也放进这个 List**，
+形成循环依赖，启动直接失败。让真正的供应商实现 `LLMProvider`，路由器只注入
+`List<LLMProvider>`，自注入问题就没了。
+
+```java
+package io.github.somehow.mysite.ragent.llm;
+
+/**
+ * 供应商标记接口 —— 只有"真正的 LLM 供应商实现"才实现它。
+ * RoutingLLMService 注入 List<LLMProvider> 而不是 List<LLMService>，
+ * 避免把自己（也是 LLMService）注入进来造成循环依赖。
+ */
+public interface LLMProvider extends LLMService {
+
+    /** 供应商标识，与配置 rag.llm.providers.{name} 对应，如 "bailian" */
+    String getName();
+}
+```
+
+各供应商实现（只需提供 baseUrl + apiKey + model + name）：
 
 ```java
 // === 百炼（阿里云）—— 国内首选 ===
 // baseUrl 格式：https://dashscope.aliyuncs.com/compatible-mode/v1
 // 文档：https://help.aliyun.com/zh/model-studio/
 @Component
-public class BaiLianProvider extends AbstractOpenAIProvider {
+public class BaiLianProvider extends AbstractOpenAIProvider implements LLMProvider {
     public BaiLianProvider(@Value("${rag.llm.providers.bailian.base-url}") String baseUrl,
                            @Value("${rag.llm.providers.bailian.api-key}") String apiKey,
                            @Value("${rag.llm.providers.bailian.chat-model}") String model,
@@ -1034,21 +1222,26 @@ public class BaiLianProvider extends AbstractOpenAIProvider {
                            ObjectMapper objectMapper) {
         super(baseUrl, apiKey, model, timeout, objectMapper);
     }
+
+    @Override
+    public String getName() {
+        return "bailian";
+    }
 }
 
-// === SiliconFlow（硅基流动）—— 备选 ===
+// === SiliconFlow（硅基流动）—— 备选（仅 chat，见 3.5 节决策 1）===
 // baseUrl：https://api.siliconflow.cn/v1
 // 文档：https://docs.siliconflow.cn/
 @Component
-public class SiliconFlowProvider extends AbstractOpenAIProvider {
-    // ... 同上模式
+public class SiliconFlowProvider extends AbstractOpenAIProvider implements LLMProvider {
+    // ... 同上模式，getName() 返回 "siliconflow"
 }
 
 // === AIHubMix —— 国际模型中转 ===
 // baseUrl：https://aihubmix.com/v1
 @Component
-public class AIHubMixProvider extends AbstractOpenAIProvider {
-    // ... 同上模式
+public class AIHubMixProvider extends AbstractOpenAIProvider implements LLMProvider {
+    // ... 同上模式，getName() 返回 "aihubmix"
 }
 
 // === Ollama 本地 —— 兜底 ===
@@ -1056,8 +1249,8 @@ public class AIHubMixProvider extends AbstractOpenAIProvider {
 // 特点：不需要 apiKey（传空字符串即可）
 // 文档：https://ollama.com/
 @Component
-public class OllamaProvider extends AbstractOpenAIProvider {
-    // ... 同上模式
+public class OllamaProvider extends AbstractOpenAIProvider implements LLMProvider {
+    // ... 同上模式，getName() 返回 "ollama"
 }
 ```
 
@@ -1066,13 +1259,17 @@ public class OllamaProvider extends AbstractOpenAIProvider {
 ```java
 package io.github.somehow.mysite.ragent.llm;
 
-import jakarta.annotation.PostConstruct;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.time.Duration;
-import java.util.*;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 模型路由器 —— Ragent 整体设计的核心。
@@ -1086,43 +1283,74 @@ import java.util.*;
  *
  * 这个类的本质是"责任链 + 策略模式"：每个 Provider 是一个策略，
  * 路由器按优先级串联成降级链。
+ *
+ * 两个关键设计点（2026-07-17 修订）：
+ *   1. 注入 List<LLMProvider> 而不是 List<LLMService> —— 本类自身也是
+ *      LLMService，注入后者会把自己装进 List，形成循环依赖（见 1.2.5）。
+ *   2. 流式降级边界 —— 只在"尚未输出任何 token"时才允许降级；
+ *      一旦已经吐过 token，失败必须直接报错给前端，
+ *      否则用户会看到两段拼起来的回答（见 3.5 节决策 2）。
  */
 @Service
 public class RoutingLLMService implements LLMService {
 
-    private final Map<String, LLMService> providerMap = new HashMap<>();
     private final Map<String, CircuitBreaker> breakers = new ConcurrentHashMap<>();
-    private final RagProperties properties;
-    private List<ProviderEntry> sortedProviders;  // 启动时排序，运行时不变
+    private final List<LLMProvider> sortedProviders;  // 启动时排序，运行时不变
 
-    public RoutingLLMService(List<LLMService> allProviders, RagProperties properties) {
-        this.properties = properties;
-        // 通过 Spring 自动注入所有 LLMService 实现
-        // Bean 名称作为 provider 标识
-    }
-
-    @PostConstruct
-    public void init() {
-        // 按配置的 priority 排序
-        // 只加载 enabled=true 的供应商
-        // 为每个供应商创建独立的 CircuitBreaker
+    public RoutingLLMService(List<LLMProvider> allProviders, RagProperties properties) {
+        // Spring 注入所有 LLMProvider 实现（不含本类自身，见 1.2.5 标记接口）
+        this.sortedProviders = allProviders.stream()
+            .filter(p -> properties.isProviderEnabled(p.getName()))
+            .sorted(Comparator.comparingInt(p -> properties.getProviderPriority(p.getName())))
+            .toList();
+        // 为每个启用的供应商创建独立断路器
+        int threshold = properties.getCircuitBreaker().getFailureThreshold();
+        long cooldown = properties.getCircuitBreaker().getCooldownSeconds();
+        sortedProviders.forEach(p ->
+            breakers.put(p.getName(), new CircuitBreaker(p.getName(), threshold, cooldown)));
     }
 
     @Override
     public Flux<String> chatStream(ChatRequest request) {
-        return Flux.defer(() -> {
-            for (ProviderEntry entry : sortedProviders) {
-                CircuitBreaker cb = breakers.get(entry.name());
-                if (!cb.allowRequest()) {
-                    continue; // 熔断中，跳过
-                }
+        return attempt(sortedProviders.iterator(), request);
+    }
 
-                // 尝试调用，如果失败则尝试下一个
-                // onErrorResume 捕获异常，记录失败，返回空 Flux
-                // Flux.defer 确保每次订阅时重新遍历（不是必须，但是好习惯）
-            }
+    /**
+     * 递归尝试供应商链。
+     *
+     * 成功/失败的记录时机：
+     *   - recordSuccess：流完整结束（doOnComplete）才算成功。
+     *     不能在"发出请求"时就算成功 —— 连接成功但流中途挂掉也应记失败。
+     *   - recordFailure：onErrorResume 时记录。
+     *
+     * 降级边界（重点）：
+     *   emitted 标记当前供应商是否已经输出过 token。
+     *   - 未输出就失败 → 用户还什么都没看到，可以安全降级到下一个供应商
+     *   - 已输出后失败 → 不能降级（否则前端收到两段拼接的回答），直接报错
+     */
+    private Flux<String> attempt(Iterator<LLMProvider> it, ChatRequest request) {
+        if (!it.hasNext()) {
             return Flux.error(new RuntimeException("All LLM providers failed"));
-        });
+        }
+        LLMProvider provider = it.next();
+        CircuitBreaker cb = breakers.get(provider.getName());
+        if (cb != null && !cb.allowRequest()) {
+            return attempt(it, request);  // 熔断中，跳过
+        }
+
+        AtomicBoolean emitted = new AtomicBoolean(false);
+        return provider.chatStream(request)
+            .doOnNext(token -> emitted.set(true))
+            .doOnComplete(cb::recordSuccess)
+            .onErrorResume(e -> {
+                cb.recordFailure();
+                if (emitted.get()) {
+                    // 已经吐过 token：不能降级，直接失败
+                    return Flux.error(e);
+                }
+                // 尚未输出：降级到下一个供应商
+                return attempt(it, request);
+            });
     }
 
     @Override
@@ -1136,8 +1364,8 @@ public class RoutingLLMService implements LLMService {
     /** 获取各供应商健康状态（用于 /actuator 健康检查或 Dashboard） */
     public Map<String, String> getHealthStatus() {
         Map<String, String> status = new LinkedHashMap<>();
-        for (ProviderEntry entry : sortedProviders) {
-            status.put(entry.name(), breakers.get(entry.name()).getState().name());
+        for (LLMProvider provider : sortedProviders) {
+            status.put(provider.getName(), breakers.get(provider.getName()).getState().name());
         }
         return status;
     }
@@ -1184,7 +1412,19 @@ public interface EmbeddingService {
 }
 ```
 
-**嵌入服务的实现**同样用 `AbstractOpenAIProvider` 模式——POST `{baseUrl}/embeddings`，请求体：
+**两个约束（2026-07-17 修订，见 3.5 节决策 1）**：
+
+1. **Embedding 不做多供应商降级**：查询向量与入库向量必须同模型、同维度，
+   降级到别的供应商（维度/语义空间不同）只会得到错误结果或直接报维度不匹配。
+   全系统锁定百炼 `text-embedding-v4`（1024 维），实现类做成单 bean
+   （如 `BaiLianEmbeddingService implements EmbeddingService`）。
+2. **`embedBatch` 必须分批调用**：百炼 embedding 接口单次调用有批量上限
+   （text-embedding-v4 为 10 条/次，实施时以官方文档为准），而 `max-chunks-per-doc: 50`，
+   整批 50 条一次发会被拒绝。实现里按上限切成多个子批顺序调用、合并结果。
+
+**嵌入服务的实现**走 OpenAI 兼容的 embeddings 端点（注意：`AbstractOpenAIProvider`
+实现的是 `LLMService`，embedding 需要独立的实现类，不能直接复用它）——
+POST `{baseUrl}/embeddings`，请求体：
 ```json
 {"model": "text-embedding-v4", "input": "今天天气真好"}
 ```
@@ -1233,11 +1473,14 @@ void testBaiLianChat() {
 
 ### Phase 1 验收清单
 
-- [ ] `CircuitBreaker` 的三个状态切换逻辑正确（单元测试覆盖）
+- [ ] `CircuitBreaker` 的三个状态切换逻辑正确（单元测试覆盖，含 HALF_OPEN 探测失败重回 OPEN）
 - [ ] `AbstractOpenAIProvider.chatStream()` 能正确解析 SSE 事件流
 - [ ] 百炼 API 调用成功，流式输出正常
 - [ ] `RoutingLLMService` 按优先级降级逻辑正确
+- [ ] 应用启动无循环依赖（`RoutingLLMService` 注入 `List<LLMProvider>`，不含自身）
+- [ ] 降级边界正确：模拟"首 token 前失败"会降级；模拟"流中途失败"不降级、直接报错
 - [ ] `EmbeddingService.embed()` 能返回正确的向量维度（1024）
+- [ ] `EmbeddingService.embedBatch()` 超过单批上限（10 条）时分批调用且结果顺序正确
 
 ---
 
@@ -1248,7 +1491,7 @@ void testBaiLianChat() {
 > **学习重点**：pgvector 使用、HNSW 索引原理、Markdown 分块策略、Spring Event 解耦
 > **验收标准**：发布一篇文章后，PG 中能看到对应的 chunks 和 vectors。调用检索 API 能找到相关片段。
 
-### 2.1 双数据源配置 `RagentDataSourceConfig.java`
+### 2.1 双数据源配置 `PrimaryDataSourceConfig` + `RagentDataSourceConfig`
 
 **理解：为什么需要两个数据源？**
 
@@ -1263,7 +1506,74 @@ MySite Application
     └── 管理：知识库、向量、对话记录
 ```
 
-**关键实现**：两个 `SqlSessionFactory`，两个 `TransactionManager`，两个 `@MapperScan` 各自指向不同包。
+**现状与三个必须处理的坑（2026-07-17 修订）**：
+
+1. **主数据源目前是 Spring Boot 自动配置的**，没有 `@Primary`。RAG 数据源一加入，
+   容器里就有两个 `DataSource`，MyBatis-Plus 自动配置等 byType 注入点会报
+   `NoUniqueBeanDefinitionException`。→ 必须显式声明主数据源并加 `@Primary`
+   （声明后 Boot 的 DataSource 自动配置会因 `@ConditionalOnMissingBean` 退避）。
+2. **现有 `@MapperScan` 在 `MysiteApplication.java:8`**（不在 `DataBaseConfiguration`——
+   那个类只配了分页插件和字段填充），且没有指定 `sqlSessionFactoryRef`。
+   两个 `SqlSessionFactory` 并存时按类型查找会冲突。
+   → 主扫描显式指定 `sqlSessionFactoryRef = "sqlSessionFactory"`
+   （这是 MyBatis-Plus 自动配置的 bean 名），RAG 扫描指定 `ragentSqlSessionFactory`。
+3. **`DataSourceBuilder` + `@ConfigurationProperties` 直接绑 `url` 会静默失败**：
+   Hikari 的 URL 属性名是 `jdbcUrl`，`hikari.*` 子属性也绑不上。
+   → 用 `DataSourceProperties` 模式（Boot 官方推荐的多数据源写法），
+   `initializeDataSourceBuilder()` 会自动处理 `url → jdbcUrl` 的转换，
+   连接池细项用第二个 `@ConfigurationProperties("xxx.hikari")` 绑定。
+
+**改动 1：`MysiteApplication.java`**
+
+```java
+// 修改前：@MapperScan("io.github.somehow.mysite.dao.mapper")
+// 修改后：显式绑定主 SqlSessionFactory（MyBatis-Plus 自动配置的 bean 名就是 sqlSessionFactory）
+@MapperScan(basePackages = "io.github.somehow.mysite.dao.mapper",
+            sqlSessionFactoryRef = "sqlSessionFactory")
+```
+
+**改动 2：删除 `config/RagentDataSourceConfig.java` 空壳**（误建的重复类，
+正确位置在 `ragent/config/` 下）。
+
+**改动 3：新增 `config/PrimaryDataSourceConfig.java`**
+
+```java
+package io.github.somehow.mysite.config;
+
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+
+import javax.sql.DataSource;
+
+/**
+ * 主数据源（MySQL，博客数据）显式声明。
+ *
+ * 为什么需要这个类？
+ *   RAG 的 PG 数据源加入后容器里有两个 DataSource，而主数据源原来靠
+ *   Spring Boot 自动配置、没有 @Primary，所有 byType 注入点都会报
+ *   NoUniqueBeanDefinitionException。显式声明 + @Primary 后：
+ *   - Boot 的 DataSource 自动配置退避（@ConditionalOnMissingBean）
+ *   - MyBatis-Plus 自动配置的 sqlSessionFactory 仍会注入这个 @Primary 主库
+ *   - spring.datasource.hikari.* 连接池配置继续生效
+ */
+@Configuration
+public class PrimaryDataSourceConfig {
+
+    @Primary
+    @Bean
+    @ConfigurationProperties("spring.datasource.hikari")  // 保留 yaml 里已有的 hikari 细项
+    public DataSource dataSource(DataSourceProperties properties) {
+        // DataSourceProperties 由 Boot 自动注册（绑定 spring.datasource.*），
+        // initializeDataSourceBuilder() 自动处理 url → jdbcUrl 的转换
+        return properties.initializeDataSourceBuilder().build();
+    }
+}
+```
+
+**改动 4：实现 `ragent/config/RagentDataSourceConfig.java`**（当前为空壳）
 
 ```java
 package io.github.somehow.mysite.ragent.config;
@@ -1271,19 +1581,29 @@ package io.github.somehow.mysite.ragent.config;
 import com.baomidou.mybatisplus.extension.spring.MybatisSqlSessionFactoryBean;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import javax.sql.DataSource;
 
 /**
- * RAG 专用数据源配置。
+ * RAG 专用数据源配置（PostgreSQL + pgvector）。
  *
  * 关键知识点：Spring Boot 多数据源
- *   1. @Primary 标注主数据源（MySQL，已在 DataBaseConfiguration 中配置）
+ *   1. 主数据源见 PrimaryDataSourceConfig（@Primary）
  *   2. 第二数据源需要自己的 DataSource、SqlSessionFactory、TransactionManager
  *   3. @MapperScan 通过 basePackages 把不同包的 Mapper 绑定到不同数据源
- *   4. 这就是为什么 RAG 的 Mapper 全放在 ragent.dao.mapper 包下
+ *   4. 用 DataSourceProperties 而不是直接 @ConfigurationProperties 绑 DataSource ——
+ *      Hikari 的 URL 属性名是 jdbcUrl，直接绑 url 会静默失败、启动才报错
+ *
+ * 注意：手工构建的 ragentSqlSessionFactory 不会自动带上主库 DataBaseConfiguration 里的
+ * MybatisPlusInterceptor（分页插件）和 MetaObjectHandler（字段自动填充）。
+ * RAG 实体保持简单：不做逻辑删除，create_time/update_time 在代码里显式 set。
  */
 @Configuration
 @MapperScan(
@@ -1294,8 +1614,15 @@ public class RagentDataSourceConfig {
 
     @Bean
     @ConfigurationProperties("rag.datasource")
-    public DataSource ragentDataSource() {
-        return DataSourceBuilder.create().build();
+    public DataSourceProperties ragentDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
+    @Bean
+    @ConfigurationProperties("rag.datasource.hikari")
+    public DataSource ragentDataSource(
+            @Qualifier("ragentDataSourceProperties") DataSourceProperties properties) {
+        return properties.initializeDataSourceBuilder().build();
     }
 
     @Bean
@@ -1309,7 +1636,7 @@ public class RagentDataSourceConfig {
     }
 
     @Bean
-    public TransactionManager ragentTransactionManager(
+    public PlatformTransactionManager ragentTransactionManager(
             @Qualifier("ragentDataSource") DataSource dataSource) {
         return new DataSourceTransactionManager(dataSource);
     }
@@ -1342,9 +1669,12 @@ public interface VectorStore {
      * 向量相似度检索
      * @param queryEmbedding 查询向量
      * @param topK 返回 top K 个最相似的
+     * @param kbId 限定知识库（null = 全库检索）。
+     *             现在传 null 即可，但签名先留好 —— 多知识库是近期规划（见 7.1），
+     *             届时再加这个参数就是 breaking change 了
      * @return 检索结果，按相似度降序排列
      */
-    List<SearchResult> search(float[] queryEmbedding, int topK);
+    List<SearchResult> search(float[] queryEmbedding, int topK, Long kbId);
 
     /**
      * 删除指定知识库的所有向量
@@ -1428,7 +1758,8 @@ public class PgvectorVectorStore implements VectorStore {
         try (Connection conn = dataSource.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             for (VectorEntry entry : entries) {
-                ps.setLong(1, generateId());
+                // 主键用 MyBatis-Plus 雪花算法生成（建表无自增序列，与全库 ASSIGN_ID 策略一致）
+                ps.setLong(1, com.baomidou.mybatisplus.core.toolkit.IdWorker.getId());
                 ps.setLong(2, entry.chunkId());
                 ps.setLong(3, entry.kbId());
                 ps.setObject(4, new PGvector(entry.embedding()));
@@ -1442,7 +1773,7 @@ public class PgvectorVectorStore implements VectorStore {
     }
 
     @Override
-    public List<SearchResult> search(float[] queryEmbedding, int topK) {
+    public List<SearchResult> search(float[] queryEmbedding, int topK, Long kbId) {
         String sql = """
             SELECT
                 v.chunk_id,
@@ -1455,6 +1786,7 @@ public class PgvectorVectorStore implements VectorStore {
             JOIN t_knowledge_chunk c ON v.chunk_id = c.id
             JOIN t_knowledge_document d ON c.doc_id = d.id
             WHERE d.status = 'READY'
+              AND (?::bigint IS NULL OR v.kb_id = ?::bigint)
             ORDER BY v.embedding <=> ?::vector
             LIMIT ?
             """;
@@ -1463,8 +1795,16 @@ public class PgvectorVectorStore implements VectorStore {
              PreparedStatement ps = conn.prepareStatement(sql)) {
             PGvector queryVec = new PGvector(queryEmbedding);
             ps.setObject(1, queryVec);
-            ps.setObject(2, queryVec);  // ORDER BY 也用到
-            ps.setInt(3, topK);
+            // kbId 为 null 时不过滤（全库检索），否则限定知识库
+            if (kbId == null) {
+                ps.setNull(2, Types.BIGINT);
+                ps.setNull(3, Types.BIGINT);
+            } else {
+                ps.setLong(2, kbId);
+                ps.setLong(3, kbId);
+            }
+            ps.setObject(4, queryVec);  // ORDER BY 也用到
+            ps.setInt(5, topK);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     results.add(new SearchResult(
@@ -1599,13 +1939,13 @@ public class ArticleEventListener {
 
     private final KnowledgeDocumentService knowledgeDocumentService;
 
-    @Async("ragAsyncExecutor")
+    // 不在这一层加 @Async：异步在 KnowledgeDocumentService.syncArticle 上做，
+    // 双重 @Async 没有收益，还会让异常栈和线程模型变复杂
     @EventListener
     public void handleArticleCreated(ArticleCreatedEvent event) {
         knowledgeDocumentService.syncArticle(event.getArticle());
     }
 
-    @Async("ragAsyncExecutor")
     @EventListener
     public void handleArticleUpdated(ArticleUpdatedEvent event) {
         knowledgeDocumentService.syncArticle(event.getArticle());
@@ -1642,68 +1982,92 @@ import io.github.somehow.mysite.ragent.dao.mapper.*;
 import io.github.somehow.mysite.ragent.ingestion.DocumentChunker;
 import io.github.somehow.mysite.ragent.llm.EmbeddingService;
 import io.github.somehow.mysite.ragent.vector.VectorStore;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Slf4j
 @Service
 public class KnowledgeDocumentService {
 
+    /**
+     * 文章 → 知识库同步（异步执行，不阻塞文章发布）。
+     *
+     * 失败处理（2026-07-17 修订补充）：
+     *   原方案全程无 try/catch —— embedding API 一旦失败，文档记录会永远停在
+     *   CHUNKING 状态，排查时无从知晓原因。现在捕获所有异常：标记 FAILED +
+     *   记录 fail_reason，Dashboard 文档列表可直观看到失败并手动重试
+     *   （重试 = 再次调用本方法，开头的"删旧档"逻辑保证幂等，
+     *   建表 SQL 里的 uk_doc_source 唯一约束兜底并发重复插入）。
+     */
     @Async("ragAsyncExecutor")
     public void syncArticle(ArticleDO article) {
-        // 1. 找到默认知识库（如果没有就创建一个）
-        KnowledgeBaseDO kb = getOrCreateDefaultKb();
+        KnowledgeDocumentDO doc = null;
+        try {
+            // 1. 找到默认知识库（如果没有就创建一个）
+            KnowledgeBaseDO kb = getOrCreateDefaultKb();
 
-        // 2. 检查是否已有该文章的文档记录 → 有则删除旧的向量
-        KnowledgeDocumentDO existingDoc = docMapper.findBySourceRef(
-            kb.getId(), "ARTICLE", article.getId().toString());
-        if (existingDoc != null) {
-            vectorStore.deleteByDocId(existingDoc.getId());
-            chunkMapper.deleteByDocId(existingDoc.getId());
-            docMapper.deleteById(existingDoc.getId());
+            // 2. 检查是否已有该文章的文档记录 → 有则删除旧的向量/分块/文档
+            KnowledgeDocumentDO existingDoc = docMapper.findBySourceRef(
+                kb.getId(), "ARTICLE", article.getId().toString());
+            if (existingDoc != null) {
+                vectorStore.deleteByDocId(existingDoc.getId());
+                chunkMapper.deleteByDocId(existingDoc.getId());
+                docMapper.deleteById(existingDoc.getId());
+            }
+
+            // 3. 创建新文档记录
+            doc = new KnowledgeDocumentDO();
+            doc.setKbId(kb.getId());
+            doc.setTitle(article.getTitle());
+            doc.setSourceType("ARTICLE");
+            doc.setSourceRef(article.getId().toString());
+            doc.setFileType("MD");
+            doc.setStatus("PENDING");
+            docMapper.insert(doc);
+
+            // 4. 分块
+            String content = article.getContent();
+            List<Chunk> chunks = chunker.chunk(content, doc.getId(), kb.getId());
+            doc.setChunkCount(chunks.size());
+            doc.setCharCount(content.length());
+            doc.setStatus("CHUNKING");
+            docMapper.updateById(doc);
+
+            // 5. 批量嵌入（内部按供应商上限分批，见 1.2.7）
+            List<String> chunkTexts = chunks.stream().map(Chunk::content).toList();
+            List<float[]> embeddings = embeddingService.embedBatch(chunkTexts);
+
+            // 6. 存储 chunks + vectors
+            for (int i = 0; i < chunks.size(); i++) {
+                Chunk c = chunks.get(i);
+                KnowledgeChunkDO chunkDO = new KnowledgeChunkDO();
+                chunkDO.setDocId(doc.getId());
+                chunkDO.setKbId(kb.getId());
+                chunkDO.setChunkIndex(c.index());
+                chunkDO.setContent(c.content());
+                chunkDO.setCharCount(c.content().length());
+                chunkMapper.insert(chunkDO);
+
+                vectorStore.insert(List.of(new VectorStore.VectorEntry(
+                    chunkDO.getId(), kb.getId(), embeddings.get(i), kb.getEmbeddingModel()
+                )));
+            }
+
+            // 7. 标记完成
+            doc.setStatus("READY");
+            docMapper.updateById(doc);
+        } catch (Exception e) {
+            // 任何一步失败：标记 FAILED + 记录原因，等下次同步或人工重试
+            log.error("文章向量化失败, articleId={}", article.getId(), e);
+            if (doc != null && doc.getId() != null) {
+                doc.setStatus("FAILED");
+                doc.setFailReason(e.getClass().getSimpleName() + ": " + e.getMessage());
+                docMapper.updateById(doc);
+            }
         }
-
-        // 3. 创建新文档记录
-        KnowledgeDocumentDO doc = new KnowledgeDocumentDO();
-        doc.setKbId(kb.getId());
-        doc.setTitle(article.getTitle());
-        doc.setSourceType("ARTICLE");
-        doc.setSourceRef(article.getId().toString());
-        doc.setFileType("MD");
-        doc.setStatus("PENDING");
-        docMapper.insert(doc);
-
-        // 4. 分块
-        String content = article.getContent();
-        List<Chunk> chunks = chunker.chunk(content, doc.getId(), kb.getId());
-        doc.setChunkCount(chunks.size());
-        doc.setCharCount(content.length());
-        doc.setStatus("CHUNKING");
-        docMapper.updateById(doc);
-
-        // 5. 批量嵌入
-        List<String> chunkTexts = chunks.stream().map(Chunk::content).toList();
-        List<float[]> embeddings = embeddingService.embedBatch(chunkTexts);
-
-        // 6. 存储 chunks + vectors
-        for (int i = 0; i < chunks.size(); i++) {
-            Chunk c = chunks.get(i);
-            KnowledgeChunkDO chunkDO = new KnowledgeChunkDO();
-            chunkDO.setDocId(doc.getId());
-            chunkDO.setKbId(kb.getId());
-            chunkDO.setChunkIndex(c.index());
-            chunkDO.setContent(c.content());
-            chunkDO.setCharCount(c.content().length());
-            chunkMapper.insert(chunkDO);
-
-            vectorStore.insert(List.of(new VectorStore.VectorEntry(
-                chunkDO.getId(), kb.getId(), embeddings.get(i), kb.getEmbeddingModel()
-            )));
-        }
-
-        // 7. 标记完成
-        doc.setStatus("READY");
-        docMapper.updateById(doc);
     }
 }
 ```
@@ -1735,15 +2099,17 @@ void testArticleChunkingAndVectorization() {
         new ArticleCreatedEvent(article));
 
     // 3. 等待异步处理完成
+    //    建议用 Awaitility（await().atMost(10, SECONDS).until(...)）代替 Thread.sleep，
+    //    CI 上 5 秒不一定够，轮询断言更稳
     Thread.sleep(5000);
 
     // 4. 验证：数据库中应该有 chunks 和 vectors
     List<KnowledgeChunkDO> chunks = chunkMapper.selectByDocId(docId);
     Assertions.assertTrue(chunks.size() > 0);
 
-    // 5. 验证：向量检索能找到相关片段
+    // 5. 验证：向量检索能找到相关片段（kbId 传 null = 全库检索）
     float[] queryEmbedding = embeddingService.embed("JWT过滤器怎么配置的？");
-    List<SearchResult> results = vectorStore.search(queryEmbedding, 3);
+    List<SearchResult> results = vectorStore.search(queryEmbedding, 3, null);
     Assertions.assertTrue(results.size() > 0);
     Assertions.assertTrue(results.get(0).content().contains("JWT"));
 }
@@ -1751,12 +2117,15 @@ void testArticleChunkingAndVectorization() {
 
 ### Phase 2 验收清单
 
-- [ ] 双数据源配置正确：`@MapperScan` 各扫各的包
+- [ ] 双数据源配置正确：主库 `@Primary`、两个 `@MapperScan` 各显式指定 `sqlSessionFactoryRef`，启动无 `NoUniqueBeanDefinitionException`
+- [ ] 删除 `config/RagentDataSourceConfig.java` 误建空壳（保留 `ragent/config/` 下的实现）
 - [ ] `MarkdownChunker` 分块：frontmatter 正确去除，overlap 保留
-- [ ] `PgvectorVectorStore.insert()` 向量写入成功
-- [ ] `PgvectorVectorStore.search()` 相似度检索正确（相似内容排前面）
-- [ ] `ArticleEventListener` 异步执行不阻塞文章发布
+- [ ] `PgvectorVectorStore.insert()` 向量写入成功（ID 用 `IdWorker.getId()` 雪花生成）
+- [ ] `PgvectorVectorStore.search()` 相似度检索正确（相似内容排前面；kbId 传 null 全库、传值限定）
+- [ ] `ArticleEventListener` 异步执行不阻塞文章发布（@Async 只在 syncArticle 一层）
 - [ ] 完整链路：发布文章 → 自动分块 → 向量化入库
+- [ ] 失败路径：人为配错 embedding API key 后发布文章，文档状态变为 FAILED 且 fail_reason 有值
+- [ ] 重复发布/更新同一文章不产生重复文档（uk_doc_source 唯一约束生效）
 
 ---
 
@@ -1815,11 +2184,12 @@ public class RetrievalEngine {
      * @return 检索结果，按相关性降序
      */
     public List<SearchResult> retrieve(String question, int topK) {
-        // Stage 1: 向量检索 Top K
+        // Stage 1: 向量检索 Top K（kbId 传 null = 全库；多知识库时传入目标 kbId）
         float[] queryEmbedding = embeddingService.embed(question);
         List<SearchResult> candidates = vectorStore.search(
             queryEmbedding,
-            properties.getRetrieval().getTopK()  // 默认 10
+            properties.getRetrieval().getTopK(),  // 默认 10
+            null
         );
 
         // 过滤低分结果
@@ -1854,30 +2224,28 @@ import java.util.List;
 /**
  * 重排序服务 —— 用专门的 Rerank 模型对检索结果精排。
  *
- * Rerank API 格式（同样遵循 OpenAI 兼容协议的一个子集）：
- *   POST {baseUrl}/rerank
+ * ⚠️ 格式修正（2026-07-17）：Rerank **不是** OpenAI 兼容协议的一部分，
+ * 各供应商格式不同，不能套用 AbstractOpenAIProvider：
+ *
+ * 百炼 gte-rerank（本项目选用，走 DashScope 原生接口，compatible-mode 不含 rerank）：
+ *   POST https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank
+ *   Header: Authorization: Bearer {apiKey}
  *   Body: {
  *     "model": "gte-rerank",
- *     "query": "JWT 过滤器怎么配置？",
- *     "documents": ["文档片段1", "文档片段2", ...],
- *     "top_n": 5
+ *     "input": {
+ *       "query": "JWT 过滤器怎么配置？",
+ *       "documents": ["文档片段1", "文档片段2", ...]
+ *     },
+ *     "parameters": {"top_n": 5, "return_documents": true}
  *   }
+ *   响应：{"output": {"results": [{"index": 3, "relevance_score": 0.95, "document": {...}}, ...]}}
  *
- * 响应：
- *   {
- *     "results": [
- *       {"index": 3, "relevance_score": 0.95},
- *       {"index": 0, "relevance_score": 0.82},
- *       ...
- *     ]
- *   }
+ * 对照：SiliconFlow / Cohere / Jina 是另一种扁平格式（POST /v1/rerank，
+ * body 为 {"model","query","documents","top_n"}），两者不要混用。
  *
- * 注意：Rerank 不是所有供应商都提供的。目前已知提供 Rerank API 的有：
- *   - 阿里百炼：gte-rerank 模型
- *   - Cohere：rerank-english-v3.0 / rerank-multilingual-v3.0
- *   - Jina AI：jina-reranker-v2
- *
- * 如果没配 Rerank，就退化到直接用向量检索的 Top K。
+ * 结论：实现 BaiLianRerankProvider 单独处理百炼格式；rerank 固定使用
+ * 主供应商（百炼），不做跨供应商降级 —— 降级供应商没配 rerank 模型时
+ * 退化为直接用向量检索的 Top K（RetrievalEngine 里已有这个兜底分支）。
  */
 public interface RerankService {
     List<SearchResult> rerank(String query, List<SearchResult> candidates, int topN);
@@ -1889,14 +2257,18 @@ public interface RerankService {
 ```java
 package io.github.somehow.mysite.ragent.core.memory;
 
+import com.alibaba.fastjson2.JSON;
 import io.github.somehow.mysite.ragent.dao.entity.ConversationDO;
 import io.github.somehow.mysite.ragent.dao.entity.ConversationMessageDO;
 import io.github.somehow.mysite.ragent.dao.mapper.ConversationMapper;
 import io.github.somehow.mysite.ragent.dao.mapper.ConversationMessageMapper;
+import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
 import io.github.somehow.mysite.ragent.llm.ChatMessage;
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * 对话记忆管理器。
@@ -1930,6 +2302,9 @@ public class ConversationManager {
             .selectRecentByConversationId(conversationId, keepTurns * 2);
 
         return recentMessages.stream()
+            // 注意：selectRecentByConversationId 按时间倒序取最近 N 条，
+            // 装入 messages 前必须翻正为时间正序，否则 LLM 看到的对话是反的
+            .sorted(Comparator.comparing(ConversationMessageDO::getCreateTime))
             .map(msg -> {
                 if ("USER".equals(msg.getRole())) {
                     return ChatMessage.user(msg.getContent());
@@ -1938,6 +2313,55 @@ public class ConversationManager {
                 }
             })
             .toList();
+    }
+
+    /**
+     * 获取或创建会话（2026-07-17 修订新增 —— 原方案只有 loadHistory，
+     * 会话创建 / 消息落库 / conversationId 回传整条链路缺失，
+     * 对话记忆实际上跑不起来）。
+     *
+     * @param conversationId 前端带来的会话 ID（null = 新会话）
+     * @param visitorId      匿名访客标识（前端 localStorage UUID，见 3.5 节决策 3）
+     * @param firstQuestion  新会话用它生成标题
+     */
+    public ConversationDO getOrCreateConversation(Long conversationId, String visitorId, String firstQuestion) {
+        if (conversationId != null) {
+            ConversationDO existing = conversationMapper.selectById(conversationId);
+            // 防 IDOR：会话必须属于这个 visitor，否则视为新会话
+            if (existing != null && Objects.equals(existing.getVisitorId(), visitorId)) {
+                return existing;
+            }
+        }
+        ConversationDO conv = new ConversationDO();
+        conv.setVisitorId(visitorId);
+        conv.setTitle(firstQuestion.length() > 20
+            ? firstQuestion.substring(0, 20) + "…" : firstQuestion);
+        conversationMapper.insert(conv);
+        return conv;
+    }
+
+    /**
+     * 保存一轮问答（流式生成完成后调用）。
+     * 注意：这是阻塞 JDBC，应在 boundedElastic / ragAsyncExecutor 上执行，
+     * 不要占用 reactor 的 event-loop 线程。
+     */
+    public void saveExchange(Long conversationId, String question,
+                             String answer, List<SourceChunkDTO> sources) {
+        ConversationMessageDO userMsg = new ConversationMessageDO();
+        userMsg.setConversationId(conversationId);
+        userMsg.setRole("USER");
+        userMsg.setContent(question);
+        messageMapper.insert(userMsg);
+
+        ConversationMessageDO assistantMsg = new ConversationMessageDO();
+        assistantMsg.setConversationId(conversationId);
+        assistantMsg.setRole("ASSISTANT");
+        assistantMsg.setContent(answer);
+        assistantMsg.setSourcesJson(JSON.toJSONString(sources));  // sources 列是 JSONB
+        messageMapper.insert(assistantMsg);
+
+        // 更新会话的消息数与 update_time（PG 没有 ON UPDATE，应用层维护）
+        conversationMapper.touchMessageCount(conversationId, 2);
     }
 }
 ```
@@ -2042,7 +2466,54 @@ public class PromptTemplate {
 }
 ```
 
-### 3.5 RAG 问答核心服务 `RagChatService.java`
+### 3.5 SSE 事件模型 `ChatEvent.java` + RAG 问答核心服务 `RagChatService.java`
+
+**为什么需要 ChatEvent（2026-07-17 修订）？** 原方案 `RagChatService.chat()` 返回
+`Flux<String>`（纯 token 流），但数据流图和前端约定了 `sources` 事件、多轮对话需要
+回传 `conversationId`——纯 token 流里这些都无处安放（"sources 事件没有生产者"）。
+改为返回 `Flux<ChatEvent>`，统一前后端协议：
+
+```java
+package io.github.somehow.mysite.ragent.llm;
+
+import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
+import java.util.List;
+
+/**
+ * SSE 事件模型 —— RagChatService 与前端之间的统一协议。
+ *
+ * 事件序列（一次问答）：
+ *   meta    ×1 → 流开始时发，携带 conversationId（新会话由后端创建，
+ * *            前端存下来，后续轮次带上它才有"记忆"）
+ *   sources ×1 → 检索到的引用来源（无检索结果时为空数组），在 content 之前发
+ *   content ×N → 每个 token 一条
+ *   done    ×1 → 正常结束
+ *   error   ×1 → 出错时发（替代裸断开，前端可以展示友好提示）
+ */
+public record ChatEvent(
+    String type,                    // meta / sources / content / done / error
+    String delta,                   // content 事件的 token
+    List<SourceChunkDTO> sources,   // sources 事件的引用来源
+    Long conversationId,            // meta 事件的会话 ID
+    String message                  // error 事件的错误信息
+) {
+    public static ChatEvent meta(Long conversationId) {
+        return new ChatEvent("meta", null, null, conversationId, null);
+    }
+    public static ChatEvent sources(List<SourceChunkDTO> sources) {
+        return new ChatEvent("sources", null, sources, null, null);
+    }
+    public static ChatEvent content(String delta) {
+        return new ChatEvent("content", delta, null, null, null);
+    }
+    public static ChatEvent done() {
+        return new ChatEvent("done", null, null, null, null);
+    }
+    public static ChatEvent error(String message) {
+        return new ChatEvent("error", null, null, null, message);
+    }
+}
+```
 
 ```java
 package io.github.somehow.mysite.ragent.service;
@@ -2050,10 +2521,13 @@ package io.github.somehow.mysite.ragent.service;
 import io.github.somehow.mysite.ragent.core.memory.ConversationManager;
 import io.github.somehow.mysite.ragent.core.prompt.PromptTemplate;
 import io.github.somehow.mysite.ragent.core.retrieval.RetrievalEngine;
+import io.github.somehow.mysite.ragent.dao.entity.ConversationDO;
+import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
 import io.github.somehow.mysite.ragent.llm.*;
 import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.util.List;
 
@@ -2064,11 +2538,14 @@ import java.util.List;
  * 理解了这段代码，你就理解了当前 90% 的 RAG 系统的运行原理。
  *
  * 完整链路（复习）：
- *   1. 加载对话记忆（滑动窗口）
- *   2. 向量检索（问题 → embedding → pgvector cosine 检索）
- *   3. Rerank 精排（可选）
- *   4. 组装 Prompt（检索上下文 + 对话历史 + 用户问题）
- *   5. LLM 流式生成（多供应商路由 + 断路器）
+ *   0. 限流检查（成本保护，见 3.7）
+ *   1. 获取或创建会话（visitorId 归属）
+ *   2. 加载对话记忆（滑动窗口）
+ *   3. 向量检索（问题 → embedding → pgvector cosine 检索）
+ *   4. Rerank 精排（可选）
+ *   5. 组装 Prompt（检索上下文 + 对话历史 + 用户问题）
+ *   6. LLM 流式生成（多供应商路由 + 断路器）
+ *   7. 完成后保存问答记录
  */
 @Service
 public class RagChatService {
@@ -2077,39 +2554,66 @@ public class RagChatService {
     private final ConversationManager conversationManager;
     private final PromptTemplate promptTemplate;
     private final RoutingLLMService routingLLMService;
+    private final ChatRateLimiter rateLimiter;
 
     /**
      * RAG 流式问答 —— 核心入口。
      *
      * @param question       用户问题
      * @param conversationId 对话 ID（null = 新对话）
-     * @return SSE 事件流（Flux<String> 每个元素是一个 token）
+     * @param visitorId      匿名访客标识（前端 localStorage UUID）
+     * @param clientIp       客户端 IP（限流用）
+     * @return ChatEvent 事件流（meta → sources → content×N → done）
      */
-    public Flux<String> chat(String question, Long conversationId) {
-        // Step 1: 加载对话历史
-        List<ChatMessage> history = conversationManager.loadHistory(conversationId);
+    public Flux<ChatEvent> chat(String question, Long conversationId,
+                                String visitorId, String clientIp) {
+        // Step 0: 成本保护 —— 超频/超长直接拒绝（抛出后由 Controller 转成 error 事件）
+        rateLimiter.check(clientIp, question);
 
-        // Step 2: 向量检索
+        // Step 1: 获取或创建会话（防 IDOR，见 ConversationManager）
+        ConversationDO conversation = conversationManager
+            .getOrCreateConversation(conversationId, visitorId, question);
+        Long convId = conversation.getId();
+
+        // Step 2: 加载对话历史
+        List<ChatMessage> history = conversationManager.loadHistory(convId);
+
+        // Step 3: 向量检索
         List<SearchResult> retrievedChunks = retrievalEngine.retrieve(question, 5);
+        List<SourceChunkDTO> sources = retrievedChunks.stream()
+            .map(r -> new SourceChunkDTO(r.docTitle(), r.content(), r.score()))
+            .toList();
 
-        // Step 3: 按是否有检索结果选择 Prompt 策略
-        List<ChatMessage> messages;
-        if (retrievedChunks.isEmpty()) {
-            // 无匹配：通用聊天模式（没有引用来源）
-            messages = promptTemplate.buildGeneralPrompt(question, history);
-        } else {
-            // 有匹配：完整 RAG 模式（基于博客内容回答）
-            messages = promptTemplate.buildRagPrompt(question, retrievedChunks, history);
-        }
+        // Step 4: 按是否有检索结果选择 Prompt 策略
+        List<ChatMessage> messages = retrievedChunks.isEmpty()
+            ? promptTemplate.buildGeneralPrompt(question, history)   // 无匹配：通用聊天
+            : promptTemplate.buildRagPrompt(question, retrievedChunks, history); // 有匹配：RAG
 
-        // Step 4: 调用 LLM 流式生成（多供应商路由，自动降级）
+        // Step 5: 调用 LLM 流式生成（多供应商路由，自动降级）
         ChatRequest request = ChatRequest.builder()
             .messages(messages)
             .temperature(0.7)
             .maxTokens(2048)
             .build();
 
-        return routingLLMService.chatStream(request);
+        // Step 6: 组装事件流 + 完成后落库
+        StringBuilder fullAnswer = new StringBuilder();
+        return Flux.concat(
+                Flux.just(ChatEvent.meta(convId), ChatEvent.sources(sources)),
+                routingLLMService.chatStream(request).map(ChatEvent::content),
+                Flux.just(ChatEvent.done())
+            )
+            .doOnNext(e -> {
+                if ("content".equals(e.type())) {
+                    fullAnswer.append(e.delta());
+                }
+            })
+            // 落库是阻塞 JDBC，切到 boundedElastic，不占 event-loop
+            .publishOn(Schedulers.boundedElastic())
+            .doOnComplete(() -> conversationManager.saveExchange(
+                convId, question, fullAnswer.toString(), sources))
+            // 统一兜底：任何异常（含全部供应商失败）转成 error 事件，而不是裸断开
+            .onErrorResume(e -> Flux.just(ChatEvent.error("AI 服务暂时不可用，请稍后再试")));
     }
 }
 ```
@@ -2119,15 +2623,16 @@ public class RagChatService {
 ```java
 package io.github.somehow.mysite.ragent.controller;
 
-import io.github.somehow.mysite.commons.context.UserContext;
-import io.github.somehow.mysite.ragent.dto.ChatStreamRequest;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.somehow.mysite.ragent.llm.ChatEvent;
 import io.github.somehow.mysite.ragent.service.RagChatService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executor;
 
 /**
  * RAG 聊天 SSE 端点。
@@ -2135,10 +2640,11 @@ import java.util.concurrent.ExecutorService;
  * SSE (Server-Sent Events) 协议基础：
  *   1. 请求头：Accept: text/event-stream
  *   2. 响应头：Content-Type: text/event-stream
- *   3. 数据格式：
- *      data: {"delta":"你好","type":"content"}\n\n
- *      data: {"sources":[...],"type":"sources"}\n\n
- *      data: [DONE]\n\n
+ *   3. 数据格式（每个事件一行 JSON，与前端 useChat 的解析一一对应）：
+ *      data: {"type":"meta","conversationId":123}\n\n
+ *      data: {"type":"sources","sources":[...]}\n\n
+ *      data: {"type":"content","delta":"你好"}\n\n
+ *      data: {"type":"done"}\n\n
  *
  * Spring MVC 通过 SseEmitter 支持 SSE（Spring 6 / Boot 3 原生支持）。
  * 也可以用 WebFlux 的 Flux<ServerSentEvent>，但这需要整个 Controller
@@ -2149,77 +2655,81 @@ import java.util.concurrent.ExecutorService;
 public class RagChatController {
 
     private final RagChatService ragChatService;
-    private final ExecutorService ragExecutor;
+    private final Executor ragExecutor;
+    private final ObjectMapper objectMapper;
 
     /**
      * SSE 流式聊天端点。
      *
-     * GET /v1/rag/chat/stream?q=JWT怎么配置的？&conversationId=123
+     * GET /v1/rag/chat/stream?q=JWT怎么配置的？&conversationId=123&visitorId=uuid
      *
-     * 响应示例（逐行推送）：
-     *   data: {"type":"content","delta":"Spring"}
-     *   data: {"type":"content","delta":" Security"}
-     *   data: {"type":"content","delta":" 中的"}
-     *   data: {"type":"content","delta":" JWT"}
-     *   ...
-     *   data: {"type":"sources","sources":[{"title":"JWT认证...","score":0.92}]}
-     *   data: [DONE]
+     * 注意（2026-07-17 修订）：
+     *   - 事件序列化用 ObjectMapper，不再手工拼 JSON 字符串 —— 原方案的
+     *     escapeJson() 只转义了 4 种字符，遇到其他控制字符会产出非法 JSON
+     *   - visitorId：匿名会话归属标识（见 3.5 节决策 3）
      */
     @GetMapping("/chat/stream")
     public SseEmitter chatStream(
             @RequestParam("q") String question,
-            @RequestParam(value = "conversationId", required = false) Long conversationId) {
+            @RequestParam(value = "conversationId", required = false) Long conversationId,
+            @RequestParam(value = "visitorId", required = false) String visitorId,
+            HttpServletRequest httpRequest) {
 
         SseEmitter emitter = new SseEmitter(120_000L);  // 120 秒超时
+        String clientIp = resolveClientIp(httpRequest);
 
         ragExecutor.execute(() -> {
             try {
-                ragChatService.chat(question, conversationId)
-                    .doOnNext(token -> {
-                        try {
-                            // 每个 token 作为一个 SSE 事件发送
-                            String event = """
-                                {"type":"content","delta":"%s"}\n
-                                """.formatted(escapeJson(token));
-                            emitter.send(SseEmitter.event()
-                                .data(event, MediaType.APPLICATION_JSON));
-                        } catch (IOException e) {
-                            // 客户端断开连接，取消发送
-                            emitter.completeWithError(e);
-                        }
-                    })
-                    .doOnComplete(() -> {
-                        // 发送完成标记
-                        emitter.send(SseEmitter.event().data("[DONE]"));
-                        emitter.complete();
-                    })
-                    .doOnError(e -> emitter.completeWithError(e))
-                    .subscribe();  // 触发执行
+                ragChatService.chat(question, conversationId, visitorId, clientIp)
+                    .subscribe(
+                        event -> sendEvent(emitter, event),
+                        // service 已兜底成 error 事件，这里理论上走不到；
+                        // 若真走到，再补一条 error 事件并关闭连接
+                        error -> sendEvent(emitter, ChatEvent.error("AI 服务异常")),
+                        // 正常结束由 done/error 事件内部调用 emitter.complete()
+                        () -> {}
+                    );
             } catch (Exception e) {
-                emitter.completeWithError(e);
+                // 同步阶段异常（如限流拒绝在订阅前抛出）
+                sendEvent(emitter, ChatEvent.error(e.getMessage()));
             }
         });
 
         return emitter;
     }
 
-    private String escapeJson(String s) {
-        return s.replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
+    /** 序列化事件并推送；客户端断开时静默结束（IOException 属正常断连） */
+    private void sendEvent(SseEmitter emitter, ChatEvent event) {
+        try {
+            emitter.send(SseEmitter.event()
+                .data(objectMapper.writeValueAsString(event), MediaType.APPLICATION_JSON));
+            if ("done".equals(event.type()) || "error".equals(event.type())) {
+                emitter.complete();
+            }
+        } catch (IOException e) {
+            emitter.completeWithError(e);
+        }
+    }
+
+    /** 取真实客户端 IP：优先 X-Forwarded-For（Nginx 反代后会带，见 5.2） */
+    private String resolveClientIp(HttpServletRequest request) {
+        String xff = request.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            return xff.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }
 ```
 
-### 3.7 Spring Security 白名单调整
+### 3.7 Spring Security 白名单调整 + 成本保护（限流）
 
 **文件**：`WebSecurityConfig.java`
 
 在 `permitAll` 列表中添加 RAG 聊天端点：
 ```java
 // RAG 端点
-"/v1/rag/chat/stream"     // 任何人都可以聊天
+"/v1/rag/chat/stream"     // 任何人都可以聊天（匿名会话，visitorId 归属）
 ```
 
 其他 RAG 端点按需配置：
@@ -2229,56 +2739,134 @@ public class RagChatController {
 "/v1/rag/knowledge-base/**"      // DEVELOPER 管理知识库
 ```
 
+**匿名聊天 = 付费 API 敞口，限流是必做项（见 3.5 节决策 4）**：
+`permitAll` 意味着任何人都能直接刷这个端点，百炼免费额度烧完就是按 token 计费。
+实现一个基于 Redis 的简单限流器（Redis 是现成基础设施）：
+
+```java
+package io.github.somehow.mysite.ragent.service;
+
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+
+/**
+ * 聊天限流器 —— 成本保护的第一道闸。
+ *
+ * 策略（够用就好，不上令牌桶）：
+ *   1. IP 维度计数：key = rag:chat:rl:{ip}，INCR 后第一次设置 1 小时过期，
+ *      超过 rag.rate-limit.max-per-hour（默认 20）拒绝
+ *   2. 问题长度上限：rag.rate-limit.max-question-length（默认 500 字符），
+ *      超长直接拒绝（长问题 = 高 token 消耗）
+ *
+ * 注意：限流检查要在 RagChatService.chat() 的最开头（Step 0），
+ * 在调用任何 LLM API 之前拦截。
+ */
+@Component
+public class ChatRateLimiter {
+
+    private final StringRedisTemplate redisTemplate;
+    private final RagProperties properties;
+
+    public void check(String clientIp, String question) {
+        int maxPerHour = properties.getRateLimit().getMaxPerHour();
+        int maxLength = properties.getRateLimit().getMaxQuestionLength();
+
+        if (question != null && question.length() > maxLength) {
+            throw new RateLimitExceededException(
+                "问题太长了，请精简到 " + maxLength + " 字以内");
+        }
+
+        String key = "rag:chat:rl:" + clientIp;
+        Long count = redisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1L) {
+            redisTemplate.expire(key, Duration.ofHours(1));
+        }
+        if (count != null && count > maxPerHour) {
+            throw new RateLimitExceededException(
+                "提问太频繁了，每小时最多 " + maxPerHour + " 次，请稍后再试");
+        }
+    }
+
+    /** 自定义异常：Controller 捕获后转成 ChatEvent.error 推给前端 */
+    public static class RateLimitExceededException extends RuntimeException {
+        public RateLimitExceededException(String message) {
+            super(message);
+        }
+    }
+}
+```
+
 ### 3.8 Phase 3 验证方式
 
 ```bash
 # 用 curl 测试 SSE 流式聊天（终端直接看 token 流）
 curl -N -X GET \
-  "http://localhost:8081/v1/rag/chat/stream?q=JWT过滤器是怎么配置的？" \
+  "http://localhost:8081/v1/rag/chat/stream?q=JWT过滤器是怎么配置的？&visitorId=test-uuid-001" \
   -H "Accept: text/event-stream"
 
 # 预期输出（逐行推送）：
-# data: {"type":"content","delta":"在"}
-# data: {"type":"content","delta":"Spring"}
-# data: {"type":"content","delta":" Security"}
+# data: {"type":"meta","conversationId":123,...}
+# data: {"type":"sources","sources":[{"title":"Spring Security 实战...",...}],...}
+# data: {"type":"content","delta":"在",...}
+# data: {"type":"content","delta":"Spring",...}
 # ...
-# data: [DONE]
+# data: {"type":"done",...}
+#
+# 多轮记忆验证：带上 meta 事件返回的 conversationId 再问一个指代性问题
+# （如"它的配置类叫什么？"），AI 应能理解"它"指代上文内容
 ```
 
 ```java
 @Test
 void testRagChatFullPipeline() {
-    // 端到端测试：嵌入 → 检索 → Rerank → 生成
+    // 端到端测试：限流 → 建会话 → 检索 → Rerank → 生成 → 落库
     String question = "JWT 过滤器怎么配置？";
-    Flux<String> stream = ragChatService.chat(question, null);
+    Flux<ChatEvent> stream = ragChatService.chat(question, null, "test-visitor", "127.0.0.1");
 
-    String fullResponse = stream
-        .doOnNext(System.out::print)
-        .collectList()
-        .map(tokens -> String.join("", tokens))
-        .block(Duration.ofSeconds(120));
+    List<ChatEvent> events = stream.collectList().block(Duration.ofSeconds(120));
 
-    Assertions.assertNotNull(fullResponse);
+    // 事件序列校验：meta 在最前、done 在最后、content 在中间
+    Assertions.assertEquals("meta", events.get(0).type());
+    Assertions.assertNotNull(events.get(0).conversationId());   // 新会话已创建
+    Assertions.assertEquals("done", events.get(events.size() - 1).type());
+
+    String fullResponse = events.stream()
+        .filter(e -> "content".equals(e.type()))
+        .map(ChatEvent::delta)
+        .reduce("", String::concat);
     Assertions.assertTrue(fullResponse.length() > 50);
     // 回答中应包含博客文章中的内容
     Assertions.assertTrue(
         fullResponse.contains("JwtAuthenticationFilter") ||
         fullResponse.contains("OncePerRequestFilter")
     );
+
+    // 落库校验：用返回的 conversationId 能查到这一问一答
+    List<ConversationMessageDO> messages = messageMapper
+        .selectRecentByConversationId(events.get(0).conversationId(), 2);
+    Assertions.assertEquals(2, messages.size());
 }
 ```
 
 ### Phase 3 验收清单
 
-- [ ] `RetrievalEngine.retrieve()` 检索结果包含相关文章片段
-- [ ] `RerankService.rerank()` 精排后 Top 1 比向量检索的 Top 1 更相关
-- [ ] `ConversationManager.loadHistory()` 正确加载最近 6 轮对话
+- [ ] `RetrievalEngine.retrieve()` 检索结果包含相关文章片段（`VectorStore.search` 已加 kbId 参数）
+- [ ] `RerankService.rerank()` 使用百炼原生接口格式（不是 OpenAI `/rerank` 格式）
+- [ ] 未配置 Rerank 时自动退化为向量检索 Top K
+- [ ] `ConversationManager.loadHistory()` 正确加载最近 6 轮对话，且消息顺序为正序
+- [ ] `ConversationManager.getOrCreateConversation()` 创建新会话并校验 visitorId 归属
+- [ ] `ConversationManager.saveExchange()` 流式生成结束后正确保存一问一答
 - [ ] `PromptTemplate.buildRagPrompt()` 生成的 Prompt 格式正确
-- [ ] `RagChatService.chat()` 完整链路不报错
-- [ ] `curl /v1/rag/chat/stream` 能收到流式 SSE 响应
+- [ ] `RagChatService.chat()` 返回 `Flux<ChatEvent>`，事件序列为 meta → sources → content×N → done
+- [ ] `RagChatService.chat()` 在 LLM 前完成限流检查（超频/超长直接拒绝）
+- [ ] `RagChatController` 用 ObjectMapper 序列化事件（不再手工 escapeJson）
+- [ ] `curl /v1/rag/chat/stream` 能收到流式 SSE 响应，包含 meta 和 sources 事件
 - [ ] 有检索结果时 AI 回答引用了博客文章
 - [ ] 无检索结果时 AI 回复友好（不编造）
-- [ ] 对话历史在后续轮次中被正确引用
+- [ ] 多轮对话能正确引用历史（conversationId 回传后再次提问，AI 保持上下文）
+- [ ] 流式降级边界正确：百炼挂掉 → SiliconFlow 兜底；一旦已输出 token 后失败不降级
 
 ---
 
@@ -2294,19 +2882,32 @@ void testRagChatFullPipeline() {
 ```
 mysite-frontend/src/
 ├── api/
-│   └── rag.ts                        # ★ 新增：RAG API 调用
+│   └── rag.ts                        # ★ 新增：RAG SSE API 封装
 ├── composables/
 │   └── useChat.ts                    # ★ 新增：聊天核心逻辑
-├── stores/
-│   └── chat.ts                       # ★ 新增：聊天状态 Pinia Store
 ├── components/chat/
 │   ├── ChatWidget.vue                # ★ 新增：聊天浮窗容器
 │   ├── ChatMessage.vue               # ★ 新增：单条消息气泡
 │   ├── ChatInput.vue                 # ★ 新增：输入框
 │   ├── ChatStreamWriter.vue          # ★ 新增：流式输出 + Markdown 渲染
 │   └── ChatSources.vue               # ★ 新增：引用来源展示
-└── app/router/index.ts               # 修改：添加仪表板路由
+└── app/router/index.ts               # Phase 5 修改：添加 /dashboard/knowledge 路由
 ```
+
+### 4.1.1 前端依赖新增
+
+虽然 `marked` 和 `katex` 已经在 `package.json`，但 `dompurify` 还没有：
+
+```bash
+cd mysite-frontend
+npm install dompurify
+# dompurify 3.x 自带 TypeScript 类型声明，无需额外 @types
+```
+
+**为什么必须加 DOMPurify？** `ChatStreamWriter.vue` 用 `v-html` 渲染 LLM 输出，
+如果不消毒，LLM 内容里的 HTML/Script 会作为代码执行（也可能通过 prompt injection
+把用户输入回显成脚本）。`marked` 可以配置禁用 HTML，但最稳妥的方式是再用
+DOMPurify 过一遍。
 
 ### 4.2 核心文件实现
 
@@ -2320,6 +2921,7 @@ mysite-frontend/src/
 export interface ChatStreamCallbacks {
   onToken: (token: string) => void;
   onSources: (sources: SourceChunk[]) => void;
+  onMeta: (conversationId: number) => void;   // 新增：后端创建/确认会话 ID 后回传
   onDone: () => void;
   onError: (error: Error) => void;
 }
@@ -2330,6 +2932,18 @@ export interface SourceChunk {
   score: number;
 }
 
+/** 匿名访客标识：localStorage 持久化，用于会话归属校验 */
+const VISITOR_ID_KEY = 'rag-visitor-id';
+
+export function getVisitorId(): string {
+  let id = localStorage.getItem(VISITOR_ID_KEY);
+  if (!id) {
+    id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+    localStorage.setItem(VISITOR_ID_KEY, id);
+  }
+  return id;
+}
+
 export function createChatStream(
   question: string,
   conversationId: number | null,
@@ -2337,20 +2951,21 @@ export function createChatStream(
 ): AbortController {
   const params = new URLSearchParams({ q: question });
   if (conversationId) params.set('conversationId', String(conversationId));
+  params.set('visitorId', getVisitorId());    // 匿名会话归属（见 3.5 节决策 3）
 
   const url = `/v1/rag/chat/stream?${params.toString()}`;
 
   // 关键：使用 fetch + ReadableStream 而不是 EventSource
-  // 原因：EventSource 不支持自定义请求头（如 Authorization），
-  // 而且只支持 GET。用 fetch + ReadableStream 更灵活。
+  // 原因：EventSource 不支持自定义请求头，且只支持 GET；fetch 更灵活。
+  //
+  // 注意：这里的 fetch 不会走 axios 拦截器，如果你以后要改成"必须登录"，
+  // 需要手动把 token 加到 headers 里；目前后端是 permitAll，所以不带 token。
   const controller = new AbortController();
 
   fetch(url, {
     method: 'GET',
     headers: {
       'Accept': 'text/event-stream',
-      // JWT token 会自动通过 axios interceptor 加到 Cookie/Header
-      // 如果 cookie 方式，这里不需要手动加
     },
     signal: controller.signal,
   })
@@ -2375,24 +2990,30 @@ export function createChatStream(
           if (line.startsWith('data: ')) {
             const dataStr = line.substring(6).trim();
 
-            if (dataStr === '[DONE]') {
-              callbacks.onDone();
-              return;
-            }
-
             try {
               const data = JSON.parse(dataStr);
-              if (data.type === 'content') {
+              if (data.type === 'meta') {
+                callbacks.onMeta(data.conversationId);
+              } else if (data.type === 'content') {
                 callbacks.onToken(data.delta);
               } else if (data.type === 'sources') {
                 callbacks.onSources(data.sources);
+              } else if (data.type === 'done') {
+                callbacks.onDone();
+                return;
+              } else if (data.type === 'error') {
+                callbacks.onError(new Error(data.message || 'AI 服务异常'));
+                return;
               }
             } catch {
-              // 解析失败，跳过（可能是心跳包）
+              // 解析失败，跳过（可能是心跳包或空行）
             }
           }
         }
       }
+
+      // 流正常结束但后端没有发 done（防御性兜底）
+      callbacks.onDone();
     })
     .catch((error) => {
       if (error.name !== 'AbortError') {
@@ -2413,16 +3034,17 @@ export function createChatStream(
 // 取消生成、自动滚动到底部。
 
 import { ref, nextTick } from 'vue';
-import { createChatStream, type SourceChunk } from '@/api/rag';
+import { createChatStream, getVisitorId, type SourceChunk } from '@/api/rag';
 
 export function useChat() {
   const messages = ref<ChatMessage[]>([]);
   const isStreaming = ref(false);
   const currentAssistantMessage = ref('');
   const currentSources = ref<SourceChunk[]>([]);
+  const conversationId = ref<number | null>(null);   // 后端回传的会话 ID，多轮记忆关键
   let abortController: AbortController | null = null;
 
-  async function sendMessage(question: string, conversationId: number | null) {
+  async function sendMessage(question: string) {
     // 1. 添加用户消息
     messages.value.push({ role: 'user', content: question, sources: [] });
 
@@ -2431,8 +3053,11 @@ export function useChat() {
     currentAssistantMessage.value = '';
     currentSources.value = [];
 
-    // 3. 发起 SSE 请求
-    abortController = createChatStream(question, conversationId, {
+    // 3. 发起 SSE 请求（带上当前 conversationId，后端会校验 visitorId 归属）
+    abortController = createChatStream(question, conversationId.value, {
+      onMeta(id: number) {
+        conversationId.value = id;
+      },
       onToken(token: string) {
         currentAssistantMessage.value += token;
       },
@@ -2477,6 +3102,7 @@ export function useChat() {
 
   function clearMessages() {
     messages.value = [];
+    conversationId.value = null;
   }
 
   return {
@@ -2484,6 +3110,7 @@ export function useChat() {
     isStreaming,
     currentAssistantMessage,
     currentSources,
+    conversationId,
     sendMessage,
     cancelGeneration,
     clearMessages,
@@ -2582,7 +3209,7 @@ const isOpen = ref(false);
 const messagesContainer = ref<HTMLElement>();
 
 const suggestedQuestions = [
-  '最近写了什么文章？',
+  '博客里有哪些关于 Redis 的文章？',
   'Spring Security 怎么配置 JWT？',
   '介绍一下你的博客技术栈',
 ];
@@ -2591,7 +3218,7 @@ function openChat() { isOpen.value = true; }
 function closeChat() { isOpen.value = false; }
 
 function askQuestion(q: string) {
-  chat.sendMessage(q, null);
+  chat.sendMessage(q);
 }
 
 // 自动滚动到底部
@@ -2639,6 +3266,7 @@ watch(
 <script setup lang="ts">
 import { computed } from 'vue';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';   // 新增：防止 LLM 输出中的 HTML/Script 注入
 import ChatSources from './ChatSources.vue';
 import type { SourceChunk } from '@/api/rag';
 
@@ -2649,9 +3277,9 @@ const props = defineProps<{
 
 const renderedContent = computed(() => {
   if (!props.content) return '<span class="cursor-blink">▊</span>';
-  // 使用 marked 的宽松模式渲染不完整的 Markdown
-  return marked.parse(props.content, { breaks: true })
-    + '<span class="cursor-blink">▊</span>';
+  const html = marked.parse(props.content, { breaks: true }) as string;
+  // 先用 marked 渲染 Markdown，再过 DOMPurify 消毒，最后加闪烁光标
+  return DOMPurify.sanitize(html) + '<span class="cursor-blink">▊</span>';
 });
 </script>
 
@@ -2714,9 +3342,13 @@ npx vite build                   # 必须通过
 - [ ] 博客页面右下角显示 AI 聊天浮窗按钮
 - [ ] 点击展开聊天面板，动画流畅
 - [ ] 发送消息后看到流式打字机效果
-- [ ] Markdown 正确渲染（代码块、表格、公式）
+- [ ] Markdown 正确渲染（代码块、表格）
+- [ ] `ChatStreamWriter` 使用 DOMPurify 消毒 LLM 输出（可通过构造 prompt 让 LLM 回显 `<script>` 标签测试）
 - [ ] 引用来源正确展示（文章标题 + 相似度）
 - [ ] 可以取消正在生成的回复
+- [ ] 首条 SSE `meta` 事件返回 conversationId，后续轮次带上它
+- [ ] 多轮对话中 AI 能基于上下文回答指代性问题（验证"记忆"真的生效）
+- [ ] 浏览器 localStorage 中存在 `rag-visitor-id`
 - [ ] `npx vue-tsc --noEmit` 通过
 - [ ] `npx vite build` 通过
 
@@ -2756,9 +3388,12 @@ mysite-frontend/src/views/dashboard/
 └── KnowledgeManageView.vue     # ★ 新增：知识库管理页面
     ├── 知识库列表（名称、文档数、向量数、状态）
     ├── 创建/编辑知识库对话框
-    ├── 文档列表（标题、来源、分块数、状态）
-    ├── 上传 Markdown/PDF 文件
+    ├── 文档列表（标题、来源、分块数、状态，含 FAILED 原因）
+    ├── 上传 Markdown 文件         # Phase 5 先只做 Markdown
     └── 批量同步已有文章按钮
+
+> PDF 文件上传支持放到后续扩展路线（7.1 节），Phase 5 先不做 ——
+> PDF 解析需要额外依赖（如 Apache PDFBox / Tika）和版面分析，容易拖长交付周期。
 ```
 
 #### 路由注册
@@ -2782,14 +3417,19 @@ mysite-frontend/src/views/dashboard/
 location /v1/rag/chat/stream {
     proxy_pass http://127.0.0.1:8081;
     proxy_http_version 1.1;
-    proxy_set_header Connection '';
-    proxy_buffering off;           # ★ 关键：关闭代理缓冲
-    proxy_cache off;               # ★ 不缓存 SSE 流
-    proxy_read_timeout 120s;       # 120 秒长连接超时
+    proxy_buffering off;       # ★ 关键：关闭代理缓冲，token 才能实时到达浏览器
+    proxy_cache off;           # ★ 不缓存 SSE 流
+    gzip off;                  # ★ 关键：gzip 会缓冲响应，SSE 必须关闭
+    proxy_read_timeout 120s;   # 120 秒长连接超时
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header Host $host;
+    # 说明：不需要 proxy_set_header Connection ''（那是 WebSocket 升级用的）
+    # 后端也可以加响应头 X-Accel-Buffering: no 双保险
 }
 ```
+
+> 注意：`X-Forwarded-For` 让后端能拿到真实客户端 IP 做限流（见 3.6 resolveClientIp）。
+> 如果 Nginx 前面还有 CDN，需按实际层级取第 N 段。
 
 ### 5.3 部署脚本更新
 
@@ -2820,11 +3460,13 @@ export RAGENT_PG_PASSWORD="your-secure-password"
 ### Phase 5 验收清单
 
 - [ ] Dashboard 知识库管理页面可用
-- [ ] 能上传 Markdown 文档并自动向量化
+- [ ] 能上传 Markdown 文档并自动向量化（PDF 支持见后续扩展）
 - [ ] 批量同步已有文章功能正常
+- [ ] 摄取失败的文档在列表中显示 FAILED 状态和 fail_reason
 - [ ] Nginx SSE 代理正常工作（生产环境流式聊天不卡顿）
 - [ ] 部署脚本正确启动 PG 容器
 - [ ] 环境变量正确注入
+- [ ] 真实客户端 IP 能被后端识别（限流基于真实 IP，而不是 Nginx 容器 IP）
 
 ---
 
@@ -2848,7 +3490,8 @@ export RAGENT_PG_PASSWORD="your-secure-password"
 - [ ] **OpenAI 兼容协议**是什么？为什么那么多国产模型都兼容？
 - [ ] **三态断路器**（CLOSED/OPEN/HALF_OPEN）的设计动机？HALF_OPEN 为什么必要？
 - [ ] **多供应商降级链**的设计逻辑？为什么百炼排第一，Ollama 排最后？
-- [ ] **首包探测**（60s timeout）的作用？为什么需要它？
+- [ ] **为什么 Embedding 不做多供应商降级？** 向量检索对模型/维度一致性的要求
+- [ ] **流式降级边界**是什么？为什么已有 token 输出后就不能再降级到别的供应商？
 
 ### Prompt 与对话
 - [ ] **Prompt 设计的核心原则？** 角色设定、知识边界、诚实原则、引用要求
@@ -2872,6 +3515,8 @@ export RAGENT_PG_PASSWORD="your-secure-password"
 2. **查询重写** —— 对复杂问题先用 LLM 拆分成子问题再检索，提高召回率
 3. **多知识库** —— 为"技术博客"和"读书笔记"建不同知识库，通过意图识别自动路由
 4. **对话分享** —— 生成对话分享链接（类似 ChatGPT 的 Share 功能）
+5. **PDF 文件上传与解析** —— 引入 Apache PDFBox / Apache Tika 或更先进的版面分析工具，
+   支持上传 PDF 并提取文本向量化；在此之前 Dashboard 只支持 Markdown（Phase 5 已明确）
 
 ### 7.2 中期（1-3 个月）
 
@@ -2893,25 +3538,31 @@ export RAGENT_PG_PASSWORD="your-secure-password"
 
 在实施过程中，这张表帮你快速定位需要修改/新建的文件：
 
-### 新建文件（按 Phase 排列）
+### 新建文件（按 Phase 排列）（2026-07-17 修订：补全标记接口/事件模型/限流器/主数据源等）
 
 | Phase | 文件 | 说明 |
 |-------|------|------|
-| P0 | `docker/init/ragent-schema.sql` | PG 建表脚本 |
+| P0 | `docker/init/ragent-schema.sql` | PG 建表脚本（含 visitor_id / fail_reason / 唯一约束） |
+| P0 | `ragent/config/RagProperties.java` | @ConfigurationProperties 配置类（封装 rag.*） |
 | P1 | `ragent/llm/CircuitBreaker.java` | 三态断路器 |
-| P1 | `ragent/llm/ChatRequest.java` | 聊天请求 DTO |
-| P1 | `ragent/llm/LLMService.java` | 聊天接口 |
-| P1 | `ragent/llm/EmbeddingService.java` | 嵌入接口 |
-| P1 | `ragent/llm/RerankService.java` | Rerank 接口 |
-| P1 | `ragent/llm/RoutingLLMService.java` | 模型路由器 |
+| P1 | `ragent/llm/ChatRequest.java` | 聊天请求 DTO（含 ChatMessage） |
+| P1 | `ragent/llm/ChatEvent.java` | SSE 事件模型（meta/sources/content/error/done） |
+| P1 | `ragent/llm/LLMService.java` | 统一聊天接口 |
+| P1 | `ragent/llm/LLMProvider.java` | 供应商标记接口（防路由自注入） |
+| P1 | `ragent/llm/EmbeddingService.java` | 统一嵌入接口（锁定百炼，不降级） |
+| P1 | `ragent/llm/RerankService.java` | 重排序接口（百炼原生格式，见 3.2） |
+| P1 | `ragent/llm/RoutingLLMService.java` | 模型路由器（含流式降级边界） |
 | P1 | `ragent/llm/provider/AbstractOpenAIProvider.java` | OpenAI 兼容基类 |
-| P1 | `ragent/llm/provider/BaiLianProvider.java` | 百炼实现 |
-| P1 | `ragent/llm/provider/SiliconFlowProvider.java` | SiliconFlow 实现 |
-| P1 | `ragent/llm/provider/AIHubMixProvider.java` | AIHubMix 实现 |
-| P1 | `ragent/llm/provider/OllamaProvider.java` | Ollama 实现 |
-| P2 | `ragent/config/RagentDataSourceConfig.java` | PG 数据源 |
+| P1 | `ragent/llm/provider/BaiLianProvider.java` | 百炼 chat 实现 |
+| P1 | `ragent/llm/provider/BaiLianEmbeddingService.java` | 百炼 embedding 实现（锁定单供应商） |
+| P1 | `ragent/llm/provider/BaiLianRerankProvider.java` | 百炼 rerank 原生接口实现 |
+| P1 | `ragent/llm/provider/SiliconFlowProvider.java` | SiliconFlow chat 实现（仅 chat，不接管 embedding） |
+| P1 | `ragent/llm/provider/AIHubMixProvider.java` | AIHubMix chat 实现（仅 chat） |
+| P1 | `ragent/llm/provider/OllamaProvider.java` | Ollama chat 实现（仅 chat） |
+| P2 | `config/PrimaryDataSourceConfig.java` | 主数据源 @Primary |
+| P2 | `ragent/config/RagentDataSourceConfig.java` | PG 数据源（DataSourceProperties 模式） |
 | P2 | `ragent/config/RagAsyncConfig.java` | 异步线程池 |
-| P2 | `ragent/vector/VectorStore.java` | 向量存储接口 |
+| P2 | `ragent/vector/VectorStore.java` | 向量存储接口（search 含 kbId 参数） |
 | P2 | `ragent/vector/PgvectorVectorStore.java` | pgvector 实现 |
 | P2 | `ragent/ingestion/DocumentChunker.java` | 分块接口 |
 | P2 | `ragent/ingestion/MarkdownChunker.java` | Markdown 分块 |
@@ -2923,12 +3574,12 @@ export RAGENT_PG_PASSWORD="your-secure-password"
 | P3 | `ragent/core/rewrite/QueryRewriter.java` | 查询重写（可选） |
 | P3 | `ragent/core/prompt/PromptTemplate.java` | Prompt 模板 |
 | P3 | `ragent/service/RagChatService.java` | RAG 核心服务 |
+| P3 | `ragent/service/ChatRateLimiter.java` | IP 限流 + 长度上限（见 3.7） |
 | P3 | `ragent/service/KnowledgeBaseService.java` | 知识库服务 |
 | P3 | `ragent/controller/RagChatController.java` | SSE 聊天端点 |
 | P3 | `ragent/dto/*.java` | RAG DTO 类 |
-| P4 | `api/rag.ts` | 前端 API |
+| P4 | `api/rag.ts` | 前端 SSE API（visitorId / meta 事件） |
 | P4 | `composables/useChat.ts` | 聊天逻辑 |
-| P4 | `stores/chat.ts` | 聊天状态 Store |
 | P4 | `components/chat/ChatWidget.vue` | 聊天浮窗 |
 | P4 | `components/chat/ChatMessage.vue` | 消息气泡 |
 | P4 | `components/chat/ChatInput.vue` | 输入框 |
@@ -2942,13 +3593,16 @@ export RAGENT_PG_PASSWORD="your-secure-password"
 
 | 文件 | Phase | 修改内容 |
 |------|-------|---------|
-| `pom.xml` | P0 | 升级 Spring Boot 3.0.7→3.5.7，加 pgvector 依赖 |
-| `docker/docker-compose.yml` | P0 | 新增 postgres 服务 + ollama(可选) |
-| `application.yaml` | P0 | 新增 `rag.*` 配置段 |
+| `pom.xml` | P0 | ✅ 已完成：Spring Boot 3.5.7、MP 3.5.14（boot3 starter + jsqlparser）、pgvector 0.1.6 |
+| `docker/docker-compose.yml` | P0 | ✅ 已完成：postgres 服务（ollama 段注释预留） |
+| `application.yaml` | P0 | 部分完成：rag.datasource 已配；llm providers / rate-limit 按 Step 0.4 修订 |
+| `MysiteApplication.java` | P2 | `@MapperScan` 加 `sqlSessionFactoryRef = "sqlSessionFactory"` |
+| `config/RagentDataSourceConfig.java` | P2 | 删除误建空壳（正确位置在 `ragent/config/`） |
+| `config/DataBaseConfiguration.java` | P2 | 保留分页插件；注意 RAG 手工建 SqlSessionFactory 不会自动继承它 |
 | `WebSecurityConfig.java` | P3 | `/v1/rag/chat/stream` 加入 permitAll |
 | `ArticleServiceImpl.java` | P2 | 发布 Spring Event |
 | `DefaultLayout.vue` | P4 | 嵌入 `<ChatWidget />` |
-| `app/router/index.ts` | P5 | 添加 knowledge 路由 |
+| `app/router/index.ts` | P5 | 添加 `/dashboard/knowledge` 路由 |
 | `deploy/nginx/mysite.conf` | P5 | SSE 长连接配置 |
 | `deploy/deploy.sh` | P5 | 启动 PG 检查 |
 
