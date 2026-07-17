@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.0.7</version>
+        <version>3.5.7</version>
         <relativePath/>
     </parent>
 
@@ -31,7 +31,7 @@
 
     <properties>
         <java.version>17</java.version>
-        <mybatis-plus.version>3.5.7</mybatis-plus.version>
+        <mybatis-plus.version>3.5.14</mybatis-plus.version>
         <fastjson2.version>2.0.36</fastjson2.version>
         <hutool-all.version>5.8.27</hutool-all.version>
         <transmittable-thread-local.version>2.14.5</transmittable-thread-local.version>
@@ -132,7 +132,14 @@
 
         <dependency>
             <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-boot-starter</artifactId>
+            <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+
+        <!-- MyBatis-Plus JSqlParser（3.5.9+ 分页插件所在模块，必须单独引入） -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
             <version>${mybatis-plus.version}</version>
         </dependency>
 
@@ -154,7 +161,12 @@
             <artifactId>postgresql</artifactId>
         </dependency>
 
-        <!-- pgvector 支持通过 MyBatis-Plus 原生 SQL -->
+        <!-- pgvector JDBC 支持 (MyBatis-Plus 原生 SQL 操作向量) -->
+        <dependency>
+            <groupId>com.pgvector</groupId>
+            <artifactId>pgvector</artifactId>
+            <version>0.1.6</version>
+        </dependency>
     </dependencies>
 
     <build>

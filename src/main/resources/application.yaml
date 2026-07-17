@@ -92,3 +92,93 @@ image:
     max-uploads-per-minute: 10
     url-fetch-connect-timeout: 5000
     url-fetch-read-timeout: 15000
+
+# ============ RAG 配置 ============
+rag:
+  # PostgreSQL 数据源（RAG 专用）
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/ragent
+    username: ragent
+    password: ${RAGENT_PG_PASSWORD:ragent123}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+
+  # LLM 供应商配置（优先级从高到低）
+  llm:
+    providers:
+      # P1: 阿里百炼 —— 国内首选，延迟低，中文能力强
+      bailian:
+        enabled: true
+        priority: 1
+        base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+        api-key: ${BAILIAN_API_KEY:sk-58d0aa5347a242e2b5da0bccdd6d3dc4}
+        chat-model: qwen3-max
+        embedding-model: text-embedding-v4
+        rerank-model: gte-rerank
+        chat-timeout: 120s
+        embedding-timeout: 30s
+
+      # P2: SiliconFlow —— 备选，模型选择丰富
+      siliconflow:
+        enabled: false
+        priority: 2
+        base-url: https://api.siliconflow.cn/v1
+        api-key: ${SILICONFLOW_API_KEY:}
+        chat-model: glm-4.7
+        embedding-model: BAAI/bge-large-zh-v1.5
+        chat-timeout: 120s
+        embedding-timeout: 30s
+
+      # P3: AIHubMix —— 国际模型代理
+      aihubmix:
+        enabled: false
+        priority: 3
+        base-url: https://aihubmix.com/v1
+        api-key: ${AIHUBMIX_API_KEY:}
+        chat-model: gpt-5.4
+        embedding-model: text-embedding-3-small
+        chat-timeout: 120s
+        embedding-timeout: 30s
+
+      # P9: 本地 Ollama —— 最低优先级兜底
+      ollama:
+        enabled: false
+        priority: 9
+        base-url: http://localhost:11434/v1
+        api-key: ""
+        chat-model: qwen3:8b
+        embedding-model: qwen3-embedding
+        chat-timeout: 180s
+        embedding-timeout: 60s
+
+    # 断路器全局参数
+    circuit-breaker:
+      failure-threshold: 2       # 连续失败 N 次 → 熔断
+      cooldown-seconds: 30       # 熔断后冷却 N 秒 → 半开
+      first-packet-timeout: 60   # 首包探测超时（秒）
+
+  # 分块参数
+  chunk:
+    size: 800
+    overlap: 100
+    max-chunks-per-doc: 50
+
+  # 检索参数
+  retrieval:
+    top-k: 10
+    rerank-top-k: 5
+    score-threshold: 0.3
+
+  # 对话记忆
+  memory:
+    keep-turns: 6
+    summary-turns: 10
+    summary-enabled: false   # Phase 3 先不做摘要，保持简单
+
+  # 异步线程池
+  async:
+    core-pool-size: 2
+    max-pool-size: 4
+    queue-capacity: 100
