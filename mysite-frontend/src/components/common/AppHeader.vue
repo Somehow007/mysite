@@ -20,6 +20,9 @@ const menuStyle = ref<Record<string, string>>({})
 const triggerRef = ref<HTMLElement | null>(null)
 let menuCloseTimer: ReturnType<typeof setTimeout> | null = null
 
+// simple-game（数独、扫雷）部署在服务器的 80 端口，可通过 VITE_GAME_URL 覆盖
+const gameUrl = import.meta.env.VITE_GAME_URL || 'http://124.222.65.169'
+
 function handleScroll() {
   scrolled.value = window.scrollY > 10
 }
@@ -136,6 +139,14 @@ async function handleAvatarUpload(e: Event) {
         >
           {{ item.label }}
         </RouterLink>
+        <a
+          :href="gameUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="px-3 py-1.5 rounded-md text-sm text-text-secondary hover:text-accent hover:bg-accent-subtle transition-all duration-200"
+        >
+          游戏
+        </a>
 
         <div class="flex items-center gap-1 ml-3 pl-3 border-l border-border">
           <SearchDialog />
@@ -199,6 +210,15 @@ async function handleAvatarUpload(e: Event) {
           >
             {{ item.label }}
           </RouterLink>
+          <a
+            :href="gameUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-sm py-2.5 px-3 rounded-lg text-text-secondary hover:bg-accent-subtle hover:text-accent transition-all duration-200"
+            @click="closeMobileMenu"
+          >
+            游戏
+          </a>
 
           <template v-if="!userStore.isLoggedIn">
             <RouterLink
