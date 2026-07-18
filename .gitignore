@@ -33,6 +33,7 @@ build/
 .vscode/
 
 ### Project specific ###
+.env
 .DS_Store
 uploads/
 备案图标.png

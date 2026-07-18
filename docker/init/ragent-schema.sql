@@ -28,10 +28,13 @@ CREATE TABLE IF NOT EXISTS t_knowledge_document (
     source_type VARCHAR(20) NOT NULL,
     source_ref VARCHAR(500),
     file_type VARCHAR(20),
-    status VARCHAR(20) DEFAULT 'PENDING',
+    status VARCHAR(20) DEFAULT 'PENDING',   -- PENDING/CHUNKING/READY/FAILED
+    fail_reason TEXT,                        -- 摄取失败原因（embedding API 挂了就记录在这里）
     chunk_count INT DEFAULT 0,
     char_count INT DEFAULT 0,
-    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    -- 同一来源只对应一份文档，防止并发的创建/更新事件插入重复记录
+    CONSTRAINT uk_doc_source UNIQUE (kb_id, source_type, source_ref)
 );
 
 -- 分块
@@ -63,11 +66,14 @@ CREATE INDEX IF NOT EXISTS idx_vector_embedding ON t_knowledge_vector
 -- 对话会话
 CREATE TABLE IF NOT EXISTS t_conversation (
     id BIGINT PRIMARY KEY,
-    user_id BIGINT NOT NULL,
+    user_id BIGINT,                          -- 可空：匿名聊天不强制登录（见 3.5 节决策 3）
+    visitor_id VARCHAR(64),                  -- 匿名访客标识（前端 localStorage UUID），防 IDOR
     title VARCHAR(200),
     message_count INT DEFAULT 0,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    -- 注意：PG 没有 MySQL 的 ON UPDATE CURRENT_TIMESTAMP，
+    -- update_time 由应用层（MyBatis-Plus 填充或 service 显式 set）维护
 );
 
 -- 对话消息
@@ -87,4 +93,5 @@ CREATE INDEX IF NOT EXISTS idx_chunk_kb_id ON t_knowledge_chunk(kb_id);
 CREATE INDEX IF NOT EXISTS idx_vector_chunk_id ON t_knowledge_vector(chunk_id);
 CREATE INDEX IF NOT EXISTS idx_vector_kb_id ON t_knowledge_vector(kb_id);
 CREATE INDEX IF NOT EXISTS idx_conv_user_id ON t_conversation(user_id);
+CREATE INDEX IF NOT EXISTS idx_conv_visitor_id ON t_conversation(visitor_id);
 CREATE INDEX IF NOT EXISTS idx_conv_msg_conv_id ON t_conversation_message(conversation_id);
