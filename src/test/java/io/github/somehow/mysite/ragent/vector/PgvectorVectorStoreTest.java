@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class PgvectorVectorStoreTest {
 
     private static final String JDBC_URL = "jdbc:postgresql://localhost:5432/ragent";
-    private static final String USER = "ragent";
+    private static final String USER = "somehow";
     private static final String PASSWORD = "ragent123";
 
     private static DataSource dataSource;
@@ -263,7 +263,17 @@ class PgvectorVectorStoreTest {
     /** 插入测试用的 chunk 和 document 记录（search SQL 需要 JOIN 这两张表） */
     private void insertTestChunkAndDocument(long chunkId, long kbId, String title, String content) {
         try (Connection conn = dataSource.getConnection()) {
-            // 检查 document 是否存在
+            // 1. 确保 knowledge_base 存在（满足外键约束）
+            try (PreparedStatement ps = conn.prepareStatement(
+                "INSERT INTO t_knowledge_base (id, name, collection_name) " +
+                "VALUES (?, ?, ?) ON CONFLICT (id) DO NOTHING"
+            )) {
+                ps.setLong(1, kbId);
+                ps.setString(2, "test-kb-" + kbId);
+                ps.setString(3, "test-collection-" + kbId);
+                ps.executeUpdate();
+            }
+            // 2. 检查 document 是否存在
             try (PreparedStatement ps = conn.prepareStatement(
                 "SELECT 1 FROM t_knowledge_document WHERE id = ?"
             )) {
@@ -282,7 +292,7 @@ class PgvectorVectorStoreTest {
                     }
                 }
             }
-            // 插入或替换 chunk
+            // 3. 插入或替换 chunk
             try (PreparedStatement ps = conn.prepareStatement(
                 "INSERT INTO t_knowledge_chunk (id, doc_id, kb_id, chunk_index, content) " +
                 "VALUES (?, ?, ?, 0, ?) ON CONFLICT (id) DO UPDATE SET content = EXCLUDED.content"
