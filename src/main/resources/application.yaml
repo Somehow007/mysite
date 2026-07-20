@@ -151,6 +151,15 @@ rag:
         chat-model: qwen3:8b
         chat-timeout: 180s
 
+      # DeepSeek（不在计划文档中，代码预留，默认关闭）
+      deepseek:
+        enabled: false
+        priority: 4
+        base-url: https://api.deepseek.com/v1
+        api-key: ""
+        chat-model: deepseek-chat
+        chat-timeout: 120s
+
     # 断路器全局参数
     circuit-breaker:
       failure-threshold: 2       # 连续失败 N 次 → 熔断

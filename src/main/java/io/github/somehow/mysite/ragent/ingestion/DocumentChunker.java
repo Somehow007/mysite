@@ -1,7 +1,41 @@
 package io.github.somehow.mysite.ragent.ingestion;
 
+import java.util.List;
+
 /**
- * 分块器接口
+ * 文档分块器接口。
+ *
+ * 为什么需要抽象？
+ *   当前实现是固定大小 + Markdown 标题感知分块，但未来可以扩展为：
+ *   - 语义分块（让 LLM 判断分块边界，成本更高但效果更好）
+ *   - 代码感知分块（AST 级别切分）
+ *   - 多模态分块（图文混合）
+ *   接口抽象让分块策略可以独立演进，不影响下游的向量化和检索。
  */
-public class DocumentChunker {
+public interface DocumentChunker {
+
+    /**
+     * 将文档内容切分为多个块。
+     *
+     * @param markdownContent 原始 Markdown 内容
+     * @param docId           文档 ID
+     * @param kbId            所属知识库 ID
+     * @return 分块列表，按文档中的出现顺序排列
+     */
+    List<Chunk> chunk(String markdownContent, Long docId, Long kbId);
+
+    /**
+     * 分块结果。
+     *
+     * @param docId      所属文档 ID
+     * @param kbId       所属知识库 ID
+     * @param index      分块序号（从 0 开始）
+     * @param content    分块文本内容
+     */
+    record Chunk(
+        Long docId,
+        Long kbId,
+        int index,
+        String content
+    ) {}
 }
