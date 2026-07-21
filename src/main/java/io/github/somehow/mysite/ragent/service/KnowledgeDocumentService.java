@@ -90,8 +90,10 @@ public class KnowledgeDocumentService {
             doc.setStatus("CHUNKING");
             docMapper.updateById(doc);
 
-            // 5. 批量嵌入（内部按供应商上限分批）
-            List<String> chunkTexts = chunks.stream().map(DocumentChunker.Chunk::content).toList();
+            // 5. 批量嵌入 — embeddingText 优先（Ragent 模式），null 时回退到 content
+            List<String> chunkTexts = chunks.stream()
+                .map(c -> c.embeddingText() != null ? c.embeddingText() : c.content())
+                .toList();
             List<float[]> embeddings = embeddingService.embedBatch(chunkTexts);
 
             // 6. 存储 chunks + vectors
@@ -102,6 +104,7 @@ public class KnowledgeDocumentService {
                 chunkDO.setKbId(kb.getId());
                 chunkDO.setChunkIndex(c.index());
                 chunkDO.setContent(c.content());
+                chunkDO.setEmbeddingText(c.embeddingText());
                 chunkDO.setCharCount(c.content().length());
                 chunkMapper.insert(chunkDO);
 

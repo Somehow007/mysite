@@ -93,9 +93,12 @@ public abstract class AbstractOpenAiProvider implements LLMService {
                 .retrieve()
                 .bodyToFlux(String.class)
                 .timeout(this.timeout)
-                .takeUntil(line -> line.contains("[DONE]"))     // SSE 结束标记
-                .filter(line -> line.startsWith("data: "))
-                .map(line -> line.substring(6))     // 去掉“data: ”前缀
+                // 部分供应商（如 Ollama）返回标准 SSE 格式（data: 前缀），
+                // 百炼兼容模式返回裸 JSON 行。统一处理：有 data: 前缀则去掉，没有则直传
+                .flatMap(chunk -> Flux.fromArray(chunk.split("\n")))
+                .filter(line -> !line.isBlank())
+                .takeUntil(line -> line.contains("[DONE]"))
+                .map(line -> line.startsWith("data: ") ? line.substring(6) : line)
                 .map(this::extractDeltaContent)
                 .filter(content -> content != null && !content.isEmpty());
     }

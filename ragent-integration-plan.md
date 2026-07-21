@@ -1700,6 +1700,7 @@ MySite Application
 ```java
 package io.github.somehow.mysite.config;
 
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -1718,15 +1719,30 @@ import javax.sql.DataSource;
  *   - Boot 的 DataSource 自动配置退避（@ConditionalOnMissingBean）
  *   - MyBatis-Plus 自动配置的 sqlSessionFactory 仍会注入这个 @Primary 主库
  *   - spring.datasource.hikari.* 连接池配置继续生效
+ *
+ * 为什么必须显式定义 DataSourceProperties bean？
+ *   RagentDataSourceConfig 里还有一个 ragentDataSourceProperties，
+ *   容器中两个 DataSourceProperties 并存，如果 dataSource() 方法参数
+ *   只写 DataSourceProperties，Spring 按类型注入会报
+ *   NoUniqueBeanDefinitionException。显式定义 primaryDataSourceProperties +
+ *   @Qualifier 精确注入才能消除歧义。
  */
 @Configuration
 public class PrimaryDataSourceConfig {
 
+    /** 显式绑定 spring.datasource.*，替代 Boot 自动配置的 DataSourceProperties */
+    @Primary
+    @Bean
+    @ConfigurationProperties("spring.datasource")
+    public DataSourceProperties primaryDataSourceProperties() {
+        return new DataSourceProperties();
+    }
+
     @Primary
     @Bean
     @ConfigurationProperties("spring.datasource.hikari")  // 保留 yaml 里已有的 hikari 细项
-    public DataSource dataSource(DataSourceProperties properties) {
-        // DataSourceProperties 由 Boot 自动注册（绑定 spring.datasource.*），
+    public DataSource dataSource(
+            @Qualifier("primaryDataSourceProperties") DataSourceProperties properties) {
         // initializeDataSourceBuilder() 自动处理 url → jdbcUrl 的转换
         return properties.initializeDataSourceBuilder().build();
     }

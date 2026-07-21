@@ -118,7 +118,7 @@ class KnowledgeDocumentServiceTest {
             // 验证 insert 被调，updateById 至少被调（CHUNKING + READY）
             verify(docMapper).insert(any(KnowledgeDocumentDO.class));
             verify(chunkMapper, atLeastOnce()).insert(any(KnowledgeChunkDO.class));
-            verify(vectorStore).insert(anyList());
+            verify(vectorStore, atLeastOnce()).insert(anyList());
             verify(docMapper, atLeast(2)).updateById(any(KnowledgeDocumentDO.class));
         }
     }

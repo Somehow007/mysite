@@ -76,6 +76,8 @@ public class RagProperties {
         private int size = 800;
         private int overlap = 100;
         private int maxChunksPerDoc = 50;
+        /** 最小 chunk 字符数，低于此阈值的碎片合并到前一个 chunk（Ragent 模式） */
+        private int minChars = 400;
     }
 
     @Data

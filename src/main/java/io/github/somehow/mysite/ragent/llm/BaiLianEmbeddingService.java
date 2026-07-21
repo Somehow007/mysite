@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.ragent.config.RagProperties;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -36,6 +37,7 @@ public class BaiLianEmbeddingService implements EmbeddingService {
     /**
      * 生产环境构造器：从 RagProperties 读取百炼配置。
      */
+    @Autowired
     public BaiLianEmbeddingService(RagProperties properties, ObjectMapper objectMapper) {
         RagProperties.Provider bailian = properties.getLlm().getProviders().get("bailian");
         if (bailian == null || !bailian.isEnabled()) {
@@ -45,8 +47,6 @@ public class BaiLianEmbeddingService implements EmbeddingService {
         this.model = bailian.getEmbeddingModel();
         this.objectMapper = objectMapper;
         this.maxBatchSize = 10;  // text-embedding-v4 单次最多 10 条
-        Duration timeout = bailian.getEmbeddingTimeout() != null
-            ? bailian.getEmbeddingTimeout() : Duration.ofSeconds(30);
 
         this.webClient = WebClient.builder()
             .baseUrl(bailian.getBaseUrl())
@@ -60,9 +60,9 @@ public class BaiLianEmbeddingService implements EmbeddingService {
 
     /**
      * 测试用构造器：直接注入 WebClient、model、maxBatchSize。
-     * package-private，避免被生产代码误用。
+     * public 以便跨 package 的集成测试使用；生产代码应使用 @Autowired 构造器。
      */
-    BaiLianEmbeddingService(WebClient webClient, String model, ObjectMapper objectMapper, int maxBatchSize) {
+    public BaiLianEmbeddingService(WebClient webClient, String model, ObjectMapper objectMapper, int maxBatchSize) {
         this.webClient = webClient;
         this.model = model;
         this.objectMapper = objectMapper;

@@ -21,6 +21,8 @@ public class KnowledgeChunkDO {
     private Long kbId;
     private Integer chunkIndex;
     private String content;
+    /** 向量化专用文本，为 null 时回退到 content（Ragent 模式：代码块去噪、表格转 KV） */
+    private String embeddingText;
     private Integer charCount;
     private LocalDateTime createTime;
 }

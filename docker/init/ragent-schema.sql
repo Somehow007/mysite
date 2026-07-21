@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS t_knowledge_chunk (
     kb_id BIGINT NOT NULL REFERENCES t_knowledge_base(id),
     chunk_index INT NOT NULL,
     content TEXT NOT NULL,
+    embedding_text TEXT,    -- 向量化专用文本，NULL 时回退到 content（Ragent 模式）
     char_count INT DEFAULT 0,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

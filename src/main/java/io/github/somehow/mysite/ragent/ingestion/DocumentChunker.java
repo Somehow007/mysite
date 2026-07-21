@@ -27,15 +27,18 @@ public interface DocumentChunker {
     /**
      * 分块结果。
      *
-     * @param docId      所属文档 ID
-     * @param kbId       所属知识库 ID
-     * @param index      分块序号（从 0 开始）
-     * @param content    分块文本内容
+     * @param docId         所属文档 ID
+     * @param kbId          所属知识库 ID
+     * @param index         分块序号（从 0 开始）
+     * @param content       展示/LLM 用的文本（原始 Markdown 格式）
+     * @param embeddingText 向量化专用文本，为 null 时回退到 content
+     *                      （Ragent 模式：代码块去噪、表格转 KV、描述替代 URL）
      */
     record Chunk(
         Long docId,
         Long kbId,
         int index,
-        String content
+        String content,
+        String embeddingText
     ) {}
 }
