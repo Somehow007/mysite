@@ -39,6 +39,8 @@ function handleSend() {
 }
 
 function handleKeydown(e: KeyboardEvent) {
+  // IME 组合输入中（拼音未确认）：不拦截 Enter，交给输入法处理候选词选择
+  if (e.isComposing) return
   if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault()
     handleSend()
