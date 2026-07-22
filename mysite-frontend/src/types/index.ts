@@ -270,3 +270,22 @@ export interface UpdateCollectionRequest {
   coverImage?: string
   sortOrder?: number
 }
+
+// ========== RAG / AI 助手 ==========
+
+export interface SourceChunk {
+  title: string
+  content: string
+  score: number
+  articleId?: string | null
+}
+
+export interface ChatMessage {
+  id: number               // 前端自增，v-for key
+  role: 'user' | 'assistant'
+  content: string
+  sources: SourceChunk[]
+  pending?: boolean        // 流式生成中
+  failed?: boolean         // 无输出即失败，可重试
+  truncated?: boolean      // 被取消或中断，保留部分内容
+}

@@ -1,8 +1,10 @@
 package io.github.somehow.mysite.ragent.dao.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import io.github.somehow.mysite.ragent.dao.handler.JsonbTypeHandler;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -22,6 +24,7 @@ public class ConversationMessageDO {
     private String role;
     private String content;
     /** 引用来源，JSONB 格式：[{"docTitle":"...","chunkContent":"...","score":0.92}] */
+    @TableField(typeHandler = JsonbTypeHandler.class)
     private String sources;
     private Integer tokenCount;
     private LocalDateTime createTime;

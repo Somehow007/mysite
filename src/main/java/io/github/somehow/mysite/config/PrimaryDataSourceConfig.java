@@ -10,6 +10,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 
 import javax.sql.DataSource;
 
@@ -70,6 +71,9 @@ public class PrimaryDataSourceConfig {
         MybatisSqlSessionFactoryBean factory = new MybatisSqlSessionFactoryBean();
         factory.setDataSource(dataSource);
         factory.setTypeAliasesPackage("io.github.somehow.mysite.dao.entity");
+        // 必须设置 mapperLocations：手动创建 SqlSessionFactory 不会自动加载 XML 映射文件
+        factory.setMapperLocations(
+            new PathMatchingResourcePatternResolver().getResources("classpath*:/mapper/**/*.xml"));
         factory.setPlugins(mybatisPlusInterceptor);
         // 注册 MetaObjectHandler（字段自动填充：createTime/updateTime/delFlag）
         com.baomidou.mybatisplus.core.config.GlobalConfig globalConfig =
