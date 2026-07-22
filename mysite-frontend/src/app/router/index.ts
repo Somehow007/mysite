@@ -102,49 +102,49 @@ const router = createRouter({
           path: 'categories',
           name: 'categories',
           component: () => import('@/views/CategoryManageView.vue'),
-          meta: { requiresDeveloper: true },
+          meta: { requiresAdmin: true },
         },
         {
           path: 'tags',
           name: 'tags',
           component: () => import('@/views/TagManageView.vue'),
-          meta: { requiresDeveloper: true },
+          meta: { requiresAdmin: true },
         },
         {
           path: 'images',
           name: 'images',
           component: () => import('@/views/ImageManagerView.vue'),
-          meta: { requiresDeveloper: true },
+          meta: { requiresAdmin: true },
         },
         {
           path: 'users',
           name: 'users',
           component: () => import('@/views/UserManageView.vue'),
-          meta: { requiresDeveloper: true },
+          meta: { requiresAdmin: true },
         },
         {
           path: 'comments',
           name: 'comments',
           component: () => import('@/views/CommentManageView.vue'),
-          meta: { requiresDeveloper: true },
+          meta: { requiresAdmin: true },
         },
         {
           path: 'collections',
-          name: 'collections',
+          name: 'collections-manage',
           component: () => import('@/views/CollectionManageView.vue'),
-          meta: { requiresDeveloper: true },
+          meta: { requiresAdmin: true },
         },
         {
           path: 'collections/new',
           name: 'collection-new',
           component: () => import('@/views/CollectionEditView.vue'),
-          meta: { requiresDeveloper: true },
+          meta: { requiresAdmin: true },
         },
         {
           path: 'collections/:id/edit',
           name: 'collection-edit',
           component: () => import('@/views/CollectionEditView.vue'),
-          meta: { requiresDeveloper: true },
+          meta: { requiresAdmin: true },
         },
         {
           path: 'settings',
@@ -174,9 +174,10 @@ router.beforeEach(async (to, _from, next) => {
     return
   }
 
-  if (to.meta.requiresDeveloper && token) {
+  if (to.meta.requiresAdmin && token) {
     const storedRole = getItem<string>('user_role')
-    if (storedRole !== 'DEVELOPER') {
+    // 兼容旧缓存值 DEVELOPER → ADMIN
+    if (storedRole !== 'ADMIN' && storedRole !== 'DEVELOPER') {
       next({ name: 'dashboard' })
       return
     }

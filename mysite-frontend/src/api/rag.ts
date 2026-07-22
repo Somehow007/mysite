@@ -69,13 +69,30 @@ export function createChatStream(
   const controller = new AbortController()
   const { signal } = controller
 
+  // 从 localStorage 读取 JWT token（与 axios client.ts 使用相同 key）
+  const token = (() => {
+    try {
+      const raw = localStorage.getItem('mysite_access_token')
+      if (!raw) return null
+      // storage.ts 的 getItem 会 JSON.parse，这里原生读 localStorage 需要手动处理
+      const parsed = JSON.parse(raw)
+      return typeof parsed === 'string' ? parsed : null
+    } catch {
+      const raw = localStorage.getItem('mysite_access_token')
+      return typeof raw === 'string' ? raw : null
+    }
+  })()
+
+  const headers: Record<string, string> = { Accept: 'text/event-stream' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
   const fail = (err: ChatStreamError) => {
     if (!signal.aborted) safe(callbacks.onError, err)
   }
 
   fetch(`/v1/rag/chat/stream?${params}`, {
     method: 'GET',
-    headers: { Accept: 'text/event-stream' },
+    headers,
     signal,
   })
     .then(async (response) => {
@@ -111,7 +128,12 @@ export function createChatStream(
           if (!payload) continue // 跳过空 data: 行
 
           let data: Record<string, unknown> | undefined
-          try { data = JSON.parse(payload) as Record<string, unknown> } catch { continue } // 半包 JSON：跳过
+          try {
+            const parsed = JSON.parse(payload)
+            // 兜底：后端可能错误地把 JSON 字符串再用 Jackson 序列化了一次
+            // （表现为 parsed 是 string 而非 object），此时再解析一次
+            data = (typeof parsed === 'string' ? JSON.parse(parsed) : parsed) as Record<string, unknown>
+          } catch { continue } // 半包 JSON：跳过
 
           switch (data?.type) {
             case 'meta': {
@@ -133,6 +155,11 @@ export function createChatStream(
               finished = true
               fail(new ChatStreamError('server', (data.message as string) || 'AI 服务暂时不可用'))
               return
+            default:
+              // 未知事件类型：记录日志但不中断流
+              if (import.meta.env.DEV) {
+                console.debug('[rag] unknown SSE event type:', data?.type, data)
+              }
           }
         }
       }

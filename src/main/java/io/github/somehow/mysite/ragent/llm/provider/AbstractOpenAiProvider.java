@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.ragent.llm.ChatRequest;
 import io.github.somehow.mysite.ragent.llm.LLMService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 
@@ -51,6 +52,7 @@ import java.util.Map;
  *   - Ollama (本地)
  *   ... 等等
  */
+@Slf4j
 public abstract class AbstractOpenAiProvider implements LLMService {
     protected final WebClient webClient;
     protected final String apiKey;
@@ -81,6 +83,10 @@ public abstract class AbstractOpenAiProvider implements LLMService {
                 .maxTokens(request.getMaxTokens())
                 .build();
 
+        long t0 = System.currentTimeMillis();
+        log.info("[llm] POST /chat/completions model={} msgs={} stream=true timeout={}",
+            this.model, actualRequest.getMessages().size(), this.timeout);
+
         return webClient.post()
                 .uri("/chat/completions")
                 .bodyValue(Map.of(
@@ -100,7 +106,11 @@ public abstract class AbstractOpenAiProvider implements LLMService {
                 .takeUntil(line -> line.contains("[DONE]"))
                 .map(line -> line.startsWith("data: ") ? line.substring(6) : line)
                 .map(this::extractDeltaContent)
-                .filter(content -> content != null && !content.isEmpty());
+                .filter(content -> content != null && !content.isEmpty())
+                .doOnComplete(() -> log.info("[llm] stream complete for model={}, elapsed={}ms",
+                    this.model, System.currentTimeMillis() - t0))
+                .doOnError(e -> log.warn("[llm] stream error for model={} after {}ms: {}",
+                    this.model, System.currentTimeMillis() - t0, e.getMessage()));
     }
 
     @Override

@@ -11,8 +11,20 @@ export const useUserStore = defineStore('user', () => {
 
   const isLoggedIn = computed(() => !!user.value)
   const displayName = computed(() => user.value?.realName || user.value?.username || '')
-  const role = computed<UserRole | undefined>(() => user.value?.role)
-  const isDeveloper = computed(() => role.value === 'DEVELOPER')
+
+  /** 兼容旧角色映射 */
+  function normalizeRole(r?: string): UserRole | undefined {
+    if (!r) return undefined
+    if (r === 'DEVELOPER') return 'ADMIN'
+    if (r === 'ADMIN' || r === 'CREATOR' || r === 'USER') return r
+    return 'USER'
+  }
+
+  const role = computed<UserRole | undefined>(() => normalizeRole(user.value?.role))
+  const isAdmin = computed(() => role.value === 'ADMIN')
+  const isCreator = computed(() => role.value === 'CREATOR')
+  /** @deprecated 使用 {@link isAdmin} 替代 */
+  const isDeveloper = computed(() => isAdmin.value)
 
   async function fetchCurrentUser() {
     loading.value = true
@@ -75,7 +87,9 @@ export const useUserStore = defineStore('user', () => {
     isLoggedIn,
     displayName,
     role,
-    isDeveloper,
+    isAdmin,
+    isCreator,
+    isDeveloper, // deprecated compat
     fetchCurrentUser,
     setUser,
     setTokens,

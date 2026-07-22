@@ -117,7 +117,7 @@ async function handleDelete(comment: Comment) {
 }
 
 function canDelete(comment: Comment): boolean {
-  if (userStore.isDeveloper) return true
+  if (userStore.isAdmin) return true
   if (isLoggedIn.value && comment.userId && currentUser.value?.id === comment.userId) return true
   return false
 }

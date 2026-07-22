@@ -23,8 +23,14 @@ public final class UserContext {
         return Optional.ofNullable(userInfoDTO).map(UserInfoDTO::getRole).orElse(null);
     }
 
+    public static boolean isAdmin() {
+        return UserRole.ADMIN.equals(getRole());
+    }
+
+    /** @deprecated 使用 {@link #isAdmin()} 替代 */
+    @Deprecated
     public static boolean isDeveloper() {
-        return UserRole.DEVELOPER.equals(getRole());
+        return isAdmin();
     }
 
     public static void removeUser() {

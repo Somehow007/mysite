@@ -1,25 +1,23 @@
 package io.github.somehow.mysite.ragent.service;
 
+import io.github.somehow.mysite.commons.enums.UserRole;
 import io.github.somehow.mysite.ragent.config.RagProperties;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 
 /**
- * 聊天限流器 —— 成本保护的第一道闸。
+ * 聊天限流器 —— 角色感知，三层速率。
  *
- * 为什么需要限流？
- *   RAG 问答 = embedding API + 向量检索 + LLM 流式生成，
- *   其中 embedding 和 LLM 都是按 token 计费的云 API。
- *   permitAll 端点不做限流，恶意脚本一晚上就能烧掉几百块。
- *
- * 策略（Redis 固定窗口，够用不复杂）：
- *   1. IP 维度计数：key = rag:chat:rl:{ip}，INCR + 首值设 1 小时 TTL
- *   2. 问题长度上限：默认 500 字符，超长直接拒绝
- *
- * Phase 4 可升级为滑动窗口 / Token Bucket（精度更高但 Redis 脚本更复杂）。
+ * 策略：
+ *   ADMIN  → 无限制（adminMaxPerHour == 0 时跳过计数）
+ *   CREATOR → 20次/小时（Redis IP 维度计数）
+ *   USER    → 10次/小时（Redis IP 维度计数）
+ *   未登录  → WebSecurityConfig 已拦截为 401，本类作为双保险拒绝
  */
+@Slf4j
 @Component
 public class ChatRateLimiter {
 
@@ -32,32 +30,55 @@ public class ChatRateLimiter {
     }
 
     /**
-     * 检查请求是否超出频率/长度限制。
+     * 角色感知限流检查。
      *
      * @param clientIp 客户端 IP
      * @param question 用户问题
+     * @param role     当前用户角色（null = 未登录，直接拒绝）
      * @throws RateLimitExceededException 超出限制时抛出
      */
-    public void check(String clientIp, String question) {
-        int maxPerHour = properties.getRateLimit().getMaxPerHour();
+    public void check(String clientIp, String question, UserRole role) {
+        if (role == null) {
+            throw new RateLimitExceededException("请登录后使用 AI 助手");
+        }
+
         int maxLength = properties.getRateLimit().getMaxQuestionLength();
 
-        // 1. 长度检查
+        // 1. 长度检查（所有角色统一）
         if (question != null && question.length() > maxLength) {
             throw new RateLimitExceededException(
                 "问题过长（" + question.length() + " 字符），请控制在 " + maxLength + " 字符以内");
         }
 
-        // 2. IP 限流（Redis INCR + 首次设 TTL）
+        // 2. 获取角色对应的限流阈值
+        int maxPerHour = getMaxPerHour(role);
+
+        // 3. ADMIN 不限流（0 = unlimited）
+        if (maxPerHour <= 0) {
+            log.debug("[rate-limit] ADMIN {} skipped (unlimited)", clientIp);
+            return;
+        }
+
+        // 4. IP 维度 Redis 计数
         String key = "rag:chat:rl:" + clientIp;
         Long count = redisTemplate.opsForValue().increment(key);
         if (count != null && count == 1L) {
             redisTemplate.expire(key, Duration.ofHours(1));
         }
         if (count != null && count > maxPerHour) {
+            log.warn("[rate-limit] IP={} role={} exceeded: {}/{}", clientIp, role, count, maxPerHour);
             throw new RateLimitExceededException(
-                "请求过于频繁，每小时限制 " + maxPerHour + " 次，请稍后再试");
+                "提问太频繁（" + role.getDescription() + "每小时 " + maxPerHour + " 次），请稍后再试");
         }
+        log.debug("[rate-limit] IP={} role={} count={}/{}", clientIp, role, count, maxPerHour);
+    }
+
+    private int getMaxPerHour(UserRole role) {
+        return switch (role) {
+            case ADMIN, DEVELOPER -> properties.getRateLimit().getAdminMaxPerHour();
+            case CREATOR -> properties.getRateLimit().getCreatorMaxPerHour();
+            case USER -> properties.getRateLimit().getUserMaxPerHour();
+        };
     }
 
     /**

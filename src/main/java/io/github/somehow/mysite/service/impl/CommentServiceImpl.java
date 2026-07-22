@@ -134,7 +134,7 @@ public class CommentServiceImpl extends ServiceImpl<CommentMapper, CommentDO> im
         UserRole currentRole = UserContext.getRole();
         String currentUserId = UserContext.getUserId();
 
-        if (!UserRole.DEVELOPER.equals(currentRole)) {
+        if (!UserRole.ADMIN.equals(currentRole)) {
             if (currentUserId == null || !currentUserId.equals(comment.getUserId() != null ? comment.getUserId().toString() : null)) {
                 throw new ClientException(ErrorCode.COMMENT_PERMISSION_DENIED);
             }

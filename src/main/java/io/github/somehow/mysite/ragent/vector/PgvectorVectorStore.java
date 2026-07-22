@@ -2,6 +2,7 @@ package io.github.somehow.mysite.ragent.vector;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.pgvector.PGvector;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
@@ -37,6 +38,7 @@ import java.util.List;
  *      再在下层精确查找，时间复杂度 O(log N)，ANN（近似最近邻）领域
  *      最主流的算法之一，pgvector、Milvus、Weaviate 都在用。
  */
+@Slf4j
 @Component
 public class PgvectorVectorStore implements VectorStore{
 
@@ -87,6 +89,7 @@ public class PgvectorVectorStore implements VectorStore{
                 ORDER BY v.embedding <=> ?::vector
                 LIMIT ?
                 """;
+        long t0 = System.currentTimeMillis();
         List<SearchResult> results = new ArrayList<>();
         try (Connection conn = dataSource.getConnection();
         PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -117,6 +120,8 @@ public class PgvectorVectorStore implements VectorStore{
         } catch (SQLException e) {
             throw new RuntimeException("Vector search failed", e);
         }
+        log.info("[pgvector] search: topK={}, kbId={}, results={}, elapsed={}ms",
+            topK, kbId, results.size(), System.currentTimeMillis() - t0);
         return results;
     }
 

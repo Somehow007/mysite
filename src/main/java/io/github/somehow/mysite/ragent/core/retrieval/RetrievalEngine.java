@@ -5,6 +5,7 @@ import io.github.somehow.mysite.ragent.llm.EmbeddingService;
 import io.github.somehow.mysite.ragent.llm.RerankService;
 import io.github.somehow.mysite.ragent.vector.VectorStore;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -28,6 +29,7 @@ import java.util.List;
  *      向量检索可能返回：Top 1 = "JWT 简介"（语义相似但没回答“怎么配置”）
  *      Rerank 会纠正：把 “JWT 过滤器配置步骤” 提到 Top 1
  */
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class RetrievalEngine {
@@ -45,13 +47,21 @@ public class RetrievalEngine {
      * @return          检索结果，按相关性降序
      */
     public List<VectorStore.SearchResult> retrieve(String question, int topK) {
+        long t0 = System.currentTimeMillis();
+
         // Stage 1: 向量检索 Top K（kbId 传 null = 全库；多知识库时传入目标 kbId）
+        long t1 = System.currentTimeMillis();
         float[] queryEmbedding = embeddingService.embed(question);
+        log.info("[retrieval] embedding done: {} dims ({}ms)",
+            queryEmbedding.length, System.currentTimeMillis() - t1);
+
         List<VectorStore.SearchResult> candidates = vectorStore.search(
                 queryEmbedding,
                 properties.getRetrieval().getTopK(),
                 null
         );
+        log.info("[retrieval] vector search: {} candidates ({}ms total)",
+            candidates.size(), System.currentTimeMillis() - t0);
 
         // 过滤低分结果
         candidates = candidates.stream()
@@ -64,10 +74,16 @@ public class RetrievalEngine {
 
         // Stage 2: Rerank 精排（如果配置了 Rerank 服务）
         if (rerankService != null && candidates.size() > topK) {
+            long tr = System.currentTimeMillis();
             candidates = rerankService.rerank(question, candidates, topK);
+            log.info("[retrieval] rerank done: {} results ({}ms)",
+                candidates.size(), System.currentTimeMillis() - tr);
         } else if (candidates.size() > topK) {
             candidates = candidates.subList(0, topK);
         }
+
+        log.info("[retrieval] done: {} final results, total={}ms",
+            candidates.size(), System.currentTimeMillis() - t0);
         return candidates;
     }
 }

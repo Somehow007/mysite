@@ -514,7 +514,7 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
 
     private void checkCollectionOwnership(CollectionDO collection) {
         UserRole currentRole = UserContext.getRole();
-        if (UserRole.DEVELOPER.equals(currentRole)) {
+        if (UserRole.ADMIN.equals(currentRole)) {
             return;
         }
 

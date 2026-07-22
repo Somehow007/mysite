@@ -51,7 +51,10 @@ public class WebSecurityConfig {
                         .requestMatchers(
                                 "/v1/auth/login",
                                 "/v1/auth/register",
-                                "/v1/auth/refresh",
+                                "/v1/auth/refresh"
+                        ).permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
                                 "/v1/articles",
                                 "/v1/articles/archive"
                         ).permitAll()
@@ -81,34 +84,42 @@ public class WebSecurityConfig {
                         .requestMatchers(
                                 "/uploads/**"
                         ).permitAll()
-                        // RAG 匿名聊天（成本保护由 ChatRateLimiter 负责）
-                        .requestMatchers(
-                                "/v1/rag/chat/stream"
-                        ).permitAll()
+                        // RAG AI 聊天：需登录（匿名用户被 ChatWidget 拦截提示登录）
                         .requestMatchers(
                                 "/v1/categories/*/children"
                         ).authenticated()
+                        // 文章管理：ADMIN + CREATOR 可创建/编辑/删除
+                        .requestMatchers(
+                                HttpMethod.POST, "/v1/articles"
+                        ).hasAnyRole("ADMIN", "CREATOR")
+                        .requestMatchers(
+                                HttpMethod.PUT, "/v1/articles/**"
+                        ).hasAnyRole("ADMIN", "CREATOR")
+                        .requestMatchers(
+                                HttpMethod.DELETE, "/v1/articles/**"
+                        ).hasAnyRole("ADMIN", "CREATOR")
+                        // 分类管理：仅 ADMIN
                         .requestMatchers(
                                 HttpMethod.POST, "/v1/categories"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.PUT, "/v1/categories/{id}"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.DELETE, "/v1/categories/{id}"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/v1/categories/batch/**"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/v1/categories/*/status"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/v1/categories/sort"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/v1/admin/users/**"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/v1/comments/article/**"
@@ -127,7 +138,7 @@ public class WebSecurityConfig {
                         ).permitAll()
                         .requestMatchers(
                                 "/v1/admin/comments/**"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         // 合集公开读接口：允许未登录读者浏览合集和文章导航
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -138,16 +149,16 @@ public class WebSecurityConfig {
                                 HttpMethod.GET,
                                 "/v1/articles/{id}/navigation"
                         ).permitAll()
-                        // 合集管理接口：仅 DEVELOPER 角色可操作
+                        // 合集管理接口：仅 ADMIN 角色可操作
                         .requestMatchers(
                                 HttpMethod.POST, "/v1/collections"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.PUT, "/v1/collections/**"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.DELETE, "/v1/collections/**"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {

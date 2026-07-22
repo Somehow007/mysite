@@ -1,6 +1,7 @@
 package io.github.somehow.mysite.ragent.llm;
 
 import io.github.somehow.mysite.ragent.config.RagProperties;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -29,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *     一档已经吐过 token，失败必须直接报错给前端，
  *     否则用户会看到两段拼起来的回答
  */
+@Slf4j
 @Service
 public class RoutingLLMService implements LLMService{
 
@@ -50,6 +52,9 @@ public class RoutingLLMService implements LLMService{
 
     @Override
     public Flux<String> chatStream(ChatRequest request) {
+        log.info("[routing] attempting LLM with {} providers: {}",
+            sortedProviders.size(),
+            sortedProviders.stream().map(LLMProvider::getName).toList());
         return attempt(sortedProviders.iterator(), request);
     }
 
@@ -81,15 +86,25 @@ public class RoutingLLMService implements LLMService{
         LLMProvider provider = it.next();
         CircuitBreaker cb = breakers.get(provider.getName());
         if (cb != null && !cb.allowRequest()) {
+            log.info("[routing] skipping {} (breaker {})", provider.getName(), cb.getState());
             return attempt(it, request);    // 熔断中，跳过
         }
 
+        log.info("[routing] trying provider: {} model={}", provider.getName(),
+            request.getModel() != null ? request.getModel() : "(default)");
+        long t0 = System.currentTimeMillis();
         AtomicBoolean emitted = new AtomicBoolean(false);
         return provider.chatStream(request)
                 .doOnNext(token -> emitted.set(true))
-                .doOnComplete(cb::recordSuccess)
+                .doOnComplete(() -> {
+                    cb.recordSuccess();
+                    log.info("[routing] {} completed successfully ({}ms)", provider.getName(),
+                        System.currentTimeMillis() - t0);
+                })
                 .onErrorResume(e -> {
                     cb.recordFailure();
+                    log.warn("[routing] {} failed after {}ms: {}",
+                        provider.getName(), System.currentTimeMillis() - t0, e.getMessage());
                     if (emitted.get()) {
                         // 已经吐过 token：不能降级，直接失败
                         return Flux.error(e);

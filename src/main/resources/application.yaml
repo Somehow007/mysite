@@ -186,7 +186,9 @@ rag:
   # 成本保护（必做项，见 3.5 节决策 4 与 3.7 节）：
   # 聊天端点 permitAll，不限流任何人都能烧你的付费 API 额度
   rate-limit:
-    max-per-hour: 20            # 每 IP 每小时最多提问次数
+    user-max-per-hour: 10       # 普通用户每小时限制
+    creator-max-per-hour: 20    # 创作者每小时限制
+    admin-max-per-hour: 0       # 管理员无限制（0 = 不限）
     max-question-length: 500    # 单次问题最大字符数
 
   # 异步线程池

@@ -99,6 +99,7 @@ public class BaiLianEmbeddingService implements EmbeddingService {
      * 返回的向量列表与输入文本列表顺序一一对应（API 保证）。
      */
     private List<float[]> callEmbeddingApi(List<String> inputs) {
+        long t0 = System.currentTimeMillis();
         try {
             String responseBody = webClient.post()
                 .uri("/embeddings")
@@ -110,9 +111,14 @@ public class BaiLianEmbeddingService implements EmbeddingService {
                 .bodyToMono(String.class)
                 .block(Duration.ofSeconds(30));
 
+            log.info("[embedding] API call done: {} inputs, responseLen={}, elapsed={}ms",
+                inputs.size(), responseBody != null ? responseBody.length() : 0,
+                System.currentTimeMillis() - t0);
+
             return parseEmbeddingResponse(responseBody);
         } catch (Exception e) {
-            log.error("Embedding API call failed: model={}, inputCount={}", model, inputs.size(), e);
+            log.error("Embedding API call failed after {}ms: model={}, inputCount={}",
+                System.currentTimeMillis() - t0, model, inputs.size(), e);
             throw new RuntimeException("Embedding API call failed: " + e.getMessage(), e);
         }
     }

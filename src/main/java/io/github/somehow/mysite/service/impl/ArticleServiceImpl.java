@@ -447,7 +447,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
     private void checkArticleOwnership(Long articleId) {
         UserRole currentRole = UserContext.getRole();
-        if (UserRole.DEVELOPER.equals(currentRole)) {
+        if (UserRole.ADMIN.equals(currentRole)) {
             return;
         }
 

@@ -7,24 +7,28 @@ import { usePermission } from '@/composables/usePermission'
 
 const route = useRoute()
 const userStore = useUserStore()
-const { isDeveloper } = usePermission()
+const { isAdmin, isCreator } = usePermission()
 
 const isCollapsed = ref(false)
 
 const allNavItems = [
-  { label: '文章管理', path: '/dashboard', icon: FileText, requireDeveloper: false },
-  { label: '写文章', path: '/dashboard/posts/new', icon: PenSquare, requireDeveloper: false },
-  { label: '合集管理', path: '/dashboard/collections', icon: BookOpen, requireDeveloper: false },
-  { label: '分类管理', path: '/dashboard/categories', icon: FolderTree, requireDeveloper: true },
-  { label: '标签管理', path: '/dashboard/tags', icon: Tags, requireDeveloper: true },
-  { label: '图片管理', path: '/dashboard/images', icon: ImageIcon, requireDeveloper: true },
-  { label: '用户管理', path: '/dashboard/users', icon: Users, requireDeveloper: true },
-  { label: '评论管理', path: '/dashboard/comments', icon: MessageSquare, requireDeveloper: true },
-  { label: '设置', path: '/dashboard/settings', icon: Settings, requireDeveloper: false },
+  { label: '文章管理', path: '/dashboard', icon: FileText, requireAdmin: false, requireCreator: true },
+  { label: '写文章', path: '/dashboard/posts/new', icon: PenSquare, requireAdmin: false, requireCreator: true },
+  { label: '合集管理', path: '/dashboard/collections', icon: BookOpen, requireAdmin: false, requireCreator: false },
+  { label: '分类管理', path: '/dashboard/categories', icon: FolderTree, requireAdmin: true, requireCreator: false },
+  { label: '标签管理', path: '/dashboard/tags', icon: Tags, requireAdmin: true, requireCreator: false },
+  { label: '图片管理', path: '/dashboard/images', icon: ImageIcon, requireAdmin: true, requireCreator: false },
+  { label: '用户管理', path: '/dashboard/users', icon: Users, requireAdmin: true, requireCreator: false },
+  { label: '评论管理', path: '/dashboard/comments', icon: MessageSquare, requireAdmin: true, requireCreator: false },
+  { label: '设置', path: '/dashboard/settings', icon: Settings, requireAdmin: false, requireCreator: false },
 ]
 
 const navItems = computed(() =>
-  allNavItems.filter(item => !item.requireDeveloper || isDeveloper.value)
+  allNavItems.filter(item => {
+    if (item.requireAdmin && !isAdmin.value) return false
+    if (item.requireCreator && !(isAdmin.value || isCreator.value)) return false
+    return true
+  })
 )
 
 async function handleLogout() {

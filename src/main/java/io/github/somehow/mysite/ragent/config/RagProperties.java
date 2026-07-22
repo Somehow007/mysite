@@ -103,7 +103,17 @@ public class RagProperties {
 
     @Data
     public static class RateLimitProperties {
-        private int maxPerHour = 20;
+        /** USER 每小时最多提问次数 */
+        private int userMaxPerHour = 10;
+        /** CREATOR 每小时最多提问次数 */
+        private int creatorMaxPerHour = 20;
+        /** ADMIN 每小时最多提问次数（0 = 无限制）*/
+        private int adminMaxPerHour = 0;
+        /** 单次问题最大字符数 */
         private int maxQuestionLength = 500;
+
+        /** @deprecated 使用 {@link #userMaxPerHour} / {@link #creatorMaxPerHour} 替代 */
+        @Deprecated
+        private int maxPerHour = 20;
     }
 }

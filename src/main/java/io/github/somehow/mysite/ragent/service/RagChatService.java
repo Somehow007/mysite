@@ -1,5 +1,6 @@
 package io.github.somehow.mysite.ragent.service;
 
+import io.github.somehow.mysite.commons.enums.UserRole;
 import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.core.PromptTemplate;
 import io.github.somehow.mysite.ragent.core.memory.ConversationManager;
@@ -61,10 +62,11 @@ public class RagChatService {
      * @return ChatEvent 事件流（meta → sources → content×N → done）
      */
     public Flux<ChatEvent> chat(String question, Long conversationId,
-                                String visitorId, String clientIp) {
+                                String visitorId, String clientIp,
+                                UserRole userRole) {
         // Step 0: 成本保护（限流检查是同步的，切到 boundedElastic 执行）
         return Mono.fromCallable(() -> {
-                rateLimiter.check(clientIp, question);
+                rateLimiter.check(clientIp, question, userRole);
                 return true;
             })
             .subscribeOn(Schedulers.boundedElastic())
@@ -78,17 +80,26 @@ public class RagChatService {
     }
 
     private Flux<ChatEvent> doChat(String question, Long conversationId, String visitorId) {
+        long t0 = System.currentTimeMillis();
+
         // Step 1: 获取或创建会话
         ConversationDO conversation = conversationManager
             .getOrCreateConversation(conversationId, visitorId, question);
         Long convId = conversation.getId();
+        log.info("[doChat] conv={} resolved ({}ms)", convId, System.currentTimeMillis() - t0);
 
         // Step 2: 加载对话历史
+        long t1 = System.currentTimeMillis();
         List<ChatMessage> history = conversationManager.loadHistory(convId);
+        log.info("[doChat] history loaded: {} messages ({}ms)",
+            history.size(), System.currentTimeMillis() - t1);
 
         // Step 3: 向量检索 + Rerank
+        long t2 = System.currentTimeMillis();
         List<SearchResult> retrieved = retrievalEngine.retrieve(
             question, properties.getRetrieval().getRerankTopK());
+        log.info("[doChat] retrieval done: {} results ({}ms)",
+            retrieved.size(), System.currentTimeMillis() - t2);
         List<SourceChunkDTO> sources = retrieved.stream()
             .map(r -> new SourceChunkDTO(r.docTitle(), r.content(), r.score()))
             .toList();
@@ -97,6 +108,8 @@ public class RagChatService {
         List<ChatMessage> messages = retrieved.isEmpty()
             ? promptTemplate.buildGeneralPrompt(question, history)
             : promptTemplate.buildRagPrompt(question, retrieved, history);
+        log.info("[doChat] prompt assembled: {} messages, {} chars total",
+            messages.size(), messages.stream().mapToInt(m -> m.getContent().length()).sum());
 
         ChatRequest request = ChatRequest.builder()
             .messages(messages)
@@ -105,7 +118,9 @@ public class RagChatService {
             .build();
 
         // Step 5 & 6: LLM 流式生成 → 事件流 → 完成后落库
+        long t4 = System.currentTimeMillis();
         StringBuilder fullAnswer = new StringBuilder();
+        final long[] firstTokenAt = { 0 };
 
         return Flux.concat(
                 // meta（会话 ID）+ sources（引用来源）
@@ -115,6 +130,11 @@ public class RagChatService {
                     .map(ChatEvent::content)
                     .doOnNext(e -> {
                         if ("content".equals(e.type())) {
+                            if (firstTokenAt[0] == 0) {
+                                firstTokenAt[0] = System.currentTimeMillis();
+                                log.info("[doChat] first token received ({}ms since LLM call)",
+                                    firstTokenAt[0] - t4);
+                            }
                             fullAnswer.append(e.delta());
                         }
                     }),
@@ -125,8 +145,12 @@ public class RagChatService {
             .publishOn(Schedulers.boundedElastic())
             .doOnComplete(() -> {
                 try {
+                    long t5 = System.currentTimeMillis();
                     conversationManager.saveExchange(
                         convId, question, fullAnswer.toString(), sources);
+                    log.info("[doChat] exchange saved ({}ms), total tokens={}, total elapsed={}ms",
+                        System.currentTimeMillis() - t5, fullAnswer.length(),
+                        System.currentTimeMillis() - t0);
                 } catch (Exception e) {
                     log.error("Failed to save exchange for conversation {}", convId, e);
                 }

@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { ref, nextTick, watch, onScopeDispose } from 'vue'
+import { ref, nextTick, watch, onScopeDispose, onBeforeUnmount } from 'vue'
+import { useRouter } from 'vue-router'
 import { Sparkles, X, RotateCw } from 'lucide-vue-next'
 import { useChat } from '@/composables/useChat'
+import { useFabStack } from '@/composables/useFabStack'
+import { useUserStore } from '@/stores/user'
 import ChatMessageItem from './ChatMessageItem.vue'
 import ChatInput from './ChatInput.vue'
 
@@ -11,12 +14,19 @@ const SUGGESTED_QUESTIONS = [
   'Spring Security 怎么配置 JWT？',
 ]
 
+const router = useRouter()
+const userStore = useUserStore()
 const isOpen = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
-const inputRef = ref<InstanceType<typeof ChatInput> | null>(null)
+const inputComponentRef = ref<InstanceType<typeof ChatInput> | null>(null)
 
 const chat = useChat()
 const isUserScrolledUp = ref(false)
+
+// ── FAB 动态堆叠 ─────────────────────────────────────────────
+const { bottomStyle: fabBottom, setVisible: setFabVisible } = useFabStack('chat-widget')
+// 面板打开时 FAB 隐藏，其他 FAB 自动下移
+watch(isOpen, (open) => setFabVisible(!open))
 
 // ── 智能滚动 ────────────────────────────────────────────────
 
@@ -66,26 +76,54 @@ function handleScroll() {
 
 // ── 开合控制 ────────────────────────────────────────────────
 
+/** ESC 关闭面板 */
 function handleEsc(e: KeyboardEvent) {
   if (e.key === 'Escape' && isOpen.value) {
+    e.preventDefault()
     close()
   }
 }
 
+/** ESC 监听与 isOpen 状态同步绑定，面板关闭即解绑，防止泄漏 */
+watch(isOpen, (open) => {
+  if (open) {
+    document.addEventListener('keydown', handleEsc)
+  } else {
+    document.removeEventListener('keydown', handleEsc)
+  }
+})
+
 function open() {
+  // 未登录 → 跳转登录页
+  if (!userStore.isLoggedIn) {
+    router.push({ name: 'login' })
+    return
+  }
   isOpen.value = true
-  document.addEventListener('keydown', handleEsc)
-  nextTick(() => scrollToBottom())
+  nextTick(() => {
+    const textarea = inputComponentRef.value?.$el?.querySelector?.('textarea') as HTMLTextAreaElement | null
+    textarea?.focus()
+    scrollToBottom()
+  })
 }
 
 function close() {
   isOpen.value = false
-  document.removeEventListener('keydown', handleEsc)
 }
 
+// ── 移动端全屏时阻止 body 背景滚动 ──
+watch(isOpen, (open) => {
+  document.body.style.overflow = open ? 'hidden' : ''
+})
+
+onBeforeUnmount(() => {
+  document.body.style.overflow = ''
+})
+
 onScopeDispose(() => {
-  document.removeEventListener('keydown', handleEsc)
   chat.cancelGeneration()
+  document.removeEventListener('keydown', handleEsc)
+  document.body.style.overflow = ''
 })
 </script>
 
@@ -93,7 +131,8 @@ onScopeDispose(() => {
   <!-- FAB 按钮 -->
   <button
     v-if="!isOpen"
-    class="fixed bottom-20 right-6 z-40 w-14 h-14
+    :style="{ bottom: fabBottom }"
+    class="fixed right-6 z-40 w-14 h-14
            rounded-full bg-accent text-white
            shadow-lg hover:shadow-xl hover:-translate-y-0.5
            flex items-center justify-center
@@ -207,6 +246,7 @@ onScopeDispose(() => {
 
         <!-- 输入框 -->
         <ChatInput
+          ref="inputComponentRef"
           :streaming="chat.isStreaming.value"
           @send="chat.sendMessage"
           @cancel="chat.cancelGeneration()"

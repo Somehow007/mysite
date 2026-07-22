@@ -88,6 +88,9 @@ public class BaiLianRerankProvider implements RerankService {
             "parameters", Map.of("top_n", topN, "return_documents", false)
         );
 
+        long t0 = System.currentTimeMillis();
+        log.info("[rerank] calling {} with {} candidates, topN={}", model, documents.size(), topN);
+
         String responseBody;
         try {
             responseBody = webClient.post()
@@ -96,7 +99,11 @@ public class BaiLianRerankProvider implements RerankService {
                 .retrieve()
                 .bodyToMono(String.class)
                 .block(Duration.ofSeconds(30));
+            log.info("[rerank] API call done: responseLen={}, elapsed={}ms",
+                responseBody != null ? responseBody.length() : 0, System.currentTimeMillis() - t0);
         } catch (WebClientResponseException e) {
+            log.warn("[rerank] HTTP {} after {}ms: {}",
+                e.getStatusCode(), System.currentTimeMillis() - t0, e.getResponseBodyAsString());
             throw new RuntimeException("Rerank HTTP " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
         }
 

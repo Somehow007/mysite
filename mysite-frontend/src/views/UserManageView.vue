@@ -72,9 +72,23 @@ function toggleSortOrder() {
   fetchUsers(1)
 }
 
+const ROLE_CYCLE: Record<string, string> = {
+  'ADMIN': 'CREATOR',
+  'CREATOR': 'USER',
+  'USER': 'ADMIN',
+  'DEVELOPER': 'CREATOR', // 兼容旧角色
+}
+
+const ROLE_LABEL: Record<string, string> = {
+  'ADMIN': '系统管理员',
+  'CREATOR': '创作者',
+  'USER': '普通用户',
+  'DEVELOPER': '开发者(旧)',
+}
+
 function handleRoleChange(user: AdminUser) {
-  const newRole = user.role === 'DEVELOPER' ? 'USER' : 'DEVELOPER'
-  const label = newRole === 'DEVELOPER' ? '开发者' : '普通用户'
+  const newRole = ROLE_CYCLE[user.role] || 'USER'
+  const label = ROLE_LABEL[newRole] || newRole
   confirmDialog.value = {
     show: true,
     title: '修改用户角色',
@@ -160,9 +174,15 @@ function closeLogs() {
 }
 
 function getRoleBadgeClass(role: string) {
-  return role === 'DEVELOPER'
-    ? 'bg-amber-100 text-amber-700'
-    : 'bg-blue-100 text-blue-700'
+  switch (role) {
+    case 'ADMIN':
+    case 'DEVELOPER': // 兼容旧角色
+      return 'bg-amber-100 text-amber-700'
+    case 'CREATOR':
+      return 'bg-purple-100 text-purple-700'
+    default:
+      return 'bg-blue-100 text-blue-700'
+  }
 }
 
 function getStatusBadgeClass(status: number) {
@@ -272,9 +292,9 @@ onMounted(() => {
             <td class="px-4 py-3 text-text-secondary">{{ user.phoneNumber || '-' }}</td>
             <td class="px-4 py-3 text-center">
               <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" :class="getRoleBadgeClass(user.role)">
-                <ShieldCheck v-if="user.role === 'DEVELOPER'" :size="10" />
+                <ShieldCheck v-if="user.role === 'ADMIN' || user.role === 'DEVELOPER'" :size="10" />
                 <Shield v-else :size="10" />
-                {{ user.role === 'DEVELOPER' ? '开发者' : '普通用户' }}
+                {{ ROLE_LABEL[user.role] || user.role }}
               </span>
             </td>
             <td class="px-4 py-3 text-center">
