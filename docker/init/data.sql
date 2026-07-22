@@ -114,7 +114,4 @@ VALUES
     (1, 3, 0),
     (2, 2, 0)
 ON DUPLICATE KEY UPDATE `collection_id` = `collection_id`;
-
-ALTER TABLE `t_user` ADD COLUMN IF NOT EXISTS `avatar` VARCHAR(500) DEFAULT NULL COMMENT '头像URL' AFTER `follower_count`;
-
 SELECT '初始化数据插入完成' AS message;
