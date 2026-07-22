@@ -136,6 +136,7 @@ src/main/java/io/github/somehow/mysite/
     │   ├── LLMProvider.java                  # 供应商标记接口（防路由自注入，见 1.2.5）
     │   ├── EmbeddingService.java             # 统一嵌入接口（锁定百炼，不降级，见 1.2.7）
     │   ├── RerankService.java               # 统一重排序接口（百炼原生格式，见 3.2）
+    │   ├── BaiLianRerankProvider.java        # 百炼 gte-rerank 实现（DashScope 原生 API）
     │   ├── RoutingLLMService.java           # 模型路由器
     │   ├── CircuitBreaker.java              # 三态断路器
     │   ├── ChatRequest.java                 # 聊天请求 DTO（含 ChatMessage）
@@ -144,7 +145,7 @@ src/main/java/io/github/somehow/mysite/
     │       ├── AbstractOpenAIProvider.java   # OpenAI 兼容基类
     │       ├── BaiLianProvider.java          # 阿里百炼
     │       ├── SiliconFlowProvider.java      # 硅基流动
-    │       ├── AIHubMixProvider.java         # AIHubMix
+    │       ├── DeepseekProvider.java         # DeepSeek
     │       └── OllamaProvider.java           # 本地 Ollama
     │
     ├── vector/                               # 向量存储层
@@ -162,9 +163,8 @@ src/main/java/io/github/somehow/mysite/
     │   ├── memory/
     │   │   └── ConversationManager.java     # 对话记忆管理
     │   ├── rewrite/
-    │   │   └── QueryRewriter.java           # 查询重写（可选）
-    │   └── prompt/
-    │       └── PromptTemplate.java          # 提示词模板
+    │   │   └── QueryRewriter.java           # 查询重写（可选，空壳预留）
+    │   └── PromptTemplate.java              # 提示词模板（直接放在 core 下，不建独立子包）
     │
     ├── service/                               # RAG 业务服务
     │   ├── RagChatService.java              # RAG 问答核心服务
@@ -333,7 +333,7 @@ src/main/java/io/github/somehow/mysite/
 |------|------|---------|
 | `t_knowledge_base` | 知识库定义 | name, collection_name, embedding_model, chunk_size |
 | `t_knowledge_document` | 文档记录 | kb_id, title, source_type(ARTICLE/UPLOAD), status, fail_reason, chunk_count |
-| `t_knowledge_chunk` | 文档分块 | doc_id, chunk_index, content, char_count |
+| `t_knowledge_chunk` | 文档分块 | doc_id, chunk_index, content, embedding_text, char_count |
 | `t_knowledge_vector` | 向量数据 | chunk_id, embedding vector(1024), HNSW 索引 |
 | `t_conversation` | 对话会话 | user_id(可空), visitor_id, title, message_count |
 | `t_conversation_message` | 对话消息 | conversation_id, role(USER/ASSISTANT), content, sources(JSONB) |
@@ -505,6 +505,7 @@ CREATE TABLE IF NOT EXISTS t_knowledge_chunk (
     kb_id BIGINT NOT NULL REFERENCES t_knowledge_base(id),
     chunk_index INT NOT NULL,
     content TEXT NOT NULL,
+    embedding_text TEXT,    -- 向量化专用文本，NULL 时回退到 content（Ragent 模式：代码去噪、表格 KV）
     char_count INT DEFAULT 0,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -761,6 +762,8 @@ public class RagProperties {
         private int size = 800;
         private int overlap = 100;
         private int maxChunksPerDoc = 50;
+        /** 最小 chunk 字符数，低于此阈值的碎片合并到前一个 chunk（Ragent 模式） */
+        private int minChars = 400;
     }
 
     @Data public static class RetrievalProperties {
@@ -2976,73 +2979,191 @@ public class ChatRateLimiter {
 
 ### 3.8 Phase 3 验证方式
 
+> ⚠️ **关键前提**：Phase 3 的完整验证（检索→RAG→来源引用）依赖 PostgreSQL 中已有向量化的文档数据。本地 PG 数据库默认是空的，直接 curl 只会走"通用聊天"兜底模式（sources 为空，不引用任何文章）。必须先灌入测试数据。
+
+#### 3.8.1 前置条件：灌入测试数据
+
+**方式一：运行 Phase 3 集成测试（推荐）**
+
+集成测试内置了数据灌入逻辑，一次运行完成"灌数据 + 验证"两步：
+
 ```bash
-# 用 curl 测试 SSE 流式聊天（终端直接看 token 流）
+# 1. 启动基础设施
+docker compose -f docker/docker-compose.yml up -d
+
+# 2. 设置 API Key（嵌入 + LLM 都需要）
+export BAILIAN_API_KEY="sk-xxx"
+
+# 3. 运行 Phase 3 集成测试（自动灌入测试文章 → 分块 → 向量化 → 验证全链路）
+./mvnw test -Dtest=Phase3IntegrationTest -pl .
+```
+
+测试会自动完成以下验证：
+- 事件序列完整性：meta(含 conversationId) → sources(含检索来源) → content×N → done
+- 检索质量：sources 中包含灌入的文章标题，score > 0.3
+- 多轮对话：conversationId 回传后 AI 保持上下文
+- 兜底模式：无匹配结果时正确走通用聊天
+- 错误降级：LLM 失败时正确返回 error 事件
+
+**方式二：先运行 Phase 2 端到端测试灌数据，再 curl**
+
+```bash
+# Step 1: 启动 PG
+docker compose -f docker/docker-compose.yml up -d postgres
+
+# Step 2: 灌入测试数据（运行 Phase 2 集成测试，完整链路含 embedding）
+export BAILIAN_API_KEY="sk-xxx"
+./mvnw test -Dtest=Phase2EndToEndTest#FullPipeline -pl .
+
+# 注：Phase2EndToEndTest 测试完成后会清理数据（@AfterEach cleanupTestData）。
+# 若需保留数据供 curl 使用，需要临时注释掉 FullPipeline 类的 @AfterEach 中的 cleanupTestData()，
+# 或直接通过 Spring Boot 应用的 article 发布功能触发 ArticleEventListener → syncArticle 自动入库。
+```
+
+**方式三：通过应用层发布文章自动入库（最接近生产）**
+
+```bash
+# 启动完整应用
+docker compose -f docker/docker-compose.yml up -d
+./mvnw spring-boot:run
+
+# 通过博客管理 API 发布一篇文章（会触发 ArticleEventListener → syncArticle → 自动入库）
+curl -X POST http://localhost:8081/v1/article \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{"title":"JWT 认证配置指南","content":"## JWT 过滤器\n\nSpring Security 中的 JWT 认证...","categoryId":1}'
+
+# 等待几秒让异步 ingestion 完成，然后测试 RAG 聊天
+```
+
+> **没有 BAILIAN_API_KEY 怎么办？** 可以只验证通用聊天模式（不需要检索数据）：
+> ```bash
+> curl -N -X GET \
+>   "http://localhost:8081/v1/rag/chat/stream?q=你好，介绍一下你自己&visitorId=test-001" \
+>   -H "Accept: text/event-stream"
+> ```
+> 这会走 PromptTemplate.buildGeneralPrompt() 兜底，sources 事件依然正常发送（只是数组为空）。
+
+#### 3.8.2 curl 手动测试（有数据时）
+
+```bash
+# 前提：PG 中已有向量化的文章数据（通过 3.8.1 任一方式灌入）
+
+# 1. 基础 RAG 问答（应返回带来源引用的回答）
 curl -N -X GET \
   "http://localhost:8081/v1/rag/chat/stream?q=JWT过滤器是怎么配置的？&visitorId=test-uuid-001" \
   -H "Accept: text/event-stream"
 
 # 预期输出（逐行推送）：
 # data: {"type":"meta","conversationId":123,...}
-# data: {"type":"sources","sources":[{"title":"Spring Security 实战...",...}],...}
+# data: {"type":"sources","sources":[{"title":"JWT 认证配置指南","content":"...","score":0.85},...],...}
 # data: {"type":"content","delta":"在",...}
 # data: {"type":"content","delta":"Spring",...}
 # ...
 # data: {"type":"done",...}
-#
-# 多轮记忆验证：带上 meta 事件返回的 conversationId 再问一个指代性问题
-# （如"它的配置类叫什么？"），AI 应能理解"它"指代上文内容
+
+# 2. 多轮记忆验证：带上 meta 事件返回的 conversationId 再问一个指代性问题
+curl -N -X GET \
+  "http://localhost:8081/v1/rag/chat/stream?q=它的配置类叫什么？&conversationId=123&visitorId=test-uuid-001" \
+  -H "Accept: text/event-stream"
+# AI 应能理解"它"指代上文的 JWT 过滤器
+
+# 3. 无匹配结果时友好回复
+curl -N -X GET \
+  "http://localhost:8081/v1/rag/chat/stream?q=今天天气怎么样？&visitorId=test-uuid-001" \
+  -H "Accept: text/event-stream"
+# sources 为空数组，AI 应表示无法回答而非编造
+
+# 4. 限流测试（快速连续发 21 次请求）
+for i in $(seq 1 21); do
+  curl -s -N -X GET \
+    "http://localhost:8081/v1/rag/chat/stream?q=测试&visitorId=test-uuid-001" \
+    -H "Accept: text/event-stream" &
+done
+# 第 21 次应返回 error 事件：{"type":"error","message":"请求过于频繁，每小时最多 20 次..."}
 ```
 
+#### 3.8.3 集成测试（自动化验证）
+
 ```java
+// Phase3IntegrationTest.java — 完整代码见 src/test/java/.../ragent/Phase3IntegrationTest.java
+// 核心验证点：
+
 @Test
-void testRagChatFullPipeline() {
-    // 端到端测试：限流 → 建会话 → 检索 → Rerank → 生成 → 落库
-    String question = "JWT 过滤器怎么配置？";
-    Flux<ChatEvent> stream = ragChatService.chat(question, null, "test-visitor", "127.0.0.1");
+@DisplayName("完整链路：灌数据 → 检索 → Prompt 组装 → LLM 流 → 事件序列")
+void fullPipelineShouldReturnCorrectEventSequence() {
+    // Given: PG 中已有测试文章（@BeforeAll 灌入）
+    // When: 提问与灌入内容相关的问题
+    Flux<ChatEvent> stream = ragChatService.chat(
+        "JWT 过滤器怎么配置？", null, "test-visitor", "127.0.0.1");
 
     List<ChatEvent> events = stream.collectList().block(Duration.ofSeconds(120));
 
-    // 事件序列校验：meta 在最前、done 在最后、content 在中间
-    Assertions.assertEquals("meta", events.get(0).type());
-    Assertions.assertNotNull(events.get(0).conversationId());   // 新会话已创建
-    Assertions.assertEquals("done", events.get(events.size() - 1).type());
+    // Then: 事件序列验证
+    assertEquals("meta", events.get(0).type());
+    assertNotNull(events.get(0).conversationId());
 
-    String fullResponse = events.stream()
-        .filter(e -> "content".equals(e.type()))
-        .map(ChatEvent::delta)
-        .reduce("", String::concat);
-    Assertions.assertTrue(fullResponse.length() > 50);
-    // 回答中应包含博客文章中的内容
-    Assertions.assertTrue(
-        fullResponse.contains("JwtAuthenticationFilter") ||
-        fullResponse.contains("OncePerRequestFilter")
-    );
+    // sources 事件应包含检索结果（验证数据灌入成功）
+    assertEquals("sources", events.get(1).type());
+    assertFalse(events.get(1).sources().isEmpty(),
+        "应检索到相关片段——确认 PG 中有测试数据");
+    assertTrue(events.get(1).sources().stream()
+        .anyMatch(s -> s.getScore() > 0.3f),
+        "至少有一条高相关性结果");
 
-    // 落库校验：用返回的 conversationId 能查到这一问一答
-    List<ConversationMessageDO> messages = messageMapper
-        .selectRecentByConversationId(events.get(0).conversationId(), 2);
-    Assertions.assertEquals(2, messages.size());
+    // content 事件应有内容
+    assertTrue(events.stream().anyMatch(e -> "content".equals(e.type())),
+        "应至少有一个 content 事件");
+
+    assertEquals("done", events.get(events.size() - 1).type());
 }
 ```
 
 ### Phase 3 验收清单
 
-- [ ] `RetrievalEngine.retrieve()` 检索结果包含相关文章片段（`VectorStore.search` 已加 kbId 参数）
-- [ ] `RerankService.rerank()` 使用百炼原生接口格式（不是 OpenAI `/rerank` 格式）
-- [ ] 未配置 Rerank 时自动退化为向量检索 Top K
-- [ ] `ConversationManager.loadHistory()` 正确加载最近 6 轮对话，且消息顺序为正序
-- [ ] `ConversationManager.getOrCreateConversation()` 创建新会话并校验 visitorId 归属
-- [ ] `ConversationManager.saveExchange()` 流式生成结束后正确保存一问一答
-- [ ] `PromptTemplate.buildRagPrompt()` 生成的 Prompt 格式正确
-- [ ] `RagChatService.chat()` 返回 `Flux<ChatEvent>`，事件序列为 meta → sources → content×N → done
-- [ ] `RagChatService.chat()` 在 LLM 前完成限流检查（超频/超长直接拒绝）
-- [ ] `RagChatController` 用 ObjectMapper 序列化事件（不再手工 escapeJson）
-- [ ] `curl /v1/rag/chat/stream` 能收到流式 SSE 响应，包含 meta 和 sources 事件
-- [ ] 有检索结果时 AI 回答引用了博客文章
-- [ ] 无检索结果时 AI 回复友好（不编造）
-- [ ] 多轮对话能正确引用历史（conversationId 回传后再次提问，AI 保持上下文）
-- [ ] 流式降级边界正确：百炼挂掉 → SiliconFlow 兜底；一旦已输出 token 后失败不降级
+> ⚠️ **已知问题**：本地 PG 卷如果是在 `embedding_text` 列加入之前创建的，则 `t_knowledge_chunk` 表缺少该列。
+> `RagentSchemaMigration`（Spring InitializingBean）启动时会执行 `ALTER TABLE ADD COLUMN IF NOT EXISTS`。
+> 若测试采用手动 JDBC（不走 Spring Context），需用不含 `embedding_text` 列的 INSERT 语句，或先手动执行：
+> ```sql
+> ALTER TABLE t_knowledge_chunk ADD COLUMN IF NOT EXISTS embedding_text TEXT;
+> ```
+> Phase3IntegrationTest 已适配此情况（INSERT 只用基础 5 列）。
+
+**核心链路 (3.1-3.4)**:
+- [x] `RetrievalEngine.retrieve()` 两阶段检索：embedding 粗排 + Rerank 精排 ✅
+- [x] `BaiLianRerankProvider` 百炼 DashScope 原生 `gte-rerank` API；未配置时退化为向量截断 ✅
+- [x] `ConversationManager.loadHistory()` 滑动窗口加载最近 N 轮，消息正序排列 ✅
+- [x] `ConversationManager.getOrCreateConversation()` 创建会话 + visitorId 防 IDOR ✅
+- [x] `ConversationManager.saveExchange()` 流式完成后落库 + 更新 message_count ✅
+- [x] `ConversationMapper.touchMessageCount()` SQL 原子递增（PG 无 ON UPDATE） ✅
+- [x] `PromptTemplate.buildRagPrompt()` 检索上下文 + 来源标注 + 通用兜底 ✅
+
+**服务层 (3.5)**:
+- [x] `ChatEvent` record 五种事件类型：meta / sources / content / done / error ✅
+- [x] `RagChatService.chat()` 6 步管道：限流→会话→记忆→检索→Prompt→LLM 流→落库 ✅
+- [x] `RagChatService.chat()` 返回 `Flux<ChatEvent>`，序列：meta → sources → content×N → done ✅
+- [x] `ChatRateLimiter` Redis IP 窗口计数 + 问题长度上限（成本保护前置） ✅
+
+**控制器 (3.6)**:
+- [x] `RagChatController` SSE 端点 `GET /v1/rag/chat/stream`，SseEmitter + ObjectMapper 序列化 ✅
+- [x] `resolveClientIp()` X-Forwarded-For → RemoteAddr 回退 ✅
+
+**安全与配置 (3.7)**:
+- [x] `WebSecurityConfig` `/v1/rag/chat/stream` 加入 permitAll ✅
+- [x] `application.yaml` rate-limit 段：max-per-hour + max-question-length ✅
+
+**集成验证（数据灌入 + curl / 集成测试）**:
+- [x] 前置条件：PG 启动 + BAILIAN_API_KEY 配置 + 测试数据灌入 ✅（Phase3IntegrationTest 自动灌入）
+- [ ] `curl /v1/rag/chat/stream` 收到 SSE 流：meta → sources → content×N → done
+- [ ] sources 事件包含正确的检索来源（标题、内容片段、相关度分数）
+- [ ] 有检索结果时 AI 引用博客文章；无结果时友好回复不编造
+- [ ] 多轮对话：conversationId 回传后再次提问，AI 保持上下文
+- [ ] 限流：超频返回 error 事件；超长直接拒绝
+- [ ] 流式降级：百炼失败 → SiliconFlow 兜底；已输出 token 后失败不降级
+
+> **验证方式说明**：上述 curl 测试需要先启动 Spring Boot 应用 + 灌入测试数据。自动化集成测试
+> `Phase3IntegrationTest` 已覆盖：事件序列验证、来源验证、兜底模式、限流拒绝、LLM 降级。
+> 运行方式：`./mvnw test -Dtest=Phase3IntegrationTest -pl .`（需要 PG + BAILIAN_API_KEY）
 
 ---
 

@@ -81,6 +81,10 @@ public class WebSecurityConfig {
                         .requestMatchers(
                                 "/uploads/**"
                         ).permitAll()
+                        // RAG 匿名聊天（成本保护由 ChatRateLimiter 负责）
+                        .requestMatchers(
+                                "/v1/rag/chat/stream"
+                        ).permitAll()
                         .requestMatchers(
                                 "/v1/categories/*/children"
                         ).authenticated()
