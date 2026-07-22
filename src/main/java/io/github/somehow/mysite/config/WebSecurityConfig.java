@@ -47,6 +47,7 @@ public class WebSecurityConfig {
                 .userDetailsService(customUserDetailsService)
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .securityContext(securityContext -> securityContext.requireExplicitSave(false))
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers(
                                 "/v1/auth/login",

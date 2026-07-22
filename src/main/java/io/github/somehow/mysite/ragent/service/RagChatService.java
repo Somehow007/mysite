@@ -138,23 +138,24 @@ public class RagChatService {
                             fullAnswer.append(e.delta());
                         }
                     }),
-                // done 事件
-                Flux.just(ChatEvent.done())
+                // 落库 + done 事件（合并在一个 Mono 中，在 boundedElastic 上执行）
+                // 注意：不能用 publishOn + doOnComplete，因为 SSE emitter.complete()
+                // 会触发 subscription.dispose()，publishOn 队列里的 onComplete 信号
+                // 会被丢弃，导致 doOnComplete 永远不执行，问答记录不落库。
+                Mono.fromCallable(() -> {
+                    try {
+                        long t5 = System.currentTimeMillis();
+                        conversationManager.saveExchange(
+                            convId, question, fullAnswer.toString(), sources);
+                        log.info("[doChat] exchange saved ({}ms), total tokens={}, total elapsed={}ms",
+                            System.currentTimeMillis() - t5, fullAnswer.length(),
+                            System.currentTimeMillis() - t0);
+                    } catch (Exception e) {
+                        log.error("Failed to save exchange for conversation {}", convId, e);
+                    }
+                    return ChatEvent.done();
+                }).subscribeOn(Schedulers.boundedElastic())
             )
-            // 落库是阻塞 JDBC，切到 boundedElastic 不占 event-loop
-            .publishOn(Schedulers.boundedElastic())
-            .doOnComplete(() -> {
-                try {
-                    long t5 = System.currentTimeMillis();
-                    conversationManager.saveExchange(
-                        convId, question, fullAnswer.toString(), sources);
-                    log.info("[doChat] exchange saved ({}ms), total tokens={}, total elapsed={}ms",
-                        System.currentTimeMillis() - t5, fullAnswer.length(),
-                        System.currentTimeMillis() - t0);
-                } catch (Exception e) {
-                    log.error("Failed to save exchange for conversation {}", convId, e);
-                }
-            })
             // 统一兜底：任何异常转为 error 事件（不裸断开）
             .onErrorResume(e -> {
                 log.error("RAG chat pipeline error", e);

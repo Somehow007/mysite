@@ -1,5 +1,7 @@
 package io.github.somehow.mysite.ragent.llm;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
 
 import java.util.List;
@@ -19,7 +21,9 @@ public record ChatEvent(
     String type,                    // meta / sources / content / done / error
     String delta,                   // content 事件的 token
     List<SourceChunkDTO> sources,   // sources 事件的引用来源
-    Long conversationId,            // meta 事件的会话 ID
+    @JsonSerialize(using = ToStringSerializer.class)
+    Long conversationId,            // meta 事件的会话 ID（序列化为字符串，
+                                    // 避免 JS Number 丢失 64-bit 精度）
     String message                  // error 事件的错误信息
 ) {
     public static ChatEvent meta(Long conversationId) {

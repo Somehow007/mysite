@@ -21,12 +21,16 @@ const overLimit = computed(() => charCount.value > MAX_LENGTH)
 const canSend = computed(() => input.value.trim().length > 0 && !overLimit.value && !props.streaming)
 
 function handleSend() {
+  // 流式中：停止按钮优先，不受输入框内容影响
+  if (props.streaming) {
+    emit('cancel')
+    return
+  }
+
   const q = input.value.trim()
   if (!q || overLimit.value) return
 
-  if (props.streaming) {
-    emit('cancel')
-  } else if (canSend.value) {
+  if (canSend.value) {
     emit('send', q)
     input.value = ''
     // 重置 textarea 高度

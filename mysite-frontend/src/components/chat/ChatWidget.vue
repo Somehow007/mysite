@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { ref, nextTick, watch, onScopeDispose, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { Sparkles, X, RotateCw } from 'lucide-vue-next'
+import { Sparkles, X, RotateCw, PanelLeftOpen } from 'lucide-vue-next'
 import { useChat } from '@/composables/useChat'
 import { useFabStack } from '@/composables/useFabStack'
+import { getVisitorId } from '@/api/rag'
 import { useUserStore } from '@/stores/user'
 import ChatMessageItem from './ChatMessageItem.vue'
 import ChatInput from './ChatInput.vue'
+import ChatHistory from './ChatHistory.vue'
 
 const SUGGESTED_QUESTIONS = [
   '介绍一下这个博客',
@@ -22,6 +24,31 @@ const inputComponentRef = ref<InstanceType<typeof ChatInput> | null>(null)
 
 const chat = useChat()
 const isUserScrolledUp = ref(false)
+
+// ── 历史侧栏 ────────────────────────────────────────────────
+const showHistory = ref(false)
+
+function toggleHistory() {
+  showHistory.value = !showHistory.value
+}
+
+function handleSelectConversation(id: number) {
+  chat.switchConversation(id)
+  showHistory.value = false
+}
+
+function handleNewConversation() {
+  chat.newConversation()
+  showHistory.value = false
+}
+
+// 面板打开时加载历史对话列表
+watch(isOpen, (open) => {
+  if (open) {
+    chat.loadConversations(getVisitorId())
+    showHistory.value = false
+  }
+})
 
 // ── FAB 动态堆叠 ─────────────────────────────────────────────
 const { bottomStyle: fabBottom, setVisible: setFabVisible } = useFabStack('chat-widget')
@@ -159,15 +186,25 @@ onScopeDispose(() => {
 
       <!-- 面板主体 -->
       <div
-        class="relative w-full sm:w-[380px] h-full sm:h-[560px] sm:max-h-[70vh]
-               glass glass-lg rounded-none sm:rounded-2xl
-               border border-glass-border
+        class="relative w-full h-full rounded-none
+               sm:w-[520px] sm:h-[680px] sm:max-h-[85vh] sm:rounded-2xl
+               glass glass-lg border border-glass-border
                flex flex-col overflow-hidden
                animate-scale-in"
       >
         <!-- Header -->
         <div class="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <div class="flex items-center gap-2">
+            <button
+              class="p-1 rounded-lg text-text-muted hover:text-text-primary
+                     hover:bg-bg-secondary transition-colors"
+              :class="showHistory ? 'text-accent bg-accent/10' : ''"
+              aria-label="历史对话"
+              title="历史对话"
+              @click="toggleHistory"
+            >
+              <PanelLeftOpen :size="16" />
+            </button>
             <Sparkles :size="16" class="text-accent" />
             <span class="text-sm font-medium text-text-primary">AI 助手</span>
           </div>
@@ -177,7 +214,7 @@ onScopeDispose(() => {
                      hover:bg-bg-secondary transition-colors"
               aria-label="新会话"
               title="新会话"
-              @click="chat.newConversation()"
+              @click="handleNewConversation"
             >
               <RotateCw :size="15" />
             </button>
@@ -192,14 +229,44 @@ onScopeDispose(() => {
           </div>
         </div>
 
-        <!-- 消息列表 -->
-        <div
-          ref="messagesContainer"
-          class="flex-1 overflow-y-auto px-4 py-4 scrollbar-thin"
-          role="log"
-          aria-live="polite"
-          @scroll="handleScroll"
-        >
+        <!-- 内容区（含侧栏） -->
+        <div class="flex-1 relative overflow-hidden">
+
+          <!-- 历史侧栏 -->
+          <Transition name="slide-left">
+            <div
+              v-if="showHistory"
+              class="absolute inset-0 z-10 bg-bg-primary/95 backdrop-blur-sm
+                     border-r border-border flex flex-col"
+              style="width: 72%"
+            >
+              <div class="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
+                <span class="text-xs font-medium text-text-secondary">历史对话</span>
+                <button
+                  class="p-0.5 rounded text-text-muted hover:text-text-primary transition-colors"
+                  @click="showHistory = false"
+                >
+                  <X :size="14" />
+                </button>
+              </div>
+              <ChatHistory
+                :conversations="chat.conversations.value"
+                :current-id="chat.conversationId.value"
+                :loading="chat.loadingHistory.value"
+                @select="handleSelectConversation"
+                @new="handleNewConversation"
+              />
+            </div>
+          </Transition>
+
+          <!-- 消息列表 -->
+          <div
+            ref="messagesContainer"
+            class="h-full overflow-y-auto px-4 py-4 scrollbar-thin"
+            role="log"
+            aria-live="polite"
+            @scroll="handleScroll"
+          >
           <!-- 空状态 -->
           <div
             v-if="chat.messages.value.length === 0"
@@ -233,7 +300,7 @@ onScopeDispose(() => {
             @retry="chat.retry()"
           />
 
-          <!-- 错误 toast（不渲染气泡的错误） -->
+          <!-- 错误 toast -->
           <div
             v-if="chat.lastError.value && chat.messages.value.length > 0"
             class="flex items-center justify-center my-2"
@@ -243,6 +310,9 @@ onScopeDispose(() => {
             </span>
           </div>
         </div>
+
+        </div>
+        <!-- 内容区（含侧栏）结束 -->
 
         <!-- 输入框 -->
         <ChatInput
@@ -255,3 +325,14 @@ onScopeDispose(() => {
     </div>
   </Teleport>
 </template>
+
+<style scoped>
+.slide-left-enter-active,
+.slide-left-leave-active {
+  transition: transform 0.2s ease;
+}
+.slide-left-enter-from,
+.slide-left-leave-to {
+  transform: translateX(-100%);
+}
+</style>

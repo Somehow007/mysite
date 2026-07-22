@@ -3,7 +3,11 @@ package io.github.somehow.mysite.ragent.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.commons.context.UserContext;
 import io.github.somehow.mysite.commons.enums.UserRole;
+import io.github.somehow.mysite.ragent.core.memory.ConversationManager;
+import io.github.somehow.mysite.ragent.dao.entity.ConversationDO;
+import io.github.somehow.mysite.ragent.dao.mapper.ConversationMapper;
 import io.github.somehow.mysite.ragent.llm.ChatEvent;
+import io.github.somehow.mysite.ragent.llm.ChatMessage;
 import io.github.somehow.mysite.ragent.service.ChatRateLimiter;
 import io.github.somehow.mysite.ragent.service.RagChatService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -13,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.*;
 import java.util.concurrent.Executor;
 
 import reactor.core.Disposable;
@@ -38,13 +43,19 @@ public class RagChatController {
     private final RagChatService ragChatService;
     private final Executor ragExecutor;
     private final ObjectMapper objectMapper;
+    private final ConversationMapper conversationMapper;
+    private final ConversationManager conversationManager;
 
     public RagChatController(RagChatService ragChatService,
                              @Qualifier("ragAsyncExecutor") Executor ragExecutor,
-                             ObjectMapper objectMapper) {
+                             ObjectMapper objectMapper,
+                             ConversationMapper conversationMapper,
+                             ConversationManager conversationManager) {
         this.ragChatService = ragChatService;
         this.ragExecutor = ragExecutor;
         this.objectMapper = objectMapper;
+        this.conversationMapper = conversationMapper;
+        this.conversationManager = conversationManager;
     }
 
     /**
@@ -107,6 +118,54 @@ public class RagChatController {
         });
 
         return emitter;
+    }
+
+    /**
+     * 获取对话历史列表（会话摘要）。
+     * 用于前端展示历史对话侧栏，用户可切换或新建对话。
+     */
+    @GetMapping("/conversations")
+    public List<Map<String, Object>> listConversations(
+            @RequestParam(value = "visitorId", required = false) String visitorId,
+            @RequestParam(value = "userId", required = false) Long userId) {
+
+        List<ConversationDO> conversations;
+        if (userId != null) {
+            conversations = conversationMapper.selectByUserId(userId);
+        } else if (visitorId != null && !visitorId.isBlank()) {
+            conversations = conversationMapper.selectByVisitorId(visitorId);
+        } else {
+            return List.of();
+        }
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ConversationDO conv : conversations) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", String.valueOf(conv.getId()));
+            item.put("title", conv.getTitle());
+            item.put("messageCount", conv.getMessageCount());
+            item.put("createTime", conv.getCreateTime());
+            item.put("updateTime", conv.getUpdateTime());
+            result.add(item);
+        }
+        return result;
+    }
+
+    /**
+     * 获取指定会话的历史消息。
+     * 前端切换/恢复历史对话时调用，将消息渲染到聊天面板中。
+     */
+    @GetMapping("/conversations/{id}/messages")
+    public List<Map<String, Object>> getMessages(@PathVariable Long id) {
+        List<ChatMessage> messages = conversationManager.loadHistory(id);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (ChatMessage msg : messages) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("role", msg.getRole());           // "USER" | "ASSISTANT"
+            item.put("content", msg.getContent());
+            result.add(item);
+        }
+        return result;
     }
 
     /**

@@ -9,7 +9,12 @@
 //    响应式代理后再操作，否则绕过 Proxy 的 set trap，视图不会更新。
 
 import { ref, computed } from 'vue'
-import { createChatStream, ChatStreamError, type ChatStreamErrorKind } from '@/api/rag'
+import {
+  createChatStream, ChatStreamError,
+  getConversations, getConversationMessages,
+  type ChatStreamErrorKind,
+  type ConversationSummary,
+} from '@/api/rag'
 import type { ChatMessage, SourceChunk } from '@/types'
 
 export type ChatStatus = 'idle' | 'streaming' | 'error'
@@ -19,9 +24,14 @@ let nextMessageId = 1
 export function useChat() {
   const messages = ref<ChatMessage[]>([])
   const status = ref<ChatStatus>('idle')
-  const conversationId = ref<number | null>(null)
+  /** Snowflake 64-bit ID，用 string 避免 JS Number 精度丢失 */
+  const conversationId = ref<string | null>(null)
   const lastError = ref<{ kind: ChatStreamErrorKind; message: string } | null>(null)
-  const lastQuestion = ref<string | null>(null) // 供"重试"使用
+  const lastQuestion = ref<string | null>(null)
+
+  // ── 对话历史 ─────────────────────────────────────────────
+  const conversations = ref<ConversationSummary[]>([])
+  const loadingHistory = ref(false)
 
   let abort: AbortController | null = null
   const isStreaming = computed(() => status.value === 'streaming')
@@ -128,15 +138,52 @@ export function useChat() {
     lastQuestion.value = null
   }
 
+  /** 加载对话历史列表 */
+  async function loadConversations(visitorId: string) {
+    try {
+      conversations.value = await getConversations(visitorId)
+    } catch {
+      conversations.value = []
+    }
+  }
+
+  /** 切换到指定历史对话并加载其消息 */
+  async function switchConversation(convId: string) {
+    if (convId === conversationId.value) return
+    cancelGeneration()
+    loadingHistory.value = true
+    try {
+      const history = await getConversationMessages(convId)
+      messages.value = history.map(msg => ({
+        id: nextMessageId++,
+        role: msg.role === 'USER' ? 'user' : 'assistant',
+        content: msg.content,
+        sources: [],
+      }))
+      conversationId.value = convId
+      lastError.value = null
+      lastQuestion.value = null
+      status.value = 'idle'
+    } catch {
+      // 加载失败，回退
+    } finally {
+      loadingHistory.value = false
+    }
+  }
+
   return {
     messages,
     status,
     isStreaming,
     conversationId,
     lastError,
+    conversations,
+    loadingHistory,
     sendMessage,
     retry,
     cancelGeneration,
     newConversation,
+    loadConversations,
+    switchConversation,
   }
 }

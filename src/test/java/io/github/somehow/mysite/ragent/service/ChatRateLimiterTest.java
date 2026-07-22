@@ -1,5 +1,6 @@
 package io.github.somehow.mysite.ragent.service;
 
+import io.github.somehow.mysite.commons.enums.UserRole;
 import io.github.somehow.mysite.ragent.config.RagProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -44,7 +45,7 @@ class ChatRateLimiterTest {
         @DisplayName("正常长度 → 通过")
         void normalLengthShouldPass() {
             when(valueOps.increment(anyString())).thenReturn(1L);
-            assertDoesNotThrow(() -> rateLimiter.check("127.0.0.1", "正常问题"));
+            assertDoesNotThrow(() -> rateLimiter.check("127.0.0.1", "正常问题", UserRole.USER));
         }
 
         @Test
@@ -53,7 +54,7 @@ class ChatRateLimiterTest {
             String longQ = "x".repeat(501);
             ChatRateLimiter.RateLimitExceededException ex = assertThrows(
                 ChatRateLimiter.RateLimitExceededException.class,
-                () -> rateLimiter.check("127.0.0.1", longQ));
+                () -> rateLimiter.check(UserRole.USER, "127.0.0.1", longQ));
             assertTrue(ex.getMessage().contains("500"));
         }
     }
@@ -67,7 +68,7 @@ class ChatRateLimiterTest {
         void firstRequestShouldPassAndSetTtl() {
             when(valueOps.increment("rag:chat:rl:127.0.0.1")).thenReturn(1L);
 
-            assertDoesNotThrow(() -> rateLimiter.check("127.0.0.1", "问题"));
+            assertDoesNotThrow(() -> rateLimiter.check("127.0.0.1", "问题", UserRole.USER));
 
             verify(redisTemplate).expire(eq("rag:chat:rl:127.0.0.1"), any(Duration.class));
         }
@@ -77,7 +78,7 @@ class ChatRateLimiterTest {
         void withinLimitShouldPass() {
             when(valueOps.increment("rag:chat:rl:127.0.0.1")).thenReturn(10L);
 
-            assertDoesNotThrow(() -> rateLimiter.check("127.0.0.1", "问题"));
+            assertDoesNotThrow(() -> rateLimiter.check("127.0.0.1", "问题", UserRole.USER));
 
             verify(redisTemplate, never()).expire(anyString(), any());
         }
@@ -89,7 +90,7 @@ class ChatRateLimiterTest {
 
             ChatRateLimiter.RateLimitExceededException ex = assertThrows(
                 ChatRateLimiter.RateLimitExceededException.class,
-                () -> rateLimiter.check("127.0.0.1", "问题"));
+                () -> rateLimiter.check("127.0.0.1", "问题", UserRole.USER));
             assertTrue(ex.getMessage().contains("20"));
         }
 
@@ -98,8 +99,8 @@ class ChatRateLimiterTest {
         void differentIpsShouldHaveSeparateCounters() {
             when(valueOps.increment(anyString())).thenReturn(1L);
 
-            assertDoesNotThrow(() -> rateLimiter.check("1.2.3.4", "问题"));
-            assertDoesNotThrow(() -> rateLimiter.check("5.6.7.8", "问题"));
+            assertDoesNotThrow(() -> rateLimiter.check("1.2.3.4", "问题", UserRole.USER));
+            assertDoesNotThrow(() -> rateLimiter.check("5.6.7.8", "问题", UserRole.USER));
 
             verify(valueOps).increment("rag:chat:rl:1.2.3.4");
             verify(valueOps).increment("rag:chat:rl:5.6.7.8");

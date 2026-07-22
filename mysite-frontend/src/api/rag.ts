@@ -5,7 +5,8 @@
 import type { SourceChunk } from '@/types'
 
 export interface ChatStreamCallbacks {
-  onMeta: (conversationId: number) => void
+  /** conversationId 是 Snowflake 64-bit Long，用 string 避免 JS Number 精度丢失 */
+  onMeta: (conversationId: string) => void
   onSources: (sources: SourceChunk[]) => void
   onToken: (delta: string) => void
   onDone: () => void
@@ -60,11 +61,11 @@ function safe<T>(fn: (v: T) => void, v: T) {
  */
 export function createChatStream(
   question: string,
-  conversationId: number | null,
+  conversationId: string | null,
   callbacks: ChatStreamCallbacks,
 ): AbortController {
   const params = new URLSearchParams({ q: question, visitorId: getVisitorId() })
-  if (conversationId != null) params.set('conversationId', String(conversationId))
+  if (conversationId != null) params.set('conversationId', conversationId)
 
   const controller = new AbortController()
   const { signal } = controller
@@ -138,7 +139,9 @@ export function createChatStream(
           switch (data?.type) {
             case 'meta': {
               const cid = data.conversationId
-              if (typeof cid === 'number') safe(callbacks.onMeta, cid)
+              // 兼容后端旧版（number）和新版（string）两种序列化格式
+              if (typeof cid === 'string') safe(callbacks.onMeta, cid)
+              else if (typeof cid === 'number') safe(callbacks.onMeta, String(cid))
               break
             }
             case 'sources':
@@ -175,4 +178,52 @@ export function createChatStream(
     })
 
   return controller
+}
+
+// ── 对话历史 API ────────────────────────────────────────────
+
+export interface ConversationSummary {
+  /** Snowflake 64-bit ID，string 避免 JS Number 精度丢失 */
+  id: string
+  title: string
+  messageCount: number
+  createTime: string
+  updateTime: string
+}
+
+export interface ConversationMessage {
+  role: 'USER' | 'ASSISTANT'
+  content: string
+}
+
+/** 获取当前访客/用户的历史对话列表 */
+export async function getConversations(visitorId: string): Promise<ConversationSummary[]> {
+  const params = new URLSearchParams({ visitorId })
+  const token = readAuthToken()
+  const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(`/v1/rag/conversations?${params}`, { headers })
+  if (!res.ok) throw new Error(`获取对话列表失败 (HTTP ${res.status})`)
+  return res.json()
+}
+
+/** 获取指定对话的历史消息 */
+export async function getConversationMessages(convId: string): Promise<ConversationMessage[]> {
+  const token = readAuthToken()
+  const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(`/v1/rag/conversations/${convId}/messages`, { headers })
+  if (!res.ok) throw new Error(`获取对话消息失败 (HTTP ${res.status})`)
+  return res.json()
+}
+
+function readAuthToken(): string | null {
+  try {
+    const raw = localStorage.getItem('mysite_access_token')
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return typeof parsed === 'string' ? parsed : null
+  } catch {
+    return null
+  }
 }
