@@ -62,6 +62,6 @@ export function deleteUser(id: string): Promise<void> {
   return del(`/v1/admin/users/${id}`)
 }
 
-export function getOperationLogs(params: { current: number; size: number; targetUserId?: number }): Promise<OperationLogPage> {
+export function getOperationLogs(params: { current: number; size: number; targetUserId?: string }): Promise<OperationLogPage> {
   return get('/v1/admin/users/operation-logs', params)
 }

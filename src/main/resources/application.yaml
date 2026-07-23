@@ -92,3 +92,106 @@ image:
     max-uploads-per-minute: 10
     url-fetch-connect-timeout: 5000
     url-fetch-read-timeout: 15000
+
+# ============ RAG 配置 ============
+rag:
+  # PostgreSQL 数据源（RAG 专用）
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://localhost:5432/ragent
+    username: ragent
+    password: ${RAGENT_PG_PASSWORD:ragent123}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+
+  # LLM 供应商配置（优先级从高到低）
+  llm:
+    providers:
+      deepseek:
+        enabled: true
+        priority: 1
+        base-url: https://api.deepseek.com/v1
+        api-key: ${DEEPSEEK_API_KEY:}
+        chat-model: deepseek-v4-flash
+        chat-timeout: 120s
+
+      # P1: 阿里百炼 —— 国内首选，延迟低，中文能力强
+      # chat + embedding + rerank 都走它
+      bailian:
+        enabled: true
+        priority: 2
+        base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+        api-key: ${BAILIAN_API_KEY:}
+        chat-model: qwen3-max
+        embedding-model: text-embedding-v4  # 1024 维，与 PG vector(1024) 绑定；更换 = 全量重建向量
+        rerank-model: qwen3-rerank            # 走 DashScope 原生接口，非 OpenAI 兼容（见 3.2）
+        chat-timeout: 120s
+        embedding-timeout: 30s
+
+      # P2: SiliconFlow —— 备选，模型选择丰富
+      # 降级供应商只接管 chat，可以不配 embedding-model：
+      # 维度与百炼不一致（如 bge-large-zh 也是 1024 但语义空间不同），
+      # 查询与入库的向量必须出自同一模型，embedding 降级没有意义（见 3.5 节决策 1）
+      siliconflow:
+        enabled: false
+        priority: 3
+        base-url: https://api.siliconflow.cn/v1
+        api-key: ${SILICONFLOW_API_KEY:}
+        chat-model: glm-4.7
+        chat-timeout: 120s
+
+      # P3: AIHubMix —— 国际模型代理
+      aihubmix:
+        enabled: false
+        priority: 4
+        base-url: https://aihubmix.com/v1
+        api-key: ${AIHUBMIX_API_KEY:}
+        chat-model: gpt-5.4
+        chat-timeout: 120s
+
+      # P9: 本地 Ollama —— 最低优先级兜底
+      ollama:
+        enabled: false
+        priority: 9
+        base-url: http://localhost:11434/v1
+        api-key: ""
+        chat-model: qwen3:8b
+        chat-timeout: 180s
+
+    # 断路器全局参数
+    circuit-breaker:
+      failure-threshold: 2       # 连续失败 N 次 → 熔断
+      cooldown-seconds: 30       # 熔断后冷却 N 秒 → 半开
+
+  # 分块参数
+  chunk:
+    size: 800
+    overlap: 100
+    max-chunks-per-doc: 50
+
+  # 检索参数
+  retrieval:
+    top-k: 10
+    rerank-top-k: 5
+    score-threshold: 0.3
+
+  # 对话记忆
+  memory:
+    keep-turns: 6
+    summary-turns: 10
+    summary-enabled: false   # Phase 3 先不做摘要，保持简单
+
+  # 成本保护（必做项，见 3.5 节决策 4 与 3.7 节）：
+  # 聊天端点 permitAll，不限流任何人都能烧你的付费 API 额度
+  rate-limit:
+    user-max-per-hour: 10       # 普通用户每小时限制
+    creator-max-per-hour: 20    # 创作者每小时限制
+    admin-max-per-hour: 0       # 管理员无限制（0 = 不限）
+    max-question-length: 500    # 单次问题最大字符数
+
+  # 异步线程池
+  async:
+    core-pool-size: 2
+    max-pool-size: 4
+    queue-capacity: 100

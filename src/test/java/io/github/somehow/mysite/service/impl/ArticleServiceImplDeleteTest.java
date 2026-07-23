@@ -87,9 +87,10 @@ class ArticleServiceImplDeleteTest {
                 .role(UserRole.USER)
                 .build());
 
-        // ServiceImpl.baseMapper needs to be set via reflection for @InjectMocks
+        // MyBatis-Plus 3.5.14: baseMapper 字段在 CrudRepository（ServiceImpl 的父类）中
+        // 需要遍历类层次结构找到该字段
         try {
-            var field = ArticleServiceImpl.class.getSuperclass().getDeclaredField("baseMapper");
+            java.lang.reflect.Field field = findField(ArticleServiceImpl.class, "baseMapper");
             field.setAccessible(true);
             field.set(articleService, articleMapper);
         } catch (Exception e) {
@@ -100,6 +101,19 @@ class ArticleServiceImplDeleteTest {
     @AfterEach
     void tearDown() {
         UserContext.removeUser();
+    }
+
+    /** 遍历类层次结构查找字段（MyBatis-Plus 3.5.14 中 baseMapper 移到 CrudRepository） */
+    private static java.lang.reflect.Field findField(Class<?> clazz, String fieldName) {
+        Class<?> current = clazz;
+        while (current != null) {
+            try {
+                return current.getDeclaredField(fieldName);
+            } catch (NoSuchFieldException e) {
+                current = current.getSuperclass();
+            }
+        }
+        throw new RuntimeException(new NoSuchFieldException(fieldName));
     }
 
     private ArticleDO createArticleDO(Long id, Long authorId, Integer delFlag) {

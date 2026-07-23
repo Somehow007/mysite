@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { List, X, ChevronsDownUp, ChevronsUpDown } from 'lucide-vue-next'
 import type { TocItem } from '@/composables/useMarkdown'
 import { useToc } from '@/composables/useToc'
+import { useFabStack } from '@/composables/useFabStack'
 import TocTree from './TocTree.vue'
 
 const props = defineProps<{
@@ -10,6 +11,11 @@ const props = defineProps<{
 }>()
 
 const isOpen = ref(false)
+
+const { bottomStyle: fabBottom, setVisible } = useFabStack('mobile-toc')
+// FAB 可见性：有目录项 且 抽屉未打开
+const fabVisible = computed(() => props.items.length > 0 && !isOpen.value)
+watch(fabVisible, setVisible, { immediate: true })
 
 const tocListRef = ref<HTMLElement | null>(null)
 
@@ -154,7 +160,8 @@ watch(tocTree, () => {
     <button
       v-if="items.length > 0 && !isOpen"
       @click="open"
-      class="fixed bottom-24 right-8 z-30 lg:hidden flex items-center justify-center w-12 h-12 rounded-full glass glass-sm shadow-lg border border-border/50 text-text-secondary hover:text-accent hover:border-accent/30 active:scale-90 transition-all duration-200"
+      :style="{ bottom: fabBottom }"
+      class="fixed right-8 z-30 lg:hidden flex items-center justify-center w-12 h-12 rounded-full glass glass-sm shadow-lg border border-border/50 text-text-secondary hover:text-accent hover:border-accent/30 active:scale-90 transition-all duration-200"
       aria-label="打开文章目录"
       title="目录"
     >

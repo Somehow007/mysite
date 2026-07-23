@@ -1,8 +1,13 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 import { RouterView } from 'vue-router'
 import AppHeader from '@/components/common/AppHeader.vue'
 import AppFooter from '@/components/common/AppFooter.vue'
 import BackToTop from '@/components/common/BackToTop.vue'
+
+const ChatWidget = defineAsyncComponent(
+  () => import('@/components/chat/ChatWidget.vue'),
+)
 </script>
 
 <template>
@@ -17,5 +22,6 @@ import BackToTop from '@/components/common/BackToTop.vue'
     </main>
     <AppFooter />
     <BackToTop />
+    <ChatWidget />
   </div>
 </template>

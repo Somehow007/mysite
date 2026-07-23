@@ -19,6 +19,8 @@ import io.github.somehow.mysite.dto.resp.ArchiveRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticlePageQueryRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleSelectRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
+import io.github.somehow.mysite.ragent.ingestion.ArticleCreatedEvent;
+import io.github.somehow.mysite.ragent.ingestion.ArticleUpdatedEvent;
 import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.ArticleService;
 import io.github.somehow.mysite.service.CategoryService;
@@ -27,6 +29,7 @@ import io.github.somehow.mysite.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +59,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     private final CollectionArticleMapper collectionArticleMapper;
     private final ArticleViewCountService articleViewCountService;
     private final ArticleCacheService articleCacheService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
@@ -114,6 +118,9 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         articleSearchService.indexArticle(articleDO);
         categoryService.evictCategoryCache();
         tagService.evictTagCache();
+
+        // ★ RAG 集成：发布文章创建事件，触发异步向量化
+        eventPublisher.publishEvent(new ArticleCreatedEvent(articleDO));
     }
 
     @Override
@@ -170,6 +177,11 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         categoryService.evictCategoryCache();
         tagService.evictTagCache();
         articleCacheService.evictArticleDetail(requestParam.getId());
+
+        // ★ RAG 集成：发布文章更新事件，触发异步重新向量化
+        if (updatedArticle != null) {
+            eventPublisher.publishEvent(new ArticleUpdatedEvent(updatedArticle));
+        }
     }
 
     @Override
@@ -435,7 +447,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
 
     private void checkArticleOwnership(Long articleId) {
         UserRole currentRole = UserContext.getRole();
-        if (UserRole.DEVELOPER.equals(currentRole)) {
+        if (UserRole.ADMIN.equals(currentRole)) {
             return;
         }
 

@@ -47,11 +47,15 @@ public class WebSecurityConfig {
                 .userDetailsService(customUserDetailsService)
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .securityContext(securityContext -> securityContext.requireExplicitSave(false))
                 .authorizeHttpRequests(authz -> authz
                         .requestMatchers(
                                 "/v1/auth/login",
                                 "/v1/auth/register",
-                                "/v1/auth/refresh",
+                                "/v1/auth/refresh"
+                        ).permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
                                 "/v1/articles",
                                 "/v1/articles/archive"
                         ).permitAll()
@@ -81,30 +85,60 @@ public class WebSecurityConfig {
                         .requestMatchers(
                                 "/uploads/**"
                         ).permitAll()
+                        // RAG AI 聊天：允许匿名提问（visitorId 归属 + 限流保护）
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/v1/rag/chat/stream"
+                        ).permitAll()
+                        // RAG 对话历史：需登录
+                        .requestMatchers(
+                                "/v1/rag/conversations/**"
+                        ).authenticated()
+                        // RAG 知识库列表：允许匿名浏览（博客读者可见知识库）
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/v1/rag/knowledge-bases",
+                                "/v1/rag/knowledge-bases/{id}"
+                        ).permitAll()
+                        // RAG 知识库管理：仅 ADMIN
+                        .requestMatchers(
+                                "/v1/rag/knowledge-bases/**"
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/v1/categories/*/children"
                         ).authenticated()
+                        // 文章管理：ADMIN + CREATOR 可创建/编辑/删除
+                        .requestMatchers(
+                                HttpMethod.POST, "/v1/articles"
+                        ).hasAnyRole("ADMIN", "CREATOR")
+                        .requestMatchers(
+                                HttpMethod.PUT, "/v1/articles/**"
+                        ).hasAnyRole("ADMIN", "CREATOR")
+                        .requestMatchers(
+                                HttpMethod.DELETE, "/v1/articles/**"
+                        ).hasAnyRole("ADMIN", "CREATOR")
+                        // 分类管理：仅 ADMIN
                         .requestMatchers(
                                 HttpMethod.POST, "/v1/categories"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.PUT, "/v1/categories/{id}"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.DELETE, "/v1/categories/{id}"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/v1/categories/batch/**"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/v1/categories/*/status"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/v1/categories/sort"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/v1/admin/users/**"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/v1/comments/article/**"
@@ -123,7 +157,7 @@ public class WebSecurityConfig {
                         ).permitAll()
                         .requestMatchers(
                                 "/v1/admin/comments/**"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         // 合集公开读接口：允许未登录读者浏览合集和文章导航
                         .requestMatchers(
                                 HttpMethod.GET,
@@ -134,16 +168,16 @@ public class WebSecurityConfig {
                                 HttpMethod.GET,
                                 "/v1/articles/{id}/navigation"
                         ).permitAll()
-                        // 合集管理接口：仅 DEVELOPER 角色可操作
+                        // 合集管理接口：仅 ADMIN 角色可操作
                         .requestMatchers(
                                 HttpMethod.POST, "/v1/collections"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.PUT, "/v1/collections/**"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 HttpMethod.DELETE, "/v1/collections/**"
-                        ).hasRole("DEVELOPER")
+                        ).hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {

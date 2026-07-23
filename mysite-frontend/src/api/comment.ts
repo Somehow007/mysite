@@ -26,7 +26,7 @@ export function toggleCommentLike(id: string): Promise<CommentLikeResult> {
 export function getAdminComments(params?: {
   page?: number
   size?: number
-  articleId?: number
+  articleId?: string
   status?: number
   keyword?: string
   sortField?: string

@@ -33,6 +33,7 @@ build/
 .vscode/
 
 ### Project specific ###
+.env
 .DS_Store
 uploads/
 备案图标.png
@@ -44,6 +45,7 @@ docker/artalk_data/
 docker/.env
 deploy/config/.env
 docker/artalk_data/artalk.db
-docs/
 配色/
 .trae/
+.claude/
+docker/pgvector_data/

@@ -35,7 +35,7 @@ useHead(() => ({
 
 const router = useRouter()
 const userStore = useUserStore()
-const { isDeveloper, canModifyArticle } = usePermission()
+const { isAdmin, canModifyArticle } = usePermission()
 const toast = useToast()
 
 const articles = ref<ArticleListItem[]>([])
@@ -96,12 +96,12 @@ async function fetchArticles(page = 1) {
       published: publishedFilter.value,
       sortField: sortField.value,
       sortOrder: sortOrder.value,
-      authorId: !isDeveloper.value ? userStore.user?.id : undefined,
+      authorId: !isAdmin.value ? userStore.user?.id : undefined,
     }
 
     const res = await getArticles(params)
 
-    if (isDeveloper.value) {
+    if (isAdmin.value) {
       articles.value = res.list
     } else {
       articles.value = res.list.filter(

@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { ArrowUp } from 'lucide-vue-next'
+import { useFabStack } from '@/composables/useFabStack'
+
+const { bottomStyle, setVisible } = useFabStack('back-to-top')
 
 const visible = ref(false)
+watch(visible, setVisible, { immediate: true })
 
 function handleScroll() {
   visible.value = window.scrollY > 300
@@ -26,7 +30,8 @@ onUnmounted(() => {
     <button
       v-if="visible"
       @click="scrollToTop"
-      class="fixed bottom-8 right-8 z-40 p-3 rounded-full bg-accent text-text-inverse shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
+      :style="{ bottom: bottomStyle }"
+      class="fixed right-8 z-40 p-3 rounded-full bg-accent text-white shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200"
       aria-label="返回顶部"
     >
       <ArrowUp :size="18" />
