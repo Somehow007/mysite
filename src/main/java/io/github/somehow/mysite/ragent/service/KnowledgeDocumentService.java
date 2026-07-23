@@ -52,16 +52,28 @@ public class KnowledgeDocumentService {
 
     /**
      * 文章 → 知识库同步（异步执行，不阻塞文章发布）。
+     * 使用默认知识库（collectionName = "default"）。
+     */
+    @Async("ragAsyncExecutor")
+    public void syncArticle(ArticleDO article) {
+        syncArticle(article, getOrCreateDefaultKb().getId());
+    }
+
+    /**
+     * 文章 → 指定知识库同步（异步执行）。
      *
      * 幂等策略：先查是否已有该文章的文档记录 → 有则删除旧的向量/分块/文档，
      * 再创建新记录。uk_doc_source 唯一约束兜底并发的重复插入。
      */
     @Async("ragAsyncExecutor")
-    public void syncArticle(ArticleDO article) {
+    public void syncArticle(ArticleDO article, Long kbId) {
         KnowledgeDocumentDO doc = null;
         try {
-            // 1. 找到默认知识库（如果没有就创建一个）
-            KnowledgeBaseDO kb = getOrCreateDefaultKb();
+            KnowledgeBaseDO kb = kbMapper.selectById(kbId);
+            if (kb == null) {
+                log.warn("知识库不存在, kbId={}", kbId);
+                return;
+            }
 
             // 2. 检查是否已有该文章的文档记录 → 有则删除旧的向量/分块/文档
             KnowledgeDocumentDO existingDoc = docMapper.findBySourceRef(

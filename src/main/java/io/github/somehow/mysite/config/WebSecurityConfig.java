@@ -85,7 +85,25 @@ public class WebSecurityConfig {
                         .requestMatchers(
                                 "/uploads/**"
                         ).permitAll()
-                        // RAG AI 聊天：需登录（匿名用户被 ChatWidget 拦截提示登录）
+                        // RAG AI 聊天：允许匿名提问（visitorId 归属 + 限流保护）
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/v1/rag/chat/stream"
+                        ).permitAll()
+                        // RAG 对话历史：需登录
+                        .requestMatchers(
+                                "/v1/rag/conversations/**"
+                        ).authenticated()
+                        // RAG 知识库列表：允许匿名浏览（博客读者可见知识库）
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/v1/rag/knowledge-bases",
+                                "/v1/rag/knowledge-bases/{id}"
+                        ).permitAll()
+                        // RAG 知识库管理：仅 ADMIN
+                        .requestMatchers(
+                                "/v1/rag/knowledge-bases/**"
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/v1/categories/*/children"
                         ).authenticated()
