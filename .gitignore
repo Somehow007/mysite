@@ -49,3 +49,4 @@ docker/artalk_data/artalk.db
 .trae/
 .claude/
 docker/pgvector_data/
+docker/mysql_data/

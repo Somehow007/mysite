@@ -1,5 +1,8 @@
 package io.github.somehow.mysite.ragent.llm;
 
+import io.github.somehow.mysite.ragent.llm.embedding.BaiLianEmbeddingService;
+import io.github.somehow.mysite.ragent.llm.embedding.EmbeddingService;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.ragent.llm.embedding.BaiLianEmbeddingService;
 import io.github.somehow.mysite.ragent.llm.embedding.EmbeddingService;

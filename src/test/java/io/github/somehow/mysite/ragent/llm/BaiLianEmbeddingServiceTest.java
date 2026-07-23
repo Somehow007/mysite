@@ -1,5 +1,7 @@
 package io.github.somehow.mysite.ragent.llm;
 
+import io.github.somehow.mysite.ragent.llm.embedding.BaiLianEmbeddingService;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.ragent.llm.embedding.BaiLianEmbeddingService;
 import okhttp3.mockwebserver.MockResponse;
