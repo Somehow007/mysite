@@ -4,7 +4,7 @@ import type { ConversationSummary } from '@/api/rag'
 
 defineProps<{
   conversations: ConversationSummary[]
-  currentId: number | null
+  currentId: string | null
   loading: boolean
 }>()
 

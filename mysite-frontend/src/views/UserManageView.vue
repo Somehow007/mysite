@@ -21,7 +21,7 @@ const logs = ref<UserOperationLog[]>([])
 const logPage = ref<OperationLogPage | null>(null)
 const logLoading = ref(false)
 const showLogs = ref(false)
-const logTargetUserId = ref<number | undefined>(undefined)
+const logTargetUserId = ref<string | undefined>(undefined)
 
 const updatingUserId = ref<string | null>(null)
 const confirmDialog = ref<{ show: boolean; title: string; message: string; action: () => void }>({
@@ -51,7 +51,7 @@ async function fetchUsers(current = 1) {
 async function fetchLogs(current = 1) {
   logLoading.value = true
   try {
-    const params: { current: number; size: number; targetUserId?: number } = { current, size: 15 }
+    const params: { current: number; size: number; targetUserId?: string } = { current, size: 15 }
     if (logTargetUserId.value) params.targetUserId = logTargetUserId.value
     const res = await getOperationLogs(params)
     logs.value = res.records || []
@@ -156,7 +156,7 @@ async function doDelete(user: AdminUser) {
   }
 }
 
-function viewUserLogs(userId: number) {
+function viewUserLogs(userId: string) {
   logTargetUserId.value = userId
   showLogs.value = true
   fetchLogs(1)
@@ -324,7 +324,7 @@ onMounted(() => {
                   <Shield :size="14" />
                 </button>
                 <button
-                  @click="viewUserLogs(Number(user.id))"
+                  @click="viewUserLogs(user.id)"
                   class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors"
                   title="查看操作日志"
                 >
