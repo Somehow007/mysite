@@ -32,7 +32,7 @@ function toggleHistory() {
   showHistory.value = !showHistory.value
 }
 
-function handleSelectConversation(id: number) {
+function handleSelectConversation(id: string) {
   chat.switchConversation(id)
   showHistory.value = false
 }

@@ -53,6 +53,7 @@ export function useFabStack(fabId: string) {
     let offset = BASE_MARGIN
     for (let i = 0; i < slotIndex; i++) {
       const slot = SLOTS[i]
+      if (!slot) continue
       if (visibility.value[slot.id] !== false) {
         offset += slot.height + GAP
       }
