@@ -1,4 +1,4 @@
-package io.github.somehow.mysite.ragent.ingestion;
+package io.github.somehow.mysite.ragent.chunking;
 
 import io.github.somehow.mysite.ragent.config.RagProperties;
 import org.springframework.stereotype.Component;

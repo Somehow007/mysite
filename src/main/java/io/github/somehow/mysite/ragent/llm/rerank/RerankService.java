@@ -1,4 +1,4 @@
-package io.github.somehow.mysite.ragent.llm;
+package io.github.somehow.mysite.ragent.llm.rerank;
 
 import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
 

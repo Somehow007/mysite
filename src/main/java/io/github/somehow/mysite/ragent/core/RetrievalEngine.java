@@ -1,8 +1,8 @@
-package io.github.somehow.mysite.ragent.core.retrieval;
+package io.github.somehow.mysite.ragent.core;
 
 import io.github.somehow.mysite.ragent.config.RagProperties;
-import io.github.somehow.mysite.ragent.llm.EmbeddingService;
-import io.github.somehow.mysite.ragent.llm.RerankService;
+import io.github.somehow.mysite.ragent.llm.embedding.EmbeddingService;
+import io.github.somehow.mysite.ragent.llm.rerank.RerankService;
 import io.github.somehow.mysite.ragent.vector.VectorStore;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

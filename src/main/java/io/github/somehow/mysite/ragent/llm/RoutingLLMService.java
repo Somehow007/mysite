@@ -1,6 +1,7 @@
 package io.github.somehow.mysite.ragent.llm;
 
 import io.github.somehow.mysite.ragent.config.RagProperties;
+import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;

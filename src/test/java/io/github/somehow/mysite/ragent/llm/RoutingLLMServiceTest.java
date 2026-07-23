@@ -1,6 +1,7 @@
 package io.github.somehow.mysite.ragent.llm;
 
 import io.github.somehow.mysite.ragent.config.RagProperties;
+import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

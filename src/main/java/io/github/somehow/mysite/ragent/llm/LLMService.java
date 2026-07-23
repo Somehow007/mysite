@@ -1,5 +1,6 @@
 package io.github.somehow.mysite.ragent.llm;
 
+import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
 import reactor.core.publisher.Flux;
 
 /**

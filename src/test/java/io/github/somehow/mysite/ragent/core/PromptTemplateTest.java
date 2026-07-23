@@ -1,6 +1,6 @@
 package io.github.somehow.mysite.ragent.core;
 
-import io.github.somehow.mysite.ragent.llm.ChatMessage;
+import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

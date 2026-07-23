@@ -54,7 +54,7 @@ class ChatRateLimiterTest {
             String longQ = "x".repeat(501);
             ChatRateLimiter.RateLimitExceededException ex = assertThrows(
                 ChatRateLimiter.RateLimitExceededException.class,
-                () -> rateLimiter.check(UserRole.USER, "127.0.0.1", longQ));
+                () -> rateLimiter.check("127.0.0.1", longQ, UserRole.USER));
             assertTrue(ex.getMessage().contains("500"));
         }
     }

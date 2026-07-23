@@ -1,4 +1,4 @@
-package io.github.somehow.mysite.ragent.core.memory;
+package io.github.somehow.mysite.ragent.core;
 
 import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.dao.entity.ConversationDO;
@@ -6,7 +6,7 @@ import io.github.somehow.mysite.ragent.dao.entity.ConversationMessageDO;
 import io.github.somehow.mysite.ragent.dao.mapper.ConversationMapper;
 import io.github.somehow.mysite.ragent.dao.mapper.ConversationMessageMapper;
 import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
-import io.github.somehow.mysite.ragent.llm.ChatMessage;
+import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

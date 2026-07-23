@@ -1,4 +1,4 @@
-package io.github.somehow.mysite.ragent.llm;
+package io.github.somehow.mysite.ragent.llm.embedding;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

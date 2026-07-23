@@ -1,4 +1,4 @@
-package io.github.somehow.mysite.ragent.llm;
+package io.github.somehow.mysite.ragent.llm.model;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

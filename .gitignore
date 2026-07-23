@@ -48,3 +48,5 @@ docker/artalk_data/artalk.db
 docs/
 配色/
 .trae/
+.claude/
+docker/pgvector_data/

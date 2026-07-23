@@ -2,12 +2,15 @@ package io.github.somehow.mysite.ragent.service;
 
 import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.core.PromptTemplate;
-import io.github.somehow.mysite.ragent.core.memory.ConversationManager;
-import io.github.somehow.mysite.ragent.core.retrieval.RetrievalEngine;
+import io.github.somehow.mysite.ragent.core.ConversationManager;
+import io.github.somehow.mysite.ragent.core.RetrievalEngine;
 import io.github.somehow.mysite.ragent.dao.entity.ConversationDO;
 import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
-import io.github.somehow.mysite.ragent.llm.*;
+import io.github.somehow.mysite.ragent.llm.RoutingLLMService;
+import io.github.somehow.mysite.ragent.llm.model.ChatEvent;
+import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
+import io.github.somehow.mysite.commons.enums.UserRole;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -66,7 +69,7 @@ class RagChatServiceTest {
                 .thenReturn(Flux.just("Hello", " World"));
 
             // When
-            Flux<ChatEvent> events = service.chat("测试问题", null, "visitor-1", "127.0.0.1");
+            Flux<ChatEvent> events = service.chat("测试问题", null, "visitor-1", "127.0.0.1", UserRole.USER);
 
             // Then
             StepVerifier.create(events)
@@ -90,7 +93,7 @@ class RagChatServiceTest {
             when(routingLLMService.chatStream(any()))
                 .thenReturn(Flux.just("ok"));
 
-            Flux<ChatEvent> events = service.chat("q", null, "v", "127.0.0.1");
+            Flux<ChatEvent> events = service.chat("q", null, "v", "127.0.0.1", UserRole.USER);
 
             StepVerifier.create(events)
                 .expectNextMatches(e -> "meta".equals(e.type()) && e.conversationId() == 99L)
@@ -119,7 +122,7 @@ class RagChatServiceTest {
             when(retrievalEngine.retrieve(anyString(), anyInt())).thenReturn(results);
             when(routingLLMService.chatStream(any())).thenReturn(Flux.just("答案"));
 
-            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1");
+            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1", UserRole.USER);
 
             StepVerifier.create(events)
                 .expectNextMatches(e -> "meta".equals(e.type()))
@@ -141,9 +144,9 @@ class RagChatServiceTest {
         @DisplayName("限流拒绝时应转换为 error 事件")
         void rateLimitRejectionShouldBecomeErrorEvent() {
             doThrow(new ChatRateLimiter.RateLimitExceededException("超频了"))
-                .when(rateLimiter).check(anyString(), anyString());
+                .when(rateLimiter).check(anyString(), anyString(), any());
 
-            Flux<ChatEvent> events = service.chat("q", null, "v", "127.0.0.1");
+            Flux<ChatEvent> events = service.chat("q", null, "v", "127.0.0.1", UserRole.USER);
 
             StepVerifier.create(events)
                 .expectNextMatches(e -> "error".equals(e.type())
@@ -168,7 +171,7 @@ class RagChatServiceTest {
             when(routingLLMService.chatStream(any()))
                 .thenReturn(Flux.error(new RuntimeException("API 挂了")));
 
-            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1");
+            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1", UserRole.USER);
 
             StepVerifier.create(events)
                 .expectNextMatches(e -> "meta".equals(e.type()))
@@ -200,7 +203,7 @@ class RagChatServiceTest {
             when(retrievalEngine.retrieve("新问题", 5)).thenReturn(List.of());
             when(routingLLMService.chatStream(any())).thenReturn(Flux.just("回复"));
 
-            Flux<ChatEvent> events = service.chat("新问题", 5L, "v", "127.0.0.1");
+            Flux<ChatEvent> events = service.chat("新问题", 5L, "v", "127.0.0.1", UserRole.USER);
 
             StepVerifier.create(events)
                 .expectNextCount(4)  // meta + sources + content + done

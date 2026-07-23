@@ -1,7 +1,7 @@
 package io.github.somehow.mysite.ragent.llm.provider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.somehow.mysite.ragent.llm.ChatRequest;
+import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;

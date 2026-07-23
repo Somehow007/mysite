@@ -2,7 +2,7 @@ package io.github.somehow.mysite.ragent.llm.provider;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.somehow.mysite.ragent.llm.ChatRequest;
+import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
 import io.github.somehow.mysite.ragent.llm.LLMService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.function.client.WebClient;
