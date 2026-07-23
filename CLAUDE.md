@@ -199,6 +199,12 @@ All providers use OpenAI-compatible `/chat/completions` API via `AbstractOpenAiP
 
 ## Development Workflow
 
+### Git Commit Rules (Mandatory)
+
+- **所有 git commit 的作者必须是用户本人**（somehow-g15），不得将 Claude/Claude Code 添加为 co-author。
+- **禁止在 commit message 中出现 `Co-authored-by:` 等 co-author 标记。**
+- 每次提交前检查 `git config user.name` 和 `git config user.email` 确保是正确的用户身份。
+
 ### Before Committing (Mandatory)
 
 ```bash
