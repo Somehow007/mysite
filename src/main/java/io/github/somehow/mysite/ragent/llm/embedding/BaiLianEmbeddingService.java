@@ -128,9 +128,9 @@ public class BaiLianEmbeddingService implements EmbeddingService {
      * 响应 JSON: {"object":"list","data":[{"object":"embedding",
      *   "embedding":[0.12, -0.34, ...], "index":0}, ...]}
      *
-     * package-private：方便单元测试直接验证解析逻辑。
+     * public：方便单元测试直接验证解析逻辑。
      */
-    List<float[]> parseEmbeddingResponse(String responseBody) {
+    public List<float[]> parseEmbeddingResponse(String responseBody) {
         try {
             JsonNode root = objectMapper.readTree(responseBody);
             JsonNode data = root.get("data");

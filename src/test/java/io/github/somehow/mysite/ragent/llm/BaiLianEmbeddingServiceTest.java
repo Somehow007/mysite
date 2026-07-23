@@ -1,6 +1,7 @@
 package io.github.somehow.mysite.ragent.llm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.somehow.mysite.ragent.llm.embedding.BaiLianEmbeddingService;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;
 import org.junit.jupiter.api.AfterEach;

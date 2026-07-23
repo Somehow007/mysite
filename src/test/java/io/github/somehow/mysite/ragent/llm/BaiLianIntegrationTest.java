@@ -1,6 +1,8 @@
 package io.github.somehow.mysite.ragent.llm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.somehow.mysite.ragent.llm.embedding.BaiLianEmbeddingService;
+import io.github.somehow.mysite.ragent.llm.embedding.EmbeddingService;
 import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
 import io.github.somehow.mysite.ragent.llm.provider.BaiLianProvider;

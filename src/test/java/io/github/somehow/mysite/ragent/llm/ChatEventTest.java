@@ -1,6 +1,7 @@
 package io.github.somehow.mysite.ragent.llm;
 
 import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
+import io.github.somehow.mysite.ragent.llm.model.ChatEvent;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
