@@ -2,7 +2,8 @@
 // SSE 不能用 axios（响应体需流式读取），这里用原生 fetch + ReadableStream。
 // 本文件是项目中唯一的流式 HTTP 代码，所有容错逻辑收口于此。
 
-import type { SourceChunk } from '@/types'
+import type { SourceChunk, KnowledgeBase, KnowledgeDocument } from '@/types'
+import { get, post, put, del } from './client'
 
 export interface ChatStreamCallbacks {
   /** conversationId 是 Snowflake 64-bit Long，用 string 避免 JS Number 精度丢失 */
@@ -215,6 +216,58 @@ export async function getConversationMessages(convId: string): Promise<Conversat
   const res = await fetch(`/v1/rag/conversations/${convId}/messages`, { headers })
   if (!res.ok) throw new Error(`获取对话消息失败 (HTTP ${res.status})`)
   return res.json()
+}
+
+// ── 知识库管理 API（走 axios client.ts，自动带 token + 统一错误处理）──
+
+export function getKnowledgeBases(): Promise<KnowledgeBase[]> {
+  return get<KnowledgeBase[]>('/v1/rag/knowledge-bases')
+}
+
+export function getKnowledgeBase(id: string): Promise<KnowledgeBase> {
+  return get<KnowledgeBase>(`/v1/rag/knowledge-bases/${id}`)
+}
+
+export function createKnowledgeBase(data: Partial<KnowledgeBase>): Promise<KnowledgeBase> {
+  return post<KnowledgeBase>('/v1/rag/knowledge-bases', data)
+}
+
+export function updateKnowledgeBase(id: string, data: Partial<KnowledgeBase>): Promise<KnowledgeBase> {
+  return put<KnowledgeBase>(`/v1/rag/knowledge-bases/${id}`, data)
+}
+
+export function deleteKnowledgeBase(id: string): Promise<void> {
+  return del<void>(`/v1/rag/knowledge-bases/${id}`)
+}
+
+export function getKnowledgeDocuments(kbId: string): Promise<KnowledgeDocument[]> {
+  return get<KnowledgeDocument[]>(`/v1/rag/knowledge-bases/${kbId}/docs`)
+}
+
+export function syncKnowledgeBase(kbId: string): Promise<{ synced: number; total: number }> {
+  return post<{ synced: number; total: number }>(`/v1/rag/knowledge-bases/${kbId}/sync`)
+}
+
+export function deleteKnowledgeDocument(kbId: string, docId: string): Promise<void> {
+  return del<void>(`/v1/rag/knowledge-bases/${kbId}/docs/${docId}`)
+}
+
+export function reprocessDocument(kbId: string, docId: string): Promise<void> {
+  return post<void>(`/v1/rag/knowledge-bases/${kbId}/docs/${docId}/reprocess`)
+}
+
+export interface AvailableArticle {
+  id: string
+  title: string
+  createTime: string
+}
+
+export function getAvailableArticles(kbId: string): Promise<AvailableArticle[]> {
+  return get<AvailableArticle[]>(`/v1/rag/knowledge-bases/${kbId}/articles/available`)
+}
+
+export function addArticlesToKb(kbId: string, articleIds: string[]): Promise<{ added: number }> {
+  return post<{ added: number }>(`/v1/rag/knowledge-bases/${kbId}/articles`, { articleIds })
 }
 
 function readAuthToken(): string | null {
