@@ -5,9 +5,9 @@
 > 当前 mysite 代码库实际结构，制定的详细落地计划。
 >
 > 编写日期：2026-07-12
-> 最近修订：2026-07-17 —— 对照仓库现状全面修订：Phase 0 已完成部分如实标注；
-> 修复若干设计问题（路由自注入、对话记忆不闭环、sources 事件无生产者、embedding
-> 维度跨供应商冲突、百炼 rerank 接口格式、双数据源绑定坑等），详见 3.5 节"关键设计决策"。
+> 最近修订：2026-07-23 —— 新增 Phase 6（意图识别与智能路由），参考 Ragent 设计但
+> 适配博客规模：扁平意图列表替代意图树、条件触发查询改写、LLM 意图分类器、
+> 歧义引导处理器、意图感知 Prompt、7 阶段管道升级。
 
 ---
 
@@ -22,8 +22,8 @@
 7. [Phase 3：RAG 问答核心链路 —— 理解 Agent 的"思考"（第 10-14 天）](#phase-3rag-问答核心链路--理解-agent-的思考)
 8. [Phase 4：前端聊天组件 —— 理解 Agent 的"脸面"（第 15-18 天）](#phase-4前端聊天组件--理解-agent-的脸面)
 9. [Phase 5：知识库管理与部署（第 19-22 天）](#phase-5知识库管理与部署)
-10. [学习检查清单（面试可用）](#六学习检查清单面试可用)
-11. [后续扩展路线](#七后续扩展路线)
+10. [Phase 6：意图识别与智能路由 —— 从"能跑"到"好用"](#phase-6意图识别与智能路由--从能跑到好用)
+11. [学习检查清单（面试可用）](#六学习检查清单面试可用)
 12. [关键文件对照表](#八关键文件对照表)
 
 ---
@@ -3802,32 +3802,824 @@ export RAGENT_PG_PASSWORD="your-secure-password"
 
 ---
 
-## 七、后续扩展路线
+## Phase 6：意图识别与智能路由 —— 从"能跑"到"好用"
 
-完成 Phase 0-5 后，你的博客已经具备基本的 AI 交互能力。以下是可以继续探索的方向：
+> **目标**：引入意图识别 + 查询改写 + 多知识库智能路由，让系统不再是"把所有 KB 一锅搜"，
+> 而是根据用户意图精准定位知识库、必要时改写查询、低置信度时主动引导用户澄清。
+> **预计时间**：7-10 天
+> **前置条件**：Phase 0-5 全部完成，已有 ≥2 个知识库且各有不同类型的文档
+> **验收标准**：
+> - 问"博客里 JWT 怎么配的？"→ 自动路由到"技术博客"KB，回答带来源引用
+> - 问"推荐几本 Java 书"→ 路由到"读书笔记"KB
+> - 问"你好"→ 识别为闲聊，走通用聊天不走检索
+> - 问"Spring 怎么样？"（两个 KB 都可能有相关）→ 全局检索，但标注每条来源的 KB 名称
+> - 问"那个东西怎么搞？"（指代不明，无上下文）→ LLM 改写失败/低置信度，引导用户补充信息
+>
+> **参考设计**：Ragent 的意图识别系统（`core/intent/`）+ 多通道检索引擎（`core/retrieve/`），
+> 以下设计方案从 Ragent 简化而来，去掉了意图树编辑器 UI 和 MCP 工具调用分支，
+> 保留博客场景真正需要的核心能力。
 
-### 7.1 近期（1-2 周可完成）
+---
 
-1. **对话摘要压缩** —— 开启 `rag.memory.summary-enabled=true`，当对话超过 10 轮时自动压缩早期对话
-2. **查询重写** —— 对复杂问题先用 LLM 拆分成子问题再检索，提高召回率
-3. **多知识库** —— 为"技术博客"和"读书笔记"建不同知识库，通过意图识别自动路由
-4. **对话分享** —— 生成对话分享链接（类似 ChatGPT 的 Share 功能）
-5. **PDF 文件上传与解析** —— 引入 Apache PDFBox / Apache Tika 或更先进的版面分析工具，
-   支持上传 PDF 并提取文本向量化；在此之前 Dashboard 只支持 Markdown（Phase 5 已明确）
+### 6.0 为什么 Phase 0-5 只是"能跑"？
 
-### 7.2 中期（1-3 个月）
+Phase 3 的 `RagChatService` 是一条**固定管道**：
 
-5. **Elasticsearch 关键词检索** —— 开启 `elasticsearch.enabled=true`，添加 BM25 关键词通道，与向量检索做 RRF 融合
-6. **RAG 质量评估** —— 建立评测集（100 个问题 + 标准答案），量化评估每次改动的效果
-7. **用户反馈循环** —— 点赞/点踩 → 存储到数据库 → 定期分析错误案例 → 优化 Prompt 和分块策略
-8. **Ollama 兜底** —— 如果服务器有 GPU 资源，启用本地 qwen3:8b 作为额外兜底层
+```
+用户问题 → 向量检索(全库, kbId=null) → Rerank → Prompt 组装 → LLM 生成
+```
 
-### 7.3 长期（3 个月以上）
+这条管道在**单知识库 + 用户问题明确**时工作良好。但实际使用中会遇到：
 
-9. **MCP 工具集成** —— 引入 MCP 协议，让 AI 助手能调用外部工具（查天气、查 GitHub Star 数、发邮件等）
-10. **意图树系统** —— 参考 Ragent 的意图识别设计，根据用户问题类型走不同的处理流程
-11. **多模态支持** —— 让 AI 能理解博客中的图片（VLM 视觉语言模型）
-12. **微调 Rerank 模型** —— 积累足够用户反馈数据后，微调 Rerank 模型提升检索精度
+| 场景 | 当前行为 | 问题 |
+|------|---------|------|
+| 两个 KB 各 500 篇文档 | 全库检索 1000 篇的向量 | 噪声翻倍，Rerank 也救不回来 |
+| 用户问"推荐几本书" | 向量检索在技术文章里找"书" | 南辕北辙——应该搜读书笔记 KB |
+| 用户问"你好" | 照样走 embedding + 向量检索 | 浪费一次 embedding API 调用 |
+| 用户问"那个配置怎么改？" | 直接检索"那个配置" | 代词没有语义，检索必然空 |
+| 用户问"Spring Security 的 JWT 过滤器怎么配，还有内存用户和数据库用户有什么区别？" | 整句 embedding | 长问题语义稀释，不如拆成 2 个子问题分别检索 |
+
+**Phase 6 要做的就是把这条固定管道升级为可感知上下文的智能管道。**
+
+---
+
+### 6.1 改造后的数据流（7 阶段管道）
+
+参考 Ragent 的 `StreamChatPipeline`（8 阶段），精简为博客规模适用的 **7 阶段管道**：
+
+```
+用户问题
+  │
+  ├── Stage 1: loadMemory()           — 加载对话历史 + 最近 6 轮消息（已有 ✅）
+  │
+  ├── Stage 2: rewriteQuery()         — ★ 新增：查询改写
+  │     ├── 指代消解："那个配置" + 上文"JWT" → "JWT 配置"
+  │     ├── 拆分长问题：1 个长句 → 2-3 个子问题（并行检索后合并）
+  │     └── 仅当问题含代词 / 过长 / 过于口语化时才调用 LLM
+  │
+  ├── Stage 3: classifyIntent()       — ★ 新增：意图分类
+  │     ├── LLM 将问题归类到已知意图（每个意图绑定一个 KB）
+  │     ├── 三类意图：KB_RETRIEVAL（查知识库）/ CHAT（闲聊）/ AMBIGUOUS（歧义）
+  │     └── 输出：IntentResult { type, targetKbId, confidence, guidance }
+  │
+  ├── [短路1] handleAmbiguous()       — ★ 新增：歧义引导
+  │     └── 低置信度（< 0.6）→ 生成候选方向让用户选 → 等待用户选择 → 重新走管道
+  │         例："Spring 实战"可能指那本书（读书笔记KB）也可能指框架教程（技术博客KB）
+  │
+  ├── [短路2] handleChatOnly()        — ★ 新增：闲聊直接回复
+  │     └── intent.type == CHAT → 跳过检索，直接用系统 Prompt + 历史 + 问题生成回复
+  │         省掉一次 embedding API 调用
+  │
+  ├── Stage 4: retrieve()             — 改造：支持定向检索
+  │     ├── KB_RETRIEVAL + 高置信度 → vectorStore.search(embedding, topK, targetKbId)
+  │     ├── KB_RETRIEVAL + 低置信度 → 全局检索 + 结果标注 KB 来源
+  │     └── 多子问题时并行检索 → 结果去重合并 → Rerank
+  │
+  ├── Stage 5: buildPrompt()          — 改造：意图感知的 Prompt
+  │     ├── 不同 intent 注入不同的 system prompt 片段
+  │     ├── CHAT 意图："你是博客助手，可以和用户闲聊，但不要编造技术细节"
+  │     └── KB 意图：标注每条来源的 KB 名称（不只是文章标题，还有"来自《技术博客》"）
+  │
+  └── Stage 6: streamRagResponse()    — 不变：LLM 流式生成 → SSE 推送
+        └── 完成后 recordFeedback() 收集隐式反馈（用户是否追问/取消/点赞）
+```
+
+---
+
+### 6.2 意图分类系统设计
+
+#### 6.2.1 数据模型
+
+参考 Ragent 的树形意图（DOMAIN → CATEGORY → TOPIC），博客简化为**扁平列表**（不需要 UI 编辑的意图树）：
+
+```sql
+-- 新增表：t_rag_intent（博客规模，一张表足够）
+CREATE TABLE IF NOT EXISTS t_rag_intent (
+    id BIGINT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,           -- 意图名称，如 "技术博客检索"、"读书笔记检索"
+    type VARCHAR(20) NOT NULL DEFAULT 'KB_RETRIEVAL',  -- KB_RETRIEVAL / CHAT
+    kb_id BIGINT,                          -- 绑定的知识库（CHAT 类型为 NULL）
+    keywords TEXT,                         -- 触发关键词，JSON 数组：["Java","Spring","JWT","Redis"]
+    description TEXT,                      -- 意图描述，给 LLM 分类用的提示
+    priority INT DEFAULT 0,               -- 优先级
+    enabled BOOLEAN DEFAULT true,
+    custom_prompt_fragment TEXT,           -- 自定义 Prompt 片段（追加到 system prompt）
+    custom_top_k INT,                      -- 该意图专用 topK（覆盖全局配置）
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 初始数据示例
+INSERT INTO t_rag_intent VALUES
+(1, '技术博客检索', 'KB_RETRIEVAL', 1, '["Java","Spring","JWT","Redis","Docker","MySQL","Vue","TypeScript"]',
+ '用户询问后端开发、Spring Boot、数据库、前端框架等技术问题', 10, true,
+ '你是博客技术文章助手的补充：回答要准确，代码示例注明版本和来源文章。', NULL, NOW()),
+(2, '读书笔记检索', 'KB_RETRIEVAL', 2, '["读书","书籍","推荐","读后感","学习路线","入门"]',
+ '用户询问书籍推荐、读书心得、学习路径等', 5, true,
+ '你是博客读书笔记助手的补充：推荐书籍时说明理由，可以结合技术博客内容给出学习路径建议。', 5, NOW()),
+(3, '闲聊', 'CHAT', NULL, '["你好","谢谢","你是谁","帮助","介绍"]',
+ '问候、自我介绍、能力询问、感谢等社交对话', 0, true, NULL, NULL, NOW());
+```
+
+#### 6.2.2 核心类：`IntentClassifier.java`
+
+“意图分类的本质是用一个 cheap、fast 的 LLM 调用代替一个 expensive 的全库检索调用。”
+
+```java
+package io.github.somehow.mysite.ragent.core.intent;
+
+import io.github.somehow.mysite.ragent.config.RagProperties;
+import io.github.somehow.mysite.ragent.llm.ChatMessage;
+import io.github.somehow.mysite.ragent.llm.LLMService;
+import lombok.Builder;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+/**
+ * 意图分类器 —— Ragent 的 intent 包精简版。
+ *
+ * 与 Ragent 的对比（面试可能被问到）：
+ *   Ragent: 树形多级（DOMAIN→CATEGORY→TOPIC），Redis 缓存意图树，
+ *           LLM 对所有叶子节点打分，score<0.35 过滤，每子问题最多取 3 个意图，
+ *           歧义时生成引导选项
+ *   MySite: 扁平列表，LLM 从 N 个意图中选最匹配的 1 个，低置信度时降级到全局检索，
+ *           不做树形编辑 UI（博客 3-5 个 KB，树形过度设计）
+ *
+ * 设计要点：
+ *   1. 用 LLM 做分类而不是关键词匹配 —— "怎么看 Spring 源码？"
+ *      "源码"不在 keywords 里，但 LLM 知道这属于技术问题而非读书推荐
+ *   2. 分类 LLM 调用用 cheap model（如 deepseek-chat），
+ *      不占用聊天生成用的 deepseek-v4-flash 额度
+ *   3. 结果缓存在请求上下文（TTL），同一轮对话不重复分类
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class IntentClassifier {
+
+    private final IntentRepository intentRepository;
+    private final LLMService cheapLLM;  // 专用轻量模型做分类，省成本（如 deepseek-chat）
+    private final RagProperties properties;
+
+    /**
+     * 对用户问题做意图分类。
+     *
+     * @param question     用户当前问题
+     * @param history      最近几轮对话（用于指代消解后的上下文中判断意图）
+     * @return 分类结果，包含目标 KB、置信度、是否需要引导
+     */
+    public IntentResult classify(String question, List<ChatMessage> history) {
+        // 1. 加载所有已启用的意图
+        List<IntentDO> intents = intentRepository.listEnabled();
+
+        if (intents.isEmpty()) {
+            return IntentResult.fallback();
+        }
+
+        // 2. 构造分类 Prompt
+        String classificationPrompt = buildClassificationPrompt(intents, question, history);
+
+        // 3. 调用轻量 LLM 做分类（非流式，fast path）
+        String llmOutput = cheapLLM.chat(ChatRequest.of("deepseek-chat", classificationPrompt));
+
+        // 4. 解析 LLM 输出
+        return parseIntentResult(llmOutput, intents);
+    }
+
+    /**
+     * 构造分类 Prompt —— 告诉 LLM 有哪些意图可选、每个意图代表什么，
+     * 让它输出 JSON 格式的分类结果。
+     */
+    private String buildClassificationPrompt(List<IntentDO> intents, String question,
+                                              List<ChatMessage> history) {
+        StringBuilder sb = new StringBuilder("""
+            你是一个意图分类器。根据用户问题判断它属于以下哪个意图。
+
+            输出格式（严格 JSON）：
+            {"intentId": <数字>, "confidence": <0.0-1.0>, "reason": "<一句话理由>",
+             "needsGuidance": <true|false>}
+
+            needsGuidance = true 的情况（必须判断）：
+            - 问题过于模糊/简短，无法确定用户真正想问什么（例："Spring 怎么样？"）
+            - 问题有歧义，可能匹配多个意图且置信度接近（例："推荐一本好书"——技术书还是小说？）
+            - 问题含代词但缺少上下文（例："那个怎么搞？"，且历史对话为空或未涉及该代词）
+
+            ## 候选意图列表
+            """);
+
+        for (IntentDO intent : intents) {
+            sb.append("- ID=%d | 类型=%s | 名称=%s | 描述=%s\n".formatted(
+                intent.getId(), intent.getType(), intent.getName(), intent.getDescription()));
+        }
+
+        // 附加最近 2 轮对话帮助 LLM 做指代消解后的意图判断
+        if (history != null && !history.isEmpty()) {
+            sb.append("\n## 对话历史（最近 2 轮）\n");
+            int start = Math.max(0, history.size() - 4);  // 2 轮 = 4 条
+            for (int i = start; i < history.size(); i++) {
+                ChatMessage m = history.get(i);
+                sb.append("- [%s]: %s\n".formatted(m.getRole(), m.getContent()));
+            }
+        }
+
+        sb.append("\n## 用户当前问题\n").append(question).append("\n\n");
+        sb.append("请输出 JSON（不要 markdown code block，直接输出 JSON）：");
+        return sb.toString();
+    }
+
+    private IntentResult parseIntentResult(String llmOutput, List<IntentDO> intents) {
+        try {
+            // 清理 LLM 可能包裹的 ```json 标记
+            String json = llmOutput.trim();
+            if (json.startsWith("```")) {
+                json = json.replaceAll("```json\\s*", "").replaceAll("```\\s*$", "");
+            }
+
+            JsonNode root = new ObjectMapper().readTree(json);
+            long intentId = root.get("intentId").asLong();
+            double confidence = root.get("confidence").asDouble();
+            String reason = root.path("reason").asText("");
+            boolean needsGuidance = root.path("needsGuidance").asBoolean(false);
+
+            IntentDO matched = intents.stream()
+                .filter(i -> i.getId() == intentId)
+                .findFirst()
+                .orElse(null);
+
+            if (matched == null) {
+                log.warn("LLM returned unknown intentId={}, falling back to global", intentId);
+                return IntentResult.fallback();
+            }
+
+            return IntentResult.builder()
+                .intentId(intentId)
+                .type(matched.getType())
+                .targetKbId(matched.getKbId())
+                .confidence(confidence)
+                .needsGuidance(needsGuidance)
+                .reason(reason)
+                .customPromptFragment(matched.getCustomPromptFragment())
+                .customTopK(matched.getCustomTopK())
+                .build();
+
+        } catch (Exception e) {
+            log.warn("Failed to parse intent classification result: {}", e.getMessage());
+            return IntentResult.fallback();
+        }
+    }
+}
+
+// ── 意图结果 DTO ──
+@Data
+@Builder
+public class IntentResult {
+    private Long intentId;
+    private String type;                // KB_RETRIEVAL / CHAT
+    private Long targetKbId;           // CHAT 类型为 null
+    private double confidence;         // 0.0 ~ 1.0
+    private boolean needsGuidance;     // 是否需要引导用户澄清
+    private String reason;             // LLM 分类理由（日志用）
+    private String customPromptFragment;
+    private Integer customTopK;
+
+    /** 分类失败或意图列表为空时的兜底：全局检索 */
+    public static IntentResult fallback() {
+        return IntentResult.builder()
+            .type("KB_RETRIEVAL")
+            .targetKbId(null)  // null = 全局检索
+            .confidence(0.0)
+            .needsGuidance(false)
+            .reason("fallback")
+            .build();
+    }
+}
+```
+
+---
+
+### 6.3 查询改写 `QueryRewriter.java`
+
+“不是所有问题都需要改写——只在检测到代词、过长、过于口语化时才触发。”
+
+参考 Ragent 的两阶段改写（同义词标准化 + LLM 改写拆分），博客简化为**条件触发 + LLM 单次改写**：
+
+```java
+package io.github.somehow.mysite.ragent.core.rewrite;
+
+import io.github.somehow.mysite.ragent.llm.*;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+/**
+ * 查询改写器 —— 让模糊的问题变清晰。
+ *
+ * 什么时候需要改写？（Ragent 经验总结）
+ *   1. 指代消解："那个配置" + 历史"JWT 过滤器" → "JWT 过滤器要怎么配置？"
+ *      —— 不做改写的话，"那个配置"的 embedding 向量毫无意义
+ *   2. 拆分长问题：一个 200 字的问题含 3 个子问题 →
+ *      拆成 3 个短问题分别检索，结果去重合并
+ *      —— 长问题 embedding 语义被稀释，检索效果差
+ *   3. 口语化转正式："搞个登录要咋整？" → "如何实现用户登录功能？"
+ *      —— embedding 模型对口语化文本的向量质量不如正式文本
+ *
+ * 什么时候不触发？（节省 LLM 调用成本）
+ *   - 问题 < 15 字且不含代词
+ *   - 问题已经是清晰的技术问句（如 "JWT 认证怎么实现？"）
+ *   - 闲聊类问题（"你好"、"谢谢"）——在 classifyIntent 阶段就会被短路
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class QueryRewriter {
+
+    private final LLMService cheapLLM;  // 复用轻量模型
+
+    /**
+     * @return RewriteResult 包含改写后的 1-N 个子问题
+     */
+    public RewriteResult rewrite(String question, List<ChatMessage> history) {
+        // 快速判断：不需要改写的直接返回原文
+        if (!needsRewrite(question, history)) {
+            return RewriteResult.unchanged(question);
+        }
+
+        try {
+            String prompt = buildRewritePrompt(question, history);
+            String llmOutput = cheapLLM.chat(ChatRequest.of("deepseek-chat", prompt));
+            return parseRewriteResult(llmOutput, question);
+        } catch (Exception e) {
+            log.warn("Query rewrite failed, using original: {}", e.getMessage());
+            return RewriteResult.unchanged(question);
+        }
+    }
+
+    private boolean needsRewrite(String question, List<ChatMessage> history) {
+        // 含代词 + 有历史 → 需要指代消解
+        if (hasPronouns(question) && history != null && !history.isEmpty()) {
+            return true;
+        }
+        // 过长（>80 字符）且含多个问号 → 可能需要拆分
+        if (question.length() > 80 && question.contains("?") && question.contains("还有")) {
+            return true;
+        }
+        // 过于口语化（"咋搞"、"啥意思"、"咋整"）
+        if (question.contains("咋") || question.contains("啥") || question.contains("咋整")) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean hasPronouns(String q) {
+        return q.contains("这个") || q.contains("那个") || q.contains("它")
+            || q.contains("上面") || q.contains("前面") || q.contains("刚才");
+    }
+
+    private String buildRewritePrompt(String question, List<ChatMessage> history) {
+        StringBuilder sb = new StringBuilder("""
+            将用户问题改写为适合向量检索的清晰查询。如果问题包含多个子问题，拆分为独立查询。
+
+            输出格式（严格 JSON，不要 markdown code block）：
+            {"subQueries": ["改写后的查询1", "查询2", ...]}
+
+            规则：
+            1. 代词（这个/那个/它）必须替换为历史对话中的具体内容
+            2. 口语化表达（咋搞/啥意思）改写为正式技术用语
+            3. 复合问题拆分为最多 3 个独立子问题
+            4. 如果问题已经很清晰，subQueries 只包含一个元素（轻微优化措辞即可）
+
+            """);
+
+        if (history != null && !history.isEmpty()) {
+            sb.append("## 对话历史\n");
+            int start = Math.max(0, history.size() - 6);
+            for (int i = start; i < history.size(); i++) {
+                ChatMessage m = history.get(i);
+                sb.append("- [%s]: %s\n".formatted(m.getRole(), m.getContent()));
+            }
+            sb.append("\n");
+        }
+
+        sb.append("## 用户当前问题\n").append(question).append("\n\n");
+        sb.append("## 改写结果（JSON）：");
+        return sb.toString();
+    }
+
+    private RewriteResult parseRewriteResult(String llmOutput, String original) {
+        try {
+            String json = llmOutput.trim()
+                .replaceAll("```json\\s*", "").replaceAll("```\\s*$", "");
+            JsonNode root = new ObjectMapper().readTree(json);
+            JsonNode arr = root.get("subQueries");
+            if (arr != null && arr.isArray() && arr.size() > 0) {
+                List<String> subQueries = new ArrayList<>();
+                for (JsonNode node : arr) {
+                    String sq = node.asText().trim();
+                    if (!sq.isEmpty() && !sq.equals(original)) {
+                        subQueries.add(sq);
+                    }
+                }
+                if (!subQueries.isEmpty()) {
+                    log.info("Query rewritten: '{}' → {}", original, subQueries);
+                    return new RewriteResult(true, subQueries);
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to parse rewrite result: {}", e.getMessage());
+        }
+        return RewriteResult.unchanged(original);
+    }
+
+    public record RewriteResult(boolean rewritten, List<String> subQueries) {
+        public static RewriteResult unchanged(String original) {
+            return new RewriteResult(false, List.of(original));
+        }
+    }
+}
+```
+
+---
+
+### 6.4 歧义引导 `GuidanceHandler.java`
+
+“不要假装理解用户——低置信度时坦诚询问比瞎猜好十倍。”
+
+```java
+package io.github.somehow.mysite.ragent.core.intent;
+
+import lombok.Builder;
+import lombok.Data;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+/**
+ * 歧义引导处理器 —— Ragent 的 guidance 包精简版。
+ *
+ * 当意图分类器遇到置信度低/多意图接近/缺上下文三种情况时，
+ * 不盲目检索，而是生成引导选项让用户点选。
+ *
+ * 对比 Ragent：Ragent 在 detectAmbiguity() 后生成 GuidancePrompt（候选方向列表），
+ * 前端渲染为可点击按钮。用户点击后带上 chosenIntentId 重新请求。
+ *
+ * MySite 采用相同交互模式，但简化了引导文案生成（不用 LLM 额外调用，直接用候选意图描述）。
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class GuidanceHandler {
+
+    /**
+     * 检测是否需要引导。
+     *
+     * 触发条件（经验值，调过几轮 Ragent 后总结）：
+     *   1. confidence < 0.6 —— 分类器自己都不确定
+     *   2. needsGuidance == true —— LLM 明确标记的歧义场景
+     *   3. top-2 意图分数比 >= 0.75 —— 两个意图非常接近
+     */
+    public boolean shouldGuide(IntentResult result, List<IntentCandidate> topCandidates) {
+        if (result.isNeedsGuidance()) return true;
+        if (result.getConfidence() < 0.6) return true;
+
+        // 检查 top-2 分数比
+        if (topCandidates.size() >= 2) {
+            double ratio = topCandidates.get(1).score / topCandidates.get(0).score;
+            if (ratio >= 0.75) return true;
+        }
+        return false;
+    }
+
+    /**
+     * 生成引导 SSE 事件（不发最终答案，而是让用户选择方向）。
+     *
+     * 前端收到的 guidance 事件格式：
+     * {"type":"guidance","message":"我不太确定你想问什么，请选择一个方向：",
+     *  "options":[{"label":"技术博客中的 Spring 框架教程","intentId":1},
+     *             {"label":"读书笔记中的《Spring 实战》书评","intentId":2}]}
+     */
+    public ChatEvent buildGuidanceEvent(List<IntentCandidate> candidates) {
+        String message = candidates.size() > 1
+            ? "我不太确定你想了解哪方面的内容，请选择一个方向："
+            : "你问的问题有些模糊，能说得更具体一点吗？";
+
+        List<GuidanceOption> options = candidates.stream()
+            .map(c -> new GuidanceOption(c.intentName, c.intentId))
+            .toList();
+
+        return ChatEvent.guidance(message, options);
+    }
+
+    @Data @Builder
+    public static class IntentCandidate {
+        private Long intentId;
+        private String intentName;
+        private double score;
+    }
+
+    public record GuidanceOption(String label, Long intentId) {}
+}
+```
+
+**ChatEvent 新增 guidance 类型**：
+
+```java
+// 在 ChatEvent.java 中新增
+public record GuidanceOption(String label, Long intentId) {}
+
+public static ChatEvent guidance(String message, List<GuidanceOption> options) {
+    // type = "guidance"，delta/sources/conversationId/message 复用现有字段
+    // 前端识别 type=="guidance" → 渲染成可点击按钮
+    return new ChatEvent("guidance", null, null, null, message, options);
+}
+```
+
+---
+
+### 6.5 改造后的 `RagChatService`
+
+把 Stage 2-4 的新逻辑串起来，核心变更用 ★ 标注：
+
+```java
+public Flux<ChatEvent> doChat(String question, Long conversationId, String visitorId) {
+    // Stage 1: 加载对话历史（不变）
+    ConversationDO conv = conversationManager.getOrCreateConversation(...);
+    List<ChatMessage> history = conversationManager.loadHistory(conv.getId());
+
+    // ── ★ Stage 2: 查询改写 ──
+    RewriteResult rewritten = queryRewriter.rewrite(question, history);
+    String primaryQuery = rewritten.subQueries().get(0);  // 主查询用于意图分类
+    log.info("[pipeline] query rewrite: rewritten={}, subQueries={}",
+        rewritten.rewritten(), rewritten.subQueries().size());
+
+    // ── ★ Stage 3: 意图分类 ──
+    IntentResult intent = intentClassifier.classify(primaryQuery, history);
+    log.info("[pipeline] intent: type={}, targetKb={}, confidence={}",
+        intent.getType(), intent.getTargetKbId(), intent.getConfidence());
+
+    // ── ★ 短路1: 歧义引导 ──
+    if (guidanceHandler.shouldGuide(intent, intent.getTopCandidates())) {
+        return Flux.just(
+            ChatEvent.meta(conv.getId()),
+            guidanceHandler.buildGuidanceEvent(intent.getTopCandidates())
+        );
+    }
+
+    // ── ★ 短路2: 闲聊 ──
+    if ("CHAT".equals(intent.getType())) {
+        List<ChatMessage> messages = promptTemplate.buildGeneralPrompt(question, history);
+        return streamLLMResponse(messages, conv.getId(), question, history);
+    }
+
+    // ── ★ Stage 4: 意图感知的检索 ──
+    int topK = intent.getCustomTopK() != null
+        ? intent.getCustomTopK()
+        : properties.getRetrieval().getTopK();
+
+    List<SearchResult> results;
+    if (rewritten.subQueries().size() > 1) {
+        // 多子问题：分别检索 → 去重合并 → Rerank
+        results = retrievalEngine.multiRetrieve(rewritten.subQueries(),
+            intent.getTargetKbId(), topK);
+    } else {
+        // 单问题（含原文未改写）：直接检索
+        results = retrievalEngine.retrieve(primaryQuery, topK, intent.getTargetKbId());
+    }
+    log.info("[pipeline] retrieval: {} results, targetedKb={}", results.size(), intent.getTargetKbId());
+
+    // ── ★ Stage 5: 意图感知的 Prompt ──
+    List<ChatMessage> messages = promptTemplate.buildIntentAwarePrompt(
+        primaryQuery, results, history, intent);
+
+    return streamLLMResponse(messages, conv.getId(), primaryQuery, results);
+}
+```
+
+**关键改造点总结**：
+
+| 改造项 | 原行为 | 新行为 |
+|--------|-------|--------|
+| `RetrievalEngine.retrieve()` | `kbId` 固定 `null`（全库） | 按意图传入 `targetKbId`，低置信时 `null` |
+| `PromptTemplate` | 固定 system prompt | 按 intent 追加 `customPromptFragment`，标注 KB 名 |
+| 闲聊问题 | 照样走 embedding | 短路跳过检索，直接 LLM 回复 |
+| 歧义问题 | 强行全库搜 | 生成引导事件让用户选 |
+| 长/模糊问题 | 原样 embedding | 改写后再检索 |
+| SSE 事件 | 固定 5 种 | 新增 `guidance` 类型 |
+
+---
+
+### 6.6 更完整的 Prompt 设计
+
+```java
+/**
+ * 意图感知的 Prompt —— 让 LLM 知道它在哪个"角色模式"下工作。
+ */
+public List<ChatMessage> buildIntentAwarePrompt(
+        String question, List<SearchResult> context,
+        List<ChatMessage> history, IntentResult intent) {
+
+    // 基础 system prompt（所有模式共享）
+    String basePersona = """
+        你是"somehow 的博客"的 AI 助手。你的职责是帮助读者理解和导航博客内容。
+
+        ## 核心规则
+        1. 只能基于提供的博客文章片段回答问题
+        2. 不知道就说不知道，不要编造
+        3. 回答中标明信息来源（文章名 + 所属知识库）
+        4. 使用 Markdown 格式，代码块标注语言
+        """;
+
+    // 意图专属 Prompt 片段
+    String intentFragment = "";
+    if (intent.getCustomPromptFragment() != null) {
+        intentFragment = "\n## 当前角色\n" + intent.getCustomPromptFragment();
+    }
+
+    // 知识库上下文
+    String contextSection = context.isEmpty()
+        ? "\n## 检索结果\n（未找到相关内容，请诚实告知用户）"
+        : "\n## 提供的博客内容\n" + formatContextWithKbName(context);
+    // ↑ 与 Phase 3 的 formatContext 的区别：每条来源前面加 "【技术博客】《Spring Security 实战》"
+
+    String systemPrompt = basePersona + intentFragment + contextSection;
+
+    List<ChatMessage> messages = new ArrayList<>();
+    messages.add(ChatMessage.system(systemPrompt));
+    messages.addAll(history);
+    messages.add(ChatMessage.user(question));
+    return messages;
+}
+
+private String formatContextWithKbName(List<SearchResult> results) {
+    StringBuilder sb = new StringBuilder();
+    for (int i = 0; i < results.size(); i++) {
+        SearchResult r = results.get(i);
+        String kbName = kbNameCache.getOrDefault(r.kbId(), "未知知识库");
+        sb.append("---\n");
+        sb.append("[来源%d] 【%s】《%s》（相关性: %.2f）\n\n".formatted(
+            i + 1, kbName, r.docTitle(), r.score()));
+        sb.append(r.content()).append("\n\n");
+    }
+    return sb.toString();
+}
+```
+
+---
+
+### 6.7 前端改动
+
+#### 6.7.1 聊天界面新增 KB 来源标注
+
+`ChatSources.vue` 改造：每条来源前面加 KB 标签颜色：
+
+```vue
+<span class="kb-badge" :style="{ backgroundColor: kbColor(source.kbId) }">
+  {{ source.kbName }}
+</span>
+```
+
+#### 6.7.2 歧义引导交互
+
+`useChat.ts` 新增 `onGuidance` 回调，前端收到 `guidance` 事件时渲染可点击的选项按钮：
+
+```
+用户问："Spring 怎么样？"
+AI：我不太确定你想了解哪方面的内容，请选择一个方向：
+  [技术博客中的 Spring 框架教程]
+  [读书笔记中的 Spring 实战书评]
+用户点击 → 带上 chosenIntentId 重新发请求
+```
+
+#### 6.7.3 新增 `/v1/rag/chat/stream` 查询参数
+
+```
+GET /v1/rag/chat/stream?q=...&conversationId=...&visitorId=...&intentId=...
+```
+
+`intentId` 参数：用户选择引导选项后回传，跳过意图分类环节。
+
+---
+
+### 6.8 知识库级别的配置增强
+
+在 `application.yaml` 中给每个知识库添加专属配置：
+
+```yaml
+rag:
+  # ... 现有配置 ...
+
+  # ── ★ 新增：知识库元数据 ──
+  knowledge-bases:
+    - id: 1
+      name: "技术博客"
+      collection: "tech_blog"
+      color: "#3b82f6"        # 前端 KB 标签色
+      default-intent-type: KB_RETRIEVAL
+    - id: 2
+      name: "读书笔记"
+      collection: "reading_notes"
+      color: "#10b981"
+      default-intent-type: KB_RETRIEVAL
+```
+
+`RagProperties` 新增对应的配置类：
+
+```java
+@Data
+public static class KnowledgeBaseMeta {
+    private Long id;
+    private String name;
+    private String collection;
+    private String color;
+    private String defaultIntentType;
+}
+
+// 惰性加载 kbId → name 缓存（避免每次查 DB）
+@Getter(lazy = true)
+private final Map<Long, String> kbNameCache = buildKbNameCache();
+
+private Map<Long, String> buildKbNameCache() {
+    return knowledgeBases.stream()
+        .collect(Collectors.toMap(KnowledgeBaseMeta::getId, KnowledgeBaseMeta::getName));
+}
+```
+
+---
+
+### 6.9 Phase 6 新增/修改文件清单
+
+| 操作 | 文件 | 说明 |
+|------|------|------|
+| 新增 | `docker/init/ragent-schema-v2.sql` | `t_rag_intent` 建表 + 种子数据 |
+| 新增 | `ragent/core/intent/IntentClassifier.java` | 意图分类器 |
+| 新增 | `ragent/core/intent/GuidanceHandler.java` | 歧义引导处理器 |
+| 新增 | `ragent/core/intent/IntentRepository.java` | 意图数据访问 |
+| 新增 | `ragent/dao/entity/IntentDO.java` | 意图实体 |
+| 新增 | `ragent/dao/mapper/IntentMapper.java` | 意图 Mapper |
+| 新增 | `ragent/core/rewrite/QueryRewriter.java` | 查询改写器 |
+| 新增 | `ragent/dto/GuidanceOptionDTO.java` | 引导选项 DTO |
+| 修改 | `ragent/service/RagChatService.java` | 集成 7 阶段管道 |
+| 修改 | `ragent/core/retrieval/RetrievalEngine.java` | retrieve() 加 kbId 参数 + multiRetrieve() |
+| 修改 | `ragent/core/PromptTemplate.java` | buildIntentAwarePrompt() + formatContextWithKbName() |
+| 修改 | `ragent/llm/ChatEvent.java` | 新增 guidance 事件类型 |
+| 修改 | `ragent/config/RagProperties.java` | 新增 knowledgeBases 配置 |
+| 修改 | `application.yaml` | 新增 rag.knowledge-bases 段 |
+| 修改 | `mysite-frontend/src/api/rag.ts` | onGuidance 回调 + intentId 参数 |
+| 修改 | `mysite-frontend/src/composables/useChat.ts` | 引导选项交互 |
+| 修改 | `mysite-frontend/src/components/chat/ChatSources.vue` | KB 标签色 |
+| 新增 | `mysite-frontend/src/components/chat/ChatGuidance.vue` | 引导选项渲染 |
+
+---
+
+### Phase 6 验收清单
+
+- [ ] 至少 2 个知识库，各有不同类型的文档（如"技术博客"'读书笔记"）
+- [ ] `t_rag_intent` 表有种子数据，每个意图绑定正确的 KB
+- [ ] 问"JWT 怎么配置？"→ 路由到技术博客 KB，回答引用技术文章
+- [ ] 问"推荐几本 Java 入门书"→ 路由到读书笔记 KB
+- [ ] 问"你好"→ 识别为闲聊，不触发检索，直接 LLM 回复
+- [ ] 问"那个怎么搞？"（上文在讨论 JWT）→ 改写为"JWT 怎么配置？"
+- [ ] 问"Spring Security 过滤器怎么配还有内存用户和数据库用户区别"→ 拆成 2-3 个子问题分别检索
+- [ ] 问"Spring 怎么样？"→ 触发歧义引导，列出 2 个候选方向，用户点击后正确路由
+- [ ] 查询改写不触发时（清晰短问题）不浪费 LLM 调用
+- [ ] 多子问题检索结果去重合并正确
+- [ ] 每条来源标注所属 KB 名称和颜色
+
+---
+
+### 6.10 为什么这个设计适用于博客规模（面试自问自答）
+
+> **"Ragent 有意图树编辑器、MCP 工具调用、8 阶段管道，你为什么不用全套？"**
+
+1. **意图树编辑器**：Ragent 的树形 DOMAIN→CATEGORY→TOPIC 是为 SaaS 多租户设计的——每个租户可以自定义意图树。个人博客就 3-5 个知识库，用扁平列表 + 种子数据更合适，不需要 UI 编辑能力。
+2. **MCP 工具调用**：博客场景暂时没有外部工具（天气/工单/销售），MCP 是过度设计。MCP 的扩展点留着（接口已定义），需要时再加。
+3. **多通道并行检索（ES 关键词 + 向量 + 意图定向）**：博客文档量小（几百篇），向量检索 + Rerank 的精度已经够用。ES 关键词通道在 Phase 6 规划为远期扩展。
+4. **RocketMQ 异步管道**：博客不需要 RocketMQ 的消息可靠性——文章发布事件用 Spring Event + @Async 就够。
+
+**一句话总结**：学 Ragent 的设计思想（意图驱动、分阶段管道、短路分支），但控制工程复杂度（线程池、MQ、多通道、树编辑器只取博客需要的部分）。
+
+---
+
+### 6.11 其他扩展方向
+
+完成 Phase 6 后，系统已经具备"意图识别 → 查询改写 → 定向检索 → 歧义引导"的生产级核心能力。以下是其他可选的优化方向，视实际需要排期：
+
+| 优先级 | 扩展项 | 说明 |
+|--------|-------|------|
+| 高 | **对话摘要压缩** | 开启 `rag.memory.summary-enabled=true`，长对话自动压缩早期内容，防 token 爆炸 |
+| 高 | **用户反馈循环** | 点赞/点踩 → 存储到 DB → 每周分析 bad case → 针对性调 Prompt 或分块策略 |
+| 中 | **RAG 质量评估** | 建 50-100 个问答对作为评测集，每次改检索/Prompt 后跑一遍看分数变化 |
+| 中 | **PDF 文件上传** | 引入 Apache PDFBox 解析 PDF，支持上传文档扩充知识库 |
+| 中 | **对话分享** | 生成只读分享链接（类似 ChatGPT share），别人可以看到完整问答 |
+| 低 | **ES 关键词检索** | 开启 `elasticsearch.enabled=true`，BM25 + 向量检索做 RRF 融合（文档 > 1000 篇时才有明显收益） |
+| 低 | **MCP 工具集成** | 引入 MCP 协议，让 AI 查天气、查 GitHub Star 数等（需要先有实际的工具调用需求） |
+| 低 | **微调 Rerank 模型** | 积累足够用户反馈数据后微调 gte-rerank，让精排更适配博客内容 |
 
 ---
 

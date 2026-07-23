@@ -45,7 +45,6 @@ docker/artalk_data/
 docker/.env
 deploy/config/.env
 docker/artalk_data/artalk.db
-docs/
 配色/
 .trae/
 .claude/
