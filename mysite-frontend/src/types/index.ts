@@ -278,6 +278,10 @@ export interface SourceChunk {
   content: string
   score: number
   articleId?: string | null
+  /** Phase 6：所属知识库 ID */
+  kbId?: string | null
+  /** Phase 6：所属知识库名称（如"技术博客"、"读书笔记"）*/
+  kbName?: string | null
 }
 
 export interface ChatMessage {
@@ -288,6 +292,19 @@ export interface ChatMessage {
   pending?: boolean        // 流式生成中
   failed?: boolean         // 无输出即失败，可重试
   truncated?: boolean      // 被取消或中断，保留部分内容
+  /** Phase 6：歧义引导选项（type=guidance 时填充）*/
+  guidance?: ChatGuidance | null
+}
+
+/** Phase 6：歧义引导 —— AI 不确定意图时生成候选方向让用户选择 */
+export interface ChatGuidance {
+  message: string
+  options: GuidanceOption[]
+}
+
+export interface GuidanceOption {
+  label: string
+  intentId: string  // Snowflake 64-bit，string 避免精度丢失
 }
 
 // ========== RAG 知识库管理 ==========

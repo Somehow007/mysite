@@ -3,6 +3,8 @@
 // 采用"消息列表内原地更新"模型：流式 token 直接追加到数组里的 AI 占位消息，
 // 消除"流式消息"与"历史消息"两套渲染路径。
 //
+// Phase 6 新增：guidance 歧义引导状态、sendWithIntent 定向发送。
+//
 // ⚠️  Vue 3 响应式关键约束：
 //    reactive() 返回的是包裹原始对象的 Proxy，原始对象本身不会被修改。
 //    所有回调中对消息属性的修改，必须通过 messages.value[index] 获取
@@ -15,7 +17,7 @@ import {
   type ChatStreamErrorKind,
   type ConversationSummary,
 } from '@/api/rag'
-import type { ChatMessage, SourceChunk } from '@/types'
+import type { ChatMessage, SourceChunk, GuidanceOption } from '@/types'
 
 export type ChatStatus = 'idle' | 'streaming' | 'error'
 
@@ -47,7 +49,17 @@ export function useChat() {
     return last?.role === 'assistant' ? last : null
   }
 
+  /** 普通发送（自动意图分类） */
   function sendMessage(question: string) {
+    sendMessageInternal(question, null)
+  }
+
+  /** Phase 6：带上用户选择的 intentId 发送（guidance 回传） */
+  function sendWithIntent(question: string, intentId: string) {
+    sendMessageInternal(question, intentId)
+  }
+
+  function sendMessageInternal(question: string, intentId: string | null) {
     const q = question.trim()
     if (!q || isStreaming.value) return // 流式中禁止并发发送
     lastError.value = null
@@ -107,7 +119,18 @@ export function useChat() {
         }
         abort = null
       },
-    })
+
+      // ── Phase 6：歧义引导 ──
+      onGuidance: (message: string, options: GuidanceOption[]) => {
+        const msg = lastAssistant()
+        if (!msg) return
+        msg.pending = false
+        msg.content = message
+        msg.guidance = { message, options }
+        status.value = 'idle'
+        abort = null
+      },
+    }, intentId)
   }
 
   /** 重试：移除失败的那条 AI 消息，用 lastQuestion 重发 */
@@ -180,6 +203,8 @@ export function useChat() {
     conversations,
     loadingHistory,
     sendMessage,
+    /** Phase 6：带上用户选择的 intentId 发送 */
+    sendWithIntent,
     retry,
     cancelGeneration,
     newConversation,

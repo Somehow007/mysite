@@ -2,7 +2,7 @@
 // SSE 不能用 axios（响应体需流式读取），这里用原生 fetch + ReadableStream。
 // 本文件是项目中唯一的流式 HTTP 代码，所有容错逻辑收口于此。
 
-import type { SourceChunk, KnowledgeBase, KnowledgeDocument } from '@/types'
+import type { SourceChunk, KnowledgeBase, KnowledgeDocument, GuidanceOption } from '@/types'
 import { get, post, put, del } from './client'
 
 export interface ChatStreamCallbacks {
@@ -12,6 +12,8 @@ export interface ChatStreamCallbacks {
   onToken: (delta: string) => void
   onDone: () => void
   onError: (error: ChatStreamError) => void
+  /** Phase 6：歧义引导 —— 低置信度时生成候选方向让用户选择 */
+  onGuidance?: (message: string, options: GuidanceOption[]) => void
 }
 
 /** 错误分类：UI 据此决定提示文案与是否展示重试 */
@@ -50,8 +52,8 @@ export function getVisitorId(): string {
 }
 
 /** 安全回调：单个回调抛异常不中断 SSE 读取循环 */
-function safe<T>(fn: (v: T) => void, v: T) {
-  try { fn(v) } catch (e) { console.error('[rag] callback error:', e) }
+function safe<T extends (...args: never[]) => void>(fn: T, ...args: Parameters<T>) {
+  try { fn(...args) } catch (e) { console.error('[rag] callback error:', e) }
 }
 
 /**
@@ -59,14 +61,18 @@ function safe<T>(fn: (v: T) => void, v: T) {
  *
  * 契约：GET /v1/rag/chat/stream
  * 事件类型：meta → sources → content(×N) → done / error
+ * Phase 6 新增：guidance 事件（歧义引导）
  */
 export function createChatStream(
   question: string,
   conversationId: string | null,
   callbacks: ChatStreamCallbacks,
+  /** Phase 6：用户选择的意图 ID（guidance 回传），null = 自动分类 */
+  intentId?: string | null,
 ): AbortController {
   const params = new URLSearchParams({ q: question, visitorId: getVisitorId() })
   if (conversationId != null) params.set('conversationId', conversationId)
+  if (intentId != null) params.set('intentId', intentId)
 
   const controller = new AbortController()
   const { signal } = controller
@@ -159,6 +165,13 @@ export function createChatStream(
               finished = true
               fail(new ChatStreamError('server', (data.message as string) || 'AI 服务暂时不可用'))
               return
+            case 'guidance': {
+              // Phase 6：歧义引导 —— 低置信度时 AI 生成候选方向让用户选
+              const message = (data.message as string) || '我不太确定你想问什么……'
+              const options = (data.options ?? []) as GuidanceOption[]
+              if (callbacks.onGuidance) safe(callbacks.onGuidance, message, options)
+              break
+            }
             default:
               // 未知事件类型：记录日志但不中断流
               if (import.meta.env.DEV) {

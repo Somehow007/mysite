@@ -42,6 +42,12 @@ function handleNewConversation() {
   showHistory.value = false
 }
 
+// ── Phase 6：歧义引导选择 ──
+function handleSelectIntent(intentId: string) {
+  if (!chat.lastQuestion.value) return
+  chat.sendWithIntent(chat.lastQuestion.value, intentId)
+}
+
 // 面板打开时加载历史对话列表
 watch(isOpen, (open) => {
   if (open) {
@@ -298,6 +304,7 @@ onScopeDispose(() => {
             :key="msg.id"
             :message="msg"
             @retry="chat.retry()"
+            @select-intent="handleSelectIntent"
           />
 
           <!-- 错误 toast -->

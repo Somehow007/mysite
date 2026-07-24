@@ -1,5 +1,7 @@
 package io.github.somehow.mysite.ragent.dto;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,4 +19,9 @@ public class SourceChunkDTO {
     private String content;
     /** 相似度分数（向量检索的 cosine 相似度或 Rerank 后的相关性分数） */
     private float score;
+    /** 所属知识库 ID（Phase 6 新增，前端 KB 标签色用） */
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long kbId;
+    /** 所属知识库名称（Phase 6 新增，如 "技术博客"、"读书笔记"） */
+    private String kbName;
 }

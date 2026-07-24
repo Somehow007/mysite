@@ -31,6 +31,23 @@ public class RagentSchemaMigration implements InitializingBean {
     public void afterPropertiesSet() {
         execute("ALTER TABLE t_knowledge_chunk ADD COLUMN IF NOT EXISTS embedding_text TEXT",
             "t_knowledge_chunk.embedding_text");
+
+        // Phase 6: 意图识别表（已有卷不含此表时自动创建）
+        execute("""
+            CREATE TABLE IF NOT EXISTS t_rag_intent (
+                id BIGINT PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                type VARCHAR(20) NOT NULL DEFAULT 'KB_RETRIEVAL',
+                kb_id BIGINT,
+                keywords TEXT,
+                description TEXT,
+                priority INT DEFAULT 0,
+                enabled BOOLEAN DEFAULT true,
+                custom_prompt_fragment TEXT,
+                custom_top_k INT,
+                create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """, "t_rag_intent");
     }
 
     private void execute(String sql, String label) {

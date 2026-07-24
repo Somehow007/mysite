@@ -3,6 +3,7 @@ import { RefreshCw } from 'lucide-vue-next'
 import type { ChatMessage } from '@/types'
 import ChatStreamWriter from './ChatStreamWriter.vue'
 import ChatSources from './ChatSources.vue'
+import ChatGuidance from './ChatGuidance.vue'
 
 defineProps<{
   message: ChatMessage
@@ -10,6 +11,8 @@ defineProps<{
 
 const emit = defineEmits<{
   retry: []
+  /** Phase 6：用户选择了歧义引导中的一个方向 */
+  selectIntent: [intentId: string]
 }>()
 </script>
 
@@ -61,9 +64,17 @@ const emit = defineEmits<{
         >已停止生成</span>
       </template>
 
+      <!-- Phase 6：歧义引导 -->
+      <ChatGuidance
+        v-if="message.guidance && !message.pending && !message.failed"
+        :message="message.guidance.message"
+        :options="message.guidance.options"
+        @select="(intentId: string) => emit('selectIntent', intentId)"
+      />
+
       <!-- 来源（非流式才展示） -->
       <ChatSources
-        v-if="!message.pending && !message.failed && message.sources.length > 0"
+        v-if="!message.pending && !message.failed && !message.guidance && message.sources.length > 0"
         :sources="message.sources"
       />
     </div>

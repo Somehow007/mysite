@@ -4,7 +4,14 @@ import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.core.PromptTemplate;
 import io.github.somehow.mysite.ragent.core.ConversationManager;
 import io.github.somehow.mysite.ragent.core.RetrievalEngine;
+import io.github.somehow.mysite.ragent.core.intent.GuidanceHandler;
+import io.github.somehow.mysite.ragent.core.intent.IntentClassifier;
+import io.github.somehow.mysite.ragent.core.intent.IntentResult;
+import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter;
+import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter.RewriteResult;
 import io.github.somehow.mysite.ragent.dao.entity.ConversationDO;
+import io.github.somehow.mysite.ragent.dao.entity.IntentDO;
+import io.github.somehow.mysite.ragent.dao.mapper.IntentMapper;
 import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
 import io.github.somehow.mysite.ragent.llm.RoutingLLMService;
 import io.github.somehow.mysite.ragent.llm.model.ChatEvent;
@@ -20,6 +27,7 @@ import reactor.test.StepVerifier;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -33,21 +41,45 @@ class RagChatServiceTest {
     private RoutingLLMService routingLLMService;
     private ChatRateLimiter rateLimiter;
     private RagProperties properties;
+    private QueryRewriter queryRewriter;
+    private IntentClassifier intentClassifier;
+    private GuidanceHandler guidanceHandler;
+    private IntentMapper intentMapper;
     private RagChatService service;
 
     @BeforeEach
     void setUp() {
         retrievalEngine = mock(RetrievalEngine.class);
         conversationManager = mock(ConversationManager.class);
-        promptTemplate = new PromptTemplate();
         routingLLMService = mock(RoutingLLMService.class);
         rateLimiter = mock(ChatRateLimiter.class);
+        queryRewriter = mock(QueryRewriter.class);
+        intentClassifier = mock(IntentClassifier.class);
+        guidanceHandler = mock(GuidanceHandler.class);
+        intentMapper = mock(IntentMapper.class);
 
         properties = new RagProperties();
         properties.getRetrieval().setRerankTopK(5);
+        // kbNameCache 惰性初始化需要 knowledgeBases 非空
+        RagProperties.KnowledgeBaseMeta kb1 = new RagProperties.KnowledgeBaseMeta();
+        kb1.setId(1L);
+        kb1.setName("技术博客");
+        properties.setKnowledgeBases(List.of(kb1));
+
+        promptTemplate = new PromptTemplate(properties);
+
+        // 默认：不改写、分类为 KB_RETRIEVAL、不触发歧义引导
+        when(queryRewriter.rewrite(anyString(), anyList()))
+            .thenReturn(RewriteResult.unchanged("测试问题"));
+        when(intentClassifier.classify(anyString(), anyList()))
+            .thenReturn(IntentResult.builder()
+                .type("KB_RETRIEVAL").targetKbId(null).confidence(0.8)
+                .needsGuidance(false).reason("test").build());
+        when(intentMapper.listEnabled()).thenReturn(List.of());
 
         service = new RagChatService(retrievalEngine, conversationManager,
-            promptTemplate, routingLLMService, rateLimiter, properties);
+            promptTemplate, routingLLMService, rateLimiter, properties,
+            queryRewriter, intentClassifier, guidanceHandler, intentMapper);
     }
 
     @Nested
@@ -64,12 +96,12 @@ class RagChatServiceTest {
             when(conversationManager.getOrCreateConversation(null, "visitor-1", "测试问题"))
                 .thenReturn(conv);
             when(conversationManager.loadHistory(42L)).thenReturn(List.of());
-            when(retrievalEngine.retrieve("测试问题", 5)).thenReturn(List.of());
+            when(retrievalEngine.retrieve(eq("测试问题"), eq(5), isNull())).thenReturn(List.of());
             when(routingLLMService.chatStream(any()))
                 .thenReturn(Flux.just("Hello", " World"));
 
             // When
-            Flux<ChatEvent> events = service.chat("测试问题", null, "visitor-1", "127.0.0.1", UserRole.USER);
+            Flux<ChatEvent> events = service.chat("测试问题", null, "visitor-1", "127.0.0.1", UserRole.USER, null);
 
             // Then
             StepVerifier.create(events)
@@ -89,11 +121,11 @@ class RagChatServiceTest {
 
             when(conversationManager.getOrCreateConversation(null, "v", "q")).thenReturn(conv);
             when(conversationManager.loadHistory(99L)).thenReturn(List.of());
-            when(retrievalEngine.retrieve(anyString(), anyInt())).thenReturn(List.of());
+            when(retrievalEngine.retrieve(anyString(), anyInt(), any())).thenReturn(List.of());
             when(routingLLMService.chatStream(any()))
                 .thenReturn(Flux.just("ok"));
 
-            Flux<ChatEvent> events = service.chat("q", null, "v", "127.0.0.1", UserRole.USER);
+            Flux<ChatEvent> events = service.chat("q", null, "v", "127.0.0.1", UserRole.USER, null);
 
             StepVerifier.create(events)
                 .expectNextMatches(e -> "meta".equals(e.type()) && e.conversationId() == 99L)
@@ -119,10 +151,10 @@ class RagChatServiceTest {
 
             when(conversationManager.getOrCreateConversation(any(), any(), any())).thenReturn(conv);
             when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
-            when(retrievalEngine.retrieve(anyString(), anyInt())).thenReturn(results);
+            when(retrievalEngine.retrieve(anyString(), anyInt(), any())).thenReturn(results);
             when(routingLLMService.chatStream(any())).thenReturn(Flux.just("答案"));
 
-            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1", UserRole.USER);
+            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1", UserRole.USER, null);
 
             StepVerifier.create(events)
                 .expectNextMatches(e -> "meta".equals(e.type()))
@@ -146,7 +178,7 @@ class RagChatServiceTest {
             doThrow(new ChatRateLimiter.RateLimitExceededException("超频了"))
                 .when(rateLimiter).check(anyString(), anyString(), any());
 
-            Flux<ChatEvent> events = service.chat("q", null, "v", "127.0.0.1", UserRole.USER);
+            Flux<ChatEvent> events = service.chat("q", null, "v", "127.0.0.1", UserRole.USER, null);
 
             StepVerifier.create(events)
                 .expectNextMatches(e -> "error".equals(e.type())
@@ -167,11 +199,11 @@ class RagChatServiceTest {
 
             when(conversationManager.getOrCreateConversation(any(), any(), any())).thenReturn(conv);
             when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
-            when(retrievalEngine.retrieve(anyString(), anyInt())).thenReturn(List.of());
+            when(retrievalEngine.retrieve(anyString(), anyInt(), any())).thenReturn(List.of());
             when(routingLLMService.chatStream(any()))
                 .thenReturn(Flux.error(new RuntimeException("API 挂了")));
 
-            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1", UserRole.USER);
+            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1", UserRole.USER, null);
 
             StepVerifier.create(events)
                 .expectNextMatches(e -> "meta".equals(e.type()))
@@ -200,10 +232,10 @@ class RagChatServiceTest {
             when(conversationManager.getOrCreateConversation(5L, "v", "新问题"))
                 .thenReturn(conv);
             when(conversationManager.loadHistory(5L)).thenReturn(history);
-            when(retrievalEngine.retrieve("新问题", 5)).thenReturn(List.of());
+            when(retrievalEngine.retrieve(eq("新问题"), eq(5), any())).thenReturn(List.of());
             when(routingLLMService.chatStream(any())).thenReturn(Flux.just("回复"));
 
-            Flux<ChatEvent> events = service.chat("新问题", 5L, "v", "127.0.0.1", UserRole.USER);
+            Flux<ChatEvent> events = service.chat("新问题", 5L, "v", "127.0.0.1", UserRole.USER, null);
 
             StepVerifier.create(events)
                 .expectNextCount(4)  // meta + sources + content + done

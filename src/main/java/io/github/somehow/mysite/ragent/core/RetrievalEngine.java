@@ -4,30 +4,31 @@ import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.llm.embedding.EmbeddingService;
 import io.github.somehow.mysite.ragent.llm.rerank.RerankService;
 import io.github.somehow.mysite.ragent.vector.VectorStore;
+import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 /**
- * 检索引擎（向量检索 + Rerank 精排）
+ * 检索引擎（向量检索 + Rerank 精排）。
  *
- * 为什么需要两阶段？
- *      Step 1 —— 向量检索（粗排）：从全库中找到 Top 10 候选
- *          - 优点：数独快（HNSW 索引 O(log N)）
- *          - 缺点：纯向量相似度不够精确，可能混入语义相近但不相关的内容
- *      Step 2 —— Rerank（精排）：用专门的 Rerank 模型对 Top 10 重排序
- *          - Rerank 模型比 Embedding 模型更“聪明”：它同时看问题和文档，
- *            判断“这篇文档是否能回答这个问题”，而不仅仅是“这两段文本是否相似”
- *          - 输入：(question，doc1), (question，doc2), ...
- *          - 输出：每个 pair 的相关性分数，取 Top 5
- *          - 成本比直接向量检索高，但只在候选集上跑，所以可控
+ * <h3>为什么需要两阶段？</h3>
+ * <ol>
+ *   <li><b>向量检索（粗排）</b>：从全库中找到 Top K 候选
+ *       —— 速度快（HNSW 索引 O(log N)），但可能混入语义相近但不相关的内容</li>
+ *   <li><b>Rerank（精排）</b>：用专门的 Rerank 模型对候选集重排序
+ *       —— Rerank 模型比 Embedding 模型更"聪明"，同时看问题和文档判断"能否回答"</li>
+ * </ol>
  *
- * 典型场景：
- *      用户问：“JWT 过滤器怎么配置？”
- *      向量检索可能返回：Top 1 = "JWT 简介"（语义相似但没回答“怎么配置”）
- *      Rerank 会纠正：把 “JWT 过滤器配置步骤” 提到 Top 1
+ * <h3>Phase 6 改造</h3>
+ * <ul>
+ *   <li>{@link #retrieve(String, int, Long)} —— kbId 参数支持定向检索（null = 全库）</li>
+ *   <li>{@link #multiRetrieve(List, Long, int)} —— 多子问题并行检索 → 去重合并 → Rerank</li>
+ * </ul>
  */
 @Slf4j
 @Component
@@ -40,42 +41,104 @@ public class RetrievalEngine {
     private final RagProperties properties;
 
     /**
-     * 检索相关文档片段
-     *
-     * @param question  用户问题（原始文本）
-     * @param topK      最终返回多少个片段
-     * @return          检索结果，按相关性降序
+     * 检索相关文档片段（兼容旧调用，kbId 为 null）。
      */
-    public List<VectorStore.SearchResult> retrieve(String question, int topK) {
+    public List<SearchResult> retrieve(String question, int topK) {
+        return retrieve(question, topK, null);
+    }
+
+    /**
+     * 检索相关文档片段（支持定向检索）。
+     *
+     * @param question 用户问题（原始文本）
+     * @param topK     最终返回多少个片段
+     * @param kbId     目标知识库 ID（null = 全库检索）
+     * @return 检索结果，按相关性降序
+     */
+    public List<SearchResult> retrieve(String question, int topK, Long kbId) {
         long t0 = System.currentTimeMillis();
 
-        // Stage 1: 向量检索 Top K（kbId 传 null = 全库；多知识库时传入目标 kbId）
+        // Stage 1: Embedding + 向量检索
         long t1 = System.currentTimeMillis();
         float[] queryEmbedding = embeddingService.embed(question);
         log.info("[retrieval] embedding done: {} dims ({}ms)",
             queryEmbedding.length, System.currentTimeMillis() - t1);
 
-        List<VectorStore.SearchResult> candidates = vectorStore.search(
-                queryEmbedding,
-                properties.getRetrieval().getTopK(),
-                null
+        List<SearchResult> candidates = vectorStore.search(
+            queryEmbedding,
+            properties.getRetrieval().getTopK(),
+            kbId
         );
-        log.info("[retrieval] vector search: {} candidates ({}ms total)",
-            candidates.size(), System.currentTimeMillis() - t0);
+        log.info("[retrieval] vector search: {} candidates, kbId={} ({}ms total)",
+            candidates.size(), kbId, System.currentTimeMillis() - t0);
 
         // 过滤低分结果
         candidates = candidates.stream()
-                .filter(r -> r.score() >= properties.getRetrieval().getScoreThreshold())
-                .toList();
+            .filter(r -> r.score() >= properties.getRetrieval().getScoreThreshold())
+            .toList();
 
         if (candidates.isEmpty()) {
             return List.of();
         }
 
-        // Stage 2: Rerank 精排（如果配置了 Rerank 服务）
+        // Stage 2: Rerank 精排
+        return rerank(candidates, topK, t0);
+    }
+
+    /**
+     * 多子问题检索：每个子问题独立检索 → 去重合并 → Rerank。
+     *
+     * <h3>使用场景</h3>
+     * 查询改写将长问题拆成 2-3 个子问题后，每个子问题分别检索各自最相关的 chunk，
+     * 然后去重合并、统一 Rerank。避免长问题 embedding 语义稀释。
+     *
+     * @param subQueries 子问题列表（通常 2-3 个）
+     * @param kbId       目标知识库（null = 全库）
+     * @param topK       最终返回多少个片段
+     * @return 去重合并 + Rerank 后的结果
+     */
+    public List<SearchResult> multiRetrieve(List<String> subQueries, Long kbId, int topK) {
+        if (subQueries.isEmpty()) return List.of();
+        if (subQueries.size() == 1) return retrieve(subQueries.get(0), topK, kbId);
+
+        long t0 = System.currentTimeMillis();
+        log.info("[multi-retrieve] {} sub-queries, kbId={}", subQueries.size(), kbId);
+
+        // 每个子问题独立检索（顺序执行 —— embedding API 有并发限制）
+        // chunkId → result，用于去重（保留更高分的那个）
+        LinkedHashMap<Long, SearchResult> dedupMap = new LinkedHashMap<>();
+
+        for (String subQuery : subQueries) {
+            List<SearchResult> results = retrieve(subQuery, topK, kbId);
+            for (SearchResult r : results) {
+                SearchResult existing = dedupMap.get(r.chunkId());
+                if (existing == null || r.score() > existing.score()) {
+                    dedupMap.put(r.chunkId(), r);
+                }
+            }
+        }
+
+        List<SearchResult> merged = new ArrayList<>(dedupMap.values());
+        log.info("[multi-retrieve] merged {} unique chunks from {} sub-queries ({}ms)",
+            merged.size(), subQueries.size(), System.currentTimeMillis() - t0);
+
+        if (merged.isEmpty()) return List.of();
+
+        // 按分数降序 → 取 topK → Rerank
+        merged.sort((a, b) -> Float.compare(b.score(), a.score()));
+        if (merged.size() > properties.getRetrieval().getTopK()) {
+            merged = merged.subList(0, properties.getRetrieval().getTopK());
+        }
+
+        return rerank(merged, topK, t0);
+    }
+
+    // ── private helpers ──
+
+    private List<SearchResult> rerank(List<SearchResult> candidates, int topK, long startTime) {
         if (rerankService != null && candidates.size() > topK) {
             long tr = System.currentTimeMillis();
-            candidates = rerankService.rerank(question, candidates, topK);
+            candidates = rerankService.rerank("", candidates, topK);
             log.info("[retrieval] rerank done: {} results ({}ms)",
                 candidates.size(), System.currentTimeMillis() - tr);
         } else if (candidates.size() > topK) {
@@ -83,7 +146,7 @@ public class RetrievalEngine {
         }
 
         log.info("[retrieval] done: {} final results, total={}ms",
-            candidates.size(), System.currentTimeMillis() - t0);
+            candidates.size(), System.currentTimeMillis() - startTime);
         return candidates;
     }
 }

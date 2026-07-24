@@ -99,7 +99,7 @@ rag:
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5432/ragent
-    username: ragent
+    username: somehow
     password: ${RAGENT_PG_PASSWORD:ragent123}
     hikari:
       maximum-pool-size: 5
@@ -189,6 +189,24 @@ rag:
     creator-max-per-hour: 20    # 创作者每小时限制
     admin-max-per-hour: 0       # 管理员无限制（0 = 不限）
     max-question-length: 500    # 单次问题最大字符数
+
+  # ── Phase 6: 知识库元数据（用于 Prompt 中标注 KB 来源名称）──
+  knowledge-bases:
+    - id: 1
+      name: "技术博客"
+      collection: "tech_blog"
+      color: "#3b82f6"
+      default-intent-type: KB_RETRIEVAL
+    - id: 2
+      name: "读书笔记"
+      collection: "reading_notes"
+      color: "#10b981"
+      default-intent-type: KB_RETRIEVAL
+    - id: 3
+      name: "学习笔记"
+      collection: "study_notes"
+      color: "#f59e0b"
+      default-intent-type: KB_RETRIEVAL
 
   # 异步线程池
   async:

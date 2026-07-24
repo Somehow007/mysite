@@ -1,12 +1,16 @@
 package io.github.somehow.mysite.ragent.config;
 
 import lombok.Data;
+import lombok.Getter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * rag 配置
@@ -23,6 +27,7 @@ public class RagProperties {
     private MemoryProperties memory = new MemoryProperties();
     private AsyncProperties async = new AsyncProperties();
     private RateLimitProperties rateLimit = new RateLimitProperties();
+    private List<KnowledgeBaseMeta> knowledgeBases = new ArrayList<>();
 
     public boolean isProviderEnabled(String name) {
         Provider p = llm.getProviders().get(name);
@@ -115,5 +120,32 @@ public class RagProperties {
         /** @deprecated 使用 {@link #userMaxPerHour} / {@link #creatorMaxPerHour} 替代 */
         @Deprecated
         private int maxPerHour = 20;
+    }
+
+    // ── Phase 6: 知识库元数据 ──
+
+    @Data
+    public static class KnowledgeBaseMeta {
+        private Long id;
+        private String name;
+        private String collection;
+        private String color;
+        private String defaultIntentType;
+    }
+
+    /**
+     * kbId → kbName 缓存（惰性加载，避免每次查 DB）。
+     * <p>
+     * 用于 Prompt 中标注每条检索结果的 KB 来源名称。
+     */
+    @Getter(lazy = true)
+    private final Map<Long, String> kbNameCache = buildKbNameCache();
+
+    private Map<Long, String> buildKbNameCache() {
+        return knowledgeBases.stream()
+            .collect(Collectors.toMap(
+                KnowledgeBaseMeta::getId,
+                KnowledgeBaseMeta::getName,
+                (a, b) -> a));
     }
 }

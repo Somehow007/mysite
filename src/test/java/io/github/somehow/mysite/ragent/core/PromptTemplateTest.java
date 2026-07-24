@@ -1,19 +1,32 @@
 package io.github.somehow.mysite.ragent.core;
 
+import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @DisplayName("PromptTemplate — Prompt 模板")
 class PromptTemplateTest {
 
-    private final PromptTemplate template = new PromptTemplate();
+    private PromptTemplate template;
+    private RagProperties properties;
+
+    @BeforeEach
+    void setUp() {
+        properties = mock(RagProperties.class);
+        when(properties.getKbNameCache()).thenReturn(Map.of());
+        template = new PromptTemplate(properties);
+    }
 
     @Nested
     @DisplayName("RAG Prompt（有检索上下文）")

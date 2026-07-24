@@ -2,17 +2,24 @@ package io.github.somehow.mysite.ragent.service;
 
 import io.github.somehow.mysite.commons.enums.UserRole;
 import io.github.somehow.mysite.ragent.config.RagProperties;
-import io.github.somehow.mysite.ragent.core.PromptTemplate;
 import io.github.somehow.mysite.ragent.core.ConversationManager;
+import io.github.somehow.mysite.ragent.core.PromptTemplate;
 import io.github.somehow.mysite.ragent.core.RetrievalEngine;
+import io.github.somehow.mysite.ragent.core.intent.GuidanceHandler;
+import io.github.somehow.mysite.ragent.core.intent.GuidanceHandler.IntentCandidate;
+import io.github.somehow.mysite.ragent.core.intent.IntentClassifier;
+import io.github.somehow.mysite.ragent.core.intent.IntentResult;
+import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter;
+import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter.RewriteResult;
 import io.github.somehow.mysite.ragent.dao.entity.ConversationDO;
+import io.github.somehow.mysite.ragent.dao.entity.IntentDO;
+import io.github.somehow.mysite.ragent.dao.mapper.IntentMapper;
 import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
+import io.github.somehow.mysite.ragent.llm.RoutingLLMService;
 import io.github.somehow.mysite.ragent.llm.model.ChatEvent;
 import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
-import io.github.somehow.mysite.ragent.llm.RoutingLLMService;
 import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -22,27 +29,23 @@ import reactor.core.scheduler.Schedulers;
 import java.util.List;
 
 /**
- * RAG 问答核心服务 —— 整个 RAG 系统的"大脑皮层"。
+ * RAG 问答核心服务 —— 7 阶段智能管道（Phase 6 升级）。
  *
- * 完整链路：
+ * <h3>管道阶段</h3>
+ * <pre>
  *   0. 成本保护（限流 + 问题长度）
- *   1. 获取或创建会话（visitorId 归属 + IDOR 防护）
- *   2. 加载对话记忆（滑动窗口，默认 6 轮）
- *   3. 向量检索 + Rerank 精排（两阶段检索）
- *   4. 组装 Prompt（检索上下文 + 对话历史 + 用户问题）
- *   5. LLM 流式生成（多供应商路由 + 断路器自动降级）
- *   6. 完成后保存问答记录（阻塞 JDBC → boundedElastic）
- *
- * SSE 事件序列：
- *   meta    ×1 → 新会话回传 conversationId，前端存下来用于后续轮次
- *   sources ×1 → 检索到的引用来源，排在首条回答之前
- *   content ×N → LLM 输出的每个 token
- *   done    ×1 → 正常结束
- *   error   ×1 → 异常中断（不裸断开连接，前端可展示提示）
+ *   1. 加载对话记忆
+ *   2. ★ 查询改写（指代消解 / 拆分 / 口语正规化）
+ *   3. ★ 意图分类（LLM 分类器 → KB_RETRIEVAL / CHAT / 歧义）
+ *   [短路] 歧义引导 —— 低置信度时生成候选方向让用户选
+ *   [短路] 闲聊直回 —— CHAT 类型跳过检索，直接 LLM 回复
+ *   4. ★ 意图感知检索（定向 KB / 多子问题并行检索）
+ *   5. ★ 意图感知 Prompt（customPromptFragment + KB 名称标注）
+ *   6. LLM 流式生成 → SSE 推送 → 落库
+ * </pre>
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class RagChatService {
 
     private final RetrievalEngine retrievalEngine;
@@ -52,25 +55,54 @@ public class RagChatService {
     private final ChatRateLimiter rateLimiter;
     private final RagProperties properties;
 
+    // ── Phase 6 新增 ──
+    private final QueryRewriter queryRewriter;
+    private final IntentClassifier intentClassifier;
+    private final GuidanceHandler guidanceHandler;
+    private final IntentMapper intentMapper;
+
+    public RagChatService(RetrievalEngine retrievalEngine,
+                          ConversationManager conversationManager,
+                          PromptTemplate promptTemplate,
+                          RoutingLLMService routingLLMService,
+                          ChatRateLimiter rateLimiter,
+                          RagProperties properties,
+                          QueryRewriter queryRewriter,
+                          IntentClassifier intentClassifier,
+                          GuidanceHandler guidanceHandler,
+                          IntentMapper intentMapper) {
+        this.retrievalEngine = retrievalEngine;
+        this.conversationManager = conversationManager;
+        this.promptTemplate = promptTemplate;
+        this.routingLLMService = routingLLMService;
+        this.rateLimiter = rateLimiter;
+        this.properties = properties;
+        this.queryRewriter = queryRewriter;
+        this.intentClassifier = intentClassifier;
+        this.guidanceHandler = guidanceHandler;
+        this.intentMapper = intentMapper;
+    }
+
     /**
      * RAG 流式问答 —— 核心入口。
      *
      * @param question       用户问题
      * @param conversationId 对话 ID（null = 新对话）
-     * @param visitorId      匿名访客标识（前端 localStorage UUID）
-     * @param clientIp       客户端 IP（限流用，开发环境可为 null）
-     * @return ChatEvent 事件流（meta → sources → content×N → done）
+     * @param visitorId      匿名访客标识
+     * @param clientIp       客户端 IP（限流用）
+     * @param userRole       用户角色（限流阈值）
+     * @param chosenIntentId 用户选择的意图 ID（guidance 回传，null = 自动分类）
      */
     public Flux<ChatEvent> chat(String question, Long conversationId,
                                 String visitorId, String clientIp,
-                                UserRole userRole) {
-        // Step 0: 成本保护（限流检查是同步的，切到 boundedElastic 执行）
+                                UserRole userRole, Long chosenIntentId) {
+        // Step 0: 成本保护
         return Mono.fromCallable(() -> {
                 rateLimiter.check(clientIp, question, userRole);
                 return true;
             })
             .subscribeOn(Schedulers.boundedElastic())
-            .flatMapMany(ok -> doChat(question, conversationId, visitorId))
+            .flatMapMany(ok -> doChat(question, conversationId, visitorId, chosenIntentId))
             .onErrorResume(e -> {
                 if (e instanceof ChatRateLimiter.RateLimitExceededException) {
                     return Flux.just(ChatEvent.error(e.getMessage()));
@@ -79,75 +111,135 @@ public class RagChatService {
             });
     }
 
-    private Flux<ChatEvent> doChat(String question, Long conversationId, String visitorId) {
+    // ── 7 阶段管道 ──
+
+    private Flux<ChatEvent> doChat(String question, Long conversationId,
+                                   String visitorId, Long chosenIntentId) {
         long t0 = System.currentTimeMillis();
 
-        // Step 1: 获取或创建会话
+        // Stage 1: 获取或创建会话 + 加载对话历史
         ConversationDO conversation = conversationManager
             .getOrCreateConversation(conversationId, visitorId, question);
         Long convId = conversation.getId();
-        log.info("[doChat] conv={} resolved ({}ms)", convId, System.currentTimeMillis() - t0);
-
-        // Step 2: 加载对话历史
-        long t1 = System.currentTimeMillis();
         List<ChatMessage> history = conversationManager.loadHistory(convId);
-        log.info("[doChat] history loaded: {} messages ({}ms)",
-            history.size(), System.currentTimeMillis() - t1);
+        log.info("[pipeline] stage1: conv={}, history={}msgs ({}ms)",
+            convId, history.size(), System.currentTimeMillis() - t0);
 
-        // Step 3: 向量检索 + Rerank
+        // ── Stage 2: 查询改写 ──
         long t2 = System.currentTimeMillis();
-        List<SearchResult> retrieved = retrievalEngine.retrieve(
-            question, properties.getRetrieval().getRerankTopK());
-        log.info("[doChat] retrieval done: {} results ({}ms)",
-            retrieved.size(), System.currentTimeMillis() - t2);
+        RewriteResult rewritten = queryRewriter.rewrite(question, history);
+        String primaryQuery = rewritten.subQueries().get(0);
+        log.info("[pipeline] stage2: rewritten={}, subQueries={} ({}ms)",
+            rewritten.rewritten(), rewritten.subQueries().size(),
+            System.currentTimeMillis() - t2);
+
+        // ── Stage 3: 意图分类（或直接使用用户选择的意图）──
+        long t3 = System.currentTimeMillis();
+        IntentResult intent;
+        if (chosenIntentId != null) {
+            intent = resolveChosenIntent(chosenIntentId);
+        } else {
+            intent = intentClassifier.classify(primaryQuery, history);
+        }
+        log.info("[pipeline] stage3: type={}, targetKb={}, confidence={}, chosenIntentId={} ({}ms)",
+            intent.getType(), intent.getTargetKbId(),
+            String.format("%.2f", intent.getConfidence()),
+            chosenIntentId, System.currentTimeMillis() - t3);
+
+        // ── 短路 1: 歧义引导 ──
+        if (chosenIntentId == null) {
+            // 仅自动分类时检查歧义；用户已选意图则跳过
+            List<IntentDO> allIntents = intentMapper.listEnabled();
+            List<IntentCandidate> ranked = guidanceHandler.rankCandidates(allIntents);
+            if (guidanceHandler.shouldGuide(intent, ranked)) {
+                log.info("[pipeline] ambiguity detected → guidance event");
+                return Flux.just(
+                    ChatEvent.meta(convId),
+                    guidanceHandler.buildGuidanceEvent(ranked),
+                    ChatEvent.done()
+                );
+            }
+        }
+
+        // ── 短路 2: 闲聊直接回复 ──
+        if (intent.isChat()) {
+            log.info("[pipeline] chat-only intent → skipping retrieval");
+            List<ChatMessage> messages = promptTemplate.buildGeneralPrompt(primaryQuery, history);
+            return streamLLMResponse(messages, convId, question, List.of());
+        }
+
+        // ── Stage 4: 意图感知检索 ──
+        long t4 = System.currentTimeMillis();
+        int topK = intent.getCustomTopK() != null
+            ? intent.getCustomTopK()
+            : properties.getRetrieval().getRerankTopK();
+
+        List<SearchResult> retrieved;
+        if (rewritten.subQueries().size() > 1) {
+            // 多子问题：分别检索 → 去重合并 → Rerank
+            retrieved = retrievalEngine.multiRetrieve(
+                rewritten.subQueries(), intent.getTargetKbId(), topK);
+        } else {
+            // 单问题（含原文未改写）：定向或全库检索
+            retrieved = retrievalEngine.retrieve(primaryQuery, topK, intent.getTargetKbId());
+        }
+        log.info("[pipeline] stage4: {} results, targetKb={}, topK={} ({}ms)",
+            retrieved.size(), intent.getTargetKbId(), topK,
+            System.currentTimeMillis() - t4);
+
         List<SourceChunkDTO> sources = retrieved.stream()
-            .map(r -> new SourceChunkDTO(r.docTitle(), r.content(), r.score()))
+            .map(r -> new SourceChunkDTO(r.docTitle(), r.content(), r.score(),
+                r.kbId(), properties.getKbNameCache().getOrDefault(r.kbId(), "博客")))
             .toList();
 
-        // Step 4: 组装 Prompt（有结果 → RAG，无结果 → 通用聊天）
-        List<ChatMessage> messages = retrieved.isEmpty()
-            ? promptTemplate.buildGeneralPrompt(question, history)
-            : promptTemplate.buildRagPrompt(question, retrieved, history);
-        log.info("[doChat] prompt assembled: {} messages, {} chars total",
+        // ── Stage 5: 意图感知 Prompt ──
+        List<ChatMessage> messages = promptTemplate.buildIntentAwarePrompt(
+            primaryQuery, retrieved, history, intent);
+        log.info("[pipeline] stage5: {} messages, {} chars",
             messages.size(), messages.stream().mapToInt(m -> m.getContent().length()).sum());
 
+        // ── Stage 6: LLM 流式生成 → SSE 推送 → 落库 ──
+        return streamLLMResponse(messages, convId, question, sources);
+    }
+
+    // ── 流式生成 + 落库（Stage 6）──
+
+    private Flux<ChatEvent> streamLLMResponse(List<ChatMessage> messages, Long convId,
+                                              String question,
+                                              List<SourceChunkDTO> sources) {
+        long t0 = System.currentTimeMillis();
         ChatRequest request = ChatRequest.builder()
             .messages(messages)
             .temperature(0.7)
             .maxTokens(2048)
             .build();
 
-        // Step 5 & 6: LLM 流式生成 → 事件流 → 完成后落库
-        long t4 = System.currentTimeMillis();
         StringBuilder fullAnswer = new StringBuilder();
         final long[] firstTokenAt = { 0 };
 
         return Flux.concat(
-                // meta（会话 ID）+ sources（引用来源）
+                // meta + sources
                 Flux.just(ChatEvent.meta(convId), ChatEvent.sources(sources)),
-                // LLM token 流 → content 事件
+                // LLM token 流
                 routingLLMService.chatStream(request)
                     .map(ChatEvent::content)
                     .doOnNext(e -> {
                         if ("content".equals(e.type())) {
                             if (firstTokenAt[0] == 0) {
                                 firstTokenAt[0] = System.currentTimeMillis();
-                                log.info("[doChat] first token received ({}ms since LLM call)",
-                                    firstTokenAt[0] - t4);
+                                log.info("[pipeline] stage6: first token ({}ms since LLM call)",
+                                    firstTokenAt[0] - t0);
                             }
                             fullAnswer.append(e.delta());
                         }
                     }),
-                // 落库 + done 事件（合并在一个 Mono 中，在 boundedElastic 上执行）
-                // 注意：不能用 publishOn + doOnComplete，因为 SSE emitter.complete()
-                // 会触发 subscription.dispose()，publishOn 队列里的 onComplete 信号
-                // 会被丢弃，导致 doOnComplete 永远不执行，问答记录不落库。
+                // 落库 + done 事件
                 Mono.fromCallable(() -> {
                     try {
                         long t5 = System.currentTimeMillis();
                         conversationManager.saveExchange(
                             convId, question, fullAnswer.toString(), sources);
-                        log.info("[doChat] exchange saved ({}ms), total tokens={}, total elapsed={}ms",
+                        log.info("[pipeline] stage6: exchange saved ({}ms), total tokens={}, total={}ms",
                             System.currentTimeMillis() - t5, fullAnswer.length(),
                             System.currentTimeMillis() - t0);
                     } catch (Exception e) {
@@ -156,13 +248,32 @@ public class RagChatService {
                     return ChatEvent.done();
                 }).subscribeOn(Schedulers.boundedElastic())
             )
-            // 统一兜底：任何异常转为 error 事件（不裸断开）
             .onErrorResume(e -> {
-                log.error("RAG chat pipeline error", e);
-                String msg = e instanceof ChatRateLimiter.RateLimitExceededException
-                    ? e.getMessage()
-                    : "AI 服务暂时不可用，请稍后再试";
-                return Flux.just(ChatEvent.error(msg));
+                log.error("[pipeline] error", e);
+                return Flux.just(ChatEvent.error("AI 服务暂时不可用，请稍后再试"));
             });
+    }
+
+    /**
+     * 根据用户选择的 intentId 构造 IntentResult（跳过分类环节）。
+     */
+    private IntentResult resolveChosenIntent(Long intentId) {
+        IntentDO intent = intentMapper.findById(intentId);
+        if (intent == null) {
+            log.warn("[pipeline] chosenIntentId={} not found, using fallback", intentId);
+            return IntentResult.fallback();
+        }
+        log.info("[pipeline] using chosen intent: id={}, name={}, type={}",
+            intent.getId(), intent.getName(), intent.getType());
+        return IntentResult.builder()
+            .intentId(intent.getId())
+            .type(intent.getType())
+            .targetKbId(intent.getKbId())
+            .confidence(1.0)           // 用户手动选择 → 最高置信度
+            .needsGuidance(false)
+            .reason("user_chosen")
+            .customPromptFragment(intent.getCustomPromptFragment())
+            .customTopK(intent.getCustomTopK())
+            .build();
     }
 }

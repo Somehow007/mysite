@@ -24,6 +24,12 @@ import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
 import io.github.somehow.mysite.ragent.service.ChatRateLimiter;
 import io.github.somehow.mysite.ragent.service.KnowledgeDocumentService;
 import io.github.somehow.mysite.ragent.service.RagChatService;
+import io.github.somehow.mysite.ragent.core.intent.GuidanceHandler;
+import io.github.somehow.mysite.ragent.core.intent.IntentClassifier;
+import io.github.somehow.mysite.ragent.core.intent.IntentResult;
+import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter;
+import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter.RewriteResult;
+import io.github.somehow.mysite.ragent.dao.mapper.IntentMapper;
 import io.github.somehow.mysite.ragent.vector.PgvectorVectorStore;
 import io.github.somehow.mysite.ragent.vector.VectorStore;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
@@ -222,11 +228,35 @@ class Phase3IntegrationTest {
             .thenReturn(conv);
         when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
 
+        // Phase 6 mocks（默认：不改写、分类为 KB_RETRIEVAL、不触发歧义）
+        QueryRewriter queryRewriter = mock(QueryRewriter.class);
+        when(queryRewriter.rewrite(anyString(), anyList()))
+            .thenAnswer(inv -> RewriteResult.unchanged(inv.getArgument(0)));
+
+        IntentClassifier intentClassifier = mock(IntentClassifier.class);
+        IntentResult defaultIntent = IntentResult.builder()
+            .type("KB_RETRIEVAL").targetKbId(null).confidence(0.8)
+            .needsGuidance(false).reason("test").build();
+        when(intentClassifier.classify(anyString(), anyList())).thenReturn(defaultIntent);
+
+        GuidanceHandler guidanceHandler = mock(GuidanceHandler.class);
+        IntentMapper intentMapper = mock(IntentMapper.class);
+        when(intentMapper.listEnabled()).thenReturn(List.of());
+
+        // kbNameCache 惰性初始化需要 knowledgeBases
+        RagProperties.KnowledgeBaseMeta kb1 = new RagProperties.KnowledgeBaseMeta();
+        kb1.setId(1L);
+        kb1.setName("技术博客");
+        ragProps.setKnowledgeBases(List.of(kb1));
+
+        PromptTemplate promptTemplate = new PromptTemplate(ragProps);
+
         // 构建 RagChatService
         ragChatService = new RagChatService(
             retrievalEngine, conversationManager,
-            new PromptTemplate(), routingLLMService,
-            rateLimiter, ragProps);
+            promptTemplate, routingLLMService,
+            rateLimiter, ragProps,
+            queryRewriter, intentClassifier, guidanceHandler, intentMapper);
     }
 
     @AfterEach
@@ -459,7 +489,7 @@ class Phase3IntegrationTest {
             seedTestArticle();
 
             Flux<ChatEvent> stream = ragChatService.chat(
-                "JWT 过滤器怎么配置？", null, "test-visitor", "127.0.0.1", UserRole.ADMIN);
+                "JWT 过滤器怎么配置？", null, "test-visitor", "127.0.0.1", UserRole.ADMIN, null);
 
             List<ChatEvent> events = stream.collectList().block(Duration.ofSeconds(120));
             assertNotNull(events);
@@ -500,7 +530,7 @@ class Phase3IntegrationTest {
             seedTestArticle();
 
             Flux<ChatEvent> stream = ragChatService.chat(
-                "JWT 过滤器怎么配置？", null, "test-visitor", "127.0.0.1", UserRole.ADMIN);
+                "JWT 过滤器怎么配置？", null, "test-visitor", "127.0.0.1", UserRole.ADMIN, null);
 
             List<ChatEvent> events = stream.collectList().block(Duration.ofSeconds(120));
             assertNotNull(events);
@@ -528,7 +558,7 @@ class Phase3IntegrationTest {
         void noResultsShouldFallbackToGeneralChat() {
             // 不灌数据 → 检索必然为空
             Flux<ChatEvent> stream = ragChatService.chat(
-                "今天天气怎么样？", null, "test-visitor", "127.0.0.1", UserRole.ADMIN);
+                "今天天气怎么样？", null, "test-visitor", "127.0.0.1", UserRole.ADMIN, null);
 
             List<ChatEvent> events = stream.collectList().block(Duration.ofSeconds(120));
             assertNotNull(events);
@@ -559,7 +589,7 @@ class Phase3IntegrationTest {
             testLLMProvider.setShouldFail(true);
 
             Flux<ChatEvent> stream = ragChatService.chat(
-                "测试问题", null, "test-visitor", "127.0.0.1", UserRole.ADMIN);
+                "测试问题", null, "test-visitor", "127.0.0.1", UserRole.ADMIN, null);
 
             List<ChatEvent> events = stream.collectList().block(Duration.ofSeconds(120));
             assertNotNull(events);
@@ -584,10 +614,10 @@ class Phase3IntegrationTest {
         @DisplayName("限流拒绝 → error 事件")
         void rateLimitRejectionShouldBecomeErrorEvent() {
             doThrow(new ChatRateLimiter.RateLimitExceededException("请求过于频繁，每小时最多 20 次"))
-                .when(rateLimiter).check(anyString(), anyString(), UserRole.ADMIN);
+                .when(rateLimiter).check(anyString(), anyString(), eq(UserRole.ADMIN));
 
             Flux<ChatEvent> stream = ragChatService.chat(
-                "问题", null, "test-visitor", "127.0.0.1", UserRole.ADMIN);
+                "问题", null, "test-visitor", "127.0.0.1", UserRole.ADMIN, null);
 
             List<ChatEvent> events = stream.collectList().block(Duration.ofSeconds(120));
             assertNotNull(events);
