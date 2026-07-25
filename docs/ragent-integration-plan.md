@@ -3804,16 +3804,18 @@ export RAGENT_PG_PASSWORD="your-secure-password"
 
 ## Phase 6：意图识别与智能路由 —— 从"能跑"到"好用"
 
+> 更新于 2026-07-25：歧义引导机制已移除（见 6.3.1），改为低置信度自动全局搜索；KB 新增启用/禁用开关（见 6.6）。
+>
 > **目标**：引入意图识别 + 查询改写 + 多知识库智能路由，让系统不再是"把所有 KB 一锅搜"，
-> 而是根据用户意图精准定位知识库、必要时改写查询、低置信度时主动引导用户澄清。
+> 而是根据用户意图精准定位知识库、必要时改写查询、低置信度时自动全局检索。
 > **预计时间**：7-10 天
 > **前置条件**：Phase 0-5 全部完成，已有 ≥2 个知识库且各有不同类型的文档
 > **验收标准**：
 > - 问"博客里 JWT 怎么配的？"→ 自动路由到"技术博客"KB，回答带来源引用
 > - 问"推荐几本 Java 书"→ 路由到"读书笔记"KB
 > - 问"你好"→ 识别为闲聊，走通用聊天不走检索
-> - 问"Spring 怎么样？"（两个 KB 都可能有相关）→ 全局检索，但标注每条来源的 KB 名称
-> - 问"那个东西怎么搞？"（指代不明，无上下文）→ LLM 改写失败/低置信度，引导用户补充信息
+> - 问"一共有多少篇文章？"→ 自动全局搜索所有 KB
+> - 问"Spring 怎么样？"（两个 KB 都可能有相关）→ 低置信度自动全局检索
 >
 > **参考设计**：Ragent 的意图识别系统（`core/intent/`）+ 多通道检索引擎（`core/retrieve/`），
 > 以下设计方案从 Ragent 简化而来，去掉了意图树编辑器 UI 和 MCP 工具调用分支，
@@ -3857,22 +3859,19 @@ Phase 3 的 `RagChatService` 是一条**固定管道**：
   │     ├── 拆分长问题：1 个长句 → 2-3 个子问题（并行检索后合并）
   │     └── 仅当问题含代词 / 过长 / 过于口语化时才调用 LLM
   │
-  ├── Stage 3: classifyIntent()       — ★ 新增：意图分类
-  │     ├── LLM 将问题归类到已知意图（每个意图绑定一个 KB）
-  │     ├── 三类意图：KB_RETRIEVAL（查知识库）/ CHAT（闲聊）/ AMBIGUOUS（歧义）
-  │     └── 输出：IntentResult { type, targetKbId, confidence, guidance }
+  ├── Stage 3: classifyIntent()       — ★ 新增：意图分类（后端自动判断，用户无感）
+  │     ├── LLM 将问题归类到已知意图（每个意图绑定一个 KB 或 NULL=全局）
+  │     ├── 意图类型：KB_RETRIEVAL（查知识库）/ CHAT（闲聊）
+  │     └── 输出：IntentResult { type, targetKbId, confidence }
+  │     └── ★ confidence < 0.6 时：强制 targetKbId = null（全局搜索，不限定单个 KB）
   │
-  ├── [短路1] handleAmbiguous()       — ★ 新增：歧义引导
-  │     └── 低置信度（< 0.6）→ 生成候选方向让用户选 → 等待用户选择 → 重新走管道
-  │         例："Spring 实战"可能指那本书（读书笔记KB）也可能指框架教程（技术博客KB）
-  │
-  ├── [短路2] handleChatOnly()        — ★ 新增：闲聊直接回复
+  ├── [短路] handleChatOnly()        — ★ 闲聊直接回复
   │     └── intent.type == CHAT → 跳过检索，直接用系统 Prompt + 历史 + 问题生成回复
   │         省掉一次 embedding API 调用
   │
   ├── Stage 4: retrieve()             — 改造：支持定向检索
   │     ├── KB_RETRIEVAL + 高置信度 → vectorStore.search(embedding, topK, targetKbId)
-  │     ├── KB_RETRIEVAL + 低置信度 → 全局检索 + 结果标注 KB 来源
+  │     ├── KB_RETRIEVAL + 低置信度(targetKbId=null) → 全局检索 + 结果标注 KB 来源
   │     └── 多子问题时并行检索 → 结果去重合并 → Rerank
   │
   ├── Stage 5: buildPrompt()          — 改造：意图感知的 Prompt
@@ -3920,7 +3919,11 @@ INSERT INTO t_rag_intent VALUES
  '用户询问学习笔记、知识点总结、面试准备、技术教程、实践踩坑等', 8, true,
  '你是博客学习笔记助手的补充：回答要结构化，给出清晰的知识点梳理和学习路径建议。', 3, NOW()),
 (4, '闲聊', 'CHAT', NULL, '["你好","谢谢","你是谁","帮助","介绍","再见","早上好","晚上好"]',
- '问候、自我介绍、能力询问、感谢等社交对话', 0, true, NULL, NULL, NOW());
+ '问候、自我介绍、能力询问、感谢等社交对话', 0, true, NULL, NULL, NOW()),
+(5, '全局检索', 'KB_RETRIEVAL', NULL,
+ '["全部","所有","总共","一共","汇总","概览","范围","涵盖","统计"]',
+ '用户询问博客整体情况（文章总数、主题范围等），需在所有知识库中检索', 9, true,
+ '你是博客全局助手：综合所有 KB 信息回答，包括文章数量、主题分布等。', NULL, NOW());
 ```
 
 #### 6.2.2 核心类：`IntentClassifier.java`
@@ -4248,106 +4251,34 @@ public class QueryRewriter {
 
 ---
 
-### 6.4 歧义引导 `GuidanceHandler.java`
+### 6.4 歧义引导（已移除 ⚠️）
 
-“不要假装理解用户——低置信度时坦诚询问比瞎猜好十倍。”
+> 更新于 2026-07-25：`GuidanceHandler.java` 及配套前端 `ChatGuidance.vue` 已移除。
 
-```java
-package io.github.somehow.mysite.ragent.core.intent;
+“不要假装理解用户——低置信度时坦诚询问比瞎猜好十倍” 这个原则本身没问题，但 **SSE 按钮引导的交互模式在博客场景下体验极差**：
 
-import lombok.Builder;
-import lombok.Data;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
+1. **`rankCandidates()` 评分逻辑有 bug**：用 `priority / 10.0` 作为候选分数，任意两个 priority 相差不到 25% 的意图都会触发引导（比值 ≥ 75%）。实际部署时几乎每次提问都弹出按钮。
+2. **打断对话流**：guidance 事件关闭 SSE 连接，用户必须点击按钮重新发起请求，体验割裂。
+3. **重发流程静默失败**：前端 `sendWithIntent` → 新 SSE 请求的链路容易因状态问题无响应。
 
-import java.util.List;
+**替代方案**：低置信度时直接降级为全局检索（`targetKbId = null`），不中断对话。真正的歧义（如指代不明）由 LLM 在回复中自然询问，不需要额外的 UI 机制。修改点：
 
-/**
- * 歧义引导处理器 —— Ragent 的 guidance 包精简版。
- *
- * 当意图分类器遇到置信度低/多意图接近/缺上下文三种情况时，
- * 不盲目检索，而是生成引导选项让用户点选。
- *
- * 对比 Ragent：Ragent 在 detectAmbiguity() 后生成 GuidancePrompt（候选方向列表），
- * 前端渲染为可点击按钮。用户点击后带上 chosenIntentId 重新请求。
- *
- * MySite 采用相同交互模式，但简化了引导文案生成（不用 LLM 额外调用，直接用候选意图描述）。
- */
-@Slf4j
-@Component
-@RequiredArgsConstructor
-public class GuidanceHandler {
+| 移除 | 替代/保留 |
+|------|----------|
+| `GuidanceHandler.java` | — |
+| `ChatWidget.handleSelectIntent()` | — |
+| `ChatGuidance.vue` | — |
+| `ChatEvent.guidance()` + `GuidanceOption` | — |
+| `RagChatService` chosenIntentId 参数 | `targetKbId = null` 当 confidence < 0.6 |
+| `RagChatController` intentId 参数 | — |
 
-    /**
-     * 检测是否需要引导。
-     *
-     * 触发条件（经验值，调过几轮 Ragent 后总结）：
-     *   1. confidence < 0.6 —— 分类器自己都不确定
-     *   2. needsGuidance == true —— LLM 明确标记的歧义场景
-     *   3. top-2 意图分数比 >= 0.75 —— 两个意图非常接近
-     */
-    public boolean shouldGuide(IntentResult result, List<IntentCandidate> topCandidates) {
-        if (result.isNeedsGuidance()) return true;
-        if (result.getConfidence() < 0.6) return true;
-
-        // 检查 top-2 分数比
-        if (topCandidates.size() >= 2) {
-            double ratio = topCandidates.get(1).score / topCandidates.get(0).score;
-            if (ratio >= 0.75) return true;
-        }
-        return false;
-    }
-
-    /**
-     * 生成引导 SSE 事件（不发最终答案，而是让用户选择方向）。
-     *
-     * 前端收到的 guidance 事件格式：
-     * {"type":"guidance","message":"我不太确定你想问什么，请选择一个方向：",
-     *  "options":[{"label":"技术博客中的 Spring 框架教程","intentId":1},
-     *             {"label":"读书笔记中的《Spring 实战》书评","intentId":2}]}
-     */
-    public ChatEvent buildGuidanceEvent(List<IntentCandidate> candidates) {
-        String message = candidates.size() > 1
-            ? "我不太确定你想了解哪方面的内容，请选择一个方向："
-            : "你问的问题有些模糊，能说得更具体一点吗？";
-
-        List<GuidanceOption> options = candidates.stream()
-            .map(c -> new GuidanceOption(c.intentName, c.intentId))
-            .toList();
-
-        return ChatEvent.guidance(message, options);
-    }
-
-    @Data @Builder
-    public static class IntentCandidate {
-        private Long intentId;
-        private String intentName;
-        private double score;
-    }
-
-    public record GuidanceOption(String label, Long intentId) {}
-}
-```
-
-**ChatEvent 新增 guidance 类型**：
-
-```java
-// 在 ChatEvent.java 中新增
-public record GuidanceOption(String label, Long intentId) {}
-
-public static ChatEvent guidance(String message, List<GuidanceOption> options) {
-    // type = "guidance"，delta/sources/conversationId/message 复用现有字段
-    // 前端识别 type=="guidance" → 渲染成可点击按钮
-    return new ChatEvent("guidance", null, null, null, message, options);
-}
-```
+**意图分类器（`IntentClassifier`）保留**：后端仍通过 LLM 自动判断意图类型和目标 KB，只是去掉了中断用户的外部 UI 层。
 
 ---
 
 ### 6.5 改造后的 `RagChatService`
 
-把 Stage 2-4 的新逻辑串起来，核心变更用 ★ 标注：
+> 更新于 2026-07-25：移除 chosenIntentId 参数和歧义引导短路，新增低置信度自动全局搜索。
 
 ```java
 public Flux<ChatEvent> doChat(String question, Long conversationId, String visitorId) {
@@ -4357,44 +4288,27 @@ public Flux<ChatEvent> doChat(String question, Long conversationId, String visit
 
     // ── ★ Stage 2: 查询改写 ──
     RewriteResult rewritten = queryRewriter.rewrite(question, history);
-    String primaryQuery = rewritten.subQueries().get(0);  // 主查询用于意图分类
-    log.info("[pipeline] query rewrite: rewritten={}, subQueries={}",
-        rewritten.rewritten(), rewritten.subQueries().size());
+    String primaryQuery = rewritten.subQueries().get(0);
 
-    // ── ★ Stage 3: 意图分类 ──
+    // ── ★ Stage 3: 意图分类（后端自动，用户无感）──
     IntentResult intent = intentClassifier.classify(primaryQuery, history);
-    log.info("[pipeline] intent: type={}, targetKb={}, confidence={}",
-        intent.getType(), intent.getTargetKbId(), intent.getConfidence());
 
-    // ── ★ 短路1: 歧义引导 ──
-    if (guidanceHandler.shouldGuide(intent, intent.getTopCandidates())) {
-        return Flux.just(
-            ChatEvent.meta(conv.getId()),
-            guidanceHandler.buildGuidanceEvent(intent.getTopCandidates())
-        );
+    // ★ 低置信度自动降级为全局搜索
+    if (intent.isKbRetrieval() && intent.getTargetKbId() != null
+            && intent.getConfidence() < 0.6) {
+        intent.setTargetKbId(null);  // 搜所有 KB
     }
 
-    // ── ★ 短路2: 闲聊 ──
-    if ("CHAT".equals(intent.getType())) {
+    // ── ★ 短路: 闲聊 ──
+    if (intent.isChat()) {
         List<ChatMessage> messages = promptTemplate.buildGeneralPrompt(question, history);
-        return streamLLMResponse(messages, conv.getId(), question, history);
+        return streamLLMResponse(messages, conv.getId(), question, List.of());
     }
 
     // ── ★ Stage 4: 意图感知的检索 ──
-    int topK = intent.getCustomTopK() != null
-        ? intent.getCustomTopK()
-        : properties.getRetrieval().getTopK();
-
-    List<SearchResult> results;
-    if (rewritten.subQueries().size() > 1) {
-        // 多子问题：分别检索 → 去重合并 → Rerank
-        results = retrievalEngine.multiRetrieve(rewritten.subQueries(),
-            intent.getTargetKbId(), topK);
-    } else {
-        // 单问题（含原文未改写）：直接检索
-        results = retrievalEngine.retrieve(primaryQuery, topK, intent.getTargetKbId());
-    }
-    log.info("[pipeline] retrieval: {} results, targetedKb={}", results.size(), intent.getTargetKbId());
+    List<SearchResult> results = retrievalEngine.retrieve(
+        primaryQuery, topK, intent.getTargetKbId());
+    // targetKbId=null → 全局搜索；targetKbId=具体值 → 定向搜索
 
     // ── ★ Stage 5: 意图感知的 Prompt ──
     List<ChatMessage> messages = promptTemplate.buildIntentAwarePrompt(
@@ -4487,29 +4401,35 @@ private String formatContextWithKbName(List<SearchResult> results) {
 </span>
 ```
 
-#### 6.7.2 歧义引导交互
-
-`useChat.ts` 新增 `onGuidance` 回调，前端收到 `guidance` 事件时渲染可点击的选项按钮：
+#### 6.7.2 SSE 端点（简化后）
 
 ```
-用户问："Spring 怎么样？"
-AI：我不太确定你想了解哪方面的内容，请选择一个方向：
-  [技术博客中的 Spring 框架教程]
-  [读书笔记中的 Spring 实战书评]
-用户点击 → 带上 chosenIntentId 重新发请求
+GET /v1/rag/chat/stream?q=...&conversationId=...&visitorId=...
 ```
 
-#### 6.7.3 新增 `/v1/rag/chat/stream` 查询参数
-
-```
-GET /v1/rag/chat/stream?q=...&conversationId=...&visitorId=...&intentId=...
-```
-
-`intentId` 参数：用户选择引导选项后回传，跳过意图分类环节。
+无额外参数。意图 100% 由后端自动判断，前端不参与分类决策。
 
 ---
 
-### 6.8 知识库级别的配置增强
+### 6.8 知识库管理增强
+
+> 更新于 2026-07-25：新增 KB 启用/禁用开关，文章自动同步到所有启用 KB。
+
+#### 6.8.1 KB 启用/禁用（`enabled` 字段）
+
+`t_knowledge_base` 新增 `enabled BOOLEAN DEFAULT true`：
+- **启用的 KB**：参与检索、接收新文章自动同步
+- **禁用的 KB**：不参与检索、不接收新文章同步，已有数据保留不删
+- API：`PUT /v1/rag/knowledge-bases/{id}/toggle` 切换状态
+- 自动迁移：旧卷启动时 ALTER TABLE 补列
+
+设计参考 Dify/FastGPT 等多 KB 系统的做法——不设「默认 KB」或「选中当前 KB」单选模式，每个 KB 独立开关，灵活且不丢失数据。
+
+#### 6.8.2 文章发布自动同步
+
+发布/更新文章时，`KnowledgeDocumentService.syncArticle()` 遍历**所有 enabled=true 的 KB**，每个 KB 独立创建文档记录 + 分块 + 向量化。不再局限于 `collectionName="default"` 的单 KB。
+
+#### 6.8.3 知识库元数据增强
 
 在 `application.yaml` 中给每个知识库添加专属配置：
 
@@ -4517,7 +4437,7 @@ GET /v1/rag/chat/stream?q=...&conversationId=...&visitorId=...&intentId=...
 rag:
   # ... 现有配置 ...
 
-  # ── ★ 新增：知识库元数据 ──
+  # ── 知识库元数据 ──
   knowledge-bases:
     - id: 1
       name: "技术博客"
