@@ -153,7 +153,7 @@ export function createChatStream(
               break
             case 'done':
               finished = true
-              safe(callbacks.onDone, undefined as unknown as void)
+              safe(callbacks.onDone)
               return
             case 'error':
               finished = true
@@ -170,7 +170,7 @@ export function createChatStream(
 
       // 流被动结束但未收到 done/error：网络中断等
       // 按"完成但可能截断"处理，由 useChat 根据已累积内容区分
-      if (!finished) safe(callbacks.onDone, undefined as unknown as void)
+      if (!finished) safe(callbacks.onDone)
     })
     .catch((err: unknown) => {
       if (signal.aborted || (err instanceof DOMException && err.name === 'AbortError')) return // 用户主动取消：静默

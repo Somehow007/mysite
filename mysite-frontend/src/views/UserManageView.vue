@@ -344,7 +344,7 @@ function handleUserReset() {
         <span class="text-[13px] text-text-secondary truncate block">{{ item.email || '-' }}</span>
       </template>
       <template #cell-role="{ item }">
-        <Dropdown trigger="click" placement="bottom" :spacing="4">
+        <Dropdown trigger="click" placement="bottom-start" :spacing="4">
           <template #trigger>
             <button
               :disabled="updatingUserId === item.id"
