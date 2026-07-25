@@ -99,7 +99,7 @@ watch(
       </h2>
 
       <div v-if="loadError" class="py-16 text-center">
-        <p class="text-red-500 mb-4">{{ loadError }}</p>
+        <p class="text-danger mb-4">{{ loadError }}</p>
         <button @click="doSearch(keyword)" class="btn-secondary">重试</button>
       </div>
 

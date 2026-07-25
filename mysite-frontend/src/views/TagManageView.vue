@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useHead } from '@unhead/vue'
-import { Plus, Trash2, Edit, Tags, Search, X, AlertCircle, TrendingUp } from 'lucide-vue-next'
+import { Plus, Trash2, Edit, Tags, AlertCircle, TrendingUp } from 'lucide-vue-next'
 import { getTags, createTag, updateTag, deleteTag } from '@/api/tag'
 import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
+import { PageHeader, SearchFilterBar, Modal, DataTable, Badge } from '@/components/ui'
 import type { Tag } from '@/types'
+import type { Column } from '@/components/ui/DataTable.vue'
 
 useHead(() => ({
   title: '标签管理 - MySite',
@@ -17,6 +20,7 @@ const editingTag = ref<Tag | null>(null)
 const saving = ref(false)
 const searchQuery = ref('')
 const toast = useToast()
+const { confirm } = useConfirm()
 
 const editorForm = ref({
   name: '',
@@ -37,6 +41,13 @@ const hotTags = computed(() =>
     .sort((a, b) => (b.articleCount ?? 0) - (a.articleCount ?? 0))
     .slice(0, 5)
 )
+
+const tagColumns: Column<Tag>[] = [
+  { key: 'name', label: '标签名称' },
+  { key: 'slug', label: '别名', width: '140px' },
+  { key: 'articleCount', label: '文章数', width: '100px', align: 'center' },
+  { key: 'actions', label: '操作', width: '100px', align: 'center' },
+]
 
 async function fetchTags() {
   loading.value = true
@@ -105,7 +116,8 @@ async function handleSave() {
 }
 
 async function handleDelete(id: string) {
-  if (!confirm('确定要删除这个标签吗？如果标签下有文章关联则无法删除。')) return
+  const ok = await confirm({ message: '确定要删除这个标签吗？如果标签下有文章关联则无法删除。', danger: true, confirmText: '删除' })
+  if (!ok) return
 
   try {
     await deleteTag(id)
@@ -124,20 +136,16 @@ onMounted(() => {
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-8">
-      <h1 class="text-2xl font-semibold text-text-primary">
-        标签管理
-      </h1>
-      <button
-        @click="openCreateModal"
-        class="btn-primary"
-      >
-        <Plus :size="14" />
-        新建标签
-      </button>
-    </div>
+    <PageHeader title="标签管理" subtitle="管理文章标签">
+      <template #actions>
+        <button @click="openCreateModal" class="btn-primary">
+          <Plus :size="14" />
+          新建标签
+        </button>
+      </template>
+    </PageHeader>
 
-    <div v-if="hotTags.length > 0" class="mb-6 p-4 rounded-xl glass glass-sm">
+    <div v-if="hotTags.length > 0" class="card-solid mb-4 px-4 py-3">
       <div class="flex items-center gap-2 mb-3">
         <TrendingUp :size="16" class="text-accent" />
         <span class="text-sm font-medium text-text-primary">热门标签</span>
@@ -154,22 +162,15 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="mb-4 relative">
-      <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-      <input
-        v-model="searchQuery"
-        type="text"
-        placeholder="搜索标签..."
-        class="input-base pl-9 pr-8"
-      />
-      <button
-        v-if="searchQuery"
-        @click="searchQuery = ''"
-        class="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition-colors"
-      >
-        <X :size="14" />
-      </button>
-    </div>
+    <SearchFilterBar
+      v-model="searchQuery"
+      placeholder="搜索标签名称或别名..."
+      :show-sort="false"
+      :show-filter="false"
+      class="mb-4"
+      @search="() => {}"
+      @reset="searchQuery = ''"
+    />
 
     <div v-if="loading" class="py-16 text-center text-text-muted">
       加载中...
@@ -186,122 +187,81 @@ onMounted(() => {
       </button>
     </div>
 
-    <div v-else-if="filteredTags.length === 0" class="py-16 text-center">
-      <Search :size="48" class="mx-auto mb-4 text-text-muted" />
-      <p class="text-text-muted">没有找到匹配的标签</p>
-    </div>
-
-    <div v-else class="rounded-lg border border-border bg-bg-secondary overflow-hidden">
-      <div class="flex items-center gap-3 px-4 py-3 border-b border-border bg-bg-code">
-        <span class="text-sm font-medium text-text-secondary flex-1">标签名称</span>
-        <span class="text-sm text-text-muted w-24 text-center">别名</span>
-        <span class="text-sm text-text-muted w-20 text-center">文章数</span>
-        <span class="text-sm text-text-muted w-20 text-center">操作</span>
-      </div>
-
-      <div class="divide-y divide-border">
-        <div
-          v-for="tag in filteredTags"
-          :key="tag.id"
-          class="flex items-center gap-3 px-4 py-3 hover:bg-bg-code transition-colors"
-        >
-          <div class="flex-1 flex items-center gap-2">
-            <span class="text-xs px-2 py-0.5 rounded-full border border-border text-text-muted">#</span>
-            <span class="text-sm text-text-secondary">{{ tag.name }}</span>
-          </div>
-          <span class="text-sm text-text-muted w-24 text-center truncate" :title="tag.slug">
-            {{ tag.slug }}
-          </span>
-          <span class="text-sm text-text-muted w-20 text-center">
-            {{ tag.articleCount || 0 }}
-          </span>
-          <div class="w-20 flex items-center justify-center gap-1">
-            <button
-              @click="openEditModal(tag)"
-              class="p-1.5 rounded text-text-muted hover:bg-bg-code hover:text-accent transition-colors"
-              title="编辑"
-            >
-              <Edit :size="14" />
-            </button>
-            <button
-              @click="handleDelete(tag.id)"
-              class="p-1.5 rounded text-text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
-              title="删除"
-            >
-              <Trash2 :size="14" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div
-      v-if="showEditor"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      @click.self="showEditor = false"
+    <DataTable
+      v-else
+      :columns="tagColumns"
+      :data="filteredTags"
+      :empty-title="tags.length === 0 ? '还没有标签' : '没有找到匹配的标签'"
     >
-      <div class="w-full max-w-md glass glass-lg rounded-2xl animate-scale-in">
-        <div class="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 class="text-lg font-semibold text-text-primary">
-            {{ editingTag ? '编辑标签' : '新建标签' }}
-          </h2>
-          <button
-            @click="showEditor = false"
-            class="p-2 rounded-lg text-text-muted hover:bg-accent-subtle transition-all duration-200"
-          >
-            ✕
+      <template #cell-name="{ item }">
+        <div class="flex items-center gap-2">
+          <span class="text-xs px-2 py-0.5 rounded-full border border-border text-text-muted">#</span>
+          <span class="text-sm text-text-secondary">{{ item.name }}</span>
+        </div>
+      </template>
+      <template #cell-slug="{ value }">
+        <span class="text-sm text-text-muted truncate block max-w-[120px]" :title="value">{{ value }}</span>
+      </template>
+      <template #cell-articleCount="{ value }">
+        <span class="text-sm text-text-muted">{{ value || 0 }}</span>
+      </template>
+      <template #cell-actions="{ item }">
+        <div class="flex items-center justify-center gap-1">
+          <button @click="openEditModal(item)" class="p-1.5 rounded text-text-muted hover:bg-bg-code hover:text-accent transition-colors" title="编辑">
+            <Edit :size="14" />
+          </button>
+          <button @click="handleDelete(item.id)" class="p-1.5 rounded text-text-muted hover:bg-danger-subtle hover:text-danger transition-colors" title="删除">
+            <Trash2 :size="14" />
           </button>
         </div>
+      </template>
+    </DataTable>
 
-        <div class="p-6 space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-text-secondary mb-1">
-              标签名称 <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="editorForm.name"
-              type="text"
-              class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="请输入标签名称"
-              @input="!editingTag && generateSlug()"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-text-secondary mb-1">
-              标签别名 <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="editorForm.slug"
-              type="text"
-              class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="URL友好的别名，如：java"
-            />
-            <p class="mt-1 text-xs text-text-muted">用于URL中显示，建议使用英文、数字和连字符</p>
-          </div>
-
-          <div v-if="editingTag && (editingTag.articleCount ?? 0) > 0" class="flex items-start gap-2 p-3 rounded-lg bg-amber-50 text-amber-700 text-sm">
-            <AlertCircle :size="16" class="flex-shrink-0 mt-0.5" />
-            <span>该标签下有 {{ editingTag.articleCount }} 篇文章关联，修改别名可能影响已有链接。</span>
-          </div>
+    <Modal
+      :open="showEditor"
+      :title="editingTag ? '编辑标签' : '新建标签'"
+      max-width="max-w-md"
+      @update:open="showEditor = $event"
+    >
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-secondary mb-1">
+            标签名称 <span class="text-danger">*</span>
+          </label>
+          <input
+            v-model="editorForm.name"
+            type="text"
+            class="input-base"
+            placeholder="请输入标签名称"
+            @input="!editingTag && generateSlug()"
+          />
         </div>
 
-        <div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-border">
-          <button
-            @click="showEditor = false"
-            class="btn-secondary"
-          >
-            取消
-          </button>
-          <button
-            @click="handleSave"
-            :disabled="saving"
-            class="btn-primary disabled:opacity-50"
-          >
-            {{ saving ? '保存中...' : '保存' }}
-          </button>
+        <div>
+          <label class="block text-sm font-medium text-text-secondary mb-1">
+            标签别名 <span class="text-danger">*</span>
+          </label>
+          <input
+            v-model="editorForm.slug"
+            type="text"
+            class="input-base"
+            placeholder="URL友好的别名，如：java"
+          />
+          <p class="mt-1 text-xs text-text-muted">用于URL中显示，建议使用英文、数字和连字符</p>
+        </div>
+
+        <div v-if="editingTag && (editingTag.articleCount ?? 0) > 0" class="flex items-start gap-2 p-3 rounded-lg bg-warning-subtle text-warning text-sm">
+          <AlertCircle :size="16" class="flex-shrink-0 mt-0.5" />
+          <span>该标签下有 {{ editingTag.articleCount }} 篇文章关联，修改别名可能影响已有链接。</span>
         </div>
       </div>
-    </div>
+
+      <template #footer>
+        <button @click="showEditor = false" class="btn-secondary">取消</button>
+        <button @click="handleSave" :disabled="saving" class="btn-primary disabled:opacity-50">
+          {{ saving ? '保存中...' : '保存' }}
+        </button>
+      </template>
+    </Modal>
   </div>
 </template>

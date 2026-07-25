@@ -92,7 +92,7 @@ onMounted(() => {
     </div>
 
     <div v-else-if="loadError" class="py-16 text-center">
-      <p class="text-red-500 mb-4">{{ loadError }}</p>
+      <p class="text-danger mb-4">{{ loadError }}</p>
       <button @click="fetchCollections(currentPage)" class="btn-secondary">重试</button>
     </div>
 

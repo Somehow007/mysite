@@ -82,7 +82,7 @@ onMounted(() => {
   <div>
     <section class="mb-10 pb-8 border-b border-border">
       <div class="flex items-center gap-3 mb-4">
-        <Heart :size="28" fill="currentColor" stroke-width="0" class="text-red-500" />
+        <Heart :size="28" fill="currentColor" stroke-width="0" class="text-danger" />
         <h1 class="text-3xl sm:text-4xl font-bold text-text-primary tracking-tight">
           我的收藏
         </h1>

@@ -386,7 +386,7 @@ function removeCover() {
       </div>
     </div>
 
-    <div v-if="error" class="mb-6 p-3 rounded-lg bg-red-50 text-red-600 text-sm flex items-center gap-2">
+    <div v-if="error" class="mb-6 p-3 rounded-lg bg-danger-subtle text-danger text-sm flex items-center gap-2">
       <AlertCircle :size="16" />
       {{ error }}
     </div>
@@ -423,14 +423,14 @@ function removeCover() {
           <div>
             <label class="block text-sm font-medium text-text-primary mb-1.5">
               摘要
-              <span v-if="showSummaryHint" class="text-red-500 ml-1">*</span>
+              <span v-if="showSummaryHint" class="text-danger ml-1">*</span>
             </label>
             <textarea
               v-model="summary"
               placeholder="文章摘要（建议填写）..."
               rows="3"
               class="input-base resize-y"
-              :class="{ 'ring-2 ring-red-500': showSummaryHint }"
+              :class="{ 'ring-2 ring-danger': showSummaryHint }"
             />
           </div>
 

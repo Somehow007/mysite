@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { useToast } from '@/composables/useToast'
+import type { Toast } from '@/composables/useToast'
 import { CheckCircle, XCircle, Info, X } from 'lucide-vue-next'
 
 const { toasts, remove } = useToast()
 
-function icon(type: 'success' | 'error' | 'info') {
+function icon(type: Toast['type']) {
   switch (type) {
     case 'success': return CheckCircle
     case 'error': return XCircle
@@ -12,33 +13,50 @@ function icon(type: 'success' | 'error' | 'info') {
   }
 }
 
-function bgClass(type: 'success' | 'error' | 'info') {
+function iconClass(type: Toast['type']) {
   switch (type) {
     case 'success':
-      return 'bg-green-50 border-green-200 text-green-800'
+      return 'bg-success-subtle text-success'
     case 'error':
-      return 'bg-red-50 border-red-200 text-red-800'
+      return 'bg-danger-subtle text-danger'
     default:
-      return 'bg-blue-50 border-blue-200 text-blue-800'
+      return 'bg-info-subtle text-info'
+  }
+}
+
+function title(type: Toast['type']) {
+  switch (type) {
+    case 'success': return '成功'
+    case 'error': return '错误'
+    default: return '提示'
   }
 }
 </script>
 
 <template>
   <Teleport to="body">
-    <div class="fixed top-4 right-4 z-[100] flex flex-col gap-2 max-w-sm w-full pointer-events-none">
+    <div class="fixed bottom-6 right-6 z-[100] flex flex-col gap-2.5 w-[340px] max-w-[calc(100vw-3rem)] pointer-events-none">
       <TransitionGroup name="toast-slide">
         <div
           v-for="toast in toasts"
           :key="toast.id"
-          class="pointer-events-auto glass glass-sm flex items-start gap-3 px-4 py-3 rounded-lg"
-          :class="bgClass(toast.type)"
+          class="pointer-events-auto flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-bg-elevated border border-border shadow-lg"
+          role="status"
         >
-          <component :is="icon(toast.type)" :size="18" class="shrink-0 mt-0.5" />
-          <span class="text-sm flex-1">{{ toast.message }}</span>
+          <span
+            class="flex items-center justify-center w-5 h-5 rounded-full shrink-0 mt-0.5"
+            :class="iconClass(toast.type)"
+          >
+            <component :is="icon(toast.type)" :size="12" />
+          </span>
+          <div class="flex-1 min-w-0">
+            <div class="text-[13.5px] font-semibold text-text-primary">{{ title(toast.type) }}</div>
+            <div class="text-[12.5px] text-text-muted mt-0.5 break-words">{{ toast.message }}</div>
+          </div>
           <button
             @click="remove(toast.id)"
-            class="shrink-0 opacity-60 hover:opacity-100 transition-opacity"
+            class="shrink-0 p-0.5 rounded text-text-muted hover:text-text-primary transition-colors"
+            aria-label="关闭"
           >
             <X :size="14" />
           </button>

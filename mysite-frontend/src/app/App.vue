@@ -4,6 +4,7 @@ import { RouterView } from 'vue-router'
 import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
 import ToastContainer from '@/components/common/ToastContainer.vue'
+import GlobalConfirmDialog from '@/components/GlobalConfirmDialog.vue'
 
 const siteStore = useSiteStore()
 const userStore = useUserStore()
@@ -17,4 +18,5 @@ onMounted(async () => {
 <template>
   <RouterView />
   <ToastContainer />
+  <GlobalConfirmDialog />
 </template>

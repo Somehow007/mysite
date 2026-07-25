@@ -1,19 +1,22 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useRouter } from 'vue-router'
-import { Plus, Trash2, Edit3, BookOpen, Loader2, Search, SortAsc, SortDesc } from 'lucide-vue-next'
+import { Plus, Trash2, Edit3, BookOpen, Loader2 } from 'lucide-vue-next'
 import { getCollections, deleteCollection } from '@/api/collection'
 import { useToast } from '@/composables/useToast'
-import type { Collection, Pagination } from '@/types'
+import { useConfirm } from '@/composables/useConfirm'
+import { PageHeader, SearchFilterBar, Pagination as PaginationBar } from '@/components/ui'
+import type { Collection, Pagination as PaginationMeta } from '@/types'
 
 const router = useRouter()
 const toast = useToast()
+const { confirm } = useConfirm()
 
 useHead(() => ({ title: '合集管理 - MySite' }))
 
 const collections = ref<Collection[]>([])
-const pagination = ref<Pagination | null>(null)
+const pagination = ref<PaginationMeta | null>(null)
 const loading = ref(false)
 const loadError = ref('')
 const keyword = ref('')
@@ -57,8 +60,26 @@ function toggleSortOrder() {
   fetchCollections(1)
 }
 
+function handleReset() {
+  keyword.value = ''
+  sortField.value = 'createTime'
+  sortOrder.value = 'desc'
+  fetchCollections(1)
+}
+
+const sortOptions = [
+  { label: '创建时间', value: 'createTime' },
+  { label: '标题', value: 'title' },
+  { label: '文章数', value: 'articleCount' },
+]
+
 async function handleDelete(id: string, title: string) {
-  if (!confirm(`确定要删除合集「${title}」吗？\n\n注意：删除合集不会删除其中的文章，文章将恢复为普通文章展示。此操作不可撤销。`)) return
+  const ok = await confirm({
+    message: `确定要删除合集「${title}」吗？\n\n注意：删除合集不会删除其中的文章，文章将恢复为普通文章展示。此操作不可撤销。`,
+    danger: true,
+    confirmText: '删除',
+  })
+  if (!ok) return
   try {
     await deleteCollection(id)
     toast.success('合集已删除')
@@ -80,54 +101,35 @@ onMounted(() => {
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-semibold text-text-primary">合集管理</h1>
-      <button @click="router.push('/dashboard/collections/new')" class="btn-primary">
-        <Plus :size="16" />
-        新建合集
-      </button>
-    </div>
+    <PageHeader title="合集管理" subtitle="管理文章合集与系列">
+      <template #actions>
+        <button @click="router.push('/dashboard/collections/new')" class="btn-primary">
+          <Plus :size="14" />
+          新建合集
+        </button>
+      </template>
+    </PageHeader>
 
-    <div class="mb-6 flex items-center gap-3 flex-wrap">
-      <div class="relative flex-1 min-w-[200px]">
-        <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input
-          v-model="keyword"
-          type="text"
-          placeholder="搜索合集..."
-          class="input-base pl-10"
-          @keydown.enter="handleSearch"
-        />
-      </div>
-      <select
-        v-model="sortField"
-        class="px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
-        @change="fetchCollections(1)"
-      >
-        <option value="createTime">按创建时间</option>
-        <option value="title">按标题</option>
-        <option value="articleCount">按文章数</option>
-      </select>
-      <button
-        @click="toggleSortOrder"
-        class="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary hover:bg-surface-secondary transition-colors"
-        title="切换排序方向"
-      >
-        <SortAsc v-if="sortOrder === 'asc'" :size="14" />
-        <SortDesc v-else :size="14" />
-        {{ sortOrder === 'asc' ? '升序' : '降序' }}
-      </button>
-      <button @click="handleSearch" class="btn-primary">
-        搜索
-      </button>
-    </div>
+    <SearchFilterBar
+      v-model="keyword"
+      placeholder="搜索合集..."
+      :sort-options="sortOptions"
+      :sort-field="sortField"
+      :sort-order="sortOrder"
+      :show-filter="false"
+      class="mb-4"
+      @update:sort-field="sortField = $event; fetchCollections(1)"
+      @update:sort-order="sortOrder = $event; fetchCollections(1)"
+      @search="handleSearch"
+      @reset="handleReset"
+    />
 
     <div v-if="loading" class="py-16 text-center">
       <Loader2 :size="24" class="animate-spin mx-auto text-text-muted" />
     </div>
 
     <div v-else-if="loadError" class="py-16 text-center">
-      <p class="text-red-500 mb-4">{{ loadError }}</p>
+      <p class="text-danger mb-4">{{ loadError }}</p>
       <button @click="fetchCollections(currentPage)" class="btn-secondary">重试</button>
     </div>
 
@@ -175,7 +177,7 @@ onMounted(() => {
           </button>
           <button
             @click="handleDelete(collection.id, collection.title)"
-            class="p-2 rounded-lg text-text-muted hover:bg-red-50 hover:text-red-500 transition-all duration-200"
+            class="p-2 rounded-lg text-text-muted hover:bg-danger-subtle hover:text-danger transition-all duration-200"
             title="删除"
           >
             <Trash2 :size="16" />
@@ -184,22 +186,14 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="pagination && pagination.totalPages > 1" class="flex items-center justify-center gap-2 mt-8">
-      <button
-        :disabled="currentPage <= 1"
-        @click="handlePageChange(currentPage - 1)"
-        class="px-3 py-1.5 rounded-lg text-sm border border-border text-text-muted hover:bg-accent-subtle hover:text-accent transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        上一页
-      </button>
-      <span class="text-sm text-text-muted">{{ currentPage }} / {{ pagination.totalPages }}</span>
-      <button
-        :disabled="currentPage >= pagination.totalPages"
-        @click="handlePageChange(currentPage + 1)"
-        class="px-3 py-1.5 rounded-lg text-sm border border-border text-text-muted hover:bg-accent-subtle hover:text-accent transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        下一页
-      </button>
+    <div v-if="pagination && pagination.totalPages > 1" class="card-solid mt-6">
+      <PaginationBar
+        in-card
+        :current="currentPage"
+        :total="pagination.total"
+        :page-size="10"
+        @update:current="handlePageChange($event)"
+      />
     </div>
   </div>
 </template>

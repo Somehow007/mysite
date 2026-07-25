@@ -71,7 +71,7 @@ async function submitReply() {
       <img
         :src="getAvatarUrl(comment)"
         :alt="comment.nickname"
-        class="w-9 h-9 rounded-full flex-shrink-0 bg-surface-secondary"
+        class="w-9 h-9 rounded-full flex-shrink-0 bg-bg-code"
         loading="lazy"
       />
 
@@ -109,20 +109,20 @@ async function submitReply() {
           <button
             v-if="canDelete"
             @click="emit('delete', comment)"
-            class="inline-flex items-center gap-1 text-xs text-text-muted hover:text-red-500 transition-colors"
+            class="inline-flex items-center gap-1 text-xs text-text-muted hover:text-danger transition-colors"
           >
             <Trash2 :size="13" />
           </button>
         </div>
 
         <!-- 内联回复表单 -->
-        <div v-if="showReplyForm" class="mt-3 p-3 rounded-lg bg-surface-secondary border border-border">
+        <div v-if="showReplyForm" class="mt-3 p-3 rounded-lg bg-bg-code border border-border">
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2">
               <img
                 :src="currentUser?.avatar || getGravatarUrl(currentUser?.email)"
                 :alt="currentUser?.username"
-                class="w-6 h-6 rounded-full bg-surface-secondary"
+                class="w-6 h-6 rounded-full bg-bg-code"
               />
               <span class="text-xs font-medium text-text-primary">{{ currentUser?.username }}</span>
               <span class="text-xs text-text-muted">回复 @{{ comment.nickname }}</span>
@@ -135,7 +135,7 @@ async function submitReply() {
             v-model="replyContent"
             rows="2"
             placeholder="写下你的回复..."
-            class="w-full px-3 py-2 text-sm rounded-md border border-border bg-surface-primary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
+            class="w-full px-3 py-2 text-sm rounded-md border border-border bg-bg-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
             @keydown.ctrl.enter="submitReply"
             @keydown.meta.enter="submitReply"
           />

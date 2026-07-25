@@ -19,9 +19,9 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <div class="mt-3 border-t border-amber-500/20 pt-3">
+  <div class="mt-3 border-t border-warning/20 pt-3">
     <div class="flex items-start gap-2 mb-2.5">
-      <HelpCircle :size="14" class="text-amber-500 mt-0.5 shrink-0" />
+      <HelpCircle :size="14" class="text-warning mt-0.5 shrink-0" />
       <p class="text-sm text-text-secondary leading-relaxed">{{ message }}</p>
     </div>
 

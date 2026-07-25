@@ -85,11 +85,14 @@ export function getFavoriteArticles(params?: {
   page?: number
   size?: number
   keyword?: string
+  /** 管理员查看他人收藏时传入目标 userId */
+  userId?: string
 }): Promise<PaginatedResponse<ArticleListItem>> {
   return getPaginated<ArticleListItem>('/v1/articles/favorites', {
     current: params?.page || 1,
     size: params?.size || 10,
     keyword: params?.keyword,
+    userId: params?.userId,
   })
 }
 

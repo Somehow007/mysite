@@ -2,7 +2,7 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { ArrowLeft, Calendar, Eye, Clock, Tag, Lock } from 'lucide-vue-next'
+import { ArrowLeft, Calendar, Eye, Clock, Tag, Lock, User } from 'lucide-vue-next'
 import { getArticleById } from '@/api/article'
 import { getArticleNavigation } from '@/api/collection'
 import { formatDate, calculateReadingTime } from '@/utils/date'
@@ -158,6 +158,15 @@ onMounted(() => {
             </div>
 
             <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-text-muted">
+              <span v-if="article.authorName" class="inline-flex items-center gap-1.5">
+                <User :size="14" />
+                <RouterLink
+                  :to="`/user/${article.authorName}`"
+                  class="hover:text-accent transition-colors font-medium text-text-secondary"
+                >
+                  {{ article.authorName }}
+                </RouterLink>
+              </span>
               <span class="inline-flex items-center gap-1.5">
                 <Calendar :size="14" />
                 <time :datetime="article.updateTime">{{ formatDate(article.updateTime) }}</time>

@@ -86,20 +86,63 @@ const { renderedHtml } = useChatMarkdown(contentRef, streamingRef)
   margin: 0.35rem 0;
 }
 
-/* ── 代码块（Prism 高亮依托全局 CSS token） ─────────────────── */
+/* ── 代码块：深色底（亮主题也 #111827 风格）+ 语言/文件名头部条 ── */
 .chat-markdown-body :deep(.markdown-body pre) {
   font-size: 0.8rem;
-  border-radius: 0.5rem;
+  border-radius: 0.625rem;
   margin: 0.5rem 0;
-  padding: 0.75rem 1rem;
   overflow-x: auto;
-  background: var(--bg-code);
+  background: #111827;
+  color: #E5E7EB;
+  position: relative;
+}
+
+/* 代码块语言标签（依赖 markdown-it fence 渲染的 code class） */
+.chat-markdown-body :deep(.markdown-body pre[class*="language-"]::before),
+.chat-markdown-body :deep(.markdown-body pre > code[class*="language-"]::before) {
+  content: attr(class);
+}
+
+/* 代码块头部条：使用 pre 的 data-language 属性模拟 */
+.chat-markdown-body :deep(.markdown-body pre > code) {
+  display: block;
+}
+
+/* 代码块内部的语言标识（通过 code 的 class） */
+.chat-markdown-body :deep(.markdown-body pre code[class*="language-"]) {
+  display: block;
+  padding-top: 2rem;
+}
+
+/* 用伪元素模拟语言头部条 */
+.chat-markdown-body :deep(.markdown-body pre) {
+  padding: 0;
 }
 
 .chat-markdown-body :deep(.markdown-body pre code) {
   font-size: inherit;
   background: none;
-  padding: 0;
+  padding: 0.75rem 1rem;
+  display: block;
+}
+
+/* 语言标签条 */
+.chat-markdown-body :deep(.markdown-body pre[class*="language-"]) {
+  padding-top: 0;
+}
+
+.chat-markdown-body :deep(.markdown-body pre[class*="language-"]::before) {
+  display: block;
+  padding: 5px 12px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  content: attr(data-lang);
+}
+
+/* 无语言标记的代码块也保持深色风格 */
+.chat-markdown-body :deep(.markdown-body pre:not([class*="language-"])) code {
+  padding: 0.75rem 1rem;
 }
 
 /* ── 行内代码 ──────────────────────────────────────────────── */

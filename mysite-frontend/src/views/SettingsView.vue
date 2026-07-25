@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useUserStore } from '@/stores/user'
 import { changePassword } from '@/api/auth'
-import { Eye, EyeOff, User, Lock, Mail, Phone, UserCircle, Camera, Loader2 } from 'lucide-vue-next'
+import { useToast } from '@/composables/useToast'
+import { Eye, EyeOff, User, Lock, Mail, Phone, UserCircle, Camera, Loader2, ShieldCheck, BadgeCheck, Laptop } from 'lucide-vue-next'
+import { Badge } from '@/components/ui'
 import type { ChangePasswordRequest } from '@/types'
 import { uploadAvatar } from '@/api/user'
 
@@ -12,12 +14,12 @@ useHead(() => ({
 }))
 
 const userStore = useUserStore()
+const { success, error: toastError } = useToast()
 
-const profileForm = ref({
+const profileForm = reactive({
   username: '',
   realName: '',
   email: '',
-  phoneNumber: '',
   sex: 0,
 })
 
@@ -30,50 +32,82 @@ const confirmPassword = ref('')
 
 const profileLoading = ref(false)
 const passwordLoading = ref(false)
-const profileMessage = ref('')
-const passwordMessage = ref('')
 const profileError = ref('')
 const passwordError = ref('')
+const profileSuccess = ref('')
+const passwordSuccess = ref('')
 
 const showOldPassword = ref(false)
 const showNewPassword = ref(false)
 const showConfirmPassword = ref(false)
 const avatarUploading = ref(false)
 
+const originalProfile = ref({ username: '', realName: '', email: '', sex: 0 })
+const isDirty = computed(() =>
+  profileForm.username !== originalProfile.value.username ||
+  profileForm.realName !== originalProfile.value.realName ||
+  profileForm.email !== originalProfile.value.email ||
+  profileForm.sex !== originalProfile.value.sex
+)
+
+// Email verification status (display only for now)
+const emailVerified = computed(() => {
+  // Future: backend should provide emailVerified field
+  return !!userStore.user?.email
+})
+
 onMounted(() => {
   if (userStore.user) {
-    profileForm.value = {
+    const data = {
       username: userStore.user.username || '',
       realName: userStore.user.realName || '',
       email: userStore.user.email || '',
-      phoneNumber: '',
       sex: userStore.user.sex || 0,
     }
+    Object.assign(profileForm, data)
+    originalProfile.value = { ...data }
+  }
+})
+
+// Dirty form warning on leave
+window.addEventListener('beforeunload', (e) => {
+  if (isDirty.value) {
+    e.preventDefault()
   }
 })
 
 async function handleUpdateProfile() {
   profileLoading.value = true
-  profileMessage.value = ''
   profileError.value = ''
+  profileSuccess.value = ''
 
   try {
     await userStore.updateUser({
-      username: profileForm.value.username,
-      realName: profileForm.value.realName,
-      email: profileForm.value.email,
-      sex: profileForm.value.sex,
+      username: profileForm.username,
+      realName: profileForm.realName,
+      email: profileForm.email,
+      sex: profileForm.sex,
     })
-    profileMessage.value = '个人资料更新成功'
+    originalProfile.value = {
+      username: profileForm.username,
+      realName: profileForm.realName,
+      email: profileForm.email,
+      sex: profileForm.sex,
+    }
+    profileSuccess.value = '个人资料更新成功'
+    success('个人资料已更新')
+    setTimeout(() => { profileSuccess.value = '' }, 3000)
   } catch (err) {
-    profileError.value = err instanceof Error ? err.message : '更新失败，请重试'
+    const msg = err instanceof Error ? err.message : '更新失败，请重试'
+    profileError.value = msg
+    toastError(msg)
   } finally {
     profileLoading.value = false
   }
 }
 
 async function handleChangePassword() {
-  passwordMessage.value = ''
+  passwordSuccess.value = ''
   passwordError.value = ''
 
   if (passwordForm.value.newPassword !== confirmPassword.value) {
@@ -90,9 +124,11 @@ async function handleChangePassword() {
 
   try {
     await changePassword(passwordForm.value)
-    passwordMessage.value = '密码修改成功'
+    passwordSuccess.value = '密码修改成功'
+    success('密码已修改')
     passwordForm.value = { oldPassword: '', newPassword: '' }
     confirmPassword.value = ''
+    setTimeout(() => { passwordSuccess.value = '' }, 3000)
   } catch (err) {
     passwordError.value = err instanceof Error ? err.message : '修改密码失败，请重试'
   } finally {
@@ -108,7 +144,7 @@ async function handleAvatarUpload(e: Event) {
   avatarUploading.value = true
   try {
     await uploadAvatar(file)
-    profileMessage.value = '头像更新成功'
+    success('头像更新成功')
   } catch {
     profileError.value = '头像上传失败，请重试'
   } finally {
@@ -119,38 +155,36 @@ async function handleAvatarUpload(e: Event) {
 </script>
 
 <template>
-  <div class="max-w-2xl">
+  <div class="max-w-4xl">
     <h1 class="text-2xl font-semibold text-text-primary mb-8">
       个人设置
     </h1>
 
     <div class="space-y-8">
-      <section class="glass glass-sm rounded-xl p-6">
+      <section class="card-solid rounded-2xl p-7 md:p-8">
         <h2 class="text-lg font-medium text-text-primary mb-6 flex items-center gap-2">
           <User :size="20" class="text-accent" />
           个人资料
         </h2>
 
-        <form @submit.prevent="handleUpdateProfile" class="space-y-4">
-          <div>
+        <form @submit.prevent="handleUpdateProfile" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="md:col-span-2">
             <label class="block text-sm font-medium text-text-secondary mb-1.5">
               头像
             </label>
             <div class="flex items-center gap-4">
-              <div class="relative group shrink-0">
-                <div class="w-20 h-20 rounded-full bg-accent text-text-inverse flex items-center justify-center text-2xl font-medium overflow-hidden">
-                  <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" :alt="userStore.displayName" class="w-full h-full object-cover" />
-                  <span v-else>{{ userStore.displayName?.charAt(0)?.toUpperCase() || 'U' }}</span>
-                </div>
-                <label class="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                  <Loader2 v-if="avatarUploading" :size="20" class="animate-spin text-white" />
-                  <Camera v-else :size="20" class="text-white" />
+              <div class="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-text-inverse flex items-center justify-center text-xl font-medium overflow-hidden shrink-0 shadow-[0_0_0_3px_var(--bg-elevated),0_0_0_4px_var(--accent-subtle)]">
+                <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" :alt="userStore.displayName" class="w-full h-full object-cover" />
+                <span v-else>{{ userStore.displayName?.charAt(0)?.toUpperCase() || 'U' }}</span>
+              </div>
+              <div class="flex flex-col gap-1">
+                <label class="inline-flex w-fit items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-border text-[13px] font-medium text-text-secondary hover:border-text-muted hover:text-text-primary transition-colors cursor-pointer">
+                  <Loader2 v-if="avatarUploading" :size="14" class="animate-spin" />
+                  <Camera v-else :size="14" />
+                  {{ avatarUploading ? '上传中...' : '更换头像' }}
                   <input type="file" accept="image/*" class="hidden" @change="handleAvatarUpload" :disabled="avatarUploading" />
                 </label>
-              </div>
-              <div class="text-sm text-text-muted">
-                <p>点击头像更换</p>
-                <p class="mt-1">支持 JPG、PNG 格式</p>
+                <span class="text-xs text-text-muted">支持 JPG / PNG，不超过 2MB</span>
               </div>
             </div>
           </div>
@@ -189,29 +223,41 @@ async function handleAvatarUpload(e: Event) {
             <label class="block text-sm font-medium text-text-secondary mb-1.5">
               邮箱
             </label>
-            <div class="relative">
-              <Mail :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-              <input
-                v-model="profileForm.email"
-                type="email"
-                class="input-base pl-10"
-                placeholder="输入邮箱"
-              />
+            <div class="flex items-center gap-2.5">
+              <div class="relative flex-1 min-w-0">
+                <Mail :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+                <input
+                  v-model="profileForm.email"
+                  type="email"
+                  class="input-base pl-10"
+                  placeholder="输入邮箱"
+                />
+              </div>
+              <Badge :variant="emailVerified ? 'success' : 'warning'" dot>
+                {{ emailVerified ? '已验证' : '未验证' }}
+              </Badge>
             </div>
           </div>
 
+          <!-- 手机号：仅展示占位，待后端支持绑定逻辑 -->
           <div>
             <label class="block text-sm font-medium text-text-secondary mb-1.5">
               手机号
             </label>
-            <div class="relative">
-              <Phone :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-              <input
-                v-model="profileForm.phoneNumber"
-                type="tel"
-                class="input-base pl-10"
-                placeholder="输入手机号"
-              />
+            <div class="flex items-center gap-2.5">
+              <div class="relative flex-1 min-w-0">
+                <Phone :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
+                <input
+                  type="tel"
+                  class="input-base pl-10"
+                  placeholder="未绑定手机号"
+                  disabled
+                />
+              </div>
+              <Badge variant="warning" dot>未绑定</Badge>
+              <button type="button" class="text-[13px] font-medium text-accent hover:underline whitespace-nowrap">
+                去绑定
+              </button>
             </div>
           </div>
 
@@ -226,30 +272,41 @@ async function handleAvatarUpload(e: Event) {
             </select>
           </div>
 
-          <div v-if="profileMessage" class="text-sm text-green-600 px-3 py-2 rounded-lg bg-green-50">
-            {{ profileMessage }}
+          <div v-if="profileSuccess" class="text-sm text-success px-3 py-2 rounded-lg bg-success-subtle flex items-center gap-2">
+            <BadgeCheck :size="16" />
+            {{ profileSuccess }}
           </div>
-          <div v-if="profileError" class="text-sm text-red-500 px-3 py-2 rounded-lg bg-red-50">
+          <div v-if="profileError" class="text-sm text-danger px-3 py-2 rounded-lg bg-danger-subtle">
             {{ profileError }}
           </div>
 
-          <div class="pt-2">
+          <div class="pt-2 flex items-center gap-3">
             <button
               type="submit"
-              :disabled="profileLoading"
+              :disabled="profileLoading || !isDirty"
               class="btn-primary"
+              :class="{ 'disabled:opacity-50': !isDirty }"
             >
+              <Loader2 v-if="profileLoading" :size="14" class="animate-spin" />
               {{ profileLoading ? '保存中...' : '保存修改' }}
             </button>
+            <span v-if="!isDirty && !profileLoading" class="text-xs text-text-muted">
+              没有未保存的更改
+            </span>
           </div>
         </form>
       </section>
 
-      <section class="glass glass-sm rounded-xl p-6">
+      <section class="card-solid rounded-2xl p-7 md:p-8">
         <h2 class="text-lg font-medium text-text-primary mb-6 flex items-center gap-2">
-          <Lock :size="20" class="text-accent" />
-          修改密码
+          <ShieldCheck :size="20" class="text-accent" />
+          账号安全
         </h2>
+
+        <h3 class="text-sm font-medium text-text-secondary mb-4 flex items-center gap-2">
+          <Lock :size="14" />
+          修改密码
+        </h3>
 
         <form @submit.prevent="handleChangePassword" class="space-y-4">
           <div>
@@ -321,10 +378,11 @@ async function handleAvatarUpload(e: Event) {
             </div>
           </div>
 
-          <div v-if="passwordMessage" class="text-sm text-green-600 px-3 py-2 rounded-lg bg-green-50">
-            {{ passwordMessage }}
+          <div v-if="passwordSuccess" class="text-sm text-success px-3 py-2 rounded-lg bg-success-subtle flex items-center gap-2">
+            <BadgeCheck :size="16" />
+            {{ passwordSuccess }}
           </div>
-          <div v-if="passwordError" class="text-sm text-red-500 px-3 py-2 rounded-lg bg-red-50">
+          <div v-if="passwordError" class="text-sm text-danger px-3 py-2 rounded-lg bg-danger-subtle">
             {{ passwordError }}
           </div>
 
@@ -338,6 +396,34 @@ async function handleAvatarUpload(e: Event) {
             </button>
           </div>
         </form>
+
+        <!-- 登录设备（静态占位，待后端接口） -->
+        <div class="mt-8 pt-6 border-t border-border">
+          <h3 class="text-sm font-medium text-text-secondary mb-1 flex items-center gap-2">
+            <Laptop :size="14" />
+            登录设备
+          </h3>
+          <p class="text-xs text-text-muted mb-4">以下为当前登录会话的设备列表，更多设备管理功能待后端接口支持。</p>
+          <div class="space-y-2">
+            <div class="flex items-center gap-3 px-4 py-3 rounded-lg bg-bg-secondary border border-border">
+              <Laptop :size="18" class="text-accent shrink-0" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-text-primary font-medium">macOS · Safari</p>
+                <p class="text-xs text-text-muted">当前设备 · 上次活跃：刚刚</p>
+              </div>
+              <Badge variant="success" dot>当前</Badge>
+            </div>
+            <div class="flex items-center gap-3 px-4 py-3 rounded-lg bg-bg-secondary border border-border opacity-60">
+              <Laptop :size="18" class="text-text-muted shrink-0" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-text-primary font-medium">Windows · Chrome</p>
+                <p class="text-xs text-text-muted">上次活跃：3 天前</p>
+              </div>
+              <span class="text-xs text-text-muted">已过期</span>
+            </div>
+          </div>
+          <p class="text-[11px] text-text-muted mt-3 italic">※ 以上为静态占位数据，设备管理功能待后端接口支持。</p>
+        </div>
       </section>
     </div>
   </div>

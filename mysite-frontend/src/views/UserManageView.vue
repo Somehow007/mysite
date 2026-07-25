@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useHead } from '@unhead/vue'
-import { Search, Shield, ShieldCheck, UserCog, Trash2, Eye, FileText, ChevronLeft, ChevronRight, X, Loader2, SortAsc, SortDesc } from 'lucide-vue-next'
+import { Shield, ShieldCheck, Trash2, Eye, FileText, X, Loader2, ChevronDown, Users, CheckCircle2 } from 'lucide-vue-next'
 import { getAdminUsers, updateUserRole, updateUserStatus, deleteUser, getOperationLogs } from '@/api/admin'
 import type { AdminUser, UserOperationLog, AdminUserPage, OperationLogPage } from '@/api/admin'
 import { formatDate } from '@/utils/date'
+import { useToast } from '@/composables/useToast'
+import { Pagination, StatsCard, PageHeader, SearchFilterBar, DataTable, Badge, Dropdown } from '@/components/ui'
+import { useConfirm } from '@/composables/useConfirm'
+import type { Column } from '@/components/ui/DataTable.vue'
+
+const { error: toastError, success } = useToast()
+const { confirm } = useConfirm()
 
 useHead(() => ({
   title: '用户管理 - MySite',
@@ -24,9 +31,6 @@ const showLogs = ref(false)
 const logTargetUserId = ref<string | undefined>(undefined)
 
 const updatingUserId = ref<string | null>(null)
-const confirmDialog = ref<{ show: boolean; title: string; message: string; action: () => void }>({
-  show: false, title: '', message: '', action: () => {}
-})
 
 async function fetchUsers(current = 1) {
   userLoading.value = true
@@ -72,85 +76,77 @@ function toggleSortOrder() {
   fetchUsers(1)
 }
 
-const ROLE_CYCLE: Record<string, string> = {
-  'ADMIN': 'CREATOR',
-  'CREATOR': 'USER',
-  'USER': 'ADMIN',
-  'DEVELOPER': 'CREATOR', // 兼容旧角色
-}
+const ROLE_OPTIONS = [
+  { value: 'ADMIN', label: '系统管理员' },
+  { value: 'CREATOR', label: '创作者' },
+  { value: 'USER', label: '普通用户' },
+]
 
 const ROLE_LABEL: Record<string, string> = {
   'ADMIN': '系统管理员',
   'CREATOR': '创作者',
   'USER': '普通用户',
-  'DEVELOPER': '开发者(旧)',
 }
 
-function handleRoleChange(user: AdminUser) {
-  const newRole = ROLE_CYCLE[user.role] || 'USER'
+async function handleRoleChange(user: AdminUser, newRole: string) {
+  if (newRole === user.role) return
   const label = ROLE_LABEL[newRole] || newRole
-  confirmDialog.value = {
-    show: true,
+  const ok = await confirm({
     title: '修改用户角色',
     message: `确定将用户「${user.realName || user.username}」的角色修改为「${label}」吗？`,
-    action: () => doRoleChange(user, newRole)
-  }
-}
+  })
+  if (!ok) return
 
-async function doRoleChange(user: AdminUser, newRole: string) {
   updatingUserId.value = user.id
-  confirmDialog.value.show = false
   try {
     await updateUserRole(user.id, newRole)
+    success('角色修改成功')
     await fetchUsers(userPage.value?.current || 1)
   } catch (e: unknown) {
-    alert(e instanceof Error ? e.message : '操作失败')
+    toastError(e instanceof Error ? e.message : '操作失败')
   } finally {
     updatingUserId.value = null
   }
 }
 
-function handleStatusToggle(user: AdminUser) {
+async function handleStatusToggle(user: AdminUser) {
   const newStatus = user.status === 1 ? 0 : 1
   const label = newStatus === 1 ? '启用' : '禁用'
-  confirmDialog.value = {
-    show: true,
+  const ok = await confirm({
     title: `${label}用户`,
     message: `确定${label}用户「${user.realName || user.username}」吗？${newStatus === 0 ? '禁用后该用户将无法登录。' : ''}`,
-    action: () => doStatusChange(user, newStatus)
-  }
-}
+  })
+  if (!ok) return
 
-async function doStatusChange(user: AdminUser, newStatus: number) {
   updatingUserId.value = user.id
-  confirmDialog.value.show = false
   try {
     await updateUserStatus(user.id, newStatus)
+    success('状态修改成功')
     await fetchUsers(userPage.value?.current || 1)
   } catch (e: unknown) {
-    alert(e instanceof Error ? e.message : '操作失败')
+    toastError(e instanceof Error ? e.message : '操作失败')
   } finally {
     updatingUserId.value = null
   }
 }
 
-function handleDelete(user: AdminUser) {
-  confirmDialog.value = {
-    show: true,
+async function handleDelete(user: AdminUser) {
+  const ok = await confirm({
     title: '删除用户',
-    message: `确定删除用户「${user.realName || user.username}」吗？此操作不可撤销。`,
-    action: () => doDelete(user)
-  }
-}
+    message: `确定删除用户「${user.realName || user.username}」吗？此操作不可撤销，该用户的所有文章将被保留。`,
+    danger: true,
+    confirmText: '删除',
+    confirmInput: user.username,
+  })
+  if (!ok) return
 
-async function doDelete(user: AdminUser) {
   updatingUserId.value = user.id
-  confirmDialog.value.show = false
   try {
     await deleteUser(user.id)
+    success('用户已删除')
     await fetchUsers(userPage.value?.current || 1)
   } catch (e: unknown) {
-    alert(e instanceof Error ? e.message : '操作失败')
+    toastError(e instanceof Error ? e.message : '操作失败')
   } finally {
     updatingUserId.value = null
   }
@@ -173,24 +169,6 @@ function closeLogs() {
   logTargetUserId.value = undefined
 }
 
-function getRoleBadgeClass(role: string) {
-  switch (role) {
-    case 'ADMIN':
-    case 'DEVELOPER': // 兼容旧角色
-      return 'bg-amber-100 text-amber-700'
-    case 'CREATOR':
-      return 'bg-purple-100 text-purple-700'
-    default:
-      return 'bg-blue-100 text-blue-700'
-  }
-}
-
-function getStatusBadgeClass(status: number) {
-  return status === 1
-    ? 'bg-green-100 text-green-700'
-    : 'bg-red-100 text-red-700'
-}
-
 function getOperationTypeLabel(type: string) {
   const map: Record<string, string> = {
     ROLE_CHANGE: '角色变更',
@@ -203,198 +181,242 @@ function getOperationTypeLabel(type: string) {
 onMounted(() => {
   fetchUsers()
 })
+
+// DataTable columns config
+const userColumns: Column<AdminUser>[] = [
+  { key: 'user', label: '用户' },
+  { key: 'email', label: '邮箱', width: '200px' },
+  { key: 'role', label: '角色', align: 'center', width: '150px' },
+  { key: 'status', label: '状态', align: 'center', width: '96px' },
+  { key: 'createTime', label: '注册时间', width: '144px' },
+  { key: 'actions', label: '操作', align: 'center', width: '156px' },
+]
+
+const userSortOptions = [
+  { label: '注册时间', value: 'createTime' },
+  { label: '用户名', value: 'username' },
+  { label: '最后登录', value: 'lastLoginTime' },
+]
+
+const roleFilterOptions = [
+  { label: '全部角色', value: '' },
+  { label: '系统管理员', value: 'ADMIN' },
+  { label: '创作者', value: 'CREATOR' },
+  { label: '普通用户', value: 'USER' },
+]
+
+const statusFilterOptions = [
+  { label: '全部状态', value: '' },
+  { label: '正常', value: '1' },
+  { label: '禁用', value: '0' },
+]
+
+// Batch selection
+const selectedUserIds = ref<Set<string>>(new Set())
+
+function toggleUserSelect(id: string) {
+  const next = new Set(selectedUserIds.value)
+  if (next.has(id)) next.delete(id); else next.add(id)
+  selectedUserIds.value = next
+}
+
+function toggleSelectAllUsers() {
+  if (selectedUserIds.value.size === users.value.length) {
+    selectedUserIds.value = new Set()
+  } else {
+    selectedUserIds.value = new Set(users.value.map(u => u.id))
+  }
+}
+
+function clearUserSelection() {
+  selectedUserIds.value = new Set()
+}
+
+async function handleBatchDisable() {
+  if (selectedUserIds.value.size === 0) return
+  const ok = await confirm({
+    title: '批量禁用',
+    message: `确定禁用选中的 ${selectedUserIds.value.size} 名用户吗？`,
+  })
+  if (!ok) return
+  for (const id of selectedUserIds.value) {
+    try { await updateUserStatus(id, 0) } catch { /* continue */ }
+  }
+  success('批量操作完成')
+  clearUserSelection()
+  await fetchUsers(userPage.value?.current || 1)
+}
+
+// Role filter state
+const roleFilter = ref('')
+const statusFilter = ref('')
+
+// Reset handler
+function handleUserReset() {
+  keyword.value = ''
+  roleFilter.value = ''
+  statusFilter.value = ''
+  sortField.value = 'createTime'
+  sortOrder.value = 'desc'
+  fetchUsers(1)
+}
 </script>
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-6">
-      <h1 class="text-2xl font-bold text-text-primary">
-        用户管理
-      </h1>
-      <button
-        @click="viewAllLogs"
-        class="btn-secondary"
-      >
-        <FileText :size="14" />
-        操作日志
-      </button>
+    <PageHeader title="用户管理" :subtitle="userPage ? `共 ${userPage.total} 位注册用户` : ''">
+      <template #actions>
+        <button @click="viewAllLogs" class="btn-secondary">
+          <FileText :size="14" />
+          操作日志
+        </button>
+      </template>
+    </PageHeader>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <StatsCard :icon="Users" label="用户总数" :value="userPage?.total ?? 0" icon-color="accent" />
+      <StatsCard :icon="ShieldCheck" label="管理员" :value="users.filter(u => u.role === 'ADMIN').length" icon-color="warning" />
+      <StatsCard :icon="FileText" label="创作者" :value="users.filter(u => u.role === 'CREATOR').length" icon-color="info" />
+      <StatsCard :icon="Shield" label="禁用" :value="users.filter(u => u.status === 0).length" icon-color="danger" />
     </div>
 
-    <div class="mb-4 flex gap-2 flex-wrap">
-      <div class="relative flex-1 min-w-[200px]">
-        <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input
-          v-model="keyword"
-          type="text"
-          placeholder="搜索用户名、姓名、邮箱或手机号..."
-          class="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent text-sm"
-          @keyup.enter="handleSearch"
-        />
-      </div>
-      <select
-        v-model="sortField"
-        class="px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
-        @change="fetchUsers(1)"
-      >
-        <option value="createTime">按注册时间</option>
-        <option value="username">按用户名</option>
-        <option value="lastLoginTime">按最后登录</option>
-      </select>
-      <button
-        @click="toggleSortOrder"
-        class="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border border-border bg-surface-primary text-text-primary hover:bg-surface-secondary transition-colors"
-        title="切换排序方向"
-      >
-        <SortAsc v-if="sortOrder === 'asc'" :size="14" />
-        <SortDesc v-else :size="14" />
-        {{ sortOrder === 'asc' ? '升序' : '降序' }}
-      </button>
-      <button
-        @click="handleSearch"
-        class="btn-primary"
-      >
-        搜索
-      </button>
-    </div>
+    <SearchFilterBar
+      v-model="keyword"
+      placeholder="搜索用户名、姓名、邮箱或手机号..."
+      :sort-options="userSortOptions"
+      :sort-field="sortField"
+      :sort-order="sortOrder"
+      :filter-options="roleFilterOptions"
+      :filter-value="roleFilter"
+      class="mb-4"
+      @update:sort-field="sortField = $event; fetchUsers(1)"
+      @update:sort-order="sortOrder = $event; fetchUsers(1)"
+      @update:filter-value="roleFilter = $event; fetchUsers(1)"
+      @search="handleSearch"
+      @reset="handleUserReset"
+    />
 
-    <div v-if="userLoading" class="flex justify-center py-12">
-      <Loader2 :size="24" class="animate-spin text-text-muted" />
-    </div>
-
-    <div v-else-if="users.length === 0" class="text-center py-12 text-text-muted">
-      暂无用户数据
-    </div>
-
-    <div v-else class="overflow-x-auto rounded-lg border border-border">
-      <table class="w-full text-sm">
-        <thead>
-          <tr class="bg-bg-code">
-            <th class="text-left px-4 py-3 font-medium text-text-muted">用户</th>
-            <th class="text-left px-4 py-3 font-medium text-text-muted">邮箱</th>
-            <th class="text-left px-4 py-3 font-medium text-text-muted">手机号</th>
-            <th class="text-center px-4 py-3 font-medium text-text-muted">角色</th>
-            <th class="text-center px-4 py-3 font-medium text-text-muted">状态</th>
-            <th class="text-left px-4 py-3 font-medium text-text-muted">注册时间</th>
-            <th class="text-center px-4 py-3 font-medium text-text-muted">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="user in users"
-            :key="user.id"
-            class="border-t border-border hover:bg-bg-code transition-colors"
-          >
-            <td class="px-4 py-3">
-              <div class="font-medium text-text-primary">{{ user.username }}</div>
-              <div class="text-xs text-text-muted">{{ user.realName }}</div>
-            </td>
-            <td class="px-4 py-3 text-text-secondary">{{ user.email || '-' }}</td>
-            <td class="px-4 py-3 text-text-secondary">{{ user.phoneNumber || '-' }}</td>
-            <td class="px-4 py-3 text-center">
-              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium" :class="getRoleBadgeClass(user.role)">
-                <ShieldCheck v-if="user.role === 'ADMIN' || user.role === 'DEVELOPER'" :size="10" />
-                <Shield v-else :size="10" />
-                {{ ROLE_LABEL[user.role] || user.role }}
-              </span>
-            </td>
-            <td class="px-4 py-3 text-center">
-              <span class="inline-flex px-2 py-0.5 rounded-full text-xs font-medium" :class="getStatusBadgeClass(user.status)">
-                {{ user.status === 1 ? '启用' : '禁用' }}
-              </span>
-            </td>
-            <td class="px-4 py-3 text-text-muted text-xs">
-              {{ formatDate(user.createTime) }}
-            </td>
-            <td class="px-4 py-3">
-              <div class="flex items-center justify-center gap-1">
-                <button
-                  @click="handleRoleChange(user)"
-                  :disabled="updatingUserId === user.id"
-                  class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors disabled:opacity-50"
-                  title="切换角色"
-                >
-                  <UserCog :size="14" />
-                </button>
-                <button
-                  @click="handleStatusToggle(user)"
-                  :disabled="updatingUserId === user.id"
-                  class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors disabled:opacity-50"
-                  :title="user.status === 1 ? '禁用用户' : '启用用户'"
-                >
-                  <Shield :size="14" />
-                </button>
-                <button
-                  @click="viewUserLogs(user.id)"
-                  class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors"
-                  title="查看操作日志"
-                >
-                  <Eye :size="14" />
-                </button>
-                <button
-                  @click="handleDelete(user)"
-                  :disabled="updatingUserId === user.id"
-                  class="p-1.5 rounded text-text-muted hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-50"
-                  title="删除用户"
-                >
-                  <Trash2 :size="14" />
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <div v-if="userPage && userPage.pages > 1" class="flex items-center justify-center gap-2 mt-4">
-      <button
-        @click="fetchUsers((userPage?.current || 1) - 1)"
-        :disabled="!userPage?.current || userPage.current <= 1"
-        class="p-2 rounded-lg text-text-muted hover:bg-bg-code transition-colors disabled:opacity-50"
-      >
-        <ChevronLeft :size="16" />
-      </button>
-      <span class="text-sm text-text-secondary">
-        {{ userPage.current }} / {{ userPage.pages }}
-      </span>
-      <button
-        @click="fetchUsers((userPage?.current || 1) + 1)"
-        :disabled="!userPage?.current || userPage.current >= userPage.pages"
-        class="p-2 rounded-lg text-text-muted hover:bg-bg-code transition-colors disabled:opacity-50"
-      >
-        <ChevronRight :size="16" />
-      </button>
-    </div>
-
-    <Teleport to="body">
-      <div v-if="confirmDialog.show" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="confirmDialog.show = false">
-        <div class="glass glass-lg rounded-2xl p-6 w-full max-w-md mx-4 animate-scale-in">
-          <h3 class="text-lg font-semibold text-text-primary mb-2">
-            {{ confirmDialog.title }}
-          </h3>
-          <p class="text-sm text-text-secondary mb-6">
-            {{ confirmDialog.message }}
-          </p>
-          <div class="flex justify-end gap-3">
-            <button
-              @click="confirmDialog.show = false"
-              class="btn-secondary"
-            >
-              取消
-            </button>
-            <button
-              @click="confirmDialog.action()"
-              class="inline-flex items-center justify-center gap-0.5 px-4 py-2 text-sm font-medium rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all duration-200"
-            >
-              确认
-            </button>
-          </div>
+    <!-- Batch bar -->
+    <Transition
+      enter-active-class="transition-all duration-200 ease-out"
+      enter-from-class="opacity-0 -translate-y-1"
+      leave-active-class="transition-all duration-200 ease-in"
+      leave-to-class="opacity-0 -translate-y-1"
+    >
+      <div v-if="selectedUserIds.size > 0" class="flex justify-center mb-4">
+        <div class="inline-flex items-center gap-3 px-4 py-2 rounded-full border border-accent/30 bg-bg-elevated shadow-md">
+          <span class="text-[13px] font-semibold text-accent">已选 {{ selectedUserIds.size }} 项</span>
+          <button @click="handleBatchDisable" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] rounded-full bg-warning-subtle text-warning hover:bg-warning/20 transition-colors">
+            <Shield :size="12" />批量禁用
+          </button>
+          <button @click="clearUserSelection" class="px-2 py-1 text-[12.5px] text-text-muted hover:text-text-primary transition-colors">取消</button>
         </div>
       </div>
-    </Teleport>
+    </Transition>
+
+    <DataTable
+      :columns="userColumns"
+      :data="users"
+      :loading="userLoading"
+      selectable
+      :selected-ids="selectedUserIds"
+      id-key="id"
+      :total="userPage?.total"
+      :current-page="userPage?.current"
+      :page-size="10"
+      @toggle-select="toggleUserSelect($event)"
+      @toggle-select-all="toggleSelectAllUsers()"
+      @update:current-page="fetchUsers($event)"
+    >
+      <template #cell-user="{ item }">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[11px] font-semibold text-white" :style="{ background: 'linear-gradient(135deg, var(--accent), #7C3AED)' }">
+            {{ (item.realName || item.username).charAt(0) }}
+          </div>
+          <div class="min-w-0">
+            <div class="text-[13.5px] font-medium text-text-primary">@{{ item.username }}</div>
+            <div class="text-xs text-text-muted">{{ item.realName }}</div>
+          </div>
+        </div>
+      </template>
+      <template #cell-email="{ item }">
+        <span class="text-[13px] text-text-secondary truncate block">{{ item.email || '-' }}</span>
+      </template>
+      <template #cell-role="{ item }">
+        <Dropdown trigger="click" placement="bottom" :spacing="4">
+          <template #trigger>
+            <button
+              :disabled="updatingUserId === item.id"
+              class="inline-flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+            >
+              <Badge :variant="item.role === 'ADMIN' ? 'warning' : item.role === 'CREATOR' ? 'accent' : 'info'" dot>
+                {{ ROLE_LABEL[item.role] || item.role }}
+              </Badge>
+              <ChevronDown :size="10" class="text-text-muted" />
+            </button>
+          </template>
+          <template #default="{ close: closeRole }">
+            <div class="w-40 py-1 rounded-xl border border-border/60 bg-bg-elevated shadow-[0_12px_40px_-12px_rgba(0,0,0,0.18)]">
+              <button
+                v-for="opt in ROLE_OPTIONS"
+                :key="opt.value"
+                @click="handleRoleChange(item, opt.value); closeRole()"
+                :disabled="opt.value === item.role"
+                class="w-full text-left px-3.5 py-2.5 text-[13px] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                :class="opt.value === item.role
+                  ? 'text-accent font-medium bg-accent-subtle/50'
+                  : 'text-text-secondary hover:bg-bg-code'"
+              >
+                <span class="flex items-center justify-between">
+                  {{ opt.label }}
+                  <CheckCircle2 v-if="opt.value === item.role" :size="13" class="text-accent shrink-0" />
+                </span>
+              </button>
+            </div>
+          </template>
+        </Dropdown>
+      </template>
+      <template #cell-status="{ item }">
+        <Badge :variant="item.status === 1 ? 'success' : 'danger'" :dot="true" :dot-pulse="false">
+          {{ item.status === 1 ? '正常' : '禁用' }}
+        </Badge>
+      </template>
+      <template #cell-createTime="{ item }">
+        <span class="text-xs text-text-muted tabular-nums whitespace-nowrap">{{ formatDate(item.createTime) }}</span>
+      </template>
+      <template #cell-actions="{ item }">
+        <div class="flex items-center justify-center gap-1">
+          <button
+            @click="handleStatusToggle(item)"
+            :disabled="updatingUserId === item.id"
+            class="p-1.5 rounded-lg text-text-muted hover:text-warning hover:bg-warning-subtle transition-colors disabled:opacity-40"
+            :title="item.status === 1 ? '禁用用户' : '启用用户'"
+          >
+            <Shield :size="15" />
+          </button>
+          <button
+            @click="viewUserLogs(item.id)"
+            class="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-accent-subtle transition-colors"
+            title="查看操作日志"
+          >
+            <Eye :size="15" />
+          </button>
+          <button
+            @click="handleDelete(item)"
+            :disabled="updatingUserId === item.id"
+            class="p-1.5 rounded-lg text-text-muted hover:text-danger hover:bg-danger-subtle transition-colors disabled:opacity-40"
+            title="删除用户"
+          >
+            <Trash2 :size="15" />
+          </button>
+        </div>
+      </template>
+    </DataTable>
 
     <Teleport to="body">
       <div v-if="showLogs" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="closeLogs">
-        <div class="glass glass-lg rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto animate-scale-in">
+        <div class="card-solid p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto animate-scale-in">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-text-primary">
               操作日志
@@ -437,25 +459,14 @@ onMounted(() => {
             </div>
           </div>
 
-          <div v-if="logPage && logPage.pages > 1" class="flex items-center justify-center gap-2 mt-4">
-            <button
-              @click="fetchLogs((logPage?.current || 1) - 1)"
-              :disabled="!logPage?.current || logPage.current <= 1"
-              class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors disabled:opacity-50"
-            >
-              <ChevronLeft :size="14" />
-            </button>
-            <span class="text-xs text-text-secondary">
-              {{ logPage.current }} / {{ logPage.pages }}
-            </span>
-            <button
-              @click="fetchLogs((logPage?.current || 1) + 1)"
-              :disabled="!logPage?.current || logPage.current >= logPage.pages"
-              class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors disabled:opacity-50"
-            >
-              <ChevronRight :size="14" />
-            </button>
-          </div>
+          <Pagination
+            v-if="logPage && logPage.pages > 1"
+            :current="logPage.current"
+            :total="logPage.total"
+            :page-size="15"
+            class="mt-4"
+            @update:current="fetchLogs($event)"
+          />
         </div>
       </div>
     </Teleport>

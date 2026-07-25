@@ -93,8 +93,8 @@ async function handleToggle() {
     :class="[
       sizeClass,
       favorited
-        ? 'text-red-500 hover:text-red-600'
-        : 'text-text-muted hover:text-red-500',
+        ? 'text-danger hover:text-danger'
+        : 'text-text-muted hover:text-danger',
       pending ? 'cursor-wait' : 'cursor-pointer'
     ]"
     :disabled="pending"

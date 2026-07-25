@@ -315,7 +315,7 @@ onMounted(() => {
       <h1 class="text-2xl font-semibold text-text-primary">{{ pageTitle }}</h1>
     </div>
 
-    <div v-if="error" class="mb-6 p-3 rounded-lg bg-red-50 text-red-600 text-sm flex items-center gap-2">
+    <div v-if="error" class="mb-6 p-3 rounded-lg bg-danger-subtle text-danger text-sm flex items-center gap-2">
       <AlertCircle :size="16" />
       {{ error }}
     </div>
@@ -323,7 +323,7 @@ onMounted(() => {
     <div v-if="loading" class="py-16 text-center text-text-muted">加载中...</div>
 
     <div v-else-if="error && isEdit" class="py-16 text-center">
-      <AlertCircle :size="32" class="mx-auto text-red-400 mb-3" />
+      <AlertCircle :size="32" class="mx-auto text-danger mb-3" />
       <p class="text-text-muted mb-4">{{ error }}</p>
       <button @click="fetchCollectionDetail(route.params.id as string)" class="btn-secondary text-sm">重试</button>
     </div>
@@ -469,7 +469,7 @@ onMounted(() => {
 
             <button
               @click="removeArticle(index)"
-              class="p-1.5 rounded text-text-muted hover:text-red-500 hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100"
+              class="p-1.5 rounded text-text-muted hover:text-danger hover:bg-danger-subtle transition-all opacity-0 group-hover:opacity-100"
               title="移除"
             >
               <X :size="14" />

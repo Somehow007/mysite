@@ -45,7 +45,7 @@ async function handleSubmit() {
 
 <template>
   <form @submit.prevent="handleSubmit" class="space-y-5">
-    <div v-if="error" class="p-3 rounded-lg bg-red-50 text-red-600 text-sm">
+    <div v-if="error" class="p-3 rounded-lg bg-danger-subtle text-danger text-sm">
       {{ error }}
     </div>
 

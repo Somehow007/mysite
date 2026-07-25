@@ -1,4 +1,13 @@
 [data-theme="aurora"] {
+  --success: #34D399;
+  --success-subtle: rgb(52 211 153 / 0.18);
+  --warning: #FBBF24;
+  --warning-subtle: rgb(251 191 36 / 0.18);
+  --danger: #F87171;
+  --danger-subtle: rgb(248 113 113 / 0.18);
+  --info: #60A5FA;
+  --info-subtle: rgb(96 165 250 / 0.18);
+
   --bg-primary: #080D0E;
   --bg-secondary: #111827;
   --bg-elevated: #1A1F36;

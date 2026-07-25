@@ -14,6 +14,25 @@ export interface User {
   histories?: Record<string, unknown>[]
 }
 
+/** 用户公开个人主页数据 */
+export interface UserProfile {
+  id: string
+  username: string
+  realName: string
+  avatar?: string
+  bio?: string
+  role: string
+  createTime: string
+  location?: string
+  website?: string
+  followingCount?: number
+  followerCount?: number
+  articleCount: number
+  collectionCount: number
+  likeCount: number
+  favoriteCount: number
+}
+
 export interface Category {
   id: string
   name: string
@@ -318,6 +337,7 @@ export interface KnowledgeBase {
   embeddingDimension: number
   chunkSize: number
   chunkOverlap: number
+  chunkingMode: string
   docCount: number
   createTime: string
   updateTime: string

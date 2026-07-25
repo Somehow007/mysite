@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useHead } from '@unhead/vue'
-import { Plus, Trash2, Edit, FolderTree, ChevronRight, ChevronDown, Settings } from 'lucide-vue-next'
+import { Plus, Trash2, FolderTree, Settings } from 'lucide-vue-next'
 import {
   getCategoryTree,
   createCategory,
@@ -13,6 +13,13 @@ import {
   type CategoryUpdateData,
 } from '@/api/category'
 import type { Category } from '@/types'
+import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
+import CategoryTreeNode from '@/components/ui/CategoryTreeNode.vue'
+import { Modal, PageHeader } from '@/components/ui'
+
+const { success, error: toastError } = useToast()
+const { confirm } = useConfirm()
 
 useHead(() => ({
   title: '分类管理 - MySite',
@@ -112,7 +119,7 @@ function openEditModal(category: Category) {
 
 async function handleSave() {
   if (!editorForm.value.name || !editorForm.value.slug) {
-    alert('分类名称和别名不能为空')
+    toastError('分类名称和别名不能为空')
     return
   }
 
@@ -124,48 +131,58 @@ async function handleSave() {
       await createCategory(editorForm.value)
     }
     showEditor.value = false
+    success('保存成功')
     await fetchCategories()
   } catch (error) {
-    alert(error instanceof Error ? error.message : '保存失败')
+    toastError(error instanceof Error ? error.message : '保存失败')
   } finally {
     saving.value = false
   }
 }
 
 async function handleDelete(id: string) {
-  if (!confirm('确定要删除这个分类吗？')) return
+  const ok = await confirm({ message: '确定要删除这个分类吗？', danger: true, confirmText: '删除' })
+  if (!ok) return
 
   try {
     await deleteCategory(id)
+    success('删除成功')
     await fetchCategories()
   } catch (error) {
-    alert(error instanceof Error ? error.message : '删除失败')
+    toastError(error instanceof Error ? error.message : '删除失败')
   }
 }
 
 async function handleToggleStatus(category: Category) {
   try {
     await updateCategoryStatus(category.id, category.status === 1 ? 0 : 1)
+    success('操作成功')
     await fetchCategories()
   } catch (error) {
-    alert(error instanceof Error ? error.message : '操作失败')
+    toastError(error instanceof Error ? error.message : '操作失败')
   }
 }
 
 async function handleBatchDelete() {
   if (selectedIds.value.size === 0) {
-    alert('请选择要删除的分类')
+    toastError('请选择要删除的分类')
     return
   }
 
-  if (!confirm(`确定要删除选中的 ${selectedIds.value.size} 个分类吗？`)) return
+  const ok = await confirm({
+    message: `确定要删除选中的 ${selectedIds.value.size} 个分类吗？`,
+    danger: true,
+    confirmText: '删除',
+  })
+  if (!ok) return
 
   try {
     await batchDelete(Array.from(selectedIds.value))
     selectedIds.value.clear()
+    success('批量删除成功')
     await fetchCategories()
   } catch (error) {
-    alert(error instanceof Error ? error.message : '删除失败')
+    toastError(error instanceof Error ? error.message : '删除失败')
   }
 }
 
@@ -212,15 +229,12 @@ onMounted(() => {
 
 <template>
   <div>
-    <div class="flex items-center justify-between mb-8">
-      <h1 class="text-2xl font-semibold text-text-primary">
-        分类管理
-      </h1>
-      <div class="flex items-center gap-2">
+    <PageHeader title="分类管理" subtitle="管理文章分类层级结构">
+      <template #actions>
         <button
           v-if="selectedIds.size > 0"
           @click="handleBatchDelete"
-          class="inline-flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-red-500 text-red-500 hover:bg-red-50 transition-all duration-200"
+          class="btn-secondary !text-danger !border-danger hover:bg-danger-subtle"
         >
           <Trash2 :size="14" />
           删除选中 ({{ selectedIds.size }})
@@ -232,8 +246,8 @@ onMounted(() => {
           <Plus :size="14" />
           新建分类
         </button>
-      </div>
-    </div>
+      </template>
+    </PageHeader>
 
     <div v-if="loading" class="py-16 text-center text-text-muted">
       加载中...
@@ -265,369 +279,189 @@ onMounted(() => {
       </div>
 
       <div class="divide-y divide-border">
-        <template v-for="category in categories" :key="category.id">
-          <div class="flex items-center gap-3 px-4 py-3 hover:bg-bg-code transition-colors">
-            <input
-              type="checkbox"
-              :checked="selectedIds.has(category.id)"
-              @change="toggleSelect(category.id)"
-              class="w-4 h-4 rounded border-border"
-            />
-            <button
-              v-if="category.children && category.children.length > 0"
-              @click="toggleExpand(category.id)"
-              class="p-0.5 rounded hover:bg-bg-code transition-colors"
-            >
-              <ChevronRight v-if="!expandedIds.has(category.id)" :size="14" />
-              <ChevronDown v-else :size="14" />
-            </button>
-            <div v-else class="w-5" />
-            <span class="text-sm text-text-secondary">{{ category.name }}</span>
-            <span class="ml-auto text-sm text-text-muted">
-              {{ category.articleCount || 0 }}
-            </span>
-            <span class="ml-4">
-              <button
-                @click="handleToggleStatus(category)"
-                :class="[
-                  'px-2 py-0.5 text-xs rounded',
-                  category.status === 1
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-gray-100 text-gray-700'
-                ]"
-              >
-                {{ category.status === 1 ? '启用' : '禁用' }}
-              </button>
-            </span>
-            <div class="ml-4 flex items-center gap-1">
-              <button
-                v-if="category.level < 3"
-                @click="openCreateModal(category.id)"
-                class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors"
-                title="添加子分类"
-              >
-                <Plus :size="14" />
-              </button>
-              <button
-                @click="openEditModal(category)"
-                class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors"
-                title="编辑"
-              >
-                <Edit :size="14" />
-              </button>
-              <button
-                @click="handleDelete(category.id)"
-                class="p-1.5 rounded text-text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
-                title="删除"
-              >
-                <Trash2 :size="14" />
-              </button>
-            </div>
-          </div>
-
-          <template v-if="expandedIds.has(category.id) && category.children">
-            <template v-for="child in category.children" :key="child.id">
-              <div class="flex items-center gap-3 px-4 py-3 pl-12 hover:bg-bg-code transition-colors">
-                <input
-                  type="checkbox"
-                  :checked="selectedIds.has(child.id)"
-                  @change="toggleSelect(child.id)"
-                  class="w-4 h-4 rounded border-border"
-                />
-                <button
-                  v-if="child.children && child.children.length > 0"
-                  @click="toggleExpand(child.id)"
-                  class="p-0.5 rounded hover:bg-bg-code transition-colors"
-                >
-                  <ChevronRight v-if="!expandedIds.has(child.id)" :size="14" />
-                  <ChevronDown v-else :size="14" />
-                </button>
-                <div v-else class="w-5" />
-                <span class="text-sm text-text-secondary">{{ child.name }}</span>
-                <span class="ml-auto text-sm text-text-muted">
-                  {{ child.articleCount || 0 }}
-                </span>
-                <span class="ml-4">
-                  <button
-                    @click="handleToggleStatus(child)"
-                    :class="[
-                      'px-2 py-0.5 text-xs rounded',
-                      child.status === 1
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-700'
-                    ]"
-                  >
-                    {{ child.status === 1 ? '启用' : '禁用' }}
-                  </button>
-                </span>
-                <div class="ml-4 flex items-center gap-1">
-                  <button
-                    v-if="child.level < 3"
-                    @click="openCreateModal(child.id)"
-                    class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors"
-                    title="添加子分类"
-                  >
-                    <Plus :size="14" />
-                  </button>
-                  <button
-                    @click="openEditModal(child)"
-                    class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors"
-                    title="编辑"
-                  >
-                    <Edit :size="14" />
-                  </button>
-                  <button
-                    @click="handleDelete(child.id)"
-                    class="p-1.5 rounded text-text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
-                    title="删除"
-                  >
-                    <Trash2 :size="14" />
-                  </button>
-                </div>
-              </div>
-
-              <template v-if="expandedIds.has(child.id) && child.children">
-                <div
-                  v-for="grandchild in child.children"
-                  :key="grandchild.id"
-                  class="flex items-center gap-3 px-4 py-3 pl-20 hover:bg-bg-code transition-colors"
-                >
-                  <input
-                    type="checkbox"
-                    :checked="selectedIds.has(grandchild.id)"
-                    @change="toggleSelect(grandchild.id)"
-                    class="w-4 h-4 rounded border-border"
-                  />
-                  <div class="w-5" />
-                  <span class="text-sm text-text-secondary">{{ grandchild.name }}</span>
-                  <span class="ml-auto text-sm text-text-muted">
-                    {{ grandchild.articleCount || 0 }}
-                  </span>
-                  <span class="ml-4">
-                    <button
-                      @click="handleToggleStatus(grandchild)"
-                      :class="[
-                        'px-2 py-0.5 text-xs rounded',
-                        grandchild.status === 1
-                          ? 'bg-green-100 text-green-700'
-                          : 'bg-gray-100 text-gray-700'
-                      ]"
-                    >
-                      {{ grandchild.status === 1 ? '启用' : '禁用' }}
-                    </button>
-                  </span>
-                  <div class="ml-4 flex items-center gap-1">
-                    <button
-                      @click="openEditModal(grandchild)"
-                      class="p-1.5 rounded text-text-muted hover:bg-bg-code transition-colors"
-                      title="编辑"
-                    >
-                      <Edit :size="14" />
-                    </button>
-                    <button
-                      @click="handleDelete(grandchild.id)"
-                      class="p-1.5 rounded text-text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
-                      title="删除"
-                    >
-                      <Trash2 :size="14" />
-                    </button>
-                  </div>
-                </div>
-              </template>
-            </template>
-          </template>
-        </template>
+        <CategoryTreeNode
+          v-for="category in categories"
+          :key="category.id"
+          :category="category"
+          :depth="0"
+          :expanded-ids="expandedIds"
+          :selected-ids="selectedIds"
+          @toggle-expand="toggleExpand"
+          @toggle-select="toggleSelect"
+          @add-child="(cat: Category) => openCreateModal(cat.id)"
+          @edit="openEditModal"
+          @delete="handleDelete"
+          @toggle-status="handleToggleStatus"
+        />
       </div>
     </div>
 
-    <div
-      v-if="showEditor"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-      @click.self="showEditor = false"
+    <Modal
+      :open="showEditor"
+      :title="editingCategory ? '编辑分类' : '新建分类'"
+      max-width="max-w-2xl"
+      @update:open="showEditor = $event"
     >
-      <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto glass glass-lg rounded-2xl animate-scale-in">
-        <div class="sticky top-0 flex items-center justify-between px-6 py-4 border-b border-border glass z-10">
-          <h2 class="text-lg font-semibold text-text-primary">
-            {{ editingCategory ? '编辑分类' : '新建分类' }}
-          </h2>
-          <button
-            @click="showEditor = false"
-            class="p-2 rounded-lg text-text-muted hover:bg-accent-subtle transition-all duration-200"
-          >
-            ✕
-          </button>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-secondary mb-1">
+            分类名称 <span class="text-danger">*</span>
+          </label>
+          <input
+            v-model="editorForm.name"
+            type="text"
+            class="input-base"
+            placeholder="请输入分类名称"
+          />
         </div>
 
-        <div class="p-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-text-secondary mb-1">
+            分类别名 <span class="text-danger">*</span>
+          </label>
+          <input
+            v-model="editorForm.slug"
+            type="text"
+            class="input-base"
+            placeholder="URL友好的别名，如：tech"
+          />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-text-secondary mb-1">
+            父分类
+          </label>
+          <select
+            v-model="editorForm.parentId"
+            class="input-base"
+          >
+            <option
+              v-for="option in parentOptions"
+              :key="String(option.id)"
+              :value="option.id"
+              :disabled="!!editingCategory && option.id === editingCategory.id"
+            >
+              {{ '&nbsp;&nbsp;'.repeat(option.level) }}{{ option.name }}
+            </option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-text-secondary mb-1">
+            分类描述
+          </label>
+          <textarea
+            v-model="editorForm.description"
+            rows="3"
+            class="input-base"
+            placeholder="分类描述（可选）"
+          />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium text-text-secondary mb-1">
-              分类名称 <span class="text-red-500">*</span>
+              排序
             </label>
             <input
-              v-model="editorForm.name"
-              type="text"
-              class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="请输入分类名称"
+              v-model.number="editorForm.sortOrder"
+              type="number"
+              class="input-base"
             />
           </div>
 
           <div>
             <label class="block text-sm font-medium text-text-secondary mb-1">
-              分类别名 <span class="text-red-500">*</span>
-            </label>
-            <input
-              v-model="editorForm.slug"
-              type="text"
-              class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="URL友好的别名，如：tech"
-            />
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium text-text-secondary mb-1">
-              父分类
+              状态
             </label>
             <select
-              v-model="editorForm.parentId"
-              class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
+              v-model.number="editorForm.status"
+              class="input-base"
             >
-              <option
-                v-for="option in parentOptions"
-                :key="String(option.id)"
-                :value="option.id"
-                :disabled="!!editingCategory && option.id === editingCategory.id"
-              >
-                {{ '&nbsp;&nbsp;'.repeat(option.level) }}{{ option.name }}
-              </option>
+              <option :value="1">启用</option>
+              <option :value="0">禁用</option>
             </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-text-secondary mb-1">
+              图标
+            </label>
+            <input
+              v-model="editorForm.icon"
+              type="text"
+              class="input-base"
+              placeholder="图标名称或URL"
+            />
           </div>
 
           <div>
             <label class="block text-sm font-medium text-text-secondary mb-1">
-              分类描述
+              颜色
             </label>
-            <textarea
-              v-model="editorForm.description"
-              rows="3"
-              class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-              placeholder="分类描述（可选）"
+            <input
+              v-model="editorForm.color"
+              type="text"
+              class="input-base"
+              placeholder="#1890ff"
             />
           </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-text-secondary mb-1">
-                排序
-              </label>
-              <input
-                v-model.number="editorForm.sortOrder"
-                type="number"
-                class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-text-secondary mb-1">
-                状态
-              </label>
-              <select
-                v-model.number="editorForm.status"
-                class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option :value="1">启用</option>
-                <option :value="0">禁用</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-text-secondary mb-1">
-                图标
-              </label>
-              <input
-                v-model="editorForm.icon"
-                type="text"
-                class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-                placeholder="图标名称或URL"
-              />
-            </div>
-
-            <div>
-              <label class="block text-sm font-medium text-text-secondary mb-1">
-                颜色
-              </label>
-              <input
-                v-model="editorForm.color"
-                type="text"
-                class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-                placeholder="#1890ff"
-              />
-            </div>
-          </div>
-
-          <div class="pt-4 border-t border-border">
-            <h3 class="text-sm font-medium text-text-secondary mb-3 flex items-center gap-2">
-              <Settings :size="14" />
-              SEO设置
-            </h3>
-
-            <div class="space-y-4">
-              <div>
-                <label class="block text-sm font-medium text-text-secondary mb-1">
-                  SEO标题
-                </label>
-                <input
-                  v-model="editorForm.seoTitle"
-                  type="text"
-                  class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-                  placeholder="SEO标题（可选）"
-                />
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-text-secondary mb-1">
-                  SEO描述
-                </label>
-                <textarea
-                  v-model="editorForm.seoDescription"
-                  rows="2"
-                  class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-                  placeholder="SEO描述（可选）"
-                />
-              </div>
-
-              <div>
-                <label class="block text-sm font-medium text-text-secondary mb-1">
-                  SEO关键词
-                </label>
-                <input
-                  v-model="editorForm.seoKeywords"
-                  type="text"
-                  class="w-full px-3 py-2 rounded-lg border border-border bg-bg-secondary text-text-secondary focus:outline-none focus:ring-2 focus:ring-accent"
-                  placeholder="关键词1,关键词2,关键词3"
-                />
-              </div>
-            </div>
-          </div>
         </div>
 
-        <div class="sticky bottom-0 flex items-center justify-end gap-2 px-6 py-4 border-t border-border bg-bg-secondary">
-          <button
-            @click="showEditor = false"
-            class="btn-secondary"
-          >
-            取消
-          </button>
-          <button
-            @click="handleSave"
-            :disabled="saving"
-            class="btn-primary disabled:opacity-50"
-          >
-            {{ saving ? '保存中...' : '保存' }}
-          </button>
+        <div class="pt-4 border-t border-border">
+          <h3 class="text-sm font-medium text-text-secondary mb-3 flex items-center gap-2">
+            <Settings :size="14" />
+            SEO设置
+          </h3>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-medium text-text-secondary mb-1">
+                SEO标题
+              </label>
+              <input
+                v-model="editorForm.seoTitle"
+                type="text"
+                class="input-base"
+                placeholder="SEO标题（可选）"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-text-secondary mb-1">
+                SEO描述
+              </label>
+              <textarea
+                v-model="editorForm.seoDescription"
+                rows="2"
+                class="input-base"
+                placeholder="SEO描述（可选）"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-text-secondary mb-1">
+                SEO关键词
+              </label>
+              <input
+                v-model="editorForm.seoKeywords"
+                type="text"
+                class="input-base"
+                placeholder="关键词1,关键词2,关键词3"
+              />
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+
+      <template #footer>
+        <button @click="showEditor = false" class="btn-secondary">取消</button>
+        <button @click="handleSave" :disabled="saving" class="btn-primary disabled:opacity-50">
+          {{ saving ? '保存中...' : '保存' }}
+        </button>
+      </template>
+    </Modal>
   </div>
 </template>

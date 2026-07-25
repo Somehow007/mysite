@@ -60,6 +60,11 @@ const router = createRouter({
           component: () => import('@/views/CollectionsView.vue'),
         },
         {
+          path: 'user/:username',
+          name: 'user-profile',
+          component: () => import('@/views/UserProfileView.vue'),
+        },
+        {
           path: 'favorites',
           name: 'favorites',
           component: () => import('@/views/FavoritesView.vue'),
@@ -182,8 +187,8 @@ router.beforeEach(async (to, _from, next) => {
 
   if (to.meta.requiresAdmin && token) {
     const storedRole = getItem<string>('user_role')
-    // 兼容旧缓存值 DEVELOPER → ADMIN
-    if (storedRole !== 'ADMIN' && storedRole !== 'DEVELOPER') {
+    // 注意：前端守卫仅作 UX 层，实际鉴权以服务端为准
+    if (storedRole !== 'ADMIN') {
       next({ name: 'dashboard' })
       return
     }

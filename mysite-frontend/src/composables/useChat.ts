@@ -28,7 +28,7 @@ export function useChat() {
   const status = ref<ChatStatus>('idle')
   /** Snowflake 64-bit ID，用 string 避免 JS Number 精度丢失 */
   const conversationId = ref<string | null>(null)
-  const lastError = ref<{ kind: ChatStreamErrorKind; message: string } | null>(null)
+  const lastError = ref<{ kind: ChatStreamErrorKind; message: string; status?: number } | null>(null)
   const lastQuestion = ref<string | null>(null)
 
   // ── 对话历史 ─────────────────────────────────────────────
@@ -114,7 +114,7 @@ export function useChat() {
           // 完全没有输出：本条标记失败，允许重试
           msg.failed = true
           msg.content = err.message
-          lastError.value = { kind: err.kind, message: err.message }
+          lastError.value = { kind: err.kind, message: err.message, status: err.status }
           status.value = 'error'
         }
         abort = null

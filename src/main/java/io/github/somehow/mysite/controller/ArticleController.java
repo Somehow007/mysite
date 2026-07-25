@@ -63,11 +63,13 @@ public class ArticleController {
         return Results.success(articleService.pageQueryArticle(requestParam));
     }
 
-    @Operation(summary = "分页获取收藏的文章")
+    @Operation(summary = "分页获取收藏的文章（管理员可通过 userId 参数查看他人收藏）")
     @GetMapping("/v1/articles/favorites")
     public Result<IPage<ArticlePageQueryRespDTO>> pageQueryFavoriteArticle(ArticleFavoritePageQueryReqDTO requestParam) {
-        String userId = UserContext.getUserId();
-        requestParam.setUserId(userId);
+        // 管理员可以通过 userId 参数查看任意用户的收藏；普通用户只能查看自己的
+        if (!UserContext.isAdmin() || requestParam.getUserId() == null) {
+            requestParam.setUserId(UserContext.getUserId());
+        }
         return Results.success(articleService.pageQueryFavoriteArticle(requestParam));
     }
 

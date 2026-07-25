@@ -37,6 +37,15 @@
   --color-glass-border: var(--glass-border);
   --shadow-glass: var(--glass-shadow);
 
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-danger: var(--danger);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-info: var(--info);
+  --color-info-subtle: var(--info-subtle);
+
   --ease-out: var(--ease-out);
   --ease-spring: var(--ease-spring);
   --ease-smooth: var(--ease-smooth);
@@ -201,6 +210,13 @@
     box-shadow: 0 1px 3px var(--shadow-color), 0 1px 2px var(--shadow-color);
   }
 
+  .card-solid {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    box-shadow: 0 1px 3px var(--shadow-color), 0 1px 2px var(--shadow-color);
+  }
+
   .card-shadow-hover {
     box-shadow: 0 4px 12px var(--shadow-color-md), 0 2px 4px var(--shadow-color);
   }
@@ -261,6 +277,66 @@
   }
 
   .btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 0.5rem;
+    background-color: var(--danger);
+    color: #FFFFFF;
+    transition: all 200ms var(--ease-smooth);
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-danger:hover {
+    background-color: color-mix(in srgb, var(--danger) 85%, black);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--danger) 30%, transparent);
+  }
+
+  .btn-danger:active {
+    transform: translateY(0);
+    box-shadow: none;
+  }
+
+  .btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 0.5rem;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    transition: all 200ms var(--ease-smooth);
+    cursor: pointer;
+  }
+
+  .btn-ghost:hover {
+    background-color: var(--bg-code);
+    color: var(--text-primary);
+  }
+
+  .btn-ghost:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }

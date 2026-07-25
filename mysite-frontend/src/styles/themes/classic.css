@@ -1,4 +1,13 @@
 [data-theme="classic-light"] {
+  --success: #10B981;
+  --success-subtle: rgb(16 185 129 / 0.12);
+  --warning: #F59E0B;
+  --warning-subtle: rgb(245 158 11 / 0.12);
+  --danger: #EF4444;
+  --danger-subtle: rgb(239 68 68 / 0.12);
+  --info: #3B82F6;
+  --info-subtle: rgb(59 130 246 / 0.12);
+
   --bg-primary: #F8F9FA;
   --bg-secondary: #FFFFFF;
   --bg-elevated: #FFFFFF;
@@ -41,6 +50,15 @@
 }
 
 [data-theme="classic-dark"] {
+  --success: #34D399;
+  --success-subtle: rgb(52 211 153 / 0.18);
+  --warning: #FBBF24;
+  --warning-subtle: rgb(251 191 36 / 0.18);
+  --danger: #F87171;
+  --danger-subtle: rgb(248 113 113 / 0.18);
+  --info: #60A5FA;
+  --info-subtle: rgb(96 165 250 / 0.18);
+
   --bg-primary: #0B0F19;
   --bg-secondary: #151A2D;
   --bg-elevated: #1A2035;

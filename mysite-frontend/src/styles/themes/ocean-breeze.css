@@ -1,4 +1,13 @@
 [data-theme="ocean-breeze"] {
+  --success: #10B981;
+  --success-subtle: rgb(16 185 129 / 0.12);
+  --warning: #F59E0B;
+  --warning-subtle: rgb(245 158 11 / 0.12);
+  --danger: #EF4444;
+  --danger-subtle: rgb(239 68 68 / 0.12);
+  --info: #3B82F6;
+  --info-subtle: rgb(59 130 246 / 0.12);
+
   --bg-primary: #F0FFFE;
   --bg-secondary: #FFFFFF;
   --bg-elevated: #FFFFFF;

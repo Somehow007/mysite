@@ -3,23 +3,8 @@ import { ref, onMounted, computed } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useRouter } from 'vue-router'
 import {
-  FileText,
-  Plus,
-  Trash2,
-  Edit,
-  Eye,
-  Search,
-  SortAsc,
-  SortDesc,
-  Heart,
-  Clock,
-  X,
-  CheckSquare,
-  Square,
-  MoreHorizontal,
-  ChevronLeft,
-  ChevronRight,
-  Lock,
+  FileText, Plus, Trash2, Edit, Eye,
+  Heart, Clock, MoreHorizontal, Lock,
 } from 'lucide-vue-next'
 import { getArticles, deleteArticle, batchDeleteArticles } from '@/api/article'
 import { getCategories } from '@/api/category'
@@ -27,7 +12,10 @@ import { getCollections } from '@/api/collection'
 import { useUserStore } from '@/stores/user'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
-import type { ArticleListItem, Pagination, Category, Collection } from '@/types'
+import { useConfirm } from '@/composables/useConfirm'
+import { Pagination, PageHeader, SearchFilterBar, DataTable, Badge } from '@/components/ui'
+import type { ArticleListItem, Pagination as PaginationType, Category, Collection } from '@/types'
+import type { Column } from '@/components/ui/DataTable.vue'
 
 useHead(() => ({
   title: '文章管理 - MySite',
@@ -37,9 +25,10 @@ const router = useRouter()
 const userStore = useUserStore()
 const { isAdmin, canModifyArticle } = usePermission()
 const toast = useToast()
+const { confirm } = useConfirm()
 
 const articles = ref<ArticleListItem[]>([])
-const pagination = ref<Pagination | null>(null)
+const pagination = ref<PaginationType | null>(null)
 const loading = ref(false)
 const deletingIds = ref<Set<string>>(new Set())
 const categories = ref<Category[]>([])
@@ -125,7 +114,8 @@ async function fetchArticles(page = 1) {
 
 async function handleDelete(article: ArticleListItem) {
   if (!canModify(article)) return
-  if (!confirm(`确定要删除「${article.title}」吗？`)) return
+  const ok = await confirm({ message: `确定要删除「${article.title}」吗？`, danger: true, confirmText: '删除' })
+  if (!ok) return
 
   const id = article.id
   deletingIds.value.add(id)
@@ -159,7 +149,8 @@ async function handleDelete(article: ArticleListItem) {
 async function handleBatchDelete() {
   if (selectedIds.value.size === 0) return
   const count = selectedIds.value.size
-  if (!confirm(`确定要删除选中的 ${count} 篇文章吗？此操作不可恢复。`)) return
+  const ok = await confirm({ message: `确定要删除选中的 ${count} 篇文章吗？此操作不可恢复。`, danger: true, confirmText: '删除' })
+  if (!ok) return
 
   const idsToDelete = Array.from(selectedIds.value)
   deletingIds.value = new Set(idsToDelete)
@@ -244,6 +235,32 @@ function clearSelection() {
   selectedIds.value = new Set()
 }
 
+const articleColumns: Column<ArticleListItem>[] = [
+  { key: 'title', label: '标题' },
+  { key: 'category', label: '分类', hideMobile: true, width: '110px' },
+  { key: 'status', label: '状态', hideMobile: true, width: '90px' },
+  { key: 'stats', label: '数据', hideMobile: true, width: '150px' },
+  { key: 'updateTime', label: '更新时间', hideMobile: true, width: '110px' },
+  { key: 'actions', label: '操作', width: '120px' },
+]
+
+const sortOptions = [
+  { label: '创建时间', value: 'createTime' },
+  { label: '浏览量', value: 'viewCount' },
+]
+
+const publishedFilterOptions = [
+  { label: '全部状态', value: '' },
+  { label: '已发布', value: '1' },
+  { label: '草稿', value: '0' },
+]
+
+const searchTypeOptions = [
+  { label: '标题', value: 'title' },
+  { label: '内容', value: 'content' },
+  { label: '作者', value: 'author' },
+]
+
 function formatDate(dateStr: string | undefined): string {
   if (!dateStr) return ''
   const date = new Date(dateStr)
@@ -268,539 +285,175 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="article-manage">
+  <div class="flex flex-col gap-5">
     <!-- 页头 -->
-    <div class="page-header">
-      <div>
-        <h1 class="page-title">文章管理</h1>
-        <p class="page-subtitle">共 {{ totalArticles }} 篇文章</p>
-      </div>
-      <button @click="router.push('/dashboard/posts/new')" class="btn-primary">
-        <Plus :size="15" />
-        写文章
-      </button>
-    </div>
+    <PageHeader title="文章管理" :subtitle="`共 ${totalArticles} 篇文章`">
+      <template #actions>
+        <button @click="router.push('/dashboard/posts/new')" class="btn-primary">
+          <Plus :size="15" />
+          写文章
+        </button>
+      </template>
+    </PageHeader>
 
     <!-- 筛选栏 -->
-    <div class="filter-bar">
-      <div class="filter-row">
-        <div class="search-box">
-          <Search :size="14" class="search-icon" />
-          <input
-            v-model="keyword"
-            type="text"
-            :placeholder="
-              searchType === 'title'
-                ? '搜索标题…'
-                : searchType === 'content'
-                ? '搜索内容…'
-                : '搜索作者…'
-            "
-            class="search-input"
-            @keyup.enter="handleSearch"
-          />
-          <button
-            v-if="keyword"
-            @click="keyword = ''; handleSearch()"
-            class="search-clear"
-            title="清空"
-          >
-            <X :size="12" />
-          </button>
-        </div>
+    <SearchFilterBar
+      v-model="keyword"
+      placeholder="搜索标题…"
+      :sort-options="sortOptions"
+      :sort-field="sortField"
+      :sort-order="sortOrder"
+      :filter-options="publishedFilterOptions"
+      :filter-value="publishedFilter === undefined ? '' : String(publishedFilter)"
+      class="mb-4"
+      @update:sort-field="sortField = $event; handleSearch()"
+      @update:sort-order="sortOrder = $event; handleSearch()"
+      @update:filter-value="publishedFilter = $event === '' ? undefined : Number($event); handleSearch()"
+      @search="handleSearch"
+      @reset="handleReset"
+    >
+      <select v-model="searchType" class="px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary cursor-pointer focus:outline-none focus:border-accent transition-colors" @change="handleSearch">
+        <option v-for="opt in searchTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+      </select>
+      <select v-if="categories.length > 0" v-model="categoryFilter" class="px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary cursor-pointer focus:outline-none focus:border-accent transition-colors" @change="handleSearch">
+        <option value="">全部分类</option>
+        <option v-for="cat in categories" :key="cat.id" :value="cat.slug">{{ cat.name }}</option>
+      </select>
+      <select v-if="collections.length > 0" v-model="collectionFilter" class="px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary cursor-pointer focus:outline-none focus:border-accent transition-colors" @change="handleSearch">
+        <option value="">全部合集</option>
+        <option v-for="col in collections" :key="col.id" :value="col.id">{{ col.title }}</option>
+      </select>
+    </SearchFilterBar>
 
-        <div class="filter-group">
-          <select v-model="searchType" class="filter-select" @change="handleSearch">
-            <option value="title">标题</option>
-            <option value="content">内容</option>
-            <option value="author">作者</option>
-          </select>
-
-          <select v-model="publishedFilter" class="filter-select" @change="handleSearch">
-            <option :value="undefined">全部状态</option>
-            <option :value="1">已发布</option>
-            <option :value="0">草稿</option>
-          </select>
-
-          <select v-model="categoryFilter" class="filter-select" @change="handleSearch">
-            <option value="">全部分类</option>
-            <option v-for="cat in categories" :key="cat.id" :value="cat.slug">
-              {{ cat.name }}
-            </option>
-          </select>
-
-          <select v-model="collectionFilter" class="filter-select" @change="handleSearch">
-            <option value="">全部合集</option>
-            <option v-for="col in collections" :key="col.id" :value="col.id">
-              {{ col.title }}
-            </option>
-          </select>
-        </div>
-      </div>
-
-      <div class="filter-row filter-row-secondary">
-        <div class="sort-group">
-          <select v-model="sortField" class="filter-select" @change="handleSearch">
-            <option value="createTime">创建时间</option>
-            <option value="viewCount">浏览量</option>
-          </select>
-          <button @click="toggleSortOrder" class="sort-dir-btn" title="切换排序方向">
-            <SortAsc v-if="sortOrder === 'asc'" :size="13" />
-            <SortDesc v-else :size="13" />
-            {{ sortOrder === 'asc' ? '升序' : '降序' }}
-          </button>
-        </div>
-
-        <div class="action-group">
-          <button @click="handleSearch" class="btn-primary btn-sm">搜索</button>
-          <button @click="handleReset" class="btn-secondary btn-sm">重置</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 批量操作栏 -->
+    <!-- 批量操作栏（悬浮胶囊） -->
     <Transition name="batch-bar">
-      <div v-if="hasSelection" class="batch-bar">
-        <div class="batch-info">
-          <CheckSquare :size="14" />
-          <span>已选择 <strong>{{ selectedIds.size }}</strong> 篇文章</span>
-        </div>
-        <div class="batch-actions">
-          <button @click="clearSelection" class="batch-btn">
-            <X :size="13" />
-            取消选择
+      <div v-if="hasSelection" class="flex justify-center mb-4">
+        <div class="inline-flex items-center gap-3 px-4 py-2 rounded-full border border-accent/30 bg-bg-elevated shadow-md">
+          <span class="text-[13px] font-semibold text-accent">已选 {{ selectedIds.size }} 项</span>
+          <button @click="handleBatchDelete" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] rounded-full bg-danger-subtle text-danger hover:bg-danger/20 transition-colors">
+            <Trash2 :size="12" />批量删除
           </button>
-          <button @click="handleBatchDelete" class="batch-btn batch-btn-danger">
-            <Trash2 :size="13" />
-            删除选中
-          </button>
+          <button @click="clearSelection" class="px-2 py-1 text-[12.5px] text-text-muted hover:text-text-primary transition-colors">取消</button>
         </div>
       </div>
     </Transition>
 
-    <!-- 内容区 -->
-    <div v-if="loading" class="empty-state">
-      <div class="loading-dots">
-        <span></span><span></span><span></span>
+    <!-- 加载状态 -->
+    <div v-if="loading" class="flex flex-col items-center justify-center py-16 text-center">
+      <div class="flex gap-1.5 mb-3">
+        <span class="w-1.5 h-1.5 rounded-full bg-text-muted animate-[dotPulse_1.2s_infinite_ease-in-out]" />
+        <span class="w-1.5 h-1.5 rounded-full bg-text-muted animate-[dotPulse_1.2s_0.15s_infinite_ease-in-out]" />
+        <span class="w-1.5 h-1.5 rounded-full bg-text-muted animate-[dotPulse_1.2s_0.3s_infinite_ease-in-out]" />
       </div>
-      <p class="empty-text">加载中…</p>
+      <p class="text-[13px] text-text-muted">加载中…</p>
     </div>
 
-    <div v-else-if="articles.length === 0" class="empty-state">
-      <div class="empty-icon">
+    <!-- 空状态 -->
+    <div v-else-if="articles.length === 0" class="flex flex-col items-center justify-center py-16 text-center">
+      <div class="w-[72px] h-[72px] flex items-center justify-center rounded-full bg-bg-secondary text-text-muted mb-4">
         <FileText :size="40" />
       </div>
-      <p class="empty-title">还没有文章</p>
-      <p class="empty-text">点击上方「写文章」开始你的第一篇</p>
+      <p class="text-[15px] font-medium text-text-primary mb-1">还没有文章</p>
+      <p class="text-[13px] text-text-muted mb-5">点击上方「写文章」开始你的第一篇</p>
       <button @click="router.push('/dashboard/posts/new')" class="btn-primary">
         <Plus :size="14" />
         写文章
       </button>
     </div>
 
-    <div v-else class="table-wrap">
-      <table class="article-table">
-        <thead>
-          <tr>
-            <th class="col-check">
-              <button
-                class="check-btn"
-                @click="toggleSelectAll"
-                :title="isAllSelected ? '取消全选' : '全选当前页'"
-              >
-                <CheckSquare v-if="isAllSelected" :size="15" class="check-icon checked" />
-                <Square v-else :size="15" class="check-icon" />
-              </button>
-            </th>
-            <th class="col-title">标题</th>
-            <th class="col-meta">分类</th>
-            <th class="col-meta">状态</th>
-            <th class="col-stats">数据</th>
-            <th class="col-date">更新时间</th>
-            <th class="col-actions">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="article in articles"
-            :key="article.id"
-            class="article-row"
-            :class="{
-              selected: selectedIds.has(article.id),
-              deleting: deletingIds.has(article.id),
-            }"
-          >
-            <td class="col-check">
-              <button
-                v-if="canModify(article)"
-                class="check-btn"
-                @click="toggleSelect(article.id)"
-              >
-                <CheckSquare
-                  v-if="selectedIds.has(article.id)"
-                  :size="15"
-                  class="check-icon checked"
-                />
-                <Square v-else :size="15" class="check-icon" />
-              </button>
-            </td>
-            <td class="col-title">
-              <div class="title-cell">
-                <div
-                  v-if="article.coverImage"
-                  class="cover-thumb"
-                >
-                  <img :src="article.coverImage" :alt="article.title" />
-                </div>
-                <div class="title-info">
-                  <button
-                    class="article-title"
-                    @click="router.push(`/post/${article.id}`)"
-                    :title="article.title"
-                  >
-                    {{ article.title }}
-                  </button>
-                  <p v-if="article.summary" class="article-summary">
-                    {{ article.summary }}
-                  </p>
-                  <div class="title-meta-mobile">
-                    <span v-if="article.categoryName" class="tag tag-category">
-                      {{ article.categoryName }}
-                    </span>
-                    <span :class="article.published === 1 ? 'tag tag-published' : 'tag tag-draft'">
-                      {{ article.published === 1 ? '已发布' : '草稿' }}
-                    </span>
-                    <Lock v-if="article.visibility === 1" :size="12" class="text-accent ml-1" title="仅自己可见" />
-                  </div>
-                </div>
-              </div>
-            </td>
-            <td class="col-meta">
-              <span v-if="article.categoryName" class="tag tag-category">
-                {{ article.categoryName }}
-              </span>
-              <span v-else class="text-dim">—</span>
-            </td>
-            <td class="col-meta">
-              <span :class="article.published === 1 ? 'tag tag-published' : 'tag tag-draft'">
-                {{ article.published === 1 ? '已发布' : '草稿' }}
-              </span>
-              <Lock v-if="article.visibility === 1" :size="12" class="text-amber-500 ml-1" title="仅自己可见" />
-            </td>
-            <td class="col-stats">
-              <div class="stats-row">
-                <span class="stat" title="浏览量">
-                  <Eye :size="11" />
-                  {{ article.viewCount }}
-                </span>
-                <span class="stat" title="收藏">
-                  <Heart :size="11" />
-                  {{ article.favoriteCount }}
-                </span>
-                <span v-if="article.readingTime" class="stat" title="阅读时长">
-                  <Clock :size="11" />
-                  {{ article.readingTime }}m
-                </span>
-              </div>
-            </td>
-            <td class="col-date">
-              <span class="date-text">{{ formatDate(article.updateTime) }}</span>
-            </td>
-            <td class="col-actions">
-              <div class="action-btns">
-                <button
-                  @click="router.push(`/post/${article.id}`)"
-                  class="icon-btn"
-                  title="查看"
-                >
-                  <Eye :size="14" />
-                </button>
-                <button
-                  v-if="canModify(article)"
-                  @click="router.push(`/dashboard/posts/${article.id}/edit`)"
-                  class="icon-btn"
-                  title="编辑"
-                >
-                  <Edit :size="14" />
-                </button>
-                <button
-                  v-if="canModify(article)"
-                  @click="handleDelete(article)"
-                  :disabled="deletingIds.has(article.id)"
-                  class="icon-btn icon-btn-danger"
-                  title="删除"
-                >
-                  <Trash2 :size="14" />
-                </button>
-                <span
-                  v-if="!canModify(article)"
-                  class="no-perm"
-                >
-                  <MoreHorizontal :size="14" />
-                </span>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <!-- 分页 -->
-      <div
-        v-if="pagination && pagination.totalPages > 1"
-        class="pagination"
-      >
-        <span class="pagination-info">
-          第 {{ pagination.page }} / {{ pagination.totalPages }} 页
-        </span>
-        <div class="pagination-btns">
-          <button
-            :disabled="pagination.page === 1"
-            @click="fetchArticles(pagination.page - 1)"
-            class="page-btn"
-          >
-            <ChevronLeft :size="14" />
-          </button>
-          <template v-for="page in pagination.totalPages" :key="page">
-            <button
-              v-if="
-                page === 1 ||
-                page === pagination.totalPages ||
-                Math.abs(page - pagination.page) <= 1
-              "
-              @click="fetchArticles(page)"
-              class="page-btn"
-              :class="{ active: page === pagination.page }"
-            >
-              {{ page }}
+    <DataTable
+      v-else
+      :columns="articleColumns"
+      :data="articles"
+      :loading="loading"
+      selectable
+      :selected-ids="selectedIds"
+      id-key="id"
+      :total="pagination?.total"
+      :current-page="pagination?.page"
+      :page-size="pagination?.size || 10"
+      @toggle-select="toggleSelect($event)"
+      @toggle-select-all="toggleSelectAll()"
+      @update:current-page="fetchArticles($event)"
+    >
+      <template #cell-title="{ item }">
+        <div class="flex items-start gap-3">
+          <div v-if="item.coverImage" class="shrink-0 w-14 h-[38px] rounded-md overflow-hidden bg-bg-secondary">
+            <img :src="item.coverImage" :alt="item.title" class="w-full h-full object-cover" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <button class="block font-medium text-text-primary text-left hover:text-accent transition-colors truncate max-w-full leading-relaxed" @click="router.push(`/post/${item.id}`)" :title="item.title">
+              {{ item.title }}
             </button>
-            <span
-              v-else-if="
-                page === pagination.page - 2 || page === pagination.page + 2
-              "
-              class="page-ellipsis"
-            >
-              …
-            </span>
-          </template>
-          <button
-            :disabled="pagination.page === pagination.totalPages"
-            @click="fetchArticles(pagination.page + 1)"
-            class="page-btn"
-          >
-            <ChevronRight :size="14" />
-          </button>
+            <p v-if="item.summary" class="mt-0.5 text-xs text-text-muted truncate leading-relaxed">{{ item.summary }}</p>
+          </div>
         </div>
-      </div>
-    </div>
+      </template>
+      <template #cell-category="{ item }">
+        <span v-if="item.categoryName" class="inline-flex items-center px-1.5 py-px text-[11px] font-medium rounded bg-accent-subtle text-accent whitespace-nowrap">{{ item.categoryName }}</span>
+        <span v-else class="text-text-muted">—</span>
+      </template>
+      <template #cell-status="{ item }">
+        <div class="flex items-center gap-1.5">
+          <span :class="item.published === 1 ? 'inline-flex items-center px-1.5 py-px text-[11px] font-medium rounded bg-success-subtle text-success whitespace-nowrap' : 'inline-flex items-center px-1.5 py-px text-[11px] font-medium rounded bg-warning-subtle text-warning whitespace-nowrap'">
+            {{ item.published === 1 ? '已发布' : '草稿' }}
+          </span>
+          <Lock v-if="item.visibility === 1" :size="12" class="text-warning" title="仅自己可见" />
+        </div>
+      </template>
+      <template #cell-stats="{ item }">
+        <div class="flex items-center gap-3">
+          <span class="inline-flex items-center gap-1 text-xs text-text-muted whitespace-nowrap" title="浏览量"><Eye :size="11" />{{ item.viewCount }}</span>
+          <span class="inline-flex items-center gap-1 text-xs text-text-muted whitespace-nowrap" title="收藏"><Heart :size="11" />{{ item.favoriteCount }}</span>
+          <span v-if="item.readingTime" class="inline-flex items-center gap-1 text-xs text-text-muted whitespace-nowrap" title="阅读时长"><Clock :size="11" />{{ item.readingTime }}m</span>
+        </div>
+      </template>
+      <template #cell-updateTime="{ item }">
+        <span class="text-xs text-text-muted whitespace-nowrap">{{ formatDate(item.updateTime) }}</span>
+      </template>
+      <template #cell-actions="{ item }">
+        <div class="flex items-center gap-0.5">
+          <button @click="router.push(`/post/${item.id}`)" class="inline-flex items-center justify-center w-7 h-7 rounded-md text-text-muted hover:bg-accent/10 hover:text-accent transition-colors" title="查看"><Eye :size="14" /></button>
+          <button v-if="canModify(item)" @click="router.push(`/dashboard/posts/${item.id}/edit`)" class="inline-flex items-center justify-center w-7 h-7 rounded-md text-text-muted hover:bg-accent/10 hover:text-accent transition-colors" title="编辑"><Edit :size="14" /></button>
+          <button v-if="canModify(item)" @click="handleDelete(item)" :disabled="deletingIds.has(item.id)" class="inline-flex items-center justify-center w-7 h-7 rounded-md text-text-muted hover:bg-danger-subtle hover:text-danger transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="删除"><Trash2 :size="14" /></button>
+          <span v-if="!canModify(item)" class="inline-flex items-center justify-center w-7 h-7 text-text-muted opacity-50"><MoreHorizontal :size="14" /></span>
+        </div>
+      </template>
+      <template #mobile-card="{ item }">
+        <div class="flex items-start gap-3">
+          <div v-if="item.coverImage" class="shrink-0 w-14 h-[38px] rounded-md overflow-hidden bg-bg-secondary mt-0.5">
+            <img :src="item.coverImage" :alt="item.title" class="w-full h-full object-cover" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <button class="block font-medium text-text-primary text-left text-sm hover:text-accent transition-colors truncate" @click="router.push(`/post/${item.id}`)">
+              {{ item.title }}
+            </button>
+            <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+              <span v-if="item.categoryName" class="inline-flex items-center px-1.5 py-px text-[11px] font-medium rounded bg-accent-subtle text-accent">{{ item.categoryName }}</span>
+              <span :class="item.published === 1 ? 'inline-flex items-center px-1.5 py-px text-[11px] font-medium rounded bg-success-subtle text-success' : 'inline-flex items-center px-1.5 py-px text-[11px] font-medium rounded bg-warning-subtle text-warning'">
+                {{ item.published === 1 ? '已发布' : '草稿' }}
+              </span>
+              <Lock v-if="item.visibility === 1" :size="11" class="text-warning" />
+              <span class="text-[11px] text-text-muted">{{ formatDate(item.updateTime) }}</span>
+            </div>
+            <div class="flex items-center gap-2 mt-1.5">
+              <button @click="router.push(`/post/${item.id}`)" class="btn-ghost text-xs py-1 px-2">查看</button>
+              <button v-if="canModify(item)" @click="router.push(`/dashboard/posts/${item.id}/edit`)" class="btn-ghost text-xs py-1 px-2">编辑</button>
+              <button v-if="canModify(item)" @click="handleDelete(item)" :disabled="deletingIds.has(item.id)" class="btn-ghost text-xs py-1 px-2 !text-danger">删除</button>
+            </div>
+          </div>
+        </div>
+      </template>
+    </DataTable>
   </div>
 </template>
 
 <style scoped>
-.article-manage {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
+@keyframes dotPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
 }
 
-/* 页头 */
-.page-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-}
-.page-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: var(--text-primary);
-  line-height: 1.2;
-  letter-spacing: -0.01em;
-}
-.page-subtitle {
-  margin-top: 0.25rem;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-}
-
-/* 筛选栏 */
-.filter-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--border);
-  background: var(--surface-primary);
-}
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  flex-wrap: wrap;
-}
-.filter-row-secondary {
-  padding-top: 0.75rem;
-  border-top: 1px dashed var(--border);
-  justify-content: space-between;
-}
-.search-box {
-  position: relative;
-  flex: 1;
-  min-width: 200px;
-  max-width: 320px;
-}
-.search-icon {
-  position: absolute;
-  left: 0.75rem;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--text-muted);
-  pointer-events: none;
-}
-.search-input {
-  width: 100%;
-  padding: 0.5rem 2rem 0.5rem 2.25rem;
-  font-size: 0.8125rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--border);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-.search-input::placeholder {
-  color: var(--text-muted);
-}
-.search-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
-}
-.search-clear {
-  position: absolute;
-  right: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  padding: 0.25rem;
-  border-radius: 0.25rem;
-  color: var(--text-muted);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.search-clear:hover {
-  color: var(--text-primary);
-  background: var(--surface-secondary);
-}
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-.filter-select {
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8125rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--border);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: border-color 0.15s;
-}
-.filter-select:focus {
-  outline: none;
-  border-color: var(--accent);
-}
-.sort-group {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.sort-dir-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8125rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--border);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.sort-dir-btn:hover {
-  background: var(--surface-secondary);
-}
-.action-group {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.btn-sm {
-  padding: 0.4375rem 0.875rem;
-  font-size: 0.8125rem;
-}
-
-/* 批量操作栏 */
-.batch-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.625rem 1rem;
-  border-radius: 0.625rem;
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-  background: color-mix(in srgb, var(--accent) 6%, var(--surface-primary));
-}
-.batch-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-}
-.batch-info strong {
-  color: var(--accent);
-  font-weight: 600;
-}
-.batch-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.batch-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  font-size: 0.8125rem;
-  border-radius: 0.375rem;
-  border: 1px solid var(--border);
-  background: var(--surface-primary);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.batch-btn:hover {
-  background: var(--surface-secondary);
-  color: var(--text-primary);
-}
-.batch-btn-danger {
-  border-color: color-mix(in srgb, #ef4444 40%, transparent);
-  color: #dc2626;
-}
-.batch-btn-danger:hover {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-:root.dark .batch-btn-danger:hover,
-.batch-btn-danger:hover {
-  background: color-mix(in srgb, #ef4444 10%, transparent);
-}
 .batch-bar-enter-active,
 .batch-bar-leave-active {
   transition: all 0.2s ease;
@@ -809,373 +462,5 @@ onMounted(() => {
 .batch-bar-leave-to {
   opacity: 0;
   transform: translateY(-4px);
-}
-
-/* 空状态 */
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 4rem 1rem;
-  text-align: center;
-}
-.empty-icon {
-  width: 4.5rem;
-  height: 4.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--surface-secondary);
-  color: var(--text-muted);
-  margin-bottom: 1rem;
-}
-.empty-title {
-  font-size: 0.9375rem;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 0.25rem;
-}
-.empty-text {
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-  margin-bottom: 1.25rem;
-}
-.loading-dots {
-  display: flex;
-  gap: 0.375rem;
-  margin-bottom: 0.75rem;
-}
-.loading-dots span {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  animation: dotPulse 1.2s infinite ease-in-out;
-}
-.loading-dots span:nth-child(2) { animation-delay: 0.15s; }
-.loading-dots span:nth-child(3) { animation-delay: 0.3s; }
-@keyframes dotPulse {
-  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1); }
-}
-
-/* 表格 */
-.table-wrap {
-  border-radius: 0.75rem;
-  border: 1px solid var(--border);
-  background: var(--surface-primary);
-  overflow: hidden;
-  overflow-x: auto;
-}
-.article-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.8125rem;
-}
-.article-table thead {
-  background: var(--bg-code, var(--surface-secondary));
-  border-bottom: 1px solid var(--border);
-}
-.article-table th {
-  padding: 0.625rem 0.875rem;
-  font-weight: 500;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  text-align: left;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-.article-table td {
-  padding: 0.75rem 0.875rem;
-  vertical-align: middle;
-}
-.col-check {
-  width: 2.5rem;
-  text-align: center;
-}
-.col-title {
-  min-width: 200px;
-}
-.col-meta {
-  width: 6.5rem;
-}
-.col-stats {
-  width: 9rem;
-}
-.col-date {
-  width: 6.5rem;
-}
-.col-actions {
-  width: 7.5rem;
-}
-.check-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.25rem;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 0.25rem;
-  color: var(--text-muted);
-  transition: color 0.15s;
-}
-.check-btn:hover {
-  color: var(--accent);
-}
-.check-icon {
-  transition: color 0.15s;
-}
-.check-icon.checked {
-  color: var(--accent);
-}
-
-/* 行 */
-.article-row {
-  border-bottom: 1px solid var(--border);
-  transition: background 0.12s;
-}
-.article-row:last-child {
-  border-bottom: none;
-}
-.article-row:hover {
-  background: color-mix(in srgb, var(--accent) 3%, transparent);
-}
-.article-row.selected {
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
-}
-.article-row.deleting {
-  opacity: 0.5;
-}
-
-/* 标题单元格 */
-.title-cell {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-}
-.cover-thumb {
-  flex-shrink: 0;
-  width: 3.5rem;
-  height: 2.375rem;
-  border-radius: 0.375rem;
-  overflow: hidden;
-  background: var(--surface-secondary);
-}
-.cover-thumb img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.title-info {
-  flex: 1;
-  min-width: 0;
-}
-.article-title {
-  display: block;
-  font-weight: 500;
-  color: var(--text-primary);
-  text-align: left;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-  line-height: 1.4;
-  transition: color 0.15s;
-}
-.article-title:hover {
-  color: var(--accent);
-}
-.article-summary {
-  margin-top: 0.125rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  line-height: 1.4;
-}
-.title-meta-mobile {
-  display: none;
-  margin-top: 0.375rem;
-  gap: 0.375rem;
-}
-
-/* 标签 */
-.tag {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.1875rem 0.5rem;
-  font-size: 0.6875rem;
-  font-weight: 500;
-  border-radius: 0.25rem;
-  white-space: nowrap;
-}
-.tag-category {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--accent);
-}
-.tag-published {
-  background: color-mix(in srgb, #10b981 10%, transparent);
-  color: #059669;
-}
-.tag-draft {
-  background: color-mix(in srgb, #f59e0b 10%, transparent);
-  color: #d97706;
-}
-.text-dim {
-  color: var(--text-muted);
-}
-
-/* 数据列 */
-.stats-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-.stat {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-.date-text {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-/* 操作按钮 */
-.action-btns {
-  display: flex;
-  align-items: center;
-  gap: 0.125rem;
-}
-.icon-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  padding: 0;
-  border: none;
-  background: transparent;
-  border-radius: 0.375rem;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.icon-btn:hover {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  color: var(--accent);
-}
-.icon-btn-danger:hover {
-  background: color-mix(in srgb, #ef4444 10%, transparent);
-  color: #dc2626;
-}
-.icon-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.no-perm {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  color: var(--text-muted);
-  opacity: 0.5;
-}
-
-/* 分页 */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1rem;
-  border-top: 1px solid var(--border);
-  background: var(--bg-code, var(--surface-secondary));
-}
-.pagination-info {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
-.pagination-btns {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-.page-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.75rem;
-  height: 1.75rem;
-  padding: 0 0.375rem;
-  font-size: 0.8125rem;
-  border: 1px solid transparent;
-  border-radius: 0.375rem;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.page-btn:hover:not(:disabled):not(.active) {
-  background: var(--surface-secondary);
-  color: var(--text-primary);
-}
-.page-btn.active {
-  background: var(--accent);
-  color: #fff;
-  font-weight: 500;
-}
-.page-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-.page-ellipsis {
-  padding: 0 0.25rem;
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-}
-
-/* 响应式 */
-@media (max-width: 768px) {
-  .filter-bar {
-    padding: 0.75rem;
-  }
-  .search-box {
-    max-width: none;
-  }
-  .col-meta,
-  .col-stats,
-  .col-date {
-    display: none;
-  }
-  .title-meta-mobile {
-    display: flex;
-  }
-  .article-table th,
-  .article-table td {
-    padding: 0.625rem 0.625rem;
-  }
-  .batch-bar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .pagination {
-    flex-direction: column;
-    gap: 0.5rem;
-    align-items: center;
-  }
 }
 </style>

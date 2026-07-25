@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Calendar, Eye, Clock, Tag, Heart, Lock } from 'lucide-vue-next'
+import { RouterLink } from 'vue-router'
+import { Calendar, Eye, Clock, Tag, Heart, Lock, User } from 'lucide-vue-next'
 import { formatDate, calculateReadingTime } from '@/utils/date'
 import type { ArticleListItem } from '@/types'
 
@@ -8,6 +9,7 @@ const props = defineProps<{
   article: ArticleListItem
   showCategory?: boolean
   showFavorite?: boolean
+  showAuthor?: boolean
 }>()
 
 const readingTime = computed(() =>
@@ -25,9 +27,18 @@ const readingTime = computed(() =>
       <Eye :size="12" />
       <span>{{ article.viewCount }}</span>
     </span>
-    <span v-if="showFavorite && article.favoriteCount > 0" class="inline-flex items-center gap-1" :class="article.isFavorited ? 'text-red-500' : ''">
+    <span v-if="showFavorite && article.favoriteCount > 0" class="inline-flex items-center gap-1" :class="article.isFavorited ? 'text-danger' : ''">
       <Heart :size="12" :fill="article.isFavorited ? 'currentColor' : 'none'" :stroke-width="article.isFavorited ? 0 : 2" />
       <span>{{ article.favoriteCount }}</span>
+    </span>
+    <span v-if="showAuthor && article.authorName" class="inline-flex items-center gap-1">
+      <User :size="12" />
+      <RouterLink
+        :to="`/user/${article.authorName}`"
+        class="hover:text-accent transition-colors"
+      >
+        {{ article.authorName }}
+      </RouterLink>
     </span>
     <span class="inline-flex items-center gap-1">
       <Clock :size="12" />

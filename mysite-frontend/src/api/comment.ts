@@ -1,4 +1,4 @@
-import { get, post, del, getPaginated } from './client'
+import { get, post, put, del, getPaginated } from './client'
 import type { Comment, CommentAdmin, CommentLikeResult, PaginatedResponse } from '@/types'
 
 export interface CreateCommentRequest {
@@ -44,5 +44,5 @@ export function getAdminComments(params?: {
 }
 
 export function updateCommentStatus(id: string, status: number): Promise<void> {
-  return post<void>(`/v1/admin/comments/${id}/status?status=${status}`)
+  return put<void>(`/v1/admin/comments/${id}/status?status=${status}`)
 }

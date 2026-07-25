@@ -4,6 +4,7 @@ import { MessageSquare, Send, Loader2, AlertCircle, RefreshCw, LogIn } from 'luc
 import { getArticleComments, createComment, toggleCommentLike, deleteComment } from '@/api/comment'
 import { useUserStore } from '@/stores/user'
 import { useToast } from '@/composables/useToast'
+import { useConfirm } from '@/composables/useConfirm'
 import { getGravatarUrl } from '@/utils/gravatar'
 import { useRouter } from 'vue-router'
 import CommentItem from '@/components/comment/CommentItem.vue'
@@ -15,6 +16,7 @@ const props = defineProps<{
 
 const userStore = useUserStore()
 const toast = useToast()
+const { confirm } = useConfirm()
 const router = useRouter()
 
 const comments = ref<Comment[]>([])
@@ -105,7 +107,8 @@ async function handleLike(comment: Comment) {
 }
 
 async function handleDelete(comment: Comment) {
-  if (!confirm('确定要删除这条评论吗？')) return
+  const ok = await confirm({ message: '确定要删除这条评论吗？', danger: true, confirmText: '删除' })
+  if (!ok) return
   try {
     await deleteComment(comment.id)
     toast.success('删除成功')
@@ -140,12 +143,12 @@ onMounted(() => {
     </div>
 
     <!-- 顶级评论输入区 - 已登录 -->
-    <div v-if="isLoggedIn" class="mb-8 p-4 rounded-lg bg-surface-secondary border border-border">
+    <div v-if="isLoggedIn" class="mb-8 p-4 rounded-lg bg-bg-code border border-border">
       <div class="flex items-center gap-3 mb-3">
         <img
           :src="currentUser?.avatar || getGravatarUrl(currentUser?.email)"
           :alt="currentUser?.username"
-          class="w-8 h-8 rounded-full bg-surface-secondary"
+          class="w-8 h-8 rounded-full bg-bg-code"
         />
         <span class="text-sm font-medium text-text-primary">{{ currentUser?.username }}</span>
       </div>
@@ -154,7 +157,7 @@ onMounted(() => {
         v-model="newContent"
         rows="3"
         placeholder="写下你的评论..."
-        class="w-full px-3 py-2 text-sm rounded-md border border-border bg-surface-primary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
+        class="w-full px-3 py-2 text-sm rounded-md border border-border bg-bg-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
       />
 
       <div class="flex justify-end mt-3">
@@ -171,7 +174,7 @@ onMounted(() => {
     </div>
 
     <!-- 评论输入区 - 未登录 -->
-    <div v-else class="mb-8 p-4 rounded-lg bg-surface-secondary border border-border text-center">
+    <div v-else class="mb-8 p-4 rounded-lg bg-bg-code border border-border text-center">
       <p class="text-sm text-text-muted mb-3">登录后即可参与评论</p>
       <button
         @click="router.push('/login')"

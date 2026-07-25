@@ -48,4 +48,7 @@ public class UserUpdateReqDTO {
 
     @Schema(description = "头像URL")
     private String avatar;
+
+    @Schema(description = "个人介绍")
+    private String bio;
 }
