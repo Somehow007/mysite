@@ -8,6 +8,7 @@ import {
 } from 'lucide-vue-next'
 import {
   getKnowledgeBases, createKnowledgeBase, updateKnowledgeBase, deleteKnowledgeBase,
+  toggleKnowledgeBase,
   getKnowledgeDocuments, getAvailableArticles, addArticlesToKb,
   deleteKnowledgeDocument, reprocessDocument, getDocumentChunks,
   type KnowledgeChunk,
@@ -261,6 +262,15 @@ async function addSelected() {
 }
 function loadMoreAvail() { availPage.value++ }
 
+async function toggleKb(kb: KnowledgeBase) {
+  try {
+    const updated = await toggleKnowledgeBase(kb.id)
+    const idx = kbs.value.findIndex(k => k.id === kb.id)
+    if (idx !== -1) kbs.value[idx] = updated
+    toast.success(updated.enabled ? `「${kb.name}」已启用` : `「${kb.name}」已禁用`)
+  } catch (e: unknown) { toast.error((e as Error).message || '操作失败') }
+}
+
 // ── 工具函数 ──
 type DocStatus = KnowledgeDocument['status']
 function statusBadge(s: DocStatus): { icon: typeof CheckCircle2; cls: string; label: string } {
@@ -486,6 +496,16 @@ watch(selectedKbId, () => {
           <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-bg-code text-text-muted">
             <Cpu :size="10" /> {{ kb.chunkingMode === 'MARKDOWN_HEADING' ? '标题感知' : '固定大小' }}
           </span>
+          <!-- 启用/禁用开关 -->
+          <button
+            class="ml-auto flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-medium transition-colors"
+            :class="kb.enabled !== false ? 'bg-success-subtle text-success' : 'bg-bg-code text-text-muted'"
+            :title="kb.enabled !== false ? '已启用，点击禁用' : '已禁用，点击启用'"
+            @click.stop="toggleKb(kb)"
+          >
+            <span class="w-1.5 h-1.5 rounded-full" :class="kb.enabled !== false ? 'bg-success' : 'bg-text-muted'" />
+            {{ kb.enabled !== false ? '启用' : '禁用' }}
+          </button>
         </div>
       </button>
     </div>

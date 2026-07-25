@@ -25,6 +25,7 @@ public class KnowledgeBaseDO {
     private Integer chunkSize;
     private Integer chunkOverlap;
     private String chunkingMode;
+    private Boolean enabled;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

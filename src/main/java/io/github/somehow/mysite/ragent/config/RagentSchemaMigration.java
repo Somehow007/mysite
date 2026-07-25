@@ -32,6 +32,10 @@ public class RagentSchemaMigration implements InitializingBean {
         execute("ALTER TABLE t_knowledge_chunk ADD COLUMN IF NOT EXISTS embedding_text TEXT",
             "t_knowledge_chunk.embedding_text");
 
+        // KB 启用/禁用开关
+        execute("ALTER TABLE t_knowledge_base ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT true",
+            "t_knowledge_base.enabled");
+
         // Phase 6: 意图识别表（已有卷不含此表时自动创建）
         execute("""
             CREATE TABLE IF NOT EXISTS t_rag_intent (

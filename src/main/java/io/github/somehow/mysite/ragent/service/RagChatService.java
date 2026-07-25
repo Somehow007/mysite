@@ -132,6 +132,15 @@ public class RagChatService {
             String.format("%.2f", intent.getConfidence()),
             System.currentTimeMillis() - t3);
 
+        // 低置信度 / 全局检索意图 → 退化为全局搜索（搜所有 KB，不限定单个 KB）
+        // 避免用户问"一共有多少文章"时被意图分类器误路由到单 KB
+        if (intent.isKbRetrieval() && intent.getTargetKbId() != null
+                && intent.getConfidence() < 0.6) {
+            log.info("[pipeline] low confidence ({}) → forcing global search",
+                String.format("%.2f", intent.getConfidence()));
+            intent.setTargetKbId(null);
+        }
+
         // ── 短路: 闲聊直接回复 ──
         if (intent.isChat()) {
             log.info("[pipeline] chat-only intent → skipping retrieval");

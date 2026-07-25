@@ -69,6 +69,17 @@ public class KnowledgeBaseService {
         return getById(id);
     }
 
+    public KnowledgeBaseDTO toggleEnabled(Long id) {
+        KnowledgeBaseDO kb = kbMapper.selectById(id);
+        if (kb == null) return null;
+        boolean newEnabled = kb.getEnabled() == null || !kb.getEnabled();
+        kb.setEnabled(newEnabled);
+        kbMapper.updateById(kb);
+        log.info("知识库 {} 已{}用: id={}, name={}",
+            newEnabled ? "启" : "禁", id, kb.getName());
+        return getById(id);
+    }
+
     @Transactional
     public void delete(Long id) {
         KnowledgeBaseDO kb = kbMapper.selectById(id);
@@ -98,6 +109,7 @@ public class KnowledgeBaseService {
         dto.setChunkSize(kb.getChunkSize());
         dto.setChunkOverlap(kb.getChunkOverlap());
         dto.setChunkingMode(kb.getChunkingMode());
+        dto.setEnabled(kb.getEnabled() != null ? kb.getEnabled() : true);
         dto.setDocCount(docCount);
         dto.setCreateTime(kb.getCreateTime());
         dto.setUpdateTime(kb.getUpdateTime());

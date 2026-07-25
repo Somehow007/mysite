@@ -240,6 +240,10 @@ export function deleteKnowledgeBase(id: string): Promise<void> {
   return del<void>(`/v1/rag/knowledge-bases/${id}`)
 }
 
+export function toggleKnowledgeBase(id: string): Promise<KnowledgeBase> {
+  return put<KnowledgeBase>(`/v1/rag/knowledge-bases/${id}/toggle`)
+}
+
 export function getKnowledgeDocuments(kbId: string, params?: Record<string, unknown>): Promise<{ list: KnowledgeDocument[]; pagination: Pagination }> {
   return getPaginated<KnowledgeDocument>(`/v1/rag/knowledge-bases/${kbId}/docs`, params)
 }

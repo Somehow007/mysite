@@ -326,6 +326,7 @@ export interface KnowledgeBase {
   chunkSize: number
   chunkOverlap: number
   chunkingMode: string
+  enabled: boolean
   docCount: number
   createTime: string
   updateTime: string

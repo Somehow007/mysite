@@ -1,5 +1,6 @@
 package io.github.somehow.mysite.ragent.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeBaseDO;
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeChunkDO;
@@ -51,12 +52,24 @@ public class KnowledgeDocumentService {
     }
 
     /**
-     * 文章 → 知识库同步（异步执行，不阻塞文章发布）。
-     * 使用默认知识库（collectionName = "default"）。
+     * 文章 → 所有启用的知识库同步（异步执行，不阻塞文章发布）。
+     * <p>
+     * 业内实践：Dify/FastGPT 等系统不设"默认 KB"——每个数据源显式绑定到 KB。
+     * 博客场景更简单：直接同步到所有启用 KB，保证每篇新文章在所有 KB 中可检索。
      */
     @Async("ragAsyncExecutor")
     public void syncArticle(ArticleDO article) {
-        syncArticle(article, getOrCreateDefaultKb().getId());
+        List<KnowledgeBaseDO> enabledKbs = kbMapper.selectList(
+            new LambdaQueryWrapper<KnowledgeBaseDO>()
+                .eq(KnowledgeBaseDO::getEnabled, true)
+                .or().isNull(KnowledgeBaseDO::getEnabled));  // 兼容旧数据 enabled=NULL
+        if (enabledKbs.isEmpty()) {
+            log.warn("没有启用的知识库，跳过文章同步: articleId={}", article.getId());
+            return;
+        }
+        for (KnowledgeBaseDO kb : enabledKbs) {
+            syncArticle(article, kb.getId());
+        }
     }
 
     /**
@@ -140,33 +153,5 @@ public class KnowledgeDocumentService {
                 docMapper.updateById(doc);
             }
         }
-    }
-
-    /**
-     * 获取或创建默认知识库。
-     * 默认知识库的 collection_name 固定为 "default"，用于存放所有博客文章向量。
-     */
-    private KnowledgeBaseDO getOrCreateDefaultKb() {
-        // 用 collection_name = "default" 作为默认知识库的查找键
-        List<KnowledgeBaseDO> kbs = kbMapper.selectList(
-            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<KnowledgeBaseDO>()
-                .eq(KnowledgeBaseDO::getCollectionName, "default")
-        );
-        if (!kbs.isEmpty()) {
-            return kbs.get(0);
-        }
-
-        // 不存在则创建
-        KnowledgeBaseDO kb = new KnowledgeBaseDO();
-        kb.setName("默认知识库");
-        kb.setDescription("博客文章自动同步的默认知识库");
-        kb.setCollectionName("default");
-        kb.setEmbeddingModel("text-embedding-v4");
-        kb.setEmbeddingDimension(1024);
-        kb.setChunkSize(800);
-        kb.setChunkOverlap(100);
-        kbMapper.insert(kb);
-        log.info("已创建默认知识库: id={}, collectionName=default", kb.getId());
-        return kb;
     }
 }

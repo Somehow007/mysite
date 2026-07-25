@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS t_knowledge_base (
     chunk_size INT DEFAULT 800,
     chunk_overlap INT DEFAULT 100,
     chunking_mode VARCHAR(30) DEFAULT 'MARKDOWN_HEADING',
+    enabled BOOLEAN DEFAULT true,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -140,5 +141,9 @@ VALUES
  '你是博客学习笔记助手的补充：回答要结构化，给出清晰的知识点梳理和学习路径建议，区分"已掌握"和"待深入"的内容。', 3, NOW()),
 (4, '闲聊', 'CHAT', NULL,
  '["你好","谢谢","你是谁","帮助","介绍","再见","早上好","晚上好"]',
- '问候、自我介绍、能力询问、感谢等社交对话', 0, true, NULL, NULL, NOW())
+ '问候、自我介绍、能力询问、感谢等社交对话', 0, true, NULL, NULL, NOW()),
+(5, '全局检索', 'KB_RETRIEVAL', NULL,
+ '["全部","所有","总共","一共","汇总","概览","范围","涵盖","包含哪些","多少","统计"]',
+ '用户询问博客整体情况、文章总数、主题范围、全站概览等元问题，需要在所有知识库中检索', 9, true,
+ '你是博客全局助手的补充：当用户询问博客整体情况时，你需要综合所有知识库的信息来回答，包括文章数量、主题分布、时间跨度等。', NULL, NOW())
 ON CONFLICT (id) DO NOTHING;

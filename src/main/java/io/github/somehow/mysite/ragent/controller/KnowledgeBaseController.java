@@ -51,4 +51,13 @@ public class KnowledgeBaseController {
         kbService.delete(id);
         return Results.success();
     }
+
+    @PutMapping("/{id}/toggle")
+    public Result<KnowledgeBaseDTO> toggle(@PathVariable Long id) {
+        KnowledgeBaseDTO dto = kbService.toggleEnabled(id);
+        if (dto == null) {
+            throw new ClientException("知识库不存在");
+        }
+        return Results.success(dto);
+    }
 }
