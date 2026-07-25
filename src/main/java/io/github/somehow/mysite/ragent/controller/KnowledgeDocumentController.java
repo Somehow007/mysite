@@ -1,12 +1,15 @@
 package io.github.somehow.mysite.ragent.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
 import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.commons.framework.web.Results;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.dao.mapper.ArticleMapper;
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeBaseDO;
+import io.github.somehow.mysite.ragent.dao.entity.KnowledgeChunkDO;
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeDocumentDO;
 import io.github.somehow.mysite.ragent.dao.mapper.KnowledgeBaseMapper;
 import io.github.somehow.mysite.ragent.dao.mapper.KnowledgeChunkMapper;
@@ -33,14 +36,43 @@ public class KnowledgeDocumentController {
     private final VectorStore vectorStore;
     private final KnowledgeBaseMapper kbMapper;
 
-    /** 获取知识库内已同步的文档列表 */
+    /** 获取知识库内已同步的文档列表（分页 + 筛选） */
     @GetMapping("/docs")
-    public Result<List<KnowledgeDocumentDO>> listDocs(@PathVariable Long kbId) {
-        List<KnowledgeDocumentDO> docs = docMapper.selectList(
-            new LambdaQueryWrapper<KnowledgeDocumentDO>()
+    public Result<IPage<KnowledgeDocumentDO>> listDocs(
+            @PathVariable Long kbId,
+            @RequestParam(defaultValue = "1") long current,
+            @RequestParam(defaultValue = "20") long size,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status) {
+        Page<KnowledgeDocumentDO> page = new Page<>(current, size);
+        LambdaQueryWrapper<KnowledgeDocumentDO> wrapper = new LambdaQueryWrapper<KnowledgeDocumentDO>()
                 .eq(KnowledgeDocumentDO::getKbId, kbId)
-                .orderByDesc(KnowledgeDocumentDO::getCreateTime));
-        return Results.success(docs);
+                .orderByDesc(KnowledgeDocumentDO::getCreateTime);
+        if (keyword != null && !keyword.isBlank()) {
+            wrapper.like(KnowledgeDocumentDO::getTitle, keyword);
+        }
+        if (status != null && !status.isBlank()) {
+            wrapper.eq(KnowledgeDocumentDO::getStatus, status);
+        }
+        return Results.success(docMapper.selectPage(page, wrapper));
+    }
+
+    /** 获取文档的分块列表（分页），用于分块预览 */
+    @GetMapping("/docs/{docId}/chunks")
+    public Result<IPage<KnowledgeChunkDO>> listChunks(
+            @PathVariable Long kbId,
+            @PathVariable Long docId,
+            @RequestParam(defaultValue = "1") long current,
+            @RequestParam(defaultValue = "50") long size) {
+        KnowledgeDocumentDO doc = docMapper.selectById(docId);
+        if (doc == null || !doc.getKbId().equals(kbId)) {
+            throw new ClientException("文档不存在");
+        }
+        Page<KnowledgeChunkDO> page = new Page<>(current, size);
+        LambdaQueryWrapper<KnowledgeChunkDO> wrapper = new LambdaQueryWrapper<KnowledgeChunkDO>()
+                .eq(KnowledgeChunkDO::getDocId, docId)
+                .orderByAsc(KnowledgeChunkDO::getChunkIndex);
+        return Results.success(chunkMapper.selectPage(page, wrapper));
     }
 
     /** 获取尚未加入该知识库的博客文章（供选择添加） */

@@ -4,14 +4,11 @@ import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.core.PromptTemplate;
 import io.github.somehow.mysite.ragent.core.ConversationManager;
 import io.github.somehow.mysite.ragent.core.RetrievalEngine;
-import io.github.somehow.mysite.ragent.core.intent.GuidanceHandler;
 import io.github.somehow.mysite.ragent.core.intent.IntentClassifier;
 import io.github.somehow.mysite.ragent.core.intent.IntentResult;
 import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter;
 import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter.RewriteResult;
 import io.github.somehow.mysite.ragent.dao.entity.ConversationDO;
-import io.github.somehow.mysite.ragent.dao.entity.IntentDO;
-import io.github.somehow.mysite.ragent.dao.mapper.IntentMapper;
 import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
 import io.github.somehow.mysite.ragent.llm.RoutingLLMService;
 import io.github.somehow.mysite.ragent.llm.model.ChatEvent;
@@ -43,8 +40,6 @@ class RagChatServiceTest {
     private RagProperties properties;
     private QueryRewriter queryRewriter;
     private IntentClassifier intentClassifier;
-    private GuidanceHandler guidanceHandler;
-    private IntentMapper intentMapper;
     private RagChatService service;
 
     @BeforeEach
@@ -55,8 +50,6 @@ class RagChatServiceTest {
         rateLimiter = mock(ChatRateLimiter.class);
         queryRewriter = mock(QueryRewriter.class);
         intentClassifier = mock(IntentClassifier.class);
-        guidanceHandler = mock(GuidanceHandler.class);
-        intentMapper = mock(IntentMapper.class);
 
         properties = new RagProperties();
         properties.getRetrieval().setRerankTopK(5);
@@ -68,18 +61,17 @@ class RagChatServiceTest {
 
         promptTemplate = new PromptTemplate(properties);
 
-        // 默认：不改写、分类为 KB_RETRIEVAL、不触发歧义引导
+        // 默认：不改写、分类为 KB_RETRIEVAL
         when(queryRewriter.rewrite(anyString(), anyList()))
             .thenReturn(RewriteResult.unchanged("测试问题"));
         when(intentClassifier.classify(anyString(), anyList()))
             .thenReturn(IntentResult.builder()
                 .type("KB_RETRIEVAL").targetKbId(null).confidence(0.8)
                 .needsGuidance(false).reason("test").build());
-        when(intentMapper.listEnabled()).thenReturn(List.of());
 
         service = new RagChatService(retrievalEngine, conversationManager,
             promptTemplate, routingLLMService, rateLimiter, properties,
-            queryRewriter, intentClassifier, guidanceHandler, intentMapper);
+            queryRewriter, intentClassifier);
     }
 
     @Nested
@@ -101,7 +93,7 @@ class RagChatServiceTest {
                 .thenReturn(Flux.just("Hello", " World"));
 
             // When
-            Flux<ChatEvent> events = service.chat("测试问题", null, "visitor-1", "127.0.0.1", UserRole.USER, null);
+            Flux<ChatEvent> events = service.chat("测试问题", null, "visitor-1", "127.0.0.1", UserRole.USER);
 
             // Then
             StepVerifier.create(events)
@@ -125,7 +117,7 @@ class RagChatServiceTest {
             when(routingLLMService.chatStream(any()))
                 .thenReturn(Flux.just("ok"));
 
-            Flux<ChatEvent> events = service.chat("q", null, "v", "127.0.0.1", UserRole.USER, null);
+            Flux<ChatEvent> events = service.chat("q", null, "v", "127.0.0.1", UserRole.USER);
 
             StepVerifier.create(events)
                 .expectNextMatches(e -> "meta".equals(e.type()) && e.conversationId() == 99L)
@@ -154,7 +146,7 @@ class RagChatServiceTest {
             when(retrievalEngine.retrieve(anyString(), anyInt(), any())).thenReturn(results);
             when(routingLLMService.chatStream(any())).thenReturn(Flux.just("答案"));
 
-            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1", UserRole.USER, null);
+            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1", UserRole.USER);
 
             StepVerifier.create(events)
                 .expectNextMatches(e -> "meta".equals(e.type()))
@@ -178,7 +170,7 @@ class RagChatServiceTest {
             doThrow(new ChatRateLimiter.RateLimitExceededException("超频了"))
                 .when(rateLimiter).check(anyString(), anyString(), any());
 
-            Flux<ChatEvent> events = service.chat("q", null, "v", "127.0.0.1", UserRole.USER, null);
+            Flux<ChatEvent> events = service.chat("q", null, "v", "127.0.0.1", UserRole.USER);
 
             StepVerifier.create(events)
                 .expectNextMatches(e -> "error".equals(e.type())
@@ -203,7 +195,7 @@ class RagChatServiceTest {
             when(routingLLMService.chatStream(any()))
                 .thenReturn(Flux.error(new RuntimeException("API 挂了")));
 
-            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1", UserRole.USER, null);
+            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1", UserRole.USER);
 
             StepVerifier.create(events)
                 .expectNextMatches(e -> "meta".equals(e.type()))
@@ -235,7 +227,7 @@ class RagChatServiceTest {
             when(retrievalEngine.retrieve(eq("新问题"), eq(5), any())).thenReturn(List.of());
             when(routingLLMService.chatStream(any())).thenReturn(Flux.just("回复"));
 
-            Flux<ChatEvent> events = service.chat("新问题", 5L, "v", "127.0.0.1", UserRole.USER, null);
+            Flux<ChatEvent> events = service.chat("新问题", 5L, "v", "127.0.0.1", UserRole.USER);
 
             StepVerifier.create(events)
                 .expectNextCount(4)  // meta + sources + content + done

@@ -42,4 +42,8 @@ public class UserDO extends BaseDO {
     private Integer followerCount;
 
     private String avatar;
+
+    private String bio;
+    private String location;
+    private String website;
 }

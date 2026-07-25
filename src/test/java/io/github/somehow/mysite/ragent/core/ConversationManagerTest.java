@@ -142,7 +142,7 @@ class ConversationManagerTest {
         @DisplayName("应保存 user + assistant 两条消息")
         void shouldSaveBothMessages() {
             List<SourceChunkDTO> sources = List.of(
-                new SourceChunkDTO("文章", "片段", 0.9f));
+                new SourceChunkDTO("文章", "片段", 0.9f, null, null));
 
             manager.saveExchange(1L, "问题", "回答", sources);
 
@@ -161,7 +161,7 @@ class ConversationManagerTest {
         @DisplayName("assistant 消息应包含 sources JSON")
         void assistantMessageShouldHaveSources() {
             List<SourceChunkDTO> sources = List.of(
-                new SourceChunkDTO("文章A", "内容", 0.85f));
+                new SourceChunkDTO("文章A", "内容", 0.85f, null, null));
 
             manager.saveExchange(1L, "问", "答", sources);
 

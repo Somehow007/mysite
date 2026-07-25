@@ -3910,13 +3910,16 @@ CREATE TABLE IF NOT EXISTS t_rag_intent (
 
 -- 初始数据示例
 INSERT INTO t_rag_intent VALUES
-(1, '技术博客检索', 'KB_RETRIEVAL', 1, '["Java","Spring","JWT","Redis","Docker","MySQL","Vue","TypeScript"]',
- '用户询问后端开发、Spring Boot、数据库、前端框架等技术问题', 10, true,
+(1, '技术博客检索', 'KB_RETRIEVAL', 1, '["Java","Spring","JWT","Redis","Docker","MySQL","Vue","TypeScript","后端","前端","数据库","安全","部署"]',
+ '用户询问后端开发、Spring Boot、数据库、前端框架、系统部署等技术问题', 10, true,
  '你是博客技术文章助手的补充：回答要准确，代码示例注明版本和来源文章。', NULL, NOW()),
-(2, '读书笔记检索', 'KB_RETRIEVAL', 2, '["读书","书籍","推荐","读后感","学习路线","入门"]',
+(2, '读书笔记检索', 'KB_RETRIEVAL', 2, '["读书","书籍","推荐","读后感","学习路线","入门","书单","阅读","好书"]',
  '用户询问书籍推荐、读书心得、学习路径等', 5, true,
  '你是博客读书笔记助手的补充：推荐书籍时说明理由，可以结合技术博客内容给出学习路径建议。', 5, NOW()),
-(3, '闲聊', 'CHAT', NULL, '["你好","谢谢","你是谁","帮助","介绍"]',
+(3, '学习笔记检索', 'KB_RETRIEVAL', 3, '["笔记","学习","总结","复习","知识点","面试","教程","整理","备忘","踩坑","实践"]',
+ '用户询问学习笔记、知识点总结、面试准备、技术教程、实践踩坑等', 8, true,
+ '你是博客学习笔记助手的补充：回答要结构化，给出清晰的知识点梳理和学习路径建议。', 3, NOW()),
+(4, '闲聊', 'CHAT', NULL, '["你好","谢谢","你是谁","帮助","介绍","再见","早上好","晚上好"]',
  '问候、自我介绍、能力询问、感谢等社交对话', 0, true, NULL, NULL, NOW());
 ```
 
@@ -4525,6 +4528,11 @@ rag:
       name: "读书笔记"
       collection: "reading_notes"
       color: "#10b981"
+      default-intent-type: KB_RETRIEVAL
+    - id: 3
+      name: "学习笔记"
+      collection: "study_notes"
+      color: "#f59e0b"        # 琥珀色
       default-intent-type: KB_RETRIEVAL
 ```
 

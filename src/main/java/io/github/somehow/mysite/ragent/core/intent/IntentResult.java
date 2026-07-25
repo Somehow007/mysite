@@ -6,7 +6,7 @@ import lombok.Data;
 /**
  * 意图分类结果 DTO。
  * <p>
- * 由 IntentClassifier 产出，下游（RagChatService、GuidanceHandler）消费。
+ * 由 IntentClassifier 产出，供 RagChatService 管道消费。
  * fallback() 返回 "全局检索" 的兜底结果——分类失败时宁可多搜也不少搜。
  */
 @Data

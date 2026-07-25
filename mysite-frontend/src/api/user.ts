@@ -1,7 +1,11 @@
-import { put } from './client'
+import { get, put } from './client'
 import apiClient from './client'
-import type { User } from '@/types'
+import type { User, UserProfile } from '@/types'
 import type { ApiResponse } from '@/types'
+
+export function getUserProfile(username: string): Promise<UserProfile> {
+  return get<UserProfile>(`/v1/users/${encodeURIComponent(username)}/profile`)
+}
 
 export function updateUser(data: Partial<User>): Promise<User> {
   return put<User>('/v1/users/me', data)

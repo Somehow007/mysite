@@ -2,8 +2,8 @@
 // SSE 不能用 axios（响应体需流式读取），这里用原生 fetch + ReadableStream。
 // 本文件是项目中唯一的流式 HTTP 代码，所有容错逻辑收口于此。
 
-import type { SourceChunk, KnowledgeBase, KnowledgeDocument, GuidanceOption } from '@/types'
-import { get, post, put, del } from './client'
+import type { SourceChunk, KnowledgeBase, KnowledgeDocument, Pagination } from '@/types'
+import { get, getPaginated, post, put, del } from './client'
 
 export interface ChatStreamCallbacks {
   /** conversationId 是 Snowflake 64-bit Long，用 string 避免 JS Number 精度丢失 */
@@ -12,8 +12,6 @@ export interface ChatStreamCallbacks {
   onToken: (delta: string) => void
   onDone: () => void
   onError: (error: ChatStreamError) => void
-  /** Phase 6：歧义引导 —— 低置信度时生成候选方向让用户选择 */
-  onGuidance?: (message: string, options: GuidanceOption[]) => void
 }
 
 /** 错误分类：UI 据此决定提示文案与是否展示重试 */
@@ -61,18 +59,14 @@ function safe<T extends (...args: never[]) => void>(fn: T, ...args: Parameters<T
  *
  * 契约：GET /v1/rag/chat/stream
  * 事件类型：meta → sources → content(×N) → done / error
- * Phase 6 新增：guidance 事件（歧义引导）
  */
 export function createChatStream(
   question: string,
   conversationId: string | null,
   callbacks: ChatStreamCallbacks,
-  /** Phase 6：用户选择的意图 ID（guidance 回传），null = 自动分类 */
-  intentId?: string | null,
 ): AbortController {
   const params = new URLSearchParams({ q: question, visitorId: getVisitorId() })
   if (conversationId != null) params.set('conversationId', conversationId)
-  if (intentId != null) params.set('intentId', intentId)
 
   const controller = new AbortController()
   const { signal } = controller
@@ -165,13 +159,6 @@ export function createChatStream(
               finished = true
               fail(new ChatStreamError('server', (data.message as string) || 'AI 服务暂时不可用'))
               return
-            case 'guidance': {
-              // Phase 6：歧义引导 —— 低置信度时 AI 生成候选方向让用户选
-              const message = (data.message as string) || '我不太确定你想问什么……'
-              const options = (data.options ?? []) as GuidanceOption[]
-              if (callbacks.onGuidance) safe(callbacks.onGuidance, message, options)
-              break
-            }
             default:
               // 未知事件类型：记录日志但不中断流
               if (import.meta.env.DEV) {
@@ -253,8 +240,8 @@ export function deleteKnowledgeBase(id: string): Promise<void> {
   return del<void>(`/v1/rag/knowledge-bases/${id}`)
 }
 
-export function getKnowledgeDocuments(kbId: string): Promise<KnowledgeDocument[]> {
-  return get<KnowledgeDocument[]>(`/v1/rag/knowledge-bases/${kbId}/docs`)
+export function getKnowledgeDocuments(kbId: string, params?: Record<string, unknown>): Promise<{ list: KnowledgeDocument[]; pagination: Pagination }> {
+  return getPaginated<KnowledgeDocument>(`/v1/rag/knowledge-bases/${kbId}/docs`, params)
 }
 
 export function syncKnowledgeBase(kbId: string): Promise<{ synced: number; total: number }> {
@@ -281,6 +268,45 @@ export function getAvailableArticles(kbId: string): Promise<AvailableArticle[]> 
 
 export function addArticlesToKb(kbId: string, articleIds: string[]): Promise<{ added: number }> {
   return post<{ added: number }>(`/v1/rag/knowledge-bases/${kbId}/articles`, { articleIds })
+}
+
+// ── 分块预览 ──
+
+export interface KnowledgeChunk {
+  id: string
+  docId: string
+  kbId: string
+  chunkIndex: number
+  content: string
+  embeddingText: string | null
+  charCount: number
+  createTime: string
+}
+
+export function getDocumentChunks(kbId: string, docId: string, params?: Record<string, unknown>): Promise<{ list: KnowledgeChunk[]; pagination: Pagination }> {
+  return getPaginated<KnowledgeChunk>(`/v1/rag/knowledge-bases/${kbId}/docs/${docId}/chunks`, params)
+}
+
+/** 重命名对话 */
+export async function renameConversation(convId: string, title: string): Promise<void> {
+  const token = readAuthToken()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(`/v1/rag/conversations/${convId}/rename`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify({ title }),
+  })
+  if (!res.ok) throw new Error(`重命名失败 (HTTP ${res.status})`)
+}
+
+/** 删除对话 */
+export async function deleteConversation(convId: string): Promise<void> {
+  const token = readAuthToken()
+  const headers: Record<string, string> = {}
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  const res = await fetch(`/v1/rag/conversations/${convId}`, { method: 'DELETE', headers })
+  if (!res.ok) throw new Error(`删除失败 (HTTP ${res.status})`)
 }
 
 function readAuthToken(): string | null {

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS t_knowledge_base (
     embedding_dimension INT DEFAULT 1024,
     chunk_size INT DEFAULT 800,
     chunk_overlap INT DEFAULT 100,
+    chunking_mode VARCHAR(30) DEFAULT 'MARKDOWN_HEADING',
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -96,3 +97,48 @@ CREATE INDEX IF NOT EXISTS idx_vector_kb_id ON t_knowledge_vector(kb_id);
 CREATE INDEX IF NOT EXISTS idx_conv_user_id ON t_conversation(user_id);
 CREATE INDEX IF NOT EXISTS idx_conv_visitor_id ON t_conversation(visitor_id);
 CREATE INDEX IF NOT EXISTS idx_conv_msg_conv_id ON t_conversation_message(conversation_id);
+
+-- ============================================================
+-- Phase 6：意图识别与智能路由
+-- ============================================================
+
+-- 意图定义表（博客规模，扁平列表，不需要意图树）
+CREATE TABLE IF NOT EXISTS t_rag_intent (
+    id BIGINT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,           -- 意图名称，如 "技术博客检索"、"读书笔记检索"
+    type VARCHAR(20) NOT NULL DEFAULT 'KB_RETRIEVAL',  -- KB_RETRIEVAL / CHAT
+    kb_id BIGINT,                          -- 绑定的知识库（CHAT 类型为 NULL）
+    keywords TEXT,                         -- 触发关键词，JSON 数组：["Java","Spring","JWT"]
+    description TEXT,                      -- 意图描述，给 LLM 分类用的提示
+    priority INT DEFAULT 0,               -- 优先级，数值越大优先级越高
+    enabled BOOLEAN DEFAULT true,
+    custom_prompt_fragment TEXT,           -- 自定义 Prompt 片段（追加到 system prompt）
+    custom_top_k INT,                      -- 该意图专用 topK（覆盖全局配置，NULL=使用默认值）
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 索引：按启用状态 + 类型查询（IntentRepository.listEnabled）
+CREATE INDEX IF NOT EXISTS idx_intent_enabled_type ON t_rag_intent(enabled, type);
+-- 索引：按知识库查询
+CREATE INDEX IF NOT EXISTS idx_intent_kb_id ON t_rag_intent(kb_id);
+
+-- 种子数据：四类初始意图（覆盖 KB 检索 + 闲聊）
+-- 使用 ON CONFLICT DO NOTHING 保证重复执行幂等
+INSERT INTO t_rag_intent (id, name, type, kb_id, keywords, description, priority, enabled, custom_prompt_fragment, custom_top_k, create_time)
+VALUES
+(1, '技术博客检索', 'KB_RETRIEVAL', 1,
+ '["Java","Spring","JWT","Redis","Docker","MySQL","Vue","TypeScript","后端","前端","数据库","安全","部署","Nginx","Linux","Git","API","微服务"]',
+ '用户询问后端开发、Spring Boot、数据库、前端框架、系统部署等技术问题', 10, true,
+ '你是博客技术文章助手的补充：回答要准确，代码示例注明版本和来源文章。', NULL, NOW()),
+(2, '读书笔记检索', 'KB_RETRIEVAL', 2,
+ '["读书","书籍","推荐","读后感","学习路线","入门","书单","阅读","好书"]',
+ '用户询问书籍推荐、读书心得、学习路径等', 5, true,
+ '你是博客读书笔记助手的补充：推荐书籍时说明理由，可以结合技术博客内容给出学习路径建议。', 5, NOW()),
+(3, '学习笔记检索', 'KB_RETRIEVAL', 3,
+ '["笔记","学习","总结","复习","知识点","面试","教程","整理","备忘","踩坑","实践","笔记整理","知识点总结"]',
+ '用户询问学习笔记、知识点总结、面试准备、技术教程、实践踩坑等', 8, true,
+ '你是博客学习笔记助手的补充：回答要结构化，给出清晰的知识点梳理和学习路径建议，区分"已掌握"和"待深入"的内容。', 3, NOW()),
+(4, '闲聊', 'CHAT', NULL,
+ '["你好","谢谢","你是谁","帮助","介绍","再见","早上好","晚上好"]',
+ '问候、自我介绍、能力询问、感谢等社交对话', 0, true, NULL, NULL, NOW())
+ON CONFLICT (id) DO NOTHING;

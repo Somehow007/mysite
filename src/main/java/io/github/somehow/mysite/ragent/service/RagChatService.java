@@ -5,15 +5,11 @@ import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.core.ConversationManager;
 import io.github.somehow.mysite.ragent.core.PromptTemplate;
 import io.github.somehow.mysite.ragent.core.RetrievalEngine;
-import io.github.somehow.mysite.ragent.core.intent.GuidanceHandler;
-import io.github.somehow.mysite.ragent.core.intent.GuidanceHandler.IntentCandidate;
 import io.github.somehow.mysite.ragent.core.intent.IntentClassifier;
 import io.github.somehow.mysite.ragent.core.intent.IntentResult;
 import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter;
 import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter.RewriteResult;
 import io.github.somehow.mysite.ragent.dao.entity.ConversationDO;
-import io.github.somehow.mysite.ragent.dao.entity.IntentDO;
-import io.github.somehow.mysite.ragent.dao.mapper.IntentMapper;
 import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
 import io.github.somehow.mysite.ragent.llm.RoutingLLMService;
 import io.github.somehow.mysite.ragent.llm.model.ChatEvent;
@@ -29,20 +25,23 @@ import reactor.core.scheduler.Schedulers;
 import java.util.List;
 
 /**
- * RAG 问答核心服务 —— 7 阶段智能管道（Phase 6 升级）。
+ * RAG 问答核心服务 —— 智能管道。
  *
  * <h3>管道阶段</h3>
  * <pre>
  *   0. 成本保护（限流 + 问题长度）
  *   1. 加载对话记忆
- *   2. ★ 查询改写（指代消解 / 拆分 / 口语正规化）
- *   3. ★ 意图分类（LLM 分类器 → KB_RETRIEVAL / CHAT / 歧义）
- *   [短路] 歧义引导 —— 低置信度时生成候选方向让用户选
+ *   2. 查询改写（指代消解 / 拆分 / 口语正规化）
+ *   3. 意图分类（LLM 分类器自动判断 → KB_RETRIEVAL / CHAT）
  *   [短路] 闲聊直回 —— CHAT 类型跳过检索，直接 LLM 回复
- *   4. ★ 意图感知检索（定向 KB / 多子问题并行检索）
- *   5. ★ 意图感知 Prompt（customPromptFragment + KB 名称标注）
+ *   4. 意图感知检索（定向 KB / 多子问题并行检索）
+ *   5. 意图感知 Prompt（customPromptFragment + KB 名称标注）
  *   6. LLM 流式生成 → SSE 推送 → 落库
  * </pre>
+ *
+ * <p>意图分类由后端自动完成，用户无需手动选择。
+ * 低置信度时自动降级为全局检索，不中断用户对话流。
+ * 当 AI 确实无法确定用户意图时，会在对话中自然地询问澄清。</p>
  */
 @Slf4j
 @Service
@@ -55,11 +54,8 @@ public class RagChatService {
     private final ChatRateLimiter rateLimiter;
     private final RagProperties properties;
 
-    // ── Phase 6 新增 ──
     private final QueryRewriter queryRewriter;
     private final IntentClassifier intentClassifier;
-    private final GuidanceHandler guidanceHandler;
-    private final IntentMapper intentMapper;
 
     public RagChatService(RetrievalEngine retrievalEngine,
                           ConversationManager conversationManager,
@@ -68,9 +64,7 @@ public class RagChatService {
                           ChatRateLimiter rateLimiter,
                           RagProperties properties,
                           QueryRewriter queryRewriter,
-                          IntentClassifier intentClassifier,
-                          GuidanceHandler guidanceHandler,
-                          IntentMapper intentMapper) {
+                          IntentClassifier intentClassifier) {
         this.retrievalEngine = retrievalEngine;
         this.conversationManager = conversationManager;
         this.promptTemplate = promptTemplate;
@@ -79,8 +73,6 @@ public class RagChatService {
         this.properties = properties;
         this.queryRewriter = queryRewriter;
         this.intentClassifier = intentClassifier;
-        this.guidanceHandler = guidanceHandler;
-        this.intentMapper = intentMapper;
     }
 
     /**
@@ -91,18 +83,17 @@ public class RagChatService {
      * @param visitorId      匿名访客标识
      * @param clientIp       客户端 IP（限流用）
      * @param userRole       用户角色（限流阈值）
-     * @param chosenIntentId 用户选择的意图 ID（guidance 回传，null = 自动分类）
      */
     public Flux<ChatEvent> chat(String question, Long conversationId,
                                 String visitorId, String clientIp,
-                                UserRole userRole, Long chosenIntentId) {
+                                UserRole userRole) {
         // Step 0: 成本保护
         return Mono.fromCallable(() -> {
                 rateLimiter.check(clientIp, question, userRole);
                 return true;
             })
             .subscribeOn(Schedulers.boundedElastic())
-            .flatMapMany(ok -> doChat(question, conversationId, visitorId, chosenIntentId))
+            .flatMapMany(ok -> doChat(question, conversationId, visitorId))
             .onErrorResume(e -> {
                 if (e instanceof ChatRateLimiter.RateLimitExceededException) {
                     return Flux.just(ChatEvent.error(e.getMessage()));
@@ -114,7 +105,7 @@ public class RagChatService {
     // ── 7 阶段管道 ──
 
     private Flux<ChatEvent> doChat(String question, Long conversationId,
-                                   String visitorId, Long chosenIntentId) {
+                                   String visitorId) {
         long t0 = System.currentTimeMillis();
 
         // Stage 1: 获取或创建会话 + 加载对话历史
@@ -133,35 +124,15 @@ public class RagChatService {
             rewritten.rewritten(), rewritten.subQueries().size(),
             System.currentTimeMillis() - t2);
 
-        // ── Stage 3: 意图分类（或直接使用用户选择的意图）──
+        // ── Stage 3: 意图分类（后端自动判断，用户无感）──
         long t3 = System.currentTimeMillis();
-        IntentResult intent;
-        if (chosenIntentId != null) {
-            intent = resolveChosenIntent(chosenIntentId);
-        } else {
-            intent = intentClassifier.classify(primaryQuery, history);
-        }
-        log.info("[pipeline] stage3: type={}, targetKb={}, confidence={}, chosenIntentId={} ({}ms)",
+        IntentResult intent = intentClassifier.classify(primaryQuery, history);
+        log.info("[pipeline] stage3: type={}, targetKb={}, confidence={} ({}ms)",
             intent.getType(), intent.getTargetKbId(),
             String.format("%.2f", intent.getConfidence()),
-            chosenIntentId, System.currentTimeMillis() - t3);
+            System.currentTimeMillis() - t3);
 
-        // ── 短路 1: 歧义引导 ──
-        if (chosenIntentId == null) {
-            // 仅自动分类时检查歧义；用户已选意图则跳过
-            List<IntentDO> allIntents = intentMapper.listEnabled();
-            List<IntentCandidate> ranked = guidanceHandler.rankCandidates(allIntents);
-            if (guidanceHandler.shouldGuide(intent, ranked)) {
-                log.info("[pipeline] ambiguity detected → guidance event");
-                return Flux.just(
-                    ChatEvent.meta(convId),
-                    guidanceHandler.buildGuidanceEvent(ranked),
-                    ChatEvent.done()
-                );
-            }
-        }
-
-        // ── 短路 2: 闲聊直接回复 ──
+        // ── 短路: 闲聊直接回复 ──
         if (intent.isChat()) {
             log.info("[pipeline] chat-only intent → skipping retrieval");
             List<ChatMessage> messages = promptTemplate.buildGeneralPrompt(primaryQuery, history);
@@ -252,28 +223,5 @@ public class RagChatService {
                 log.error("[pipeline] error", e);
                 return Flux.just(ChatEvent.error("AI 服务暂时不可用，请稍后再试"));
             });
-    }
-
-    /**
-     * 根据用户选择的 intentId 构造 IntentResult（跳过分类环节）。
-     */
-    private IntentResult resolveChosenIntent(Long intentId) {
-        IntentDO intent = intentMapper.findById(intentId);
-        if (intent == null) {
-            log.warn("[pipeline] chosenIntentId={} not found, using fallback", intentId);
-            return IntentResult.fallback();
-        }
-        log.info("[pipeline] using chosen intent: id={}, name={}, type={}",
-            intent.getId(), intent.getName(), intent.getType());
-        return IntentResult.builder()
-            .intentId(intent.getId())
-            .type(intent.getType())
-            .targetKbId(intent.getKbId())
-            .confidence(1.0)           // 用户手动选择 → 最高置信度
-            .needsGuidance(false)
-            .reason("user_chosen")
-            .customPromptFragment(intent.getCustomPromptFragment())
-            .customTopK(intent.getCustomTopK())
-            .build();
     }
 }

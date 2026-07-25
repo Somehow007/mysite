@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
 import io.github.somehow.mysite.dto.req.user.UserPageQueryReqDTO;
 import io.github.somehow.mysite.dto.resp.user.UserPageQueryFollowRespDTO;
+import io.github.somehow.mysite.dto.resp.user.UserProfileRespDTO;
 import io.github.somehow.mysite.dto.resp.user.UserSearchRespDTO;
 import io.github.somehow.mysite.dto.resp.user.UserSelectRespDTO;
 import io.github.somehow.mysite.security.SecurityUserDetails;
@@ -30,6 +31,12 @@ public class UserController {
 
     private final UserService userService;
     private final ImageService imageService;
+
+    @Operation(summary = "获取用户个人主页信息（按用户名）")
+    @GetMapping("/v1/users/{username}/profile")
+    public Result<UserProfileRespDTO> getUserProfile(@PathVariable String username) {
+        return Results.success(userService.getUserProfile(username));
+    }
 
     @Operation(summary = "根据用户id获取用户具体信息")
     @GetMapping("/v1/users/{id}")

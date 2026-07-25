@@ -24,6 +24,7 @@ public class KnowledgeBaseDO {
     private Integer embeddingDimension;
     private Integer chunkSize;
     private Integer chunkOverlap;
+    private String chunkingMode;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

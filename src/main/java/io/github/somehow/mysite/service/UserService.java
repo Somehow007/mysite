@@ -8,6 +8,7 @@ import io.github.somehow.mysite.dto.req.user.UserFollowReqDTO;
 import io.github.somehow.mysite.dto.req.user.UserPageQueryReqDTO;
 import io.github.somehow.mysite.dto.req.user.UserUpdateReqDTO;
 import io.github.somehow.mysite.dto.resp.user.UserPageQueryFollowRespDTO;
+import io.github.somehow.mysite.dto.resp.user.UserProfileRespDTO;
 import io.github.somehow.mysite.dto.resp.user.UserSearchRespDTO;
 import io.github.somehow.mysite.dto.resp.user.UserSelectRespDTO;
 
@@ -20,4 +21,6 @@ public interface UserService extends IService<UserDO> {
     IPage<UserPageQueryFollowRespDTO> selectFollowers(String id, long current, long size);
     IPage<UserPageQueryFollowRespDTO> selectFollowings(String id, long current, long size);
     IPage<UserSearchRespDTO> pageQueryUser(UserPageQueryReqDTO requestParam);
+
+    UserProfileRespDTO getUserProfile(String username);
 }

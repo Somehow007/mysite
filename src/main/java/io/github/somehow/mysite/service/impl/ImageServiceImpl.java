@@ -144,7 +144,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
                     height = image.getHeight();
                     generateWebpCopy(image, filePath);
                 }
-            } catch (IOException e) {
+            } catch (Throwable e) {
                 log.warn("读取图片尺寸失败: {}", filePath, e);
             }
         }
@@ -301,7 +301,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
                     height = image.getHeight();
                     generateWebpCopy(image, filePath);
                 }
-            } catch (IOException e) {
+            } catch (Throwable e) {
                 log.warn("读取远程图片尺寸失败", e);
             }
         }

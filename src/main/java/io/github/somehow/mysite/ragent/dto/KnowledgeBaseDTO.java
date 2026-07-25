@@ -14,6 +14,7 @@ public class KnowledgeBaseDTO {
     private Integer embeddingDimension;
     private Integer chunkSize;
     private Integer chunkOverlap;
+    private String chunkingMode;
     private Integer docCount;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

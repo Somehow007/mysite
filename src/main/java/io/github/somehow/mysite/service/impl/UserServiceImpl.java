@@ -9,10 +9,15 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.baomidou.mybatisplus.extension.toolkit.SqlHelper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
 import io.github.somehow.mysite.commons.framework.exception.ClientException;
+import io.github.somehow.mysite.dao.entity.ArticleDO;
+import io.github.somehow.mysite.dao.entity.CollectionDO;
 import io.github.somehow.mysite.dao.entity.UserDO;
 import io.github.somehow.mysite.dao.entity.UserFollowDO;
+import io.github.somehow.mysite.dao.mapper.ArticleMapper;
+import io.github.somehow.mysite.dao.mapper.CollectionMapper;
 import io.github.somehow.mysite.dao.mapper.UserFollowMapper;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
 import io.github.somehow.mysite.dto.req.auth.ChangePasswordReqDTO;
@@ -20,6 +25,7 @@ import io.github.somehow.mysite.dto.req.user.UserFollowReqDTO;
 import io.github.somehow.mysite.dto.req.user.UserPageQueryReqDTO;
 import io.github.somehow.mysite.dto.req.user.UserUpdateReqDTO;
 import io.github.somehow.mysite.dto.resp.user.UserPageQueryFollowRespDTO;
+import io.github.somehow.mysite.dto.resp.user.UserProfileRespDTO;
 import io.github.somehow.mysite.dto.resp.user.UserSearchRespDTO;
 import io.github.somehow.mysite.dto.resp.user.UserSelectRespDTO;
 import io.github.somehow.mysite.elasticsearch.service.UserIndexService;
@@ -37,6 +43,8 @@ import java.util.Objects;
 public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements UserService {
 
     private final UserFollowMapper userFollowMapper;
+    private final ArticleMapper articleMapper;
+    private final CollectionMapper collectionMapper;
     private final PasswordEncoder passwordEncoder;
     private final UserIndexService userIndexService;
 
@@ -163,5 +171,60 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     @Override
     public IPage<UserSearchRespDTO> pageQueryUser(UserPageQueryReqDTO requestParam) {
         return userIndexService.searchUsers(requestParam);
+    }
+
+    @Override
+    public UserProfileRespDTO getUserProfile(String username) {
+        UserDO user = baseMapper.selectOneByUsername(username);
+        if (user == null) {
+            throw new ClientException(ErrorCode.USER_QUERY_FAILED);
+        }
+
+        UserProfileRespDTO dto = new UserProfileRespDTO();
+        dto.setId(user.getId());
+        dto.setUsername(user.getUsername());
+        dto.setRealName(user.getRealName());
+        dto.setAvatar(user.getAvatar());
+        dto.setBio(user.getBio());
+        dto.setLocation(user.getLocation());
+        dto.setWebsite(user.getWebsite());
+        dto.setRole(user.getRole().name());
+        dto.setFollowingCount(user.getFollowingCount());
+        dto.setFollowerCount(user.getFollowerCount());
+        dto.setCreateTime(user.getCreateTime() != null
+                ? user.getCreateTime().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()
+                : null);
+
+        // 文章数
+        dto.setArticleCount(articleMapper.selectCount(
+                new LambdaQueryWrapper<ArticleDO>()
+                        .eq(ArticleDO::getAuthorId, user.getId())
+                        .eq(ArticleDO::getPublished, 1)
+                        .eq(ArticleDO::getDelFlag, 0)));
+
+        // 合集数
+        dto.setCollectionCount(collectionMapper.selectCount(
+                new LambdaQueryWrapper<CollectionDO>()
+                        .eq(CollectionDO::getAuthorId, user.getId())
+                        .eq(CollectionDO::getDelFlag, 0)));
+
+        // 被收藏数 = 用户所有文章的 favoriteCount 之和
+        long favoriteTotal = 0L;
+        var articles = articleMapper.selectList(
+                new LambdaQueryWrapper<ArticleDO>()
+                        .select(ArticleDO::getFavoriteCount)
+                        .eq(ArticleDO::getAuthorId, user.getId())
+                        .eq(ArticleDO::getDelFlag, 0));
+        for (ArticleDO a : articles) {
+            if (a.getFavoriteCount() != null) {
+                favoriteTotal += a.getFavoriteCount();
+            }
+        }
+        dto.setFavoriteCount(favoriteTotal);
+
+        // likeCount: 跨文章评论点赞，计算复杂，暂返回 0
+        dto.setLikeCount(0L);
+
+        return dto;
     }
 }

@@ -54,6 +54,9 @@ public class KnowledgeBaseService {
             if (base.isEmpty()) base = "kb";
             kb.setCollectionName(base + "_" + System.currentTimeMillis() % 100000);
         }
+        if (kb.getChunkingMode() == null || kb.getChunkingMode().isBlank()) {
+            kb.setChunkingMode("MARKDOWN_HEADING");
+        }
         kbMapper.insert(kb);
         return toDTO(kb, 0);
     }
@@ -94,6 +97,7 @@ public class KnowledgeBaseService {
         dto.setEmbeddingDimension(kb.getEmbeddingDimension());
         dto.setChunkSize(kb.getChunkSize());
         dto.setChunkOverlap(kb.getChunkOverlap());
+        dto.setChunkingMode(kb.getChunkingMode());
         dto.setDocCount(docCount);
         dto.setCreateTime(kb.getCreateTime());
         dto.setUpdateTime(kb.getUpdateTime());

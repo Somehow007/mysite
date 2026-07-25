@@ -3,8 +3,6 @@
 // 采用"消息列表内原地更新"模型：流式 token 直接追加到数组里的 AI 占位消息，
 // 消除"流式消息"与"历史消息"两套渲染路径。
 //
-// Phase 6 新增：guidance 歧义引导状态、sendWithIntent 定向发送。
-//
 // ⚠️  Vue 3 响应式关键约束：
 //    reactive() 返回的是包裹原始对象的 Proxy，原始对象本身不会被修改。
 //    所有回调中对消息属性的修改，必须通过 messages.value[index] 获取
@@ -17,7 +15,7 @@ import {
   type ChatStreamErrorKind,
   type ConversationSummary,
 } from '@/api/rag'
-import type { ChatMessage, SourceChunk, GuidanceOption } from '@/types'
+import type { ChatMessage, SourceChunk } from '@/types'
 
 export type ChatStatus = 'idle' | 'streaming' | 'error'
 
@@ -29,7 +27,6 @@ export function useChat() {
   /** Snowflake 64-bit ID，用 string 避免 JS Number 精度丢失 */
   const conversationId = ref<string | null>(null)
   const lastError = ref<{ kind: ChatStreamErrorKind; message: string; status?: number } | null>(null)
-  const lastQuestion = ref<string | null>(null)
 
   // ── 对话历史 ─────────────────────────────────────────────
   const conversations = ref<ConversationSummary[]>([])
@@ -49,21 +46,11 @@ export function useChat() {
     return last?.role === 'assistant' ? last : null
   }
 
-  /** 普通发送（自动意图分类） */
+  /** 发送消息（后端自动判断意图） */
   function sendMessage(question: string) {
-    sendMessageInternal(question, null)
-  }
-
-  /** Phase 6：带上用户选择的 intentId 发送（guidance 回传） */
-  function sendWithIntent(question: string, intentId: string) {
-    sendMessageInternal(question, intentId)
-  }
-
-  function sendMessageInternal(question: string, intentId: string | null) {
     const q = question.trim()
     if (!q || isStreaming.value) return // 流式中禁止并发发送
     lastError.value = null
-    lastQuestion.value = q
 
     messages.value.push({
       id: nextMessageId++,
@@ -119,25 +106,15 @@ export function useChat() {
         }
         abort = null
       },
-
-      // ── Phase 6：歧义引导 ──
-      onGuidance: (message: string, options: GuidanceOption[]) => {
-        const msg = lastAssistant()
-        if (!msg) return
-        msg.pending = false
-        msg.content = message
-        msg.guidance = { message, options }
-        status.value = 'idle'
-        abort = null
-      },
-    }, intentId)
+    })
   }
 
-  /** 重试：移除失败的那条 AI 消息，用 lastQuestion 重发 */
+  /** 重试：移除失败的那条 AI 消息，用原问题重发 */
   function retry() {
+    const userMsg = [...messages.value].reverse().find(m => m.role === 'user')
     const last = messages.value[messages.value.length - 1]
     if (last?.role === 'assistant' && last.failed) messages.value.pop()
-    if (lastQuestion.value) sendMessage(lastQuestion.value)
+    if (userMsg) sendMessage(userMsg.content)
   }
 
   /** 取消当前生成 */
@@ -158,7 +135,6 @@ export function useChat() {
     messages.value = []
     conversationId.value = null
     lastError.value = null
-    lastQuestion.value = null
   }
 
   /** 加载对话历史列表 */
@@ -185,7 +161,6 @@ export function useChat() {
       }))
       conversationId.value = convId
       lastError.value = null
-      lastQuestion.value = null
       status.value = 'idle'
     } catch {
       // 加载失败，回退
@@ -203,8 +178,6 @@ export function useChat() {
     conversations,
     loadingHistory,
     sendMessage,
-    /** Phase 6：带上用户选择的 intentId 发送 */
-    sendWithIntent,
     retry,
     cancelGeneration,
     newConversation,
