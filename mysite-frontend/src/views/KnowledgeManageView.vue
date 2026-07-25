@@ -398,13 +398,13 @@ watch(docs, (newDocs) => {
 
 // DataTable columns for document list
 const docColumns: Column<KnowledgeDocument>[] = [
-  { key: 'title', label: '文档标题', width: 'auto' },
-  { key: 'source', label: '来源', width: '80px' },
-  { key: 'chunkCount', label: '分块', width: '64px', align: 'center' },
-  { key: 'fileSize', label: '大小', width: '68px', align: 'center' },
-  { key: 'status', label: '状态', width: '104px' },
-  { key: 'updateTime', label: '更新时间', width: '104px', hideMobile: true },
-  { key: 'actions', label: '操作', width: '88px', align: 'center' },
+  { key: 'title', label: '文档标题' },
+  { key: 'source', label: '来源', width: '64px' },
+  { key: 'chunkCount', label: '分块', width: '56px', align: 'center' },
+  { key: 'fileSize', label: '大小', width: '60px', align: 'center' },
+  { key: 'status', label: '状态', width: '80px' },
+  { key: 'updateTime', label: '更新时间', width: '96px', hideMobile: true },
+  { key: 'actions', label: '操作', width: '72px', align: 'center' },
 ]
 
 onMounted(() => {
@@ -633,12 +633,15 @@ watch(selectedKbId, () => {
             @update:current-page="fetchDocs($event)"
           >
             <template #cell-title="{ item }">
-              <div class="flex items-center gap-2.5">
+              <div class="flex items-center gap-2.5 min-w-0">
                 <div class="w-[30px] h-[30px] rounded-lg flex items-center justify-center shrink-0"
                   :class="item.sourceType === 'ARTICLE' ? 'bg-accent-subtle text-accent' : 'bg-bg-code text-text-muted'">
                   <component :is="sourceIcon(item.sourceType)" :size="15" />
                 </div>
-                <span class="text-sm text-text-primary font-medium truncate">{{ item.title }}</span>
+                <span
+                  class="text-sm text-text-primary font-medium truncate"
+                  :title="item.title"
+                >{{ item.title }}</span>
               </div>
             </template>
             <template #cell-source="{ item }">

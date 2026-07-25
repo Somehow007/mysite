@@ -98,7 +98,7 @@ function getSortIcon(field: string) {
               v-for="col in columns"
               :key="col.key"
               :style="{ width: col.width, textAlign: col.headerAlign || col.align || 'left' }"
-              class="px-4 py-3 font-medium text-text-muted text-xs uppercase tracking-wider"
+              class="px-3 py-3 font-medium text-text-muted text-xs whitespace-nowrap"
             >
               <button
                 v-if="col.sortable"
@@ -127,7 +127,7 @@ function getSortIcon(field: string) {
             <td v-if="selectable" class="px-3 py-3">
               <div class="w-4 h-4 rounded bg-bg-code animate-pulse" />
             </td>
-            <td v-for="col in columns" :key="col.key" class="px-4 py-3">
+            <td v-for="col in columns" :key="col.key" class="px-3 py-3">
               <div class="h-4 bg-bg-code rounded animate-pulse" :style="{ width: col.width || '60%' }" />
             </td>
           </tr>
@@ -163,7 +163,7 @@ function getSortIcon(field: string) {
                 v-for="col in columns"
                 :key="col.key"
                 :style="{ textAlign: col.align || 'left' }"
-                class="px-4 py-3 text-text-secondary"
+                class="px-3 py-3 text-text-secondary"
               >
                 <slot :name="'cell-' + col.key" :item="item" :value="item[col.key]" :row="item">
                   {{ item[col.key] }}
