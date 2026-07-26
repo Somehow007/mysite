@@ -19,6 +19,8 @@ public class UserSelectRespDTO {
 
     private String email;
 
+    private String phoneNumber;
+
     private Integer sex;
 
     private String role;

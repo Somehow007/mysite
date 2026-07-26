@@ -46,14 +46,14 @@ public class UserController {
 
     @Operation(summary = "更新当前用户信息")
     @PutMapping("/v1/users/me")
-    public Result<Void> updateCurrentUser(@AuthenticationPrincipal SecurityUserDetails userDetails,
-                                          @RequestBody io.github.somehow.mysite.dto.req.user.UserUpdateReqDTO requestParam) {
+    public Result<UserSelectRespDTO> updateCurrentUser(@AuthenticationPrincipal SecurityUserDetails userDetails,
+                                                        @RequestBody io.github.somehow.mysite.dto.req.user.UserUpdateReqDTO requestParam) {
         if (userDetails == null) {
-            return Results.success();
+            throw new ClientException(ErrorCode.SECURITY_NOT_AUTHENTICATED);
         }
         requestParam.setUserId(userDetails.getUserId().toString());
         userService.updateUser(requestParam);
-        return Results.success();
+        return Results.success(userService.selectUserById(userDetails.getUserId().toString()));
     }
 
     @Operation(summary = "上传用户头像")

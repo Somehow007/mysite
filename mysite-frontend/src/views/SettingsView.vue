@@ -20,6 +20,7 @@ const profileForm = reactive({
   username: '',
   realName: '',
   email: '',
+  phoneNumber: '',
   sex: 0,
 })
 
@@ -42,11 +43,12 @@ const showNewPassword = ref(false)
 const showConfirmPassword = ref(false)
 const avatarUploading = ref(false)
 
-const originalProfile = ref({ username: '', realName: '', email: '', sex: 0 })
+const originalProfile = ref({ username: '', realName: '', email: '', phoneNumber: '', sex: 0 })
 const isDirty = computed(() =>
   profileForm.username !== originalProfile.value.username ||
   profileForm.realName !== originalProfile.value.realName ||
   profileForm.email !== originalProfile.value.email ||
+  profileForm.phoneNumber !== originalProfile.value.phoneNumber ||
   profileForm.sex !== originalProfile.value.sex
 )
 
@@ -62,6 +64,7 @@ onMounted(() => {
       username: userStore.user.username || '',
       realName: userStore.user.realName || '',
       email: userStore.user.email || '',
+      phoneNumber: userStore.user.phoneNumber || '',
       sex: userStore.user.sex || 0,
     }
     Object.assign(profileForm, data)
@@ -86,12 +89,14 @@ async function handleUpdateProfile() {
       username: profileForm.username,
       realName: profileForm.realName,
       email: profileForm.email,
+      phoneNumber: profileForm.phoneNumber,
       sex: profileForm.sex,
     })
     originalProfile.value = {
       username: profileForm.username,
       realName: profileForm.realName,
       email: profileForm.email,
+      phoneNumber: profileForm.phoneNumber,
       sex: profileForm.sex,
     }
     profileSuccess.value = '个人资料更新成功'
@@ -239,7 +244,7 @@ async function handleAvatarUpload(e: Event) {
             </div>
           </div>
 
-          <!-- 手机号：仅展示占位，待后端支持绑定逻辑 -->
+          <!-- 手机号 -->
           <div>
             <label class="block text-sm font-medium text-text-secondary mb-1.5">
               手机号
@@ -248,16 +253,15 @@ async function handleAvatarUpload(e: Event) {
               <div class="relative flex-1 min-w-0">
                 <Phone :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
                 <input
+                  v-model="profileForm.phoneNumber"
                   type="tel"
                   class="input-base pl-10"
-                  placeholder="未绑定手机号"
-                  disabled
+                  placeholder="输入手机号"
                 />
               </div>
-              <Badge variant="warning" dot>未绑定</Badge>
-              <button type="button" class="text-[13px] font-medium text-accent hover:underline whitespace-nowrap">
-                去绑定
-              </button>
+              <Badge :variant="profileForm.phoneNumber ? 'success' : 'warning'" dot>
+                {{ profileForm.phoneNumber ? '已绑定' : '未绑定' }}
+              </Badge>
             </div>
           </div>
 

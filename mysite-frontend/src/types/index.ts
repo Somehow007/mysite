@@ -5,6 +5,7 @@ export interface User {
   username: string
   realName: string
   email?: string
+  phoneNumber?: string
   sex?: number
   role?: UserRole
   followingCount?: number
