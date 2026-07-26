@@ -7,6 +7,7 @@ import { getCollections } from '@/api/collection'
 import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
 import { useFavorite } from '@/composables/useFavorite'
+import { useScrollReveal } from '@/composables/useScrollReveal'
 import { ArrowUpDown, ArrowUp, ArrowDown, Tag, X, Loader2, BookOpen, ChevronRight } from 'lucide-vue-next'
 import ArticleList from '@/components/article/ArticleList.vue'
 import CollectionCard from '@/components/collection/CollectionCard.vue'
@@ -139,6 +140,9 @@ watch(
   },
 )
 
+// Enable scroll-reveal animations for cards
+useScrollReveal()
+
 onMounted(() => {
   const page = route.params.page ? Number(route.params.page) : 1
   fetchArticles(page)
@@ -245,11 +249,13 @@ onMounted(() => {
         <div v-for="i in 3" :key="i" class="h-48 rounded-xl border border-border bg-bg-secondary animate-pulse" />
       </div>
       <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <CollectionCard
+        <div
           v-for="collection in collections"
           :key="collection.id"
-          :collection="collection"
-        />
+          data-reveal
+        >
+          <CollectionCard :collection="collection" />
+        </div>
       </div>
     </section>
 

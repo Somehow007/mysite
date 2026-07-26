@@ -2,6 +2,7 @@
 import { useToast } from '@/composables/useToast'
 import type { Toast } from '@/composables/useToast'
 import { CheckCircle, XCircle, Info, X } from 'lucide-vue-next'
+import { gsap } from 'gsap'
 
 const { toasts, remove } = useToast()
 
@@ -31,12 +32,53 @@ function title(type: Toast['type']) {
     default: return '提示'
   }
 }
+
+// GSAP TransitionGroup hooks
+function onBeforeEnter(el: Element) {
+  gsap.set(el as HTMLElement, { autoAlpha: 0, x: 80, scale: 0.9 })
+}
+
+function onEnter(el: Element, done: () => void) {
+  gsap.to(el as HTMLElement, {
+    autoAlpha: 1,
+    x: 0,
+    scale: 1,
+    duration: 0.4,
+    ease: 'back.out(1.4)',
+    onComplete: done,
+  })
+}
+
+function onLeave(el: Element, done: () => void) {
+  gsap.to(el as HTMLElement, {
+    autoAlpha: 0,
+    x: 80,
+    scale: 0.9,
+    duration: 0.2,
+    ease: 'power2.in',
+    onComplete: done,
+  })
+}
+
+// Stagger animation when toasts shift position
+function onMove(el: Element) {
+  gsap.to(el as HTMLElement, {
+    y: 0,
+    duration: 0.3,
+    ease: 'power2.out',
+  })
+}
 </script>
 
 <template>
   <Teleport to="body">
     <div class="fixed bottom-6 right-6 z-[100] flex flex-col gap-2.5 w-[340px] max-w-[calc(100vw-3rem)] pointer-events-none">
-      <TransitionGroup name="toast-slide">
+      <TransitionGroup
+        name="toast-slide"
+        @before-enter="onBeforeEnter"
+        @enter="onEnter"
+        @leave="onLeave"
+      >
         <div
           v-for="toast in toasts"
           :key="toast.id"
@@ -65,20 +107,3 @@ function title(type: Toast['type']) {
     </div>
   </Teleport>
 </template>
-
-<style scoped>
-.toast-slide-enter-active {
-  transition: all 0.3s ease-out;
-}
-.toast-slide-leave-active {
-  transition: all 0.2s ease-in;
-}
-.toast-slide-enter-from {
-  opacity: 0;
-  transform: translateX(100%);
-}
-.toast-slide-leave-to {
-  opacity: 0;
-  transform: translateX(100%);
-}
-</style>

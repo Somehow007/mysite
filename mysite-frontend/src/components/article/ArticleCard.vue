@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { BookOpen, Lock } from 'lucide-vue-next'
 import ArticleMeta from './ArticleMeta.vue'
 import FavoriteButton from './FavoriteButton.vue'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
+import { gsap } from 'gsap'
 import type { ArticleListItem } from '@/types'
 
 const props = defineProps<{
@@ -17,6 +19,7 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
+const cardRef = ref<HTMLElement | null>(null)
 
 function handleFavoriteToggle(favorited: boolean) {
   emit('favorite-toggle', props.article.id, favorited)
@@ -25,10 +28,34 @@ function handleFavoriteToggle(favorited: boolean) {
 function handleLoginRequired() {
   router.push('/login')
 }
+
+// Subtle hover animation via GSAP
+function onMouseEnter() {
+  gsap.to(cardRef.value, {
+    y: -2,
+    duration: 0.3,
+    ease: 'power2.out',
+    overwrite: 'auto',
+  })
+}
+
+function onMouseLeave() {
+  gsap.to(cardRef.value, {
+    y: 0,
+    duration: 0.3,
+    ease: 'power2.out',
+    overwrite: 'auto',
+  })
+}
 </script>
 
 <template>
-  <article class="group relative">
+  <article
+    ref="cardRef"
+    class="group relative cursor-pointer"
+    @mouseenter="onMouseEnter"
+    @mouseleave="onMouseLeave"
+  >
     <div class="flex items-start justify-between gap-3">
       <RouterLink :to="`/post/${article.id}`" class="flex-1 min-w-0">
         <div

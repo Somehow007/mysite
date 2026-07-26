@@ -1,11 +1,15 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { BookOpen, Library, Eye } from 'lucide-vue-next'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
+import { gsap } from 'gsap'
 import type { Collection } from '@/types'
 
 defineProps<{
   collection: Collection
 }>()
+
+const cardRef = ref<HTMLElement | null>(null)
 
 function formatViewCount(count?: number): string {
   if (!count || count <= 0) return '0'
@@ -13,12 +17,35 @@ function formatViewCount(count?: number): string {
   if (count >= 1000) return (count / 1000).toFixed(1) + 'k'
   return String(count)
 }
+
+function onMouseEnter() {
+  gsap.to(cardRef.value, {
+    y: -3,
+    scale: 1.01,
+    duration: 0.3,
+    ease: 'power2.out',
+    overwrite: 'auto',
+  })
+}
+
+function onMouseLeave() {
+  gsap.to(cardRef.value, {
+    y: 0,
+    scale: 1,
+    duration: 0.3,
+    ease: 'power2.out',
+    overwrite: 'auto',
+  })
+}
 </script>
 
 <template>
   <RouterLink
+    ref="cardRef"
     :to="`/collection/${collection.id}`"
-    class="group block rounded-xl border border-border border-l-[3px] border-l-accent overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-accent/40 hover:-translate-y-0.5 bg-accent-subtle/30"
+    class="group block rounded-xl border border-border border-l-[3px] border-l-accent overflow-hidden transition-all duration-300 hover:shadow-lg hover:border-accent/40 bg-accent-subtle/30"
+    @mouseenter="onMouseEnter"
+    @mouseleave="onMouseLeave"
   >
     <div v-if="collection.coverImage" class="aspect-[2/1] overflow-hidden relative">
       <OptimizedImage

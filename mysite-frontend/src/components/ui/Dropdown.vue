@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useFloating, offset, flip, shift, autoUpdate } from '@floating-ui/vue'
+import { gsap } from 'gsap'
 
 const props = withDefaults(defineProps<{
   /** 触发方式：click | hover | manual */
@@ -123,6 +124,45 @@ onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleEsc)
   if (hoverTimer) clearTimeout(hoverTimer)
 })
+
+// ── GSAP Transition hooks (animate inner wrapper, not the positioned panel) ──
+
+function onBeforeEnter(el: Element) {
+  const inner = (el as HTMLElement).querySelector('.dropdown-inner') as HTMLElement
+  if (inner) gsap.set(inner, { autoAlpha: 0, scale: 0.92, y: -8 })
+}
+
+function onEnter(el: Element, done: () => void) {
+  const inner = (el as HTMLElement).querySelector('.dropdown-inner') as HTMLElement
+  if (inner) {
+    gsap.to(inner, {
+      autoAlpha: 1,
+      scale: 1,
+      y: 0,
+      duration: 0.25,
+      ease: 'back.out(1.3)',
+      onComplete: done,
+    })
+  } else {
+    done()
+  }
+}
+
+function onLeave(el: Element, done: () => void) {
+  const inner = (el as HTMLElement).querySelector('.dropdown-inner') as HTMLElement
+  if (inner) {
+    gsap.to(inner, {
+      autoAlpha: 0,
+      scale: 0.97,
+      y: -2,
+      duration: 0.15,
+      ease: 'power2.in',
+      onComplete: done,
+    })
+  } else {
+    done()
+  }
+}
 </script>
 
 <template>
@@ -138,9 +178,13 @@ onBeforeUnmount(() => {
       <slot name="trigger" :open="controlledOpen" :close="close" />
     </div>
 
-    <!-- Floating panel -->
+    <!-- Floating panel: outer div positioned by floating-ui, inner div animated by GSAP -->
     <Teleport to="body">
-      <Transition name="dropdown-fade">
+      <Transition
+        @before-enter="onBeforeEnter"
+        @enter="onEnter"
+        @leave="onLeave"
+      >
         <div
           v-if="controlledOpen"
           ref="floatingRef"
@@ -149,7 +193,9 @@ onBeforeUnmount(() => {
           @mouseenter="handleContentEnter"
           @mouseleave="handleContentLeave"
         >
-          <slot :close="close" />
+          <div class="dropdown-inner">
+            <slot :close="close" />
+          </div>
         </div>
       </Transition>
     </Teleport>
@@ -165,20 +211,6 @@ onBeforeUnmount(() => {
   cursor: pointer;
 }
 .dropdown-panel {
-  /* base styling left to consumer; animation handled here */
-}
-.dropdown-fade-enter-active {
-  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.dropdown-fade-leave-active {
-  transition: opacity 0.15s ease-in, transform 0.15s ease-in;
-}
-.dropdown-fade-enter-from {
-  opacity: 0;
-  transform: scale(0.95) translateY(-6px);
-}
-.dropdown-fade-leave-to {
-  opacity: 0;
-  transform: scale(0.97) translateY(-2px);
+  /* base styling left to consumer; animation handled by GSAP */
 }
 </style>

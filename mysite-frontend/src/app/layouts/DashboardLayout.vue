@@ -4,8 +4,34 @@ import { RouterView } from 'vue-router'
 import { Menu } from 'lucide-vue-next'
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar.vue'
 import Drawer from '@/components/ui/Drawer.vue'
+import { gsap } from 'gsap'
 
 const drawerOpen = ref(false)
+
+// GSAP page transition hooks
+function onBeforeEnter(el: Element) {
+  gsap.set(el as HTMLElement, { autoAlpha: 0, y: 8 })
+}
+
+function onEnter(el: Element, done: () => void) {
+  gsap.to(el as HTMLElement, {
+    autoAlpha: 1,
+    y: 0,
+    duration: 0.25,
+    ease: 'power2.out',
+    onComplete: done,
+  })
+}
+
+function onLeave(el: Element, done: () => void) {
+  gsap.to(el as HTMLElement, {
+    autoAlpha: 0,
+    y: -8,
+    duration: 0.15,
+    ease: 'power2.in',
+    onComplete: done,
+  })
+}
 </script>
 
 <template>
@@ -34,23 +60,14 @@ const drawerOpen = ref(false)
       </div>
 
       <RouterView v-slot="{ Component }">
-        <component :is="Component" />
+        <Transition
+          @before-enter="onBeforeEnter"
+          @enter="onEnter"
+          @leave="onLeave"
+        >
+          <component :is="Component" />
+        </Transition>
       </RouterView>
     </main>
   </div>
 </template>
-
-<style scoped>
-.page-enter-active,
-.page-leave-active {
-  transition: opacity 150ms var(--ease-smooth), transform 150ms var(--ease-smooth);
-}
-.page-enter-from {
-  opacity: 0;
-  transform: translateY(8px);
-}
-.page-leave-to {
-  opacity: 0;
-  transform: translateY(-8px);
-}
-</style>

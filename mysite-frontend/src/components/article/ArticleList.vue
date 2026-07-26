@@ -29,14 +29,18 @@ defineEmits<{
     </div>
 
     <div v-else class="space-y-10">
-      <ArticleCard
+      <div
         v-for="(article, index) in articles"
         :key="article.id"
-        :article="article"
-        :show-favorite="showFavorite"
-        :priority="index < 2"
-        @favorite-toggle="(...args: [string, boolean]) => $emit('favorite-toggle', ...args)"
-      />
+        data-reveal
+      >
+        <ArticleCard
+          :article="article"
+          :show-favorite="showFavorite"
+          :priority="index < 2"
+          @favorite-toggle="(...args: [string, boolean]) => $emit('favorite-toggle', ...args)"
+        />
+      </div>
     </div>
 
     <ArticlePagination

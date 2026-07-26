@@ -8,8 +8,20 @@ import 'katex/dist/katex.min.css'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createUnhead, VueHeadMixin, headSymbol } from '@unhead/vue'
+import { gsap } from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import App from './app/App.vue'
 import router from './app/router'
+
+// Register GSAP plugins once at app level
+gsap.registerPlugin(ScrollTrigger)
+
+// Project-wide defaults: smooth easing, reasonable duration
+gsap.defaults({
+  duration: 0.5,
+  ease: 'power2.out',
+  overwrite: 'auto',
+})
 
 const app = createApp(App)
 const unhead = createUnhead()

@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { BookOpen, Library, Eye, Loader2, Search, ArrowLeft } from 'lucide-vue-next'
 import { getCollections } from '@/api/collection'
 import { formatDate } from '@/utils/date'
+import { useScrollReveal } from '@/composables/useScrollReveal'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
 import SkeletonCard from '@/components/common/SkeletonCard.vue'
 import type { Collection, Pagination } from '@/types'
@@ -52,6 +53,9 @@ function formatViewCount(count?: number): string {
   if (count >= 1000) return (count / 1000).toFixed(1) + 'k'
   return String(count)
 }
+
+// Enable scroll-reveal animations
+useScrollReveal()
 
 onMounted(() => {
   fetchCollections()
@@ -102,12 +106,15 @@ onMounted(() => {
     </div>
 
     <div v-else class="space-y-4">
-      <RouterLink
+      <div
         v-for="collection in collections"
         :key="collection.id"
-        :to="`/collection/${collection.id}`"
-        class="group flex gap-5 p-4 sm:p-5 rounded-xl border border-border bg-bg-secondary hover:border-accent/40 hover:shadow-lg card-shadow transition-all duration-300"
+        data-reveal
       >
+        <RouterLink
+          :to="`/collection/${collection.id}`"
+          class="group flex gap-5 p-4 sm:p-5 rounded-xl border border-border bg-bg-secondary hover:border-accent/40 hover:shadow-lg card-shadow transition-all duration-300"
+        >
         <!-- 封面缩略图 -->
         <div class="w-32 h-24 sm:w-40 sm:h-28 rounded-lg overflow-hidden shrink-0 bg-bg-code">
           <OptimizedImage
@@ -147,6 +154,7 @@ onMounted(() => {
           </div>
         </div>
       </RouterLink>
+      </div>
     </div>
 
     <div v-if="pagination && pagination.totalPages > 1" class="flex items-center justify-center gap-2 mt-8">
