@@ -27,6 +27,8 @@ export function useChat() {
   /** Snowflake 64-bit ID，用 string 避免 JS Number 精度丢失 */
   const conversationId = ref<string | null>(null)
   const lastError = ref<{ kind: ChatStreamErrorKind; message: string; status?: number } | null>(null)
+  /** 用户选择的知识库 ID 列表（空 = 不检索） */
+  const selectedKbIds = ref<string[]>([])
 
   // ── 对话历史 ─────────────────────────────────────────────
   const conversations = ref<ConversationSummary[]>([])
@@ -69,7 +71,7 @@ export function useChat() {
     })
 
     status.value = 'streaming'
-    abort = createChatStream(q, conversationId.value, {
+    abort = createChatStream(q, conversationId.value, selectedKbIds.value, {
       onMeta: (id) => { conversationId.value = id },
 
       onSources: (sources: SourceChunk[]) => {
@@ -137,6 +139,21 @@ export function useChat() {
     lastError.value = null
   }
 
+  /** 切换 KB 选中状态 */
+  function toggleKb(kbId: string) {
+    const idx = selectedKbIds.value.indexOf(kbId)
+    if (idx >= 0) {
+      selectedKbIds.value.splice(idx, 1)
+    } else {
+      selectedKbIds.value.push(kbId)
+    }
+  }
+
+  /** 清空 KB 选择 */
+  function clearKbSelection() {
+    selectedKbIds.value = []
+  }
+
   /** 加载对话历史列表 */
   async function loadConversations(visitorId: string) {
     try {
@@ -177,10 +194,13 @@ export function useChat() {
     lastError,
     conversations,
     loadingHistory,
+    selectedKbIds,
     sendMessage,
     retry,
     cancelGeneration,
     newConversation,
+    toggleKb,
+    clearKbSelection,
     loadConversations,
     switchConversation,
   }

@@ -23,12 +23,10 @@ public interface VectorStore {
      *
      * @param queryEmbedding    查询向量
      * @param topK              返回 top K 个最相似的
-     * @param kbId              限定知识库（null = 全库检索）。
-     *                          现在传 null 即可，但签名先留好 —— 多知识库是近期规划
-     *                          届时再加这个参数就是 breaking change 了
+     * @param kbIds             限定知识库 ID 列表（null 或空 = 全库检索）
      * @return                  检索结果，按相似度降序排列
      */
-    List<SearchResult> search(float[] queryEmbedding, int topK, Long kbId);
+    List<SearchResult> search(float[] queryEmbedding, int topK, List<Long> kbIds);
 
     /**
      * 删除指定知识库的所有向量

@@ -22,6 +22,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -32,16 +33,15 @@ import java.util.List;
  *   0. 成本保护（限流 + 问题长度）
  *   1. 加载对话记忆
  *   2. 查询改写（指代消解 / 拆分 / 口语正规化）
- *   3. 意图分类（LLM 分类器自动判断 → KB_RETRIEVAL / CHAT）
- *   [短路] 闲聊直回 —— CHAT 类型跳过检索，直接 LLM 回复
- *   4. 意图感知检索（定向 KB / 多子问题并行检索）
+ *   3. 意图分类（LLM 分类器 → KB_RETRIEVAL / CHAT / MCP）
+ *   [短路] 闲聊/MCP 直回 —— 非 KB_RETRIEVAL 类型跳过检索
+ *   4. 用户指定 KB 检索（前端传来的 kbIds 决定检索范围）
  *   5. 意图感知 Prompt（customPromptFragment + KB 名称标注）
  *   6. LLM 流式生成 → SSE 推送 → 落库
  * </pre>
  *
- * <p>意图分类由后端自动完成，用户无需手动选择。
- * 低置信度时自动降级为全局检索，不中断用户对话流。
- * 当 AI 确实无法确定用户意图时，会在对话中自然地询问澄清。</p>
+ * <p>意图分类判断模式（检索/闲聊/MCP），但具体检索哪个 KB 由用户在前端手动选择。
+ * 用户未选择任何 KB 时跳过检索，纯 LLM 回复。</p>
  */
 @Slf4j
 @Service
@@ -83,17 +83,18 @@ public class RagChatService {
      * @param visitorId      匿名访客标识
      * @param clientIp       客户端 IP（限流用）
      * @param userRole       用户角色（限流阈值）
+     * @param kbIds          用户选择的知识库 ID 列表（null 或空 = 不做检索）
      */
     public Flux<ChatEvent> chat(String question, Long conversationId,
                                 String visitorId, String clientIp,
-                                UserRole userRole) {
+                                UserRole userRole, List<Long> kbIds) {
         // Step 0: 成本保护
         return Mono.fromCallable(() -> {
                 rateLimiter.check(clientIp, question, userRole);
                 return true;
             })
             .subscribeOn(Schedulers.boundedElastic())
-            .flatMapMany(ok -> doChat(question, conversationId, visitorId))
+            .flatMapMany(ok -> doChat(question, conversationId, visitorId, kbIds))
             .onErrorResume(e -> {
                 if (e instanceof ChatRateLimiter.RateLimitExceededException) {
                     return Flux.just(ChatEvent.error(e.getMessage()));
@@ -102,11 +103,12 @@ public class RagChatService {
             });
     }
 
-    // ── 7 阶段管道 ──
+    // ── 6 阶段管道 ──
 
     private Flux<ChatEvent> doChat(String question, Long conversationId,
-                                   String visitorId) {
+                                   String visitorId, List<Long> kbIds) {
         long t0 = System.currentTimeMillis();
+        boolean hasKbIds = kbIds != null && !kbIds.isEmpty();
 
         // Stage 1: 获取或创建会话 + 加载对话历史
         ConversationDO conversation = conversationManager
@@ -124,31 +126,29 @@ public class RagChatService {
             rewritten.rewritten(), rewritten.subQueries().size(),
             System.currentTimeMillis() - t2);
 
-        // ── Stage 3: 意图分类（后端自动判断，用户无感）──
+        // ── Stage 3: 意图分类（判断模式：KB_RETRIEVAL / CHAT / MCP）──
         long t3 = System.currentTimeMillis();
         IntentResult intent = intentClassifier.classify(primaryQuery, history);
-        log.info("[pipeline] stage3: type={}, targetKb={}, confidence={} ({}ms)",
-            intent.getType(), intent.getTargetKbId(),
-            String.format("%.2f", intent.getConfidence()),
-            System.currentTimeMillis() - t3);
+        log.info("[pipeline] stage3: type={}, confidence={}, reason={} ({}ms)",
+            intent.getType(), String.format("%.2f", intent.getConfidence()),
+            intent.getReason(), System.currentTimeMillis() - t3);
 
-        // 低置信度 / 全局检索意图 → 退化为全局搜索（搜所有 KB，不限定单个 KB）
-        // 避免用户问"一共有多少文章"时被意图分类器误路由到单 KB
-        if (intent.isKbRetrieval() && intent.getTargetKbId() != null
-                && intent.getConfidence() < 0.6) {
-            log.info("[pipeline] low confidence ({}) → forcing global search",
-                String.format("%.2f", intent.getConfidence()));
-            intent.setTargetKbId(null);
-        }
-
-        // ── 短路: 闲聊直接回复 ──
-        if (intent.isChat()) {
-            log.info("[pipeline] chat-only intent → skipping retrieval");
+        // ── 短路: 非检索类型直接 LLM 回复 ──
+        // CHAT = 闲聊，MCP = 工具调用（预留），均不检索
+        if (!intent.isKbRetrieval()) {
+            log.info("[pipeline] non-retrieval intent ({}) → skipping retrieval", intent.getType());
             List<ChatMessage> messages = promptTemplate.buildGeneralPrompt(primaryQuery, history);
             return streamLLMResponse(messages, convId, question, List.of());
         }
 
-        // ── Stage 4: 意图感知检索 ──
+        // 用户未选择任何 KB → 不检索，直接 LLM 回复
+        if (!hasKbIds) {
+            log.info("[pipeline] KB_RETRIEVAL but no KBs selected by user → skipping retrieval");
+            List<ChatMessage> messages = promptTemplate.buildGeneralPrompt(primaryQuery, history);
+            return streamLLMResponse(messages, convId, question, List.of());
+        }
+
+        // ── Stage 4: 用户指定 KB 检索 ──
         long t4 = System.currentTimeMillis();
         int topK = intent.getCustomTopK() != null
             ? intent.getCustomTopK()
@@ -158,13 +158,13 @@ public class RagChatService {
         if (rewritten.subQueries().size() > 1) {
             // 多子问题：分别检索 → 去重合并 → Rerank
             retrieved = retrievalEngine.multiRetrieve(
-                rewritten.subQueries(), intent.getTargetKbId(), topK);
+                rewritten.subQueries(), kbIds, topK);
         } else {
-            // 单问题（含原文未改写）：定向或全库检索
-            retrieved = retrievalEngine.retrieve(primaryQuery, topK, intent.getTargetKbId());
+            // 单问题（含原文未改写）
+            retrieved = retrievalEngine.retrieve(primaryQuery, topK, kbIds);
         }
-        log.info("[pipeline] stage4: {} results, targetKb={}, topK={} ({}ms)",
-            retrieved.size(), intent.getTargetKbId(), topK,
+        log.info("[pipeline] stage4: {} results, kbIds={}, topK={} ({}ms)",
+            retrieved.size(), kbIds, topK,
             System.currentTimeMillis() - t4);
 
         List<SourceChunkDTO> sources = retrieved.stream()

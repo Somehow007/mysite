@@ -26,8 +26,8 @@ import java.util.List;
  *
  * <h3>Phase 6 改造</h3>
  * <ul>
- *   <li>{@link #retrieve(String, int, Long)} —— kbId 参数支持定向检索（null = 全库）</li>
- *   <li>{@link #multiRetrieve(List, Long, int)} —— 多子问题并行检索 → 去重合并 → Rerank</li>
+ *   <li>{@link #retrieve(String, int, List)} —— kbIds 参数支持多 KB 定向检索</li>
+ *   <li>{@link #multiRetrieve(List, List, int)} —— 多子问题并行检索 → 去重合并 → Rerank</li>
  * </ul>
  */
 @Slf4j
@@ -41,21 +41,21 @@ public class RetrievalEngine {
     private final RagProperties properties;
 
     /**
-     * 检索相关文档片段（兼容旧调用，kbId 为 null）。
+     * 检索相关文档片段（不限 KB）。
      */
     public List<SearchResult> retrieve(String question, int topK) {
         return retrieve(question, topK, null);
     }
 
     /**
-     * 检索相关文档片段（支持定向检索）。
+     * 检索相关文档片段（支持多 KB 定向检索）。
      *
      * @param question 用户问题（原始文本）
      * @param topK     最终返回多少个片段
-     * @param kbId     目标知识库 ID（null = 全库检索）
+     * @param kbIds    目标知识库 ID 列表（null 或空 = 全库检索）
      * @return 检索结果，按相关性降序
      */
-    public List<SearchResult> retrieve(String question, int topK, Long kbId) {
+    public List<SearchResult> retrieve(String question, int topK, List<Long> kbIds) {
         long t0 = System.currentTimeMillis();
 
         // Stage 1: Embedding + 向量检索
@@ -67,10 +67,10 @@ public class RetrievalEngine {
         List<SearchResult> candidates = vectorStore.search(
             queryEmbedding,
             properties.getRetrieval().getTopK(),
-            kbId
+            kbIds
         );
-        log.info("[retrieval] vector search: {} candidates, kbId={} ({}ms total)",
-            candidates.size(), kbId, System.currentTimeMillis() - t0);
+        log.info("[retrieval] vector search: {} candidates, kbIds={} ({}ms total)",
+            candidates.size(), kbIds, System.currentTimeMillis() - t0);
 
         // 过滤低分结果
         candidates = candidates.stream()
@@ -93,23 +93,23 @@ public class RetrievalEngine {
      * 然后去重合并、统一 Rerank。避免长问题 embedding 语义稀释。
      *
      * @param subQueries 子问题列表（通常 2-3 个）
-     * @param kbId       目标知识库（null = 全库）
+     * @param kbIds      目标知识库 ID 列表（null 或空 = 全库）
      * @param topK       最终返回多少个片段
      * @return 去重合并 + Rerank 后的结果
      */
-    public List<SearchResult> multiRetrieve(List<String> subQueries, Long kbId, int topK) {
+    public List<SearchResult> multiRetrieve(List<String> subQueries, List<Long> kbIds, int topK) {
         if (subQueries.isEmpty()) return List.of();
-        if (subQueries.size() == 1) return retrieve(subQueries.get(0), topK, kbId);
+        if (subQueries.size() == 1) return retrieve(subQueries.get(0), topK, kbIds);
 
         long t0 = System.currentTimeMillis();
-        log.info("[multi-retrieve] {} sub-queries, kbId={}", subQueries.size(), kbId);
+        log.info("[multi-retrieve] {} sub-queries, kbIds={}", subQueries.size(), kbIds);
 
         // 每个子问题独立检索（顺序执行 —— embedding API 有并发限制）
         // chunkId → result，用于去重（保留更高分的那个）
         LinkedHashMap<Long, SearchResult> dedupMap = new LinkedHashMap<>();
 
         for (String subQuery : subQueries) {
-            List<SearchResult> results = retrieve(subQuery, topK, kbId);
+            List<SearchResult> results = retrieve(subQuery, topK, kbIds);
             for (SearchResult r : results) {
                 SearchResult existing = dedupMap.get(r.chunkId());
                 if (existing == null || r.score() > existing.score()) {

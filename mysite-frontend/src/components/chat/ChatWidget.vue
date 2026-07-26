@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, nextTick, watch, onScopeDispose, onBeforeUnmount, computed } from 'vue'
+import { ref, nextTick, watch, onScopeDispose, onBeforeUnmount, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Sparkles, X, RotateCw, PanelLeftOpen, AlertTriangle, Clock, LogIn, Bot } from 'lucide-vue-next'
+import { Sparkles, X, RotateCw, PanelLeftOpen, AlertTriangle, Clock, LogIn, Bot, Library } from 'lucide-vue-next'
 import { useChat } from '@/composables/useChat'
 import { useFabStack } from '@/composables/useFabStack'
-import { getVisitorId } from '@/api/rag'
+import { getVisitorId, getKnowledgeBases } from '@/api/rag'
 import { useUserStore } from '@/stores/user'
+import type { KnowledgeBase } from '@/types'
 import ChatMessageItem from './ChatMessageItem.vue'
 import ChatInput from './ChatInput.vue'
 import ChatHistory from './ChatHistory.vue'
@@ -27,6 +28,35 @@ const inputComponentRef = ref<InstanceType<typeof ChatInput> | null>(null)
 
 const chat = useChat()
 const isUserScrolledUp = ref(false)
+
+// ── 知识库选择 ────────────────────────────────────────────────
+const kbs = ref<KnowledgeBase[]>([])
+const kbsLoading = ref(false)
+
+async function loadKbs() {
+  kbsLoading.value = true
+  try {
+    kbs.value = await getKnowledgeBases()
+  } catch {
+    kbs.value = []
+  } finally {
+    kbsLoading.value = false
+  }
+}
+
+function toggleKb(kbId: string) {
+  chat.toggleKb(kbId)
+}
+
+const hasSelectedKbs = computed(() => chat.selectedKbIds.value.length > 0)
+const subtitleText = computed(() => {
+  if (!hasSelectedKbs.value) return '未选择知识库，直接对话'
+  if (chat.selectedKbIds.value.length === 1 && kbs.value.length > 0) {
+    const kb = kbs.value.find(k => k.id === chat.selectedKbIds.value[0])
+    return kb ? `检索：${kb.name}` : '已选择 1 个知识库'
+  }
+  return `检索 ${chat.selectedKbIds.value.length} 个知识库`
+})
 
 // ── 历史侧栏 ────────────────────────────────────────────────
 const showHistory = ref(false)
@@ -78,10 +108,11 @@ onBeforeUnmount(() => {
   if (rateLimitTimer) clearInterval(rateLimitTimer)
 })
 
-// 面板打开时加载历史对话列表
+// 面板打开时加载历史对话列表 + KB 列表
 watch(isOpen, (open) => {
   if (open) {
     chat.loadConversations(getVisitorId())
+    loadKbs()
     showHistory.value = false
   }
 })
@@ -246,8 +277,11 @@ onScopeDispose(() => {
           <div class="flex-1 min-w-0">
             <h1 class="text-[15px] font-semibold text-text-primary leading-tight">AI 助手</h1>
             <p class="text-[11.5px] text-text-muted mt-0.5 flex items-center gap-1.5">
-              <span class="w-1.5 h-1.5 rounded-full bg-success shrink-0" />
-              基于站内知识库
+              <span
+                class="w-1.5 h-1.5 rounded-full shrink-0"
+                :class="hasSelectedKbs ? 'bg-accent' : 'bg-text-muted'"
+              />
+              {{ subtitleText }}
             </p>
           </div>
 
@@ -269,6 +303,26 @@ onScopeDispose(() => {
           >
             <X :size="17" />
           </button>
+        </div>
+
+        <!-- KB 选择标签栏 -->
+        <div
+          v-if="kbs.length > 0"
+          class="shrink-0 px-3.5 py-2 border-b border-border flex items-center gap-1.5 overflow-x-auto scrollbar-thin"
+        >
+          <Library :size="13" class="text-text-muted shrink-0" />
+          <button
+            v-for="kb in kbs"
+            :key="kb.id"
+            @click="toggleKb(kb.id)"
+            class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200"
+            :class="chat.selectedKbIds.value.includes(kb.id)
+              ? 'bg-accent text-text-inverse shadow-sm'
+              : 'bg-bg-code text-text-muted hover:bg-accent-subtle hover:text-accent'"
+          >
+            {{ kb.name }}
+          </button>
+          <span v-if="kbsLoading" class="text-[11px] text-text-muted ml-1">加载中...</span>
         </div>
 
         <!-- 内容区（含侧栏） -->

@@ -63,10 +63,19 @@ function safe<T extends (...args: never[]) => void>(fn: T, ...args: Parameters<T
 export function createChatStream(
   question: string,
   conversationId: string | null,
+  kbIds: string[],
   callbacks: ChatStreamCallbacks,
 ): AbortController {
   const params = new URLSearchParams({ q: question, visitorId: getVisitorId() })
   if (conversationId != null) params.set('conversationId', conversationId)
+  if (kbIds != null && kbIds.length > 0) {
+    kbIds.forEach(id => params.append('kbIds', id))
+  }
+
+  // 诊断日志：确认 kbIds 已拼入 URL
+  if (import.meta.env.DEV) {
+    console.log('[rag] streaming request:', `/v1/rag/chat/stream?${params}`, 'kbIds:', kbIds)
+  }
 
   const controller = new AbortController()
   const { signal } = controller

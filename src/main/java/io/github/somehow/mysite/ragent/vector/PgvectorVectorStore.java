@@ -7,7 +7,12 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
-import java.sql.*;
+import java.sql.Array;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -72,8 +77,11 @@ public class PgvectorVectorStore implements VectorStore{
     }
 
     @Override
-    public List<SearchResult> search(float[] queryEmbedding, int topK, Long kbId) {
-        String sql = """
+    public List<SearchResult> search(float[] queryEmbedding, int topK, List<Long> kbIds) {
+        boolean hasFilter = kbIds != null && !kbIds.isEmpty();
+        String sql;
+        if (hasFilter) {
+            sql = """
                 SELECT
                     v.chunk_id,
                     c.doc_id,
@@ -85,26 +93,43 @@ public class PgvectorVectorStore implements VectorStore{
                 JOIN t_knowledge_chunk c ON v.chunk_id = c.id
                 JOIN t_knowledge_document d ON c.doc_id = d.id
                 WHERE d.status = 'READY'
-                    AND (?::bigint IS NULL OR v.kb_id = ?::bigint)
+                    AND v.kb_id = ANY(?::bigint[])
                 ORDER BY v.embedding <=> ?::vector
                 LIMIT ?
                 """;
+        } else {
+            sql = """
+                SELECT
+                    v.chunk_id,
+                    c.doc_id,
+                    d.title AS doc_title,
+                    c.content,
+                    1 - (v.embedding <=> ?::vector) AS similarity,
+                    v.kb_id
+                FROM t_knowledge_vector v
+                JOIN t_knowledge_chunk c ON v.chunk_id = c.id
+                JOIN t_knowledge_document d ON c.doc_id = d.id
+                WHERE d.status = 'READY'
+                ORDER BY v.embedding <=> ?::vector
+                LIMIT ?
+                """;
+        }
         long t0 = System.currentTimeMillis();
         List<SearchResult> results = new ArrayList<>();
         try (Connection conn = dataSource.getConnection();
         PreparedStatement ps = conn.prepareStatement(sql)) {
             PGvector queryVec = new PGvector(queryEmbedding);
-            ps.setObject(1, queryVec);
-            // kbId 为 null 时不过滤（全库检索），否则限定知识库
-            if (kbId == null) {
-                ps.setNull(2, Types.BIGINT);
-                ps.setNull(3, Types.BIGINT);
+            if (hasFilter) {
+                ps.setObject(1, queryVec);
+                Array kbArray = conn.createArrayOf("bigint", kbIds.toArray(new Long[0]));
+                ps.setArray(2, kbArray);
+                ps.setObject(3, queryVec);
+                ps.setInt(4, topK);
             } else {
-                ps.setLong(2, kbId);
-                ps.setLong(3, kbId);
+                ps.setObject(1, queryVec);
+                ps.setObject(2, queryVec);
+                ps.setInt(3, topK);
             }
-            ps.setObject(4, queryVec);  // ORDER BY 也用到
-            ps.setInt(5, topK);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     results.add(new SearchResult(
@@ -120,8 +145,8 @@ public class PgvectorVectorStore implements VectorStore{
         } catch (SQLException e) {
             throw new RuntimeException("Vector search failed", e);
         }
-        log.info("[pgvector] search: topK={}, kbId={}, results={}, elapsed={}ms",
-            topK, kbId, results.size(), System.currentTimeMillis() - t0);
+        log.info("[pgvector] search: topK={}, kbIds={}, hasFilter={}, results={}, elapsed={}ms",
+            topK, kbIds, hasFilter, results.size(), System.currentTimeMillis() - t0);
         return results;
     }
 

@@ -72,13 +72,20 @@ public class RagChatController {
             @RequestParam("q") String question,
             @RequestParam(value = "conversationId", required = false) Long conversationId,
             @RequestParam(value = "visitorId", required = false) String visitorId,
+            @RequestParam(value = "kbIds", required = false) List<String> kbIdStrings,
             HttpServletRequest request) {
 
         SseEmitter emitter = new SseEmitter(120_000L);  // 120 秒超时
         String clientIp = resolveClientIp(request);
         UserRole userRole = UserContext.getRole();
-        log.info("RAG chat request: ip={}, role={}, visitorId={}, convId={}, qLen={}",
-            clientIp, userRole, visitorId, conversationId, question.length());
+
+        // 将前端传来的 string kbIds 转为 Long（避免 Spring 自动转换的潜在问题）
+        List<Long> kbIds = (kbIdStrings != null && !kbIdStrings.isEmpty())
+            ? kbIdStrings.stream().map(Long::parseLong).toList()
+            : List.of();
+
+        log.info("RAG chat request: ip={}, role={}, visitorId={}, convId={}, qLen={}, kbIds={}",
+            clientIp, userRole, visitorId, conversationId, question.length(), kbIds);
 
         // ── 优雅终止：存储订阅句柄，客户端断开 / 超时时取消后端 Flux ──
         final Disposable[] subscriptionHolder = new Disposable[1];
@@ -96,7 +103,7 @@ public class RagChatController {
         ragExecutor.execute(() -> {
             try {
                 Disposable subscription = ragChatService
-                    .chat(question, conversationId, visitorId, clientIp, userRole)
+                    .chat(question, conversationId, visitorId, clientIp, userRole, kbIds)
                     .subscribe(
                         event -> sendEvent(emitter, event),
                         // service 层已兜底为 error 事件，理论上这里走不到

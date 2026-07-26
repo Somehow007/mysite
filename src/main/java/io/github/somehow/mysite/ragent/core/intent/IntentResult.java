@@ -43,7 +43,12 @@ public class IntentResult {
         return "CHAT".equals(type);
     }
 
-    /** 判断置信度是否足够高，可以直接定向检索 */
+    /** 判断是否属于 MCP 工具调用类型（预留，暂未实现） */
+    public boolean isMcp() {
+        return "MCP".equals(type);
+    }
+
+    /** 判断置信度是否足够高 */
     public boolean isHighConfidence() {
         return confidence >= 0.6;
     }
