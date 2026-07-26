@@ -7,14 +7,16 @@ import {
   Heart, Loader2, ExternalLink, Eye, Edit3,
 } from 'lucide-vue-next'
 import { Pagination } from '@/components/ui'
+import CollectionCard from '@/components/collection/CollectionCard.vue'
 import { useUserStore } from '@/stores/user'
 import { getUserProfile, updateUser } from '@/api/user'
 import { getFavoriteArticles } from '@/api/article'
+import { getCollections } from '@/api/collection'
 import { getPaginated } from '@/api/client'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { formatDate } from '@/utils/date'
-import type { UserProfile } from '@/types'
+import type { UserProfile, Collection } from '@/types'
 import type { ArticleListItem } from '@/types'
 
 const route = useRoute()
@@ -41,6 +43,12 @@ const isOwner = computed(() =>
 
 // Owner or admin can view private tabs (favorites)
 const canViewPrivate = computed(() => isOwner.value || isAdmin.value)
+
+// Collections list (public — visible to everyone)
+const collections = ref<Collection[]>([])
+const loadingCollections = ref(false)
+const collectionsPage = ref(1)
+const collectionsTotal = ref(0)
 
 // Favorites list
 const favorites = ref<ArticleListItem[]>([])
@@ -130,6 +138,25 @@ async function fetchFavorites(page: number = 1) {
   }
 }
 
+async function fetchCollections(page: number = 1) {
+  if (!profile.value) return
+  loadingCollections.value = true
+  try {
+    const result = await getCollections({
+      page,
+      size: 10,
+      authorId: String(profile.value.id),
+    })
+    collections.value = result.list
+    collectionsTotal.value = result.pagination.total
+    collectionsPage.value = page
+  } catch {
+    collections.value = []
+  } finally {
+    loadingCollections.value = false
+  }
+}
+
 // Bio editing
 const editingBio = ref(false)
 const bioText = ref('')
@@ -168,9 +195,11 @@ watch(username, () => {
   fetchProfile()
 })
 
-// Auto-load favorites when switching to the favorites tab
+// Auto-load data when switching tabs
 watch(activeTab, (tab) => {
-  if (tab === 'favorites' && canViewPrivate.value && favorites.value.length === 0) {
+  if (tab === 'collections' && collections.value.length === 0) {
+    fetchCollections(1)
+  } else if (tab === 'favorites' && canViewPrivate.value && favorites.value.length === 0) {
     fetchFavorites(1)
   }
 })
@@ -197,8 +226,8 @@ onMounted(() => {
     <div v-else-if="profile">
       <!-- Profile card -->
       <div class="card-solid rounded-[20px] p-8 md:p-10 mb-6 relative overflow-hidden">
-        <!-- 顶部渐变条纹 -->
-        <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+        <!-- 顶部装饰线 -->
+        <div class="absolute top-0 left-0 right-0 h-[2px] bg-accent/25" />
         <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
           <!-- Avatar -->
           <div class="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-text-inverse flex items-center justify-center text-3xl font-bold shrink-0 overflow-hidden shadow-[0_0_0_4px_var(--bg-elevated),0_0_0_6px_var(--accent-subtle)]">
@@ -322,7 +351,7 @@ onMounted(() => {
             <!-- 封面缩略图：有封面用封面图，否则渐变占位 -->
             <div class="hidden sm:flex w-[200px] h-[100px] shrink-0 rounded-lg overflow-hidden shadow-sm">
               <img v-if="a.coverImage" :src="a.coverImage" :alt="a.title" class="w-full h-full object-cover" />
-              <div v-else class="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center px-4 text-center text-[13px] font-bold leading-snug text-white/90 line-clamp-2">
+              <div v-else class="w-full h-full bg-gradient-to-br from-accent to-accent-hover flex items-center justify-center px-4 text-center text-[13px] font-bold leading-snug text-white/90 line-clamp-2">
                 {{ a.title }}
               </div>
             </div>
@@ -336,8 +365,29 @@ onMounted(() => {
           />
         </div>
       </div>
-      <div v-else-if="activeTab === 'collections'" class="space-y-4">
-        <p class="text-text-muted text-center py-8">合集列表将在此显示</p>
+      <div v-else-if="activeTab === 'collections'">
+        <div v-if="loadingCollections" class="flex justify-center py-8">
+          <Loader2 :size="20" class="animate-spin text-text-muted" />
+        </div>
+        <div v-else-if="collections.length === 0" class="text-center py-8">
+          <BookOpen :size="32" class="mx-auto mb-3 text-text-muted/40" />
+          <p class="text-text-muted text-sm">暂无合集</p>
+        </div>
+        <div v-else>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <CollectionCard
+              v-for="c in collections"
+              :key="c.id"
+              :collection="c"
+            />
+          </div>
+          <Pagination
+            :current="collectionsPage"
+            :total="collectionsTotal"
+            :page-size="10"
+            @update:current="fetchCollections"
+          />
+        </div>
       </div>
       <div v-else-if="activeTab === 'favorites' && canViewPrivate">
         <!-- Load on first open -->
@@ -371,7 +421,7 @@ onMounted(() => {
             </div>
             <div class="hidden sm:flex w-[200px] h-[100px] shrink-0 rounded-lg overflow-hidden shadow-sm">
               <img v-if="a.coverImage" :src="a.coverImage" :alt="a.title" class="w-full h-full object-cover" />
-              <div v-else class="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center px-4 text-center text-[13px] font-bold leading-snug text-white/90 line-clamp-2">
+              <div v-else class="w-full h-full bg-gradient-to-br from-accent to-accent-hover flex items-center justify-center px-4 text-center text-[13px] font-bold leading-snug text-white/90 line-clamp-2">
                 {{ a.title }}
               </div>
             </div>
