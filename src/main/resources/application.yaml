@@ -99,7 +99,8 @@ rag:
   datasource:
     driver-class-name: org.postgresql.Driver
     url: jdbc:postgresql://localhost:5432/ragent
-    username: somehow
+    # 生产环境 docker-compose 创建的用户是 ragent；本地开发如用别的用户，设置环境变量 RAGENT_PG_USER 覆盖，不要再直接改这里
+    username: ${RAGENT_PG_USER:ragent}
     password: ${RAGENT_PG_PASSWORD:ragent123}
     hikari:
       maximum-pool-size: 5

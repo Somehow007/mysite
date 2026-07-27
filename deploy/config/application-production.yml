@@ -98,3 +98,13 @@ image:
     max-uploads-per-minute: 10
     url-fetch-connect-timeout: 5000
     url-fetch-read-timeout: 15000
+
+# ============ RAG 数据源 (PostgreSQL + pgvector) ============
+# 显式覆盖，避免 jar 内 application.yaml 的本地开发默认值泄漏到生产
+# docker-compose 创建的 PG 用户是 ragent / ragent123
+rag:
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${RAGENT_PG_HOST:localhost}:${RAGENT_PG_PORT:5432}/${RAGENT_PG_DB:ragent}
+    username: ${RAGENT_PG_USER:ragent}
+    password: ${RAGENT_PG_PASSWORD:ragent123}

@@ -2,6 +2,24 @@
 
 ## 更新日志
 
+### 2026-07-27: 生产环境 RAG 数据源配置修复（PG 用户名不一致）
+
+> 更新于 2026-07-27：定位并修复线上 RAG 模块全线报错（知识库列表/新建、聊天记录"消失"）。
+
+#### 决策背景
+
+线上报"新建知识库报错、原有知识库与聊天记录消失"。排查结论：**数据未丢失**（PG 内仍有 1 个知识库 / 46 文档 / 334 chunks / 11 会话 / 24 消息），根因是连接认证失败——`application.yaml` 中 RAG 数据源 `username` 在 commit `960cfd9`（2026-07-26）被误改为本地开发用户 `somehow`（此前 `530b969` 已修过一次，属二次复发），重新部署后后端以 `somehow` 连接 PG，报 `FATAL: password authentication failed for user "somehow"`，所有 RAG 接口 500，前端表现为数据消失。
+
+#### 决策内容
+
+1. **配置环境变量化**：`application.yaml` 的 RAG 数据源用户名改为 `${RAGENT_PG_USER:ragent}`，与 docker-compose 的 `POSTGRES_USER: ragent` 默认一致；本地开发若用别的 PG 用户，通过环境变量 `RAGENT_PG_USER` 覆盖，**禁止再直接改文件提交**。
+2. **生产配置显式覆盖**：`deploy/config/application-production.yml` 新增 `rag.datasource` 段（host/port/db/user/password 全部环境变量化，默认 ragent/ragent123），使生产配置不再依赖 jar 内默认值，杜绝本地开发配置泄漏到生产。
+3. **服务器热修**：同步追加 `/opt/mysite/application-production.yml` 的 `rag.datasource` 段并 `start.sh restart`，无需重新打包即恢复。
+
+#### 影响范围
+
+- `src/main/resources/application.yaml`、`deploy/config/application-production.yml`、服务器 `/opt/mysite/application-production.yml`
+
 ### 2026-07-27: 学习手帐第二期后端化实施
 
 > 更新于 2026-07-27：第二期（后端化 + 跨设备同步）开发与本地验证完成，待部署上线。
