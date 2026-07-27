@@ -15,6 +15,7 @@
 1. **配置环境变量化**：`application.yaml` 的 RAG 数据源用户名改为 `${RAGENT_PG_USER:ragent}`，与 docker-compose 的 `POSTGRES_USER: ragent` 默认一致；本地开发若用别的 PG 用户，通过环境变量 `RAGENT_PG_USER` 覆盖，**禁止再直接改文件提交**。
 2. **生产配置显式覆盖**：`deploy/config/application-production.yml` 新增 `rag.datasource` 段（host/port/db/user/password 全部环境变量化，默认 ragent/ragent123），使生产配置不再依赖 jar 内默认值，杜绝本地开发配置泄漏到生产。
 3. **服务器热修**：同步追加 `/opt/mysite/application-production.yml` 的 `rag.datasource` 段并 `start.sh restart`，无需重新打包即恢复。
+4. **PG 密码对齐**：修完用户名后暴露出第二层问题——PG 数据卷初始化时用的是 `docker/.env` 里的强密码 `Shragent123!`（`POSTGRES_PASSWORD` 仅在卷首次初始化时生效，与 compose 默认值 `ragent123` 无关）。已通过 `ALTER USER` 将 DB 密码统一为 `Shragent123!`，并同步到生产 yml；`/opt/mysite/.env` 已有该值，新 jar 的 `${RAGENT_PG_PASSWORD:...}` 占位符会自动取到。
 
 #### 影响范围
 
