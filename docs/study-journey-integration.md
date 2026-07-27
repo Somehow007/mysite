@@ -258,6 +258,16 @@ API 清单（响应统一博客 `Result<T>` 包装，**data 段与前端 TS 类�
 
 > 备注：`/actuator/health` 返回 Result 包装的错误是既有怪癖（ES 等健康指示器异常被全局异常处理器接住），与本期无关；部署脚本的健康检查本就对此有告警兜底。
 
+### 8.6 上线当日事故与热修复（2026-07-27 12:13）
+
+**现象**：手帐页面点击心情、添加学习记录无反应。
+
+**根因**（既有架构缺陷，由手帐首次高频触发）：`ragentTransactionManager`（绑定 PG）曾是容器中唯一的 `PlatformTransactionManager`，Boot 的事务管理器自动配置因此退避，**所有未限定名称的 `@Transactional`（博客主业务 + journal）都被绑到 PG 数据源**；生产服务器未部署 PG，带事务的写操作全部抛 `CannotCreateTransactionException`。前端写操作是 fire-and-forget，错误被静默吞掉，表现为「按钮无反应」。本地冒烟通过是因为本地 PG 在运行。
+
+**修复**（commit `2dc1611`，已重新部署）：`PrimaryDataSourceConfig` 显式声明 `@Primary` 的主库 `DataSourceTransactionManager`；`KnowledgeBaseService` 的 `@Transactional` 显式限定 `ragentTransactionManager`。副作用收益：博客所有带事务的写路径（发文、评论管理等）在未部署 PG 的环境也一并修复。
+
+**教训**：前端 fire-and-forget 写操作必须补「保存失败」提示（v2.0 §6 第 3 项「保存状态可信化」，列为后续打磨项）。
+
 ## 9. 当前阶段的已知限制
 
 | 限制 | 说明 | 计划 |
