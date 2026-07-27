@@ -1,7 +1,7 @@
 # 学习手帐（花期 Blossom）集成日志与说明
 
 > 本文档记录学习手帐项目（`study-journey/`）集成进 MySite 博客的决策、实施过程、服务器现状与运维方法。
-> 创建：2026-07-26 ｜ 状态：**第一期已上线** ✅ ／ **第二期开发完成，待部署** 🔧
+> 创建：2026-07-26 ｜ 状态：**第一期已上线** ✅ ／ **第二期已部署（2026-07-27），待浏览器验收** ✅
 
 ---
 
@@ -247,13 +247,16 @@ API 清单（响应统一博客 `Result<T>` 包装，**data 段与前端 TS 类�
 | 本地全链路冒烟（8082 临时实例，admin 真实 JWT） | ✅ upsert + patch 语义、learnings 全量替换、按月查询、搜索、自定义心情 CRUD、导出、导入幂等（两次导入记录数不增）、无 token→401、USER 角色→403、删除后条目级联清零 |
 | 冒烟发现并修复的 bug | `importData` 原实现先导记录后导心情，记录引用的自定义心情尚不存在时校验失败导致整批回滚 → **已修复为先导心情后导记录** |
 
-### 8.5 部署步骤（待执行）
+### 8.5 部署执行记录（2026-07-27 已完成）
 
-1. **建表**：服务器 MySQL 执行 `docker/init/journal-schema.sql`
-2. **后端**：标准流程（git pull + `./mvnw clean package -Pproduction -Dmaven.test.skip=true` + 重启）——测试源码编译问题要求打包必须跳过测试编译（见 §10）
-3. **手帐产物**：本地 `npm run build` → scp `dist/` → rsync 到 `/var/www/journal/`（同第一期 §6.1）
-4. **验证**：管理员登录后浏览器打开 `https://somehow007.top/journal/` 走一遍记录/统计/搜索/导入导出；curl 复核 `/api/journal/*`
-5. **迁移**：在常用浏览器的手帐设置页点「迁移本地旧数据」，把第一期 IndexedDB 数据传上服务器
+1. ✅ **建表**：`journal-schema.sql` 经 `docker exec mysite-mysql` 在生产库执行，3 表就位
+2. ✅ **后端**：服务器 `~/project/mysite` git pull → `./mvnw clean package -Dmaven.test.skip=true` → jar 拷至 `/opt/mysite/mysite.jar` → `start.sh` 重启（14s 启动完成）。因 RAG 测试源码编译问题（§10），`deploy/server-deploy.sh` 已同步修正为 `-Dmaven.test.skip=true`
+3. ✅ **手帐产物**：本地 `npm run build` → scp → rsync 到 `/var/www/journal/`（同第一期 §6.1）
+4. ✅ **线上匿名验证**：`/journal/` 与 SPA fallback 200、8080 兼容入口 200、`/api/journal/export` 未登录 401（A070100）、线上 bundle 哈希与本地构建一致、博客首页与 `/v1/site/info` 无回归
+5. ⏳ **浏览器验收（需管理员本人）**：登录博客 → 打开 `https://somehow007.top/journal/` 走一遍记录/统计/搜索/导入导出
+6. ⏳ **历史数据迁移**：在存有第一期数据的浏览器里，进手帐设置页点「迁移本地旧数据」（幂等，可重复）
+
+> 备注：`/actuator/health` 返回 Result 包装的错误是既有怪癖（ES 等健康指示器异常被全局异常处理器接住），与本期无关；部署脚本的健康检查本就对此有告警兜底。
 
 ## 9. 当前阶段的已知限制
 
