@@ -80,7 +80,9 @@ public class KnowledgeBaseService {
         return getById(id);
     }
 
-    @Transactional
+    // 必须显式限定事务管理器：主库事务管理器是 @Primary（见 PrimaryDataSourceConfig），
+    // 而本服务操作的是 PG 数据源
+    @Transactional("ragentTransactionManager")
     public void delete(Long id) {
         KnowledgeBaseDO kb = kbMapper.selectById(id);
         if (kb == null) return;

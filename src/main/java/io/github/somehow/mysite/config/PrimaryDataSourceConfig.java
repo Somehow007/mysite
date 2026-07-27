@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 
 import javax.sql.DataSource;
 
@@ -51,6 +52,30 @@ public class PrimaryDataSourceConfig {
     public DataSource dataSource(
             @Qualifier("primaryDataSourceProperties") DataSourceProperties properties) {
         return properties.initializeDataSourceBuilder().build();
+    }
+
+    /**
+     * 主库事务管理器 —— 必须显式声明且 @Primary。
+     * <p>
+     * RagentDataSourceConfig 定义了 ragentTransactionManager（绑定 PG 数据源）后，
+     * Spring Boot 的 DataSourceTransactionManagerAutoConfiguration 因
+     * @ConditionalOnMissingBean(PlatformTransactionManager) 整体退避，
+     * 容器里只剩 PG 那一个事务管理器：所有未限定名称的 @Transactional
+     * （博客主业务 + journal 模块）都会被绑到 PG 数据源上。
+     * 未部署 PG 的环境（如生产服务器）会直接抛
+     * CannotCreateTransactionException: Could not open JDBC Connection for transaction，
+     * 表现为一切带事务的写操作失败（2026-07-27 手帐 upsert 线上事故根因）。
+     * </p>
+     * <p>
+     * 显式声明 @Primary 的 MySQL 事务管理器后，未限定的 @Transactional 默认走主库；
+     * ragent 自己的 @Transactional 需显式指定 @Transactional("ragentTransactionManager")。
+     * </p>
+     */
+    @Primary
+    @Bean
+    public DataSourceTransactionManager transactionManager(
+            @Qualifier("dataSource") DataSource dataSource) {
+        return new DataSourceTransactionManager(dataSource);
     }
 
     /**
