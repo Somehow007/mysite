@@ -5,7 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-@MapperScan(value = "io.github.somehow.mysite.dao.mapper",
+@MapperScan(value = {"io.github.somehow.mysite.dao.mapper", "io.github.somehow.mysite.journal.dao.mapper"},
             sqlSessionFactoryRef = "sqlSessionFactory")
 public class MysiteApplication {
 

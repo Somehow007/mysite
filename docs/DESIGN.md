@@ -2,6 +2,27 @@
 
 ## 更新日志
 
+### 2026-07-27: 学习手帐第二期后端化实施
+
+> 更新于 2026-07-27：第二期（后端化 + 跨设备同步）开发与本地验证完成，待部署上线。
+
+#### 决策背景
+
+第一期已把纯前端手帐挂到 `/journal/` 子路径；第二期按《网站集成与 MySQL 存储方案 v2.0》执行后端化，解决第一期遗留的两个核心限制：数据困在各自浏览器（不跨设备）、URL 无服务端鉴权。
+
+#### 决策内容
+
+1. **范围边界**：本期 = v2.0 的 P0/P1（后端）+ P2 数据层切换 + P3/P4（迁移与部署）。v2.0 §6 体验清单中的 v4.0 视觉重写、字体本地化、移动端重构**不在本期**（属独立的前端重开专项，另立阶段）。
+2. **数据库**：mysite 库新增 `sj_day_record` / `sj_learning_item` / `sj_custom_mood`（v2.0 §3 DDL 原样落地）。与博客建表惯例的差异均为 v2.0 定稿内容：**硬删除 + 外键级联**（无 `del_flag`，手帐删除是真实删除语义）、BIGINT Unix 毫秒时间戳（与前端 `number` 对齐）、`date` 为 CHAR(10) 字符串（全程禁止时区转换）。
+3. **后端**：新增顶层包 `io.github.somehow.mysite.journal`（controller/service/dao/dto，MyBatis-Plus 主数据源；`@MapperScan` 追加 `journal.dao.mapper` 绑定主库 `sqlSessionFactory`）。API 前缀 `/api/journal`；响应统一 `Result<T>` 包装（data 段与前端 TS 类型逐字段对齐——v2.0「裸 JSON」示例相应调整为全站一致风格）；`user_id` 一律从博客 JWT（`UserContext`）解析，禁止前端传参；`/api/journal/**` 仅 ADMIN 可访问。未采用 v2.0 的 `default-user-id` 兜底配置——博客认证链已完整，直接接真实用户。upsert 为事务内 patch 语义（learnings 传则全量替换）；`/import` 兼容 v1/v2 格式、按 `(user_id,date)` 幂等。
+4. **前端**：新增 `http.ts`（Bearer token 取自同源 `localStorage['mysite_access_token']`、Result 解包、401 跳 `/login`、写操作遇 5xx/网络错误自动重试一次）+ `api.ts`（与 `db.ts` 同名同签名）+ `journalEvents` 事件总线 + `useApiQuery`（替代 dexie `useLiveQuery` 的响应式查询）。9 个页面/组件切换数据源，页面代码对存储切换无感；`useDataIO` 改走服务端导入导出，并新增「迁移本地旧数据」一键入口（读旧 IndexedDB → POST /import，幂等可重复）；App 启动门控由「IndexedDB 就绪」改为「登录态检查」；dev 端口改 5174（避让博客 5173）+ `/api → localhost:8081` 代理。`db.ts` 保留不删，仅供迁移读取。
+5. **Nginx**：零改动——`location /api/` 反代第一期就已存在，这正是当初选子路径方案的核心收益。
+
+#### 影响范围
+
+- 后端：`journal/` 包 20 个新文件；`MysiteApplication`（@MapperScan）、`WebSecurityConfig`（/api/journal/** ADMIN 规则）、`ErrorCode`（A11 段）；`docker/init/schema.sql` 追加 + `docker/init/journal-schema.sql` 新增
+- 手帐：`src/lib/{http,api,journalEvents,useApiQuery}.ts` 新增；App.tsx、moodUtils、useDataIO、6 个页面、MoodEditModal、vite.config.ts 修改
+
 ### 2026-07-26: 学习手帐（花期 Blossom）集成方案确定
 
 > 更新于 2026-07-26：与用户讨论后确定集成路线，第一期已实施。

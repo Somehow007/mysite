@@ -1,7 +1,7 @@
 # 学习手帐（花期 Blossom）集成日志与说明
 
 > 本文档记录学习手帐项目（`study-journey/`）集成进 MySite 博客的决策、实施过程、服务器现状与运维方法。
-> 创建：2026-07-26 ｜ 状态：**第一期已上线** ✅
+> 创建：2026-07-26 ｜ 状态：**第一期已上线** ✅ ／ **第二期开发完成，待部署** 🔧
 
 ---
 
@@ -44,8 +44,9 @@
   │
   └─ https://somehow007.top/journal/    → 手帐（React 18 SPA，/var/www/journal）
         ├─ vite base='/journal/'，BrowserRouter basename='/journal'
-        ├─ 数据：浏览器 IndexedDB（第一期）
-        └─ 第二期将调用同源 /api/journal → Spring Boot(8081) → MySQL sj_ 表
+        ├─ 数据（第二期）：同源 /api/journal → Spring Boot(8081) journal 模块 → MySQL sj_ 表
+        │    └─ 登录态复用博客 JWT（localStorage['mysite_access_token']），服务端按 user_id 隔离
+        └─ 浏览器 IndexedDB 降级为迁移兜底（设置页「迁移本地旧数据」读取后不再使用）
 
 Nginx (443/HTTPS，证书由 Certbot 管理，自动覆盖子路径)
   ├─ location /journal/ { alias /var/www/journal/; try_files … }   ← 手帐
@@ -172,19 +173,101 @@ sudo rm -rf /var/www/journal
 - mysite 仓库的 `.gitignore` **未**忽略该目录，但因嵌套 `.git` 的存在，mysite 不会跟踪其内容。⚠️ 在 mysite 根目录执行 `git add .` 时留意不要把 `study-journey/` 作为嵌入式仓库（gitlink）误加入。
 - 两个仓库的提交相互独立，按功能模块分别提交。
 
-## 8. 第二期规划（待定）
+## 8. 第二期实施记录（2026-07-27，待部署）
 
-依据手帐仓库内《网站集成与 MySQL 存储方案 v2.0》：
+依据手帐仓库内《网站集成与 MySQL 存储方案 v2.0》，完成 P0/P1（后端）+ P2（前端数据层）+ 迁移入口。**范围边界**：v2.0 §6 体验清单中的 v4.0 视觉重写、字体本地化、移动端重构不在本期，UI 保持现状只换数据底座。
 
-1. **P0/P1 后端**：MySQL 现有库新建 `sj_day_record`、`sj_learning_item`、`sj_custom_mood` 三张表；后端新增 journal 包（controller/service/entity/dto），API 前缀 `/api/journal`，登录态从博客 JWT 解析 `user_id`。
-2. **P2 前端**：手帐数据层由 IndexedDB 切换为 HTTP API（同源，无 CORS 成本——正是第一期选子路径的核心收益）。
-3. **P3/P4**：历史数据经 `/import` 迁移、服务端用户隔离验收。
+### 8.1 数据库
+
+mysite 库新增 3 张表（DDL 按 v2.0 §3 原样）：
+
+| 表 | 要点 |
+|----|------|
+| `sj_day_record` | `(user_id,date)` 唯一索引；`mood` 存预设枚举或自定义心情 nanoid；`diary` TEXT；`created_at/updated_at` BIGINT Unix 毫秒 |
+| `sj_learning_item` | 外键 `record_id → sj_day_record.id` **ON DELETE CASCADE**；`client_id` 存前端 nanoid |
+| `sj_custom_mood` | nanoid 直接作 VARCHAR(21) 主键；深色三档色存 `dark_colors` JSON 列 |
+
+与博客建表惯例的两处差异（均为 v2.0 定稿）：**硬删除**（无 `del_flag`，手帐删除是真实删除语义）；时间用 BIGINT 毫秒、`date` 用 CHAR(10) 字符串（全程禁止时区转换，否则日记「串天」）。
+
+脚本：`docker/init/schema.sql` 已追加（新环境一次建好）；**存量库用独立迁移脚本** `docker/init/journal-schema.sql`（全部 `CREATE TABLE IF NOT EXISTS`，幂等）。
+
+### 8.2 后端 journal 模块
+
+新增顶层包 `io.github.somehow.mysite.journal`（仿 ragent 的模块边界，但走**主 MySQL 数据源**）：
+
+```
+journal/
+├── controller/  JournalController        /api/journal/records・/search・/import・/export
+│                JournalMoodController    /api/journal/moods/custom
+├── service/     JournalService / CustomMoodService（+ impl）
+├── dao/entity/  SjDayRecordDO / SjLearningItemDO / SjCustomMoodDO（不继承 BaseDO）
+├── dao/mapper/  3 个 BaseMapper（@MapperScan 追加 journal.dao.mapper，绑定主库 sqlSessionFactory）
+└── dto/         DayRecordDTO / LearningItemDTO / CustomMoodDTO / DarkColorsDTO / 请求与导入导出 DTO
+```
+
+API 清单（响应统一博客 `Result<T>` 包装，**data 段与前端 TS 类型逐字段对齐**，camelCase）：
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/journal/records/{date}` | 单日详情（含 learnings） |
+| GET | `/api/journal/records?month=YYYY-MM` / `?year=YYYY` / 无参 | 按月 / 按年 / 全部（date 升序） |
+| PUT | `/api/journal/records/{date}` | upsert，patch 语义：mood/diary 传了才更新（mood 空串=清除）；learnings 传则全量替换。事务内完成 |
+| DELETE | `/api/journal/records/{date}` | 删整日（条目级联），幂等 |
+| GET | `/api/journal/search?keyword=` | 日记 LIKE 搜索，updatedAt 倒序，上限 200 |
+| POST | `/api/journal/import` | 兼容 v1 纯数组 / v2 含 customMoods；按 `(user_id,date)` 与心情 nanoid **幂等 upsert** |
+| GET | `/api/journal/export` | 导出 v2 格式 JSON（与旧前端导出文件格式一致，可直接回导） |
+| GET/POST/PUT/DELETE | `/api/journal/moods/custom[/{id}]` | 自定义心情 CRUD |
+
+**鉴权与用户隔离**：`WebSecurityConfig` 中 `/api/journal/**` → `hasRole("ADMIN")`；所有 service 方法强制带 `user_id` 条件，`user_id` 由服务端从博客 JWT（`UserContext.getUserId()`）解析，**前端不传**。未采用 v2.0 的 `default-user-id` 兜底——博客认证链已完整，直接接真实用户。错误码新增 A11 段（`ErrorCode`）。
+
+**Nginx 零改动**：`location /api/ { proxy_pass http://localhost:8081/api/; }` 第一期就在配置里（当时尚未使用），本期直接复用——这是子路径方案的预期收益。
+
+### 8.3 手帐前端数据层切换
+
+| 文件 | 改动 |
+|------|------|
+| `src/lib/http.ts`（新） | fetch 封装：Bearer token 取自同源 `localStorage['mysite_access_token']`（与博客 `storage.ts` 格式一致，JSON 字符串）；`Result` 解包；401 → 跳网站 `/login`；写操作遇 5xx/网络错误自动重试一次 |
+| `src/lib/api.ts`（新） | 与 `db.ts` **同名同签名**的数据操作（另加 `getAllRecords`）；写操作成功后发变更事件 |
+| `src/lib/journalEvents.ts` + `useApiQuery.ts`（新） | 轻量事件总线 + 查询 Hook，替代 dexie `useLiveQuery` 的响应式：任何写操作后挂载中的查询自动重拉，页面体验与 IndexedDB 版一致 |
+| 6 个页面 + `moodUtils` + `MoodEditModal` + `Settings` | import 来源 `lib/db` → `lib/api`；`useLiveQuery` → `useApiQuery` |
+| `src/lib/useDataIO.ts` | 导出/导入改走服务端；**新增「迁移本地旧数据」入口**：读本浏览器 IndexedDB（`db.ts` 保留的读取能力）→ POST `/import`，幂等可重复 |
+| `src/App.tsx` | 启动门控由「IndexedDB 就绪」改为「登录态检查」（无 token 跳 `/login`）；移除 DB 错误页 |
+| `vite.config.ts` | dev 端口 5173 → **5174**（避让博客）；新增 `/api → localhost:8081` 开发代理 |
+
+`src/lib/db.ts`（Dexie）**保留不删**，仅供迁移入口读取历史数据。
+
+### 8.4 本地验证结果（2026-07-27）
+
+| 检查项 | 结果 |
+|--------|------|
+| 后端编译 `./mvnw compile` | ✅ |
+| 后端测试 `./mvnw test` | ⚠️ 与改动前基线**完全一致**的失败集（6 个 RAG 测试类 + 1 个 DEVELOPER 角色旧测试，均为改动前已存在的问题，非本期引入）；且发现干净构建下 RAG 测试**源码**编译不过（此前靠增量缓存掩盖）——见 §10 |
+| 手帐构建 `npm run build`（tsc + vite build） | ✅ |
+| 建表脚本 | ✅ 本地 MySQL 执行通过，3 表结构与 DDL 一致 |
+| 本地全链路冒烟（8082 临时实例，admin 真实 JWT） | ✅ upsert + patch 语义、learnings 全量替换、按月查询、搜索、自定义心情 CRUD、导出、导入幂等（两次导入记录数不增）、无 token→401、USER 角色→403、删除后条目级联清零 |
+| 冒烟发现并修复的 bug | `importData` 原实现先导记录后导心情，记录引用的自定义心情尚不存在时校验失败导致整批回滚 → **已修复为先导心情后导记录** |
+
+### 8.5 部署步骤（待执行）
+
+1. **建表**：服务器 MySQL 执行 `docker/init/journal-schema.sql`
+2. **后端**：标准流程（git pull + `./mvnw clean package -Pproduction -Dmaven.test.skip=true` + 重启）——测试源码编译问题要求打包必须跳过测试编译（见 §10）
+3. **手帐产物**：本地 `npm run build` → scp `dist/` → rsync 到 `/var/www/journal/`（同第一期 §6.1）
+4. **验证**：管理员登录后浏览器打开 `https://somehow007.top/journal/` 走一遍记录/统计/搜索/导入导出；curl 复核 `/api/journal/*`
+5. **迁移**：在常用浏览器的手帐设置页点「迁移本地旧数据」，把第一期 IndexedDB 数据传上服务器
 
 ## 9. 当前阶段的已知限制
 
 | 限制 | 说明 | 计划 |
 |------|------|------|
-| 数据不跨设备 | 存各自浏览器 IndexedDB | 第二期后端化解决 |
-| URL 无服务端鉴权 | 仅隐藏入口；但数据本地存储，暴露 URL 无数据泄露风险 | 第二期随登录态打通解决 |
+| ~~数据不跨设备~~ | ~~存各自浏览器 IndexedDB~~ | ✅ 第二期已解决（MySQL + /api/journal） |
+| ~~URL 无服务端鉴权~~ | ~~仅隐藏入口~~ | ✅ 第二期已解决（/api/journal/** 仅 ADMIN + user_id 隔离） |
+| 断网不可用 | 数据上服务端后，离线无法读写（v2.0 §10 已接受的取舍） | 如在意，后续用保留的 Dexie 做「本地优先 + 后台同步」，另立专项 |
+| 并发写无版本号 | 同一管理员多设备同时编辑同一天，后写覆盖先写（个人自用场景概率极低） | 有需要时给 upsert 加 updatedAt 乐观锁 |
 | 字体走 Google Fonts CDN | 国内偶发加载慢 | 集成方案 v2.0 §6 体验清单第 7 项：字体本地化 |
 | 手帐产物未做不可变缓存头 | 仅 ETag 协商缓存，对管理员自用场景无感 | 有需要时在 `location /journal/` 内补静态资源缓存规则 |
+
+## 10. 仓库既有问题备忘（非本期引入）
+
+- **RAG 测试源码与主代码签名漂移**：`RagChatServiceTest` / `Phase3IntegrationTest` / `PgvectorVectorStoreTest` 等 6 个测试类按旧签名编写（如 `RagChatService.chat` 少了 `List<Long>` 参数），干净构建下**测试源码编译不过**；此前 `./mvnw test` 能跑是靠 `target/` 增量缓存（旧 class 运行时报 NoSuchMethod）。另有 `ArticleServiceImplDeleteTest` 一个 DEVELOPER 角色旧测试失败。均为本期改动之前就存在的问题（已用 git stash 基线对比确认）。
+- **影响**：后端打包必须跳过测试编译（`-Dmaven.test.skip=true`，注意不是 `-DskipTests`——后者只跳过执行、仍会编译）。部署脚本与 CI 需注意。
+- **建议**：单独立项修复 RAG 测试签名，恢复 `./mvnw test` 的干净构建可用性。

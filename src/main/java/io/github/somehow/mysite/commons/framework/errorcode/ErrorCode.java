@@ -115,6 +115,14 @@ public enum ErrorCode implements IErrorCode {
     COLLECTION_ARTICLE_NOT_IN_COLLECTION("A100103", "文章不在该合集中"),
     COLLECTION_PERMISSION_DENIED("A100104", "权限不足，只能操作自己的合集"),
 
+    // ---------- A11: 学习手帐模块错误 ----------
+    JOURNAL_ERROR("A110001", "学习手帐模块错误"),
+    JOURNAL_DATE_INVALID("A110100", "日期格式无效，应为 YYYY-MM-DD"),
+    JOURNAL_MOOD_INVALID("A110101", "心情值无效：需为预设心情或已创建的自定义心情"),
+    JOURNAL_MOOD_NOT_FOUND("A110102", "自定义心情不存在"),
+    JOURNAL_MOOD_DUPLICATE("A110103", "自定义心情 ID 已存在"),
+    JOURNAL_IMPORT_INVALID("A110104", "导入数据格式无效"),
+
     // ==================== B: 服务端错误 ====================
     SERVICE_ERROR("B000001", "系统执行出错"),
     SERVICE_TIMEOUT_ERROR("B000100", "系统执行超时"),

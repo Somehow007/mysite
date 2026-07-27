@@ -158,6 +158,10 @@ public class WebSecurityConfig {
                         .requestMatchers(
                                 "/v1/admin/comments/**"
                         ).hasRole("ADMIN")
+                        // 学习手帐（花期 Blossom）：仅 ADMIN（前端入口本身只对管理员显示，服务端按 user_id 隔离数据）
+                        .requestMatchers(
+                                "/api/journal/**"
+                        ).hasRole("ADMIN")
                         // 合集公开读接口：允许未登录读者浏览合集和文章导航
                         .requestMatchers(
                                 HttpMethod.GET,
