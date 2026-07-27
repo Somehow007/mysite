@@ -1,7 +1,7 @@
 # 学习手帐（花期 Blossom）集成日志与说明
 
 > 本文档记录学习手帐项目（`study-journey/`）集成进 MySite 博客的决策、实施过程、服务器现状与运维方法。
-> 创建：2026-07-26 ｜ 状态：**第一期已上线** ✅ ／ **第二期已部署（2026-07-27），待浏览器验收** ✅
+> 创建：2026-07-26 ｜ 状态：**第一期已上线** ✅ ／ **第二期已上线并验收（2026-07-27）** ✅
 
 ---
 
@@ -253,8 +253,8 @@ API 清单（响应统一博客 `Result<T>` 包装，**data 段与前端 TS 类�
 2. ✅ **后端**：服务器 `~/project/mysite` git pull → `./mvnw clean package -Dmaven.test.skip=true` → jar 拷至 `/opt/mysite/mysite.jar` → `start.sh` 重启（14s 启动完成）。因 RAG 测试源码编译问题（§10），`deploy/server-deploy.sh` 已同步修正为 `-Dmaven.test.skip=true`
 3. ✅ **手帐产物**：本地 `npm run build` → scp → rsync 到 `/var/www/journal/`（同第一期 §6.1）
 4. ✅ **线上匿名验证**：`/journal/` 与 SPA fallback 200、8080 兼容入口 200、`/api/journal/export` 未登录 401（A070100）、线上 bundle 哈希与本地构建一致、博客首页与 `/v1/site/info` 无回归
-5. ⏳ **浏览器验收（需管理员本人）**：登录博客 → 打开 `https://somehow007.top/journal/` 走一遍记录/统计/搜索/导入导出
-6. ⏳ **历史数据迁移**：在存有第一期数据的浏览器里，进手帐设置页点「迁移本地旧数据」（幂等，可重复）
+5. ✅ **浏览器验收（2026-07-27）**：管理员线上实际使用了心情记录、学习条目、日记（当日数据已落库，见 §8.7），全链路正常。验收过程中暴露并修复了事务管理器事故（§8.6）
+6. ⏳ **历史数据迁移（按需）**：若某浏览器第一期 IndexedDB 里还有想保留的旧数据，在该浏览器的手帐设置页点「迁移本地旧数据」（幂等，可重复）；无需迁移则可忽略
 
 > 备注：`/actuator/health` 返回 Result 包装的错误是既有怪癖（ES 等健康指示器异常被全局异常处理器接住），与本期无关；部署脚本的健康检查本就对此有告警兜底。
 
@@ -262,11 +262,21 @@ API 清单（响应统一博客 `Result<T>` 包装，**data 段与前端 TS 类�
 
 **现象**：手帐页面点击心情、添加学习记录无反应。
 
-**根因**（既有架构缺陷，由手帐首次高频触发）：`ragentTransactionManager`（绑定 PG）曾是容器中唯一的 `PlatformTransactionManager`，Boot 的事务管理器自动配置因此退避，**所有未限定名称的 `@Transactional`（博客主业务 + journal）都被绑到 PG 数据源**；生产服务器未部署 PG，带事务的写操作全部抛 `CannotCreateTransactionException`。前端写操作是 fire-and-forget，错误被静默吞掉，表现为「按钮无反应」。本地冒烟通过是因为本地 PG 在运行。
+**根因**（既有架构缺陷，由手帐首次高频触发）：`ragentTransactionManager`（绑定 PG）曾是容器中唯一的 `PlatformTransactionManager`，Boot 的事务管理器自动配置因此退避，**所有未限定名称的 `@Transactional`（博客主业务 + journal）都被绑到 PG 数据源**；事故当时生产服务器未部署 PG（同日稍后已随 RAG 数据源配置修复一并解决，见 DESIGN.md「2026-07-27: 生产环境 RAG 数据源配置修复」条目），带事务的写操作全部抛 `CannotCreateTransactionException`。前端写操作是 fire-and-forget，错误被静默吞掉，表现为「按钮无反应」。本地冒烟通过是因为本地 PG 在运行。
 
 **修复**（commit `2dc1611`，已重新部署）：`PrimaryDataSourceConfig` 显式声明 `@Primary` 的主库 `DataSourceTransactionManager`；`KnowledgeBaseService` 的 `@Transactional` 显式限定 `ragentTransactionManager`。副作用收益：博客所有带事务的写路径（发文、评论管理等）在未部署 PG 的环境也一并修复。
 
 **教训**：前端 fire-and-forget 写操作必须补「保存失败」提示（v2.0 §6 第 3 项「保存状态可信化」，列为后续打磨项）。
+
+### 8.7 数据存储现状（2026-07-27 起）
+
+**主存储**：服务器 `124.222.65.169` 的 docker 容器 `mysite-mysql`（MySQL 8.4）→ `mysite` 库 → `sj_day_record` / `sj_learning_item` / `sj_custom_mood`。访问链路：浏览器 → 同源 `/api/journal/**`（Nginx 反代）→ Spring Boot journal 模块 → MySQL，服务端从博客 JWT 解析 `user_id` 隔离，仅 ADMIN。
+
+**首批真实数据**（事务事故修复后产生，验证了全链路）：2026-07-27 当日 1 条日记录（心情 + 51 字日记）+ 1 条学习条目（60 分钟），自定义心情 0 个。
+
+**遗留本地数据**：各浏览器 IndexedDB（`StudyJournalDB`）里可能还留着第一期数据，已降级为迁移兜底，仅设置页「迁移本地旧数据」读取。
+
+**备份**（⚠️ 待落实）：`sj_` 表已随网站 MySQL 成为数据的唯一权威副本，但服务器目前**没有系统化的 MySQL 定期备份**。日记从「不出浏览器」变成「只在服务器」后这是新的单点风险（v2.0 §10 已提示）。建议：每日 `docker exec mysite-mysql mysqldump` 全库快照 + 异地留存，待确认后实施。
 
 ## 9. 当前阶段的已知限制
 
@@ -275,6 +285,7 @@ API 清单（响应统一博客 `Result<T>` 包装，**data 段与前端 TS 类�
 | ~~数据不跨设备~~ | ~~存各自浏览器 IndexedDB~~ | ✅ 第二期已解决（MySQL + /api/journal） |
 | ~~URL 无服务端鉴权~~ | ~~仅隐藏入口~~ | ✅ 第二期已解决（/api/journal/** 仅 ADMIN + user_id 隔离） |
 | 断网不可用 | 数据上服务端后，离线无法读写（v2.0 §10 已接受的取舍） | 如在意，后续用保留的 Dexie 做「本地优先 + 后台同步」，另立专项 |
+| MySQL 备份待落实 | 后端化后服务器 DB 是数据唯一权威副本，目前无系统化定期备份 | 每日 mysqldump 全库快照 + 异地留存（§8.7，待确认后实施） |
 | 并发写无版本号 | 同一管理员多设备同时编辑同一天，后写覆盖先写（个人自用场景概率极低） | 有需要时给 upsert 加 updatedAt 乐观锁 |
 | 字体走 Google Fonts CDN | 国内偶发加载慢 | 集成方案 v2.0 §6 体验清单第 7 项：字体本地化 |
 | 手帐产物未做不可变缓存头 | 仅 ETag 协商缓存，对管理员自用场景无感 | 有需要时在 `location /journal/` 内补静态资源缓存规则 |
