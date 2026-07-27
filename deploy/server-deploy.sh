@@ -59,7 +59,10 @@ step_build_backend() {
     local mvn_cmd
     mvn_cmd=$(find_maven "$PROJECT_DIR")
     [ "$mvn_cmd" = "$PROJECT_DIR/mvnw" ] && chmod +x "$mvn_cmd"
-    if ! "$mvn_cmd" clean package -DskipTests 2>&1 | tee -a "$DEPLOY_LOG"; then
+    # 用 -Dmaven.test.skip=true 而非 -DskipTests：仓库里存在签名漂移的 RAG 测试源码
+    # （干净构建下编译不过，见 docs/study-journey-integration.md §10），
+    # -DskipTests 只跳过执行、仍会编译测试，故必须跳过测试编译
+    if ! "$mvn_cmd" clean package -Dmaven.test.skip=true 2>&1 | tee -a "$DEPLOY_LOG"; then
         die "后端构建失败，请查看日志: $DEPLOY_LOG"
     fi
     local fat_jar
