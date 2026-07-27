@@ -2,6 +2,40 @@
 
 ## 更新日志
 
+### 2026-07-26: 学习手帐（花期 Blossom）集成方案确定
+
+> 更新于 2026-07-26：与用户讨论后确定集成路线，第一期已实施。
+
+#### 决策背景
+
+学习手帐项目（`study-journey/`，React 18 + Vite 独立前端，当前数据存浏览器 IndexedDB）需要集成进已部署的博客站点（`somehow007.top`）。讨论了三种 URL 方案：
+
+| 方案 | 形态 | 结论 |
+|------|------|------|
+| 子路径 | `somehow007.top/journal/` | ✅ **采用** |
+| 子域名 | `journal.somehow007.top` | ❌ 放弃 |
+| 独立端口 | `IP:8082` | ❌ 放弃 |
+
+#### 决策内容
+
+1. **URL 形态：子路径 `somehow007.top/journal/`**
+   - 理由：与手帐《网站集成与 MySQL 存储方案 v2.0》§7.3 的推荐一致；无需变更 DNS、无需扩容 SSL 证书（现有 Let's Encrypt 证书自动覆盖）、无 CORS 与跨域 cookie 问题；**同源**为第二期后端化（`sj_` 表 + 复用博客 JWT 登录态）铺平道路。
+   - 放弃子域名的理由：需要新增 DNS A 记录、`certbot --expand` 扩容证书、后端 CORS 放行，且 localStorage 按源隔离导致博客登录态无法直接共享，与 v2.0 方案"同源请求携带登录态"的核心假设冲突。
+
+2. **入口可见性：仅 ADMIN 可见**
+   - 博客顶栏（AppHeader）通过 `userStore.isAdmin` 条件渲染「手帐」链接，桌面端与移动端菜单同步。
+   - 当前阶段数据存各自浏览器 IndexedDB，URL 暴露不泄露数据；第二期后端化后由服务端 `user_id` 隔离做真正鉴权。
+
+3. **分两期实施**
+   - **第一期（2026-07-26 实施 ✅）**：手帐按现状（纯前端 IndexedDB 版）部署到 `/journal/`；手帐侧 `vite.config.ts` 设 `base: '/journal/'`、`BrowserRouter basename="/journal"`、按集成文档 §7.4 移除 PWA 注册；博客侧 Nginx（443 与 8080 两个 server 块）新增 `location /journal/ { alias /var/www/journal/; try_files ... }`；产物部署至服务器 `/var/www/journal/`。
+   - **第二期（待定）**：按《网站集成与 MySQL 存储方案 v2.0》执行后端化——MySQL 新增 `sj_` 前缀 3 张表、后端新增 journal 模块、前端数据层由 IndexedDB 切换为 `/api/journal` 同源接口，实现跨设备同步与真实用户隔离。
+
+#### 影响范围
+
+- `study-journey/vite.config.ts`、`src/main.tsx`、`index.html`：子路径构建改造
+- `mysite-frontend/src/components/common/AppHeader.vue`：管理员入口
+- `deploy/nginx/mysite.conf` + 服务器 `/etc/nginx/sites-available/mysite.conf`：`/journal/` location
+
 ### 2026-06-22: 管理页面排序和筛选功能优化
 
 #### 问题描述

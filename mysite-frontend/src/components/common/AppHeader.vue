@@ -88,6 +88,15 @@ async function handleAvatarUpload(e: Event) {
           {{ item.label }}
         </RouterLink>
 
+        <!-- 学习手帐（花期）：子路径独立应用，仅管理员可见；用原生 a 避免被 vue-router 拦截 -->
+        <a
+          v-if="userStore.isAdmin"
+          href="/journal/"
+          class="px-3 py-1.5 rounded-md text-sm text-text-secondary hover:text-accent hover:bg-accent-subtle transition-all duration-200"
+        >
+          手帐
+        </a>
+
         <div class="flex items-center gap-1 ml-3 pl-3 border-l border-border">
           <SearchDialog />
           <ThemeToggle />
@@ -217,6 +226,15 @@ async function handleAvatarUpload(e: Event) {
           >
             {{ item.label }}
           </RouterLink>
+
+          <a
+            v-if="userStore.isAdmin"
+            href="/journal/"
+            class="text-sm py-2.5 px-3 rounded-lg text-text-secondary hover:bg-accent-subtle hover:text-accent transition-all duration-200"
+            @click="closeMobileMenu"
+          >
+            手帐
+          </a>
 
           <template v-if="!userStore.isLoggedIn">
             <RouterLink
