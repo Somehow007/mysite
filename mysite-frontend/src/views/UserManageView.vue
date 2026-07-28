@@ -334,9 +334,10 @@ function handleUserReset() {
           <div class="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[11px] font-semibold text-white" :style="{ background: 'linear-gradient(135deg, var(--accent), #7C3AED)' }">
             {{ (item.realName || item.username).charAt(0) }}
           </div>
-          <div class="min-w-0">
-            <div class="text-[13.5px] font-medium text-text-primary">@{{ item.username }}</div>
-            <div class="text-xs text-text-muted">{{ item.realName }}</div>
+          <!-- table-fixed 下弹性列：长用户名/昵称自行截断 + 悬浮全称 -->
+          <div class="min-w-0 flex-1">
+            <div class="text-[13.5px] font-medium text-text-primary truncate" :title="'@' + item.username">@{{ item.username }}</div>
+            <div class="text-xs text-text-muted truncate" :title="item.realName">{{ item.realName }}</div>
           </div>
         </div>
       </template>

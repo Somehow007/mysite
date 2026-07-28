@@ -194,9 +194,10 @@ onMounted(() => {
       :empty-title="tags.length === 0 ? '还没有标签' : '没有找到匹配的标签'"
     >
       <template #cell-name="{ item }">
-        <div class="flex items-center gap-2">
-          <span class="text-xs px-2 py-0.5 rounded-full border border-border text-text-muted">#</span>
-          <span class="text-sm text-text-secondary">{{ item.name }}</span>
+        <!-- table-fixed 下弹性列：长标签名自行截断 + 悬浮全称 -->
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="text-xs px-2 py-0.5 rounded-full border border-border text-text-muted shrink-0">#</span>
+          <span class="text-sm text-text-secondary truncate" :title="item.name">{{ item.name }}</span>
         </div>
       </template>
       <template #cell-slug="{ value }">

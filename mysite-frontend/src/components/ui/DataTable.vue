@@ -10,6 +10,11 @@ export interface Column<T = any> {
   key: string
   label: string
   sortable?: boolean
+  /**
+   * 列宽。表格为 table-layout: fixed（见模板），width 是**权威值**而非建议值，
+   * 内容无法把列撑宽。约定：每个表格留一个不设 width 的弹性列（通常是标题/
+   * 名称列）吸收剩余宽度，该列内的长文本单元格须自行 truncate + title 处理。
+   */
   width?: string
   align?: 'left' | 'center' | 'right'
   headerAlign?: 'left' | 'center' | 'right'
@@ -78,9 +83,14 @@ function getSortIcon(field: string) {
 
 <template>
   <div class="max-w-full">
-    <!-- Desktop Table -->
+    <!-- Desktop Table
+         table-layout: fixed（业界处理长文本表格的标准做法，Ant Design /
+         Element Plus / TanStack Table 同款）：列宽只由表头 width 决定，
+         长标题无法挤压其他列，弹性列靠单元格 truncate + title 收敛。
+         默认 auto 布局下，nowrap 单元格的"理想宽度"= 全文长度，长标题
+         会把整列撑宽、挤压其余列，甚至触发横向滚动。 -->
     <div class="hidden md:block overflow-x-auto rounded-lg border border-border">
-      <table class="w-full text-sm">
+      <table class="w-full text-sm table-fixed">
         <thead>
           <tr class="bg-bg-code">
             <!-- Select column -->
