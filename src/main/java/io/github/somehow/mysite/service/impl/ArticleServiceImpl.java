@@ -20,6 +20,7 @@ import io.github.somehow.mysite.dto.resp.ArticlePageQueryRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleSelectRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
 import io.github.somehow.mysite.ragent.ingestion.ArticleCreatedEvent;
+import io.github.somehow.mysite.ragent.ingestion.ArticleDeletedEvent;
 import io.github.somehow.mysite.ragent.ingestion.ArticleUpdatedEvent;
 import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.ArticleService;
@@ -222,6 +223,9 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         categoryService.evictCategoryCache();
         tagService.evictTagCache();
         articleCacheService.evictArticleDetail(id);
+
+        // ★ RAG 集成：发布文章删除事件，触发异步清理知识库文档/分块/向量
+        eventPublisher.publishEvent(new ArticleDeletedEvent(id));
     }
 
     @Override

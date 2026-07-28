@@ -203,6 +203,55 @@ class KnowledgeDocumentServiceTest {
         }
     }
 
+    @Nested
+    @DisplayName("删除清理：removeArticle")
+    class RemoveArticle {
+
+        @Test
+        @DisplayName("文章存在于多个知识库 → 逐个删除向量/分块/文档")
+        void shouldRemoveDocsAcrossAllKbs() {
+            KnowledgeDocumentDO doc1 = new KnowledgeDocumentDO();
+            doc1.setId(9001L);
+            doc1.setKbId(1L);
+            KnowledgeDocumentDO doc2 = new KnowledgeDocumentDO();
+            doc2.setId(9002L);
+            doc2.setKbId(2L);
+            when(docMapper.findBySource("ARTICLE", "700")).thenReturn(List.of(doc1, doc2));
+
+            service.removeArticle(700L);
+
+            verify(vectorStore).deleteByDocId(9001L);
+            verify(vectorStore).deleteByDocId(9002L);
+            verify(chunkMapper).deleteByDocId(9001L);
+            verify(chunkMapper).deleteByDocId(9002L);
+            verify(docMapper).deleteById(9001L);
+            verify(docMapper).deleteById(9002L);
+        }
+
+        @Test
+        @DisplayName("知识库中无该文章 → 静默跳过")
+        void shouldDoNothingWhenNoDocs() {
+            when(docMapper.findBySource("ARTICLE", "800")).thenReturn(List.of());
+
+            service.removeArticle(800L);
+
+            verify(vectorStore, never()).deleteByDocId(anyLong());
+            verify(chunkMapper, never()).deleteByDocId(anyLong());
+            verify(docMapper, never()).deleteById(anyLong());
+        }
+
+        @Test
+        @DisplayName("向量删除异常 → 被吞掉，不向外抛（清理失败不影响文章删除主流程）")
+        void shouldSwallowException() {
+            KnowledgeDocumentDO doc = new KnowledgeDocumentDO();
+            doc.setId(9003L);
+            when(docMapper.findBySource("ARTICLE", "900")).thenReturn(List.of(doc));
+            doThrow(new RuntimeException("PG 连接断开")).when(vectorStore).deleteByDocId(9003L);
+
+            assertDoesNotThrow(() -> service.removeArticle(900L));
+        }
+    }
+
     @Test
     @DisplayName("没有启用的知识库 → 跳过同步（不再自动创建默认 KB）")
     void shouldSkipSyncWhenNoEnabledKb() {

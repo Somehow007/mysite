@@ -154,4 +154,28 @@ public class KnowledgeDocumentService {
             }
         }
     }
+
+    /**
+     * 文章删除 → 清理所有知识库中对应的文档/分块/向量（异步执行，不阻塞文章删除）。
+     *
+     * 清理顺序与 {@link #syncArticle(ArticleDO, Long)} 的"删旧档"逻辑一致：
+     * 先删向量，再删分块，最后删文档记录。
+     * 全程 try/catch 兜底：RAG 清理失败不能影响文章删除主流程，只记错误日志。
+     */
+    @Async("ragAsyncExecutor")
+    public void removeArticle(Long articleId) {
+        try {
+            List<KnowledgeDocumentDO> docs = docMapper.findBySource("ARTICLE", articleId.toString());
+            for (KnowledgeDocumentDO doc : docs) {
+                vectorStore.deleteByDocId(doc.getId());
+                chunkMapper.deleteByDocId(doc.getId());
+                docMapper.deleteById(doc.getId());
+            }
+            if (!docs.isEmpty()) {
+                log.info("文章 RAG 数据清理完成: articleId={}, 清理文档数={}", articleId, docs.size());
+            }
+        } catch (Exception e) {
+            log.error("清理文章 RAG 数据失败, articleId={}", articleId, e);
+        }
+    }
 }

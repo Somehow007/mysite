@@ -74,6 +74,9 @@ class ArticleServiceImplDeleteTest {
     @Mock
     private ArticleViewCountService articleViewCountService;
 
+    @Mock
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
     @InjectMocks
     private ArticleServiceImpl articleService;
 
@@ -138,6 +141,8 @@ class ArticleServiceImplDeleteTest {
         verify(articleTagMapper).physicalDeleteByArticleId(ARTICLE_ID);
         verify(userFavoriteArticleMapper).delete(any());
         verify(articleSearchService).deleteArticle(ARTICLE_ID);
+        // 发布删除事件，触发 RAG 知识库异步清理
+        verify(eventPublisher).publishEvent(any(io.github.somehow.mysite.ragent.ingestion.ArticleDeletedEvent.class));
     }
 
     @Test

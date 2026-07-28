@@ -3,6 +3,8 @@ package io.github.somehow.mysite.ragent.ingestion;
 import io.github.somehow.mysite.ragent.service.KnowledgeDocumentService;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
  * 监听 ArticleCreatedEvent / ArticleUpdatedEvent，自动触发文档向量化。
@@ -32,5 +34,17 @@ public class ArticleEventListener {
     @EventListener
     public void handleArticleUpdated(ArticleUpdatedEvent event) {
         knowledgeDocumentService.syncArticle(event.getArticle());
+    }
+
+    /**
+     * 文章删除 → 异步清理 RAG 数据。
+     *
+     * 用 @TransactionalEventListener 而非 @EventListener：等文章删除事务提交后再清理，
+     * 避免事务回滚却已删掉向量。fallbackExecution = true 覆盖无事务场景
+     * （batchDeleteArticles 自调用 deleteArticle 时不经过代理，没有活动事务，此时立即执行）。
+     */
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void handleArticleDeleted(ArticleDeletedEvent event) {
+        knowledgeDocumentService.removeArticle(event.getArticleId());
     }
 }
