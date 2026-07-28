@@ -2,6 +2,31 @@
 
 ## 更新日志
 
+### 2026-07-28: 文章管理批量操作增强（批量隐藏/公开、批量加入合集）+ 删除联动 RAG 清理
+
+> 更新于 2026-07-28：文章管理页批量选中原先只有批量删除，补齐两类批量操作，并修复文章删除后 RAG 知识库数据残留（AI 聊天仍能检索到已删除文章）的问题。
+
+#### 决策背景
+
+- 管理页勾选多篇文章后只能逐个进编辑器切换可见性，效率低；批量加入合集同样缺失（后端 `POST /v1/collections/{collectionId}/articles/batch` 早已存在，仅缺 UI 入口）。
+- `ArticleServiceImpl.deleteArticle` 不触碰 PostgreSQL 知识库，`t_knowledge_document / t_knowledge_chunk / t_knowledge_vector` 随文章删除残留，AI 问答会引用已删除内容。
+
+#### 决策内容
+
+1. **批量隐藏/公开**：新接口 `PUT /v1/articles/visibility/batch`（body：`{ids, visibility}`，visibility 0=公开 / 1=仅自己可见）。
+   - **混合状态拒绝**：选中文章当前可见性不一致时整批拒绝（错误码 `A030110`），不做部分修改；前端批量栏同样预检并 toast 提示，双保险。
+   - **权限**：管理员可操作任意文章（沿用 `checkArticleOwnership` 的 ADMIN 旁路），普通用户仅限本人文章。管理员查看/管理不受 visibility 影响——既有 `selectOneArticle` 与列表查询的 `isDeveloper()`（= isAdmin）旁路天然满足。
+   - **副作用同步**：一条 SQL 批量更新后，逐篇刷新 ES 搜索索引（`articleSearchService.updateArticle`，ES 索引了 visibility 字段）并失效文章详情缓存（详情接口按 visibility 鉴权）。
+2. **批量加入合集**：前端批量栏新增「加入合集」按钮 + 合集单选弹窗（非管理员仅列出自己创建的合集，与后端 `checkCollectionOwnership` 对齐），复用既有 `batchAddArticles` API（后端静默跳过已在合集中的文章）。
+3. **删除联动 RAG 清理**：沿用 Spring Event 解耦模式——`deleteArticle` 末尾发布 `ArticleDeletedEvent(articleId)`；`ArticleEventListener` 用 `@TransactionalEventListener(AFTER_COMMIT, fallbackExecution = true)` 消费（事务提交后才清理，避免回滚误删向量；fallback 覆盖 `batchDeleteArticles` 自调用的无事务路径）；`KnowledgeDocumentService.removeArticle` 在 `ragAsyncExecutor` 上异步执行，跨所有 KB 按 `source_ref` 找到文档后依次删向量 → 删分块 → 删文档（与 `syncArticle` 的"删旧档"顺序一致），全程 try/catch 兜底——RAG 清理失败只记日志，绝不影响文章删除主流程。
+4. **范围确认**：隐藏文章**不**从知识库移除（仅删除时清理）；批量删除循环调用 `deleteArticle`，每篇各发一个删除事件，天然覆盖批量场景。
+
+#### 影响范围
+
+- 后端：`ArticleController`、`ArticleService(Impl)`（+ `batchUpdateVisibility`、`deleteArticle` 发事件）、`ArticleBatchVisibilityReqDTO`（新增）、`ErrorCode`（+ `ARTICLE_VISIBILITY_MIXED`）、`ragent/ingestion/ArticleDeletedEvent`（新增）与 `ArticleEventListener`、`KnowledgeDocumentMapper.findBySource`、`KnowledgeDocumentService.removeArticle`
+- 前端：`api/article.ts`（+ `batchUpdateArticleVisibility`）、`DashboardView.vue`（批量栏 +3 按钮、合集选择 Modal）
+- 测试：`ArticleServiceImplVisibilityTest`（7 用例）、`KnowledgeDocumentServiceTest` 追加 removeArticle 用例；全量 289 测试通过，前端 vue-tsc + vite build 通过
+
 ### 2026-07-28: RAG 检索质量修复（rerank 空 query + 双阈值过滤）
 
 > 更新于 2026-07-28：修复 AI 回答引用不相关来源（甚至 34% 相关度也被引用）的问题。三个叠加根因：① rerank 精排调用传空字符串 query，cross-encoder 失去 query↔doc 相关性判据、形同虚设；② 向量粗排阈值 0.3 对中文 embedding 过宽松（无关主题实测也有 0.3~0.4 分）；③ rerank 的 relevance_score 替换向量分后无二次过滤，top_n 要几条给几条。

@@ -698,8 +698,10 @@ JWT 过滤器无需调整——`/v1/rag/chat/stream` 直接加入 Spring Securit
 
 1. **分块器** - `MarkdownChunker`
 2. **文档服务** - `KnowledgeDocumentService`
-3. **事件监听** - `ArticleEventListener` (监听 `ArticleCreatedEvent` / `ArticleUpdatedEvent`)
+3. **事件监听** - `ArticleEventListener` (监听 `ArticleCreatedEvent` / `ArticleUpdatedEvent` / `ArticleDeletedEvent`)
 4. **手动同步 API** - 批量重建已有文章索引
+
+> 更新于 2026-07-28：新增 `ArticleDeletedEvent` 删除事件链路。`ArticleServiceImpl.deleteArticle` 末尾发布事件（批量删除循环复用同一路径）；监听器使用 `@TransactionalEventListener(phase = AFTER_COMMIT, fallbackExecution = true)`——等删除事务提交后再清理（避免回滚误删向量），`fallbackExecution = true` 覆盖 `batchDeleteArticles` 自调用 `deleteArticle` 的无事务场景；`KnowledgeDocumentService.removeArticle(articleId)` 在 `ragAsyncExecutor` 上异步执行，通过 `KnowledgeDocumentMapper.findBySource("ARTICLE", articleId)` 跨所有 KB 定位文档，按「删向量 → 删分块 → 删文档」顺序清理（与 `syncArticle` 的删旧档逻辑一致），全程 try/catch 兜底，清理失败不影响文章删除主流程。隐藏文章不从知识库移除，仅删除时清理。
 
 ### Phase 4：前端集成 (第 5-6 步)
 
