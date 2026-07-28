@@ -670,7 +670,7 @@ function removeCover() {
 
           <div class="p-4 rounded-lg bg-bg-code">
             <p class="text-xs text-text-muted leading-relaxed mb-2">
-              编辑区目前为精简模式：将写好的内容<strong>粘贴</strong>到编辑框即可，右侧实时渲染预览。
+              图片上传：支持<strong>直接粘贴</strong>（截图/复制的图片）、<strong>拖拽图片</strong>到编辑区，或点击工具栏「图片」按钮选择文件（≤5MB），上传后自动插入图片语法。
             </p>
             <p class="text-xs text-text-muted leading-relaxed">
               支持 Markdown 语法、代码高亮、数学公式与标注；可在编辑 / 分屏 / 预览之间切换。

@@ -2,6 +2,52 @@
 
 ## 更新日志
 
+### 2026-07-28: 文章编辑器图片上传功能恢复 + 上传链路加固
+
+> 更新于 2026-07-28：修复"写文章时无法上传/粘贴图片"的问题，并对整条上传链路（前端编辑器 → API → 后端服务 → Nginx）做健壮性排查与加固。
+
+#### 决策背景
+
+2026 年早些时候 CodeMirror 编辑器出现问题，commit `7bf272b` 临时将写文章页面切换到精简版 `SimpleMarkdownEditor`（纯 textarea）。切换时图片上传能力没有迁移过来：工具栏无上传按钮、无粘贴/拖拽处理，导致写文章时完全无法上传图片。同时排查发现后端上传服务存在两处健壮性隐患（Redis 故障导致上传整体不可用、粘贴图片空文件名触发 DB NOT NULL 约束 500）。
+
+#### 决策内容
+
+1. **精简版编辑器补齐图片上传能力**（与 MarkdownEditor 行为对齐）：
+   - 工具栏「图片」按钮：文件选择器上传，支持多选（JPEG/PNG/GIF/WebP/SVG，≤5MB）；
+   - 编辑框内**粘贴图片**（截图/复制的图片）自动上传；
+   - **拖拽图片**到编辑区上传（带拖入高亮遮罩）；
+   - 上传成功后在光标处插入 `![alt](url)` Markdown 语法，支持多文件并发上传 + 工具栏进度显示 + toast 错误提示。
+2. **后端 `ImageServiceImpl` 健壮性加固**：
+   - Redis 限流降级：`checkUploadRateLimit` 捕获 Redis 异常并放行（限流是保护措施，缓存故障不应导致上传整体不可用）；
+   - 文件名兜底：粘贴/截图图片可能无文件名，`original_name` 为空时生成 `pasted_image_<timestamp><ext>`，超长文件名截断到列宽内；
+   - `uploaderId` 安全解析：非数字 userId 归为 0（匿名），不中断上传。
+3. **链路排查结论（无需改动）**：Nginx（仓库 + 生产）已配置 `client_max_body_size 6m` 与 `/uploads/` 静态别名；Spring multipart 限制 6MB/12MB；`GlobalExceptionHandler` 已覆盖 `MaxUploadSizeExceededException` / `MultipartException`；生产 `application-production.yml` 的 `base-path` 与 Nginx 别名一致（`/data/mysite/uploads/images`）。
+4. **测试同步修复**（此前测试编译已整体失败，部署脚本以 `-Dmaven.test.skip=true` 绕过）：RAG 相关测试补齐 `chat(..., kbIds)` / `search(..., List<Long>)` 签名变更；`KnowledgeDocumentService` 系测试补 `kbMapper.selectById` mock 并将"自动创建默认 KB"用例改为验证当前"无启用 KB → 跳过同步"行为；限流测试对齐 USER 10 次/小时阈值；文章删除测试改经 `UserRole.fromAuthority("ROLE_DEVELOPER")` 验证废弃角色映射。`./mvnw test` 恢复全绿（276 通过 / 3 按设计跳过）。
+
+#### 影响范围
+
+- `mysite-frontend/src/components/editor/SimpleMarkdownEditor.vue`（核心修复）、`mysite-frontend/src/views/PostEditorView.vue`（提示文案）
+- `src/main/java/io/github/somehow/mysite/service/impl/ImageServiceImpl.java`
+- `src/test/java/.../ragent/{Phase2EndToEndTest, Phase3IntegrationTest, service/RagChatServiceTest, service/KnowledgeDocumentServiceTest, service/ChatRateLimiterTest, vector/PgvectorVectorStoreTest}.java`、`src/test/java/.../service/impl/ArticleServiceImplDeleteTest.java`
+
+### 2026-07-28: AI 聊天移动端体验优化（底部 sheet + 视口基建）
+
+> 更新于 2026-07-28：移动端聊天面板由全屏抽屉改为底部 sheet，并新建全站 visualViewport 视口基建，解决"打开即全屏、键盘弹起遮住对话"的体验问题。
+
+#### 决策背景
+
+移动端真机使用反馈：① 聊天面板打开即吞掉全屏，压迫感强；② 软键盘弹起后输入框与对话被遮挡（iOS Safari 键盘弹起时布局视口不收缩，而面板高度基于布局视口）。调研确认根因：原设计有意采用全屏抽屉（见 ragent-frontend-design.md）；`open()` 无条件聚焦 textarea 导致打开即弹键盘；全项目无 visualViewport 代码。
+
+#### 决策内容
+
+1. **移动端形态改为底部 sheet**（用户确认）：顶部留 24px 缝隙、圆角 + 拖拽把手、下滑超阈值关闭；桌面端 520×680 右下角面板不变。属局部体验优化，不改变"移动端重构不在本期"的范围边界（见 2026-07-27 手帐条目）。
+2. **视口基建**：新增 `useVisualViewport` composable（visualViewport API → `--vvh` CSS 变量 + `vvHeight` ref），面板高度 = `min(100dvh - 24px, var(--vvh) - 8px)`，键盘弹起时面板实时压缩到键盘上方；viewport meta 追加 `interactive-widget=resizes-content`（Android Chrome 108+ 生效，iOS 由 visualViewport 兜底）。该基建为后续所有 fixed 弹层的键盘适配提供统一方案。
+3. **输入体验**：移动端打开不自动聚焦；textarea 移动端 16px（防 iOS 聚焦缩放）+ `enterkeyhint="send"` + safe-area 底边距；消息列表 `overscroll-contain` + 遮罩 touchmove 拦截防滚动穿透。
+
+#### 影响范围
+
+- `mysite-frontend/index.html`、`src/composables/useVisualViewport.ts`（新增）、`src/components/chat/ChatWidget.vue`、`src/components/chat/ChatInput.vue`、`docs/ragent-frontend-design.md`
+
 ### 2026-07-27: 生产环境 RAG 数据源配置修复（PG 用户名不一致）
 
 > 更新于 2026-07-27：定位并修复线上 RAG 模块全线报错（知识库列表/新建、聊天记录"消失"）。
