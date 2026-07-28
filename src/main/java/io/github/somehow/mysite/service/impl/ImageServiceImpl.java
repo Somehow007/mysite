@@ -149,12 +149,11 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
             }
         }
 
-        String userId = UserContext.getUserId();
-        Long uploaderId = userId != null ? Long.parseLong(userId) : 0L;
+        Long uploaderId = parseUploaderId(UserContext.getUserId());
 
         ImageDO imageDO = ImageDO.builder()
                 .id(IdUtil.getSnowflakeNextId())
-                .originalName(file.getOriginalFilename())
+                .originalName(resolveOriginalName(file.getOriginalFilename(), extension))
                 .storedName(storedName)
                 .filePath(relativePath)
                 .url(url)
@@ -307,8 +306,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
         }
 
         String originalName = extractFileNameFromUrl(imageUrl, extension);
-        String userId = UserContext.getUserId();
-        Long uploaderId = userId != null ? Long.parseLong(userId) : 0L;
+        Long uploaderId = parseUploaderId(UserContext.getUserId());
 
         ImageDO imageDO = ImageDO.builder()
                 .id(IdUtil.getSnowflakeNextId())
@@ -425,13 +423,20 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
             return;
         }
 
-        String key = "image:upload:limit:" + userId;
-        Long count = stringRedisTemplate.opsForValue().increment(key);
-        if (count != null && count == 1) {
-            stringRedisTemplate.expire(key, 60, TimeUnit.SECONDS);
-        }
-        if (count != null && count > imageUploadConfig.getMaxUploadsPerMinute()) {
-            throw new ClientException(ErrorCode.IMAGE_UPLOAD_RATE_LIMITED);
+        // Redis 不可用时降级放行：限流是保护措施，不能因缓存故障导致上传整体不可用
+        try {
+            String key = "image:upload:limit:" + userId;
+            Long count = stringRedisTemplate.opsForValue().increment(key);
+            if (count != null && count == 1) {
+                stringRedisTemplate.expire(key, 60, TimeUnit.SECONDS);
+            }
+            if (count != null && count > imageUploadConfig.getMaxUploadsPerMinute()) {
+                throw new ClientException(ErrorCode.IMAGE_UPLOAD_RATE_LIMITED);
+            }
+        } catch (ClientException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn("Redis 不可用，跳过图片上传限流: {}", e.getMessage());
         }
     }
 
@@ -529,6 +534,39 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
         } catch (Exception ignored) {
         }
         return "remote_image" + defaultExtension;
+    }
+
+    /**
+     * 兜底处理原始文件名：粘贴/截图上传的图片可能没有文件名（t_image.original_name 为 NOT NULL），
+     * 过长文件名也会被截断到数据库列宽以内。
+     */
+    private String resolveOriginalName(String originalFilename, String extension) {
+        if (StrUtil.isBlank(originalFilename)) {
+            return "pasted_image_" + System.currentTimeMillis() + extension;
+        }
+        if (originalFilename.length() > 250) {
+            int dotIndex = originalFilename.lastIndexOf('.');
+            String ext = (dotIndex > 0 && dotIndex > originalFilename.length() - 6)
+                    ? originalFilename.substring(dotIndex)
+                    : extension;
+            return originalFilename.substring(0, 250 - ext.length()) + ext;
+        }
+        return originalFilename;
+    }
+
+    /**
+     * 安全解析上传者 ID：解析失败时归为 0（匿名），不中断上传流程。
+     */
+    private Long parseUploaderId(String userId) {
+        if (StrUtil.isBlank(userId)) {
+            return 0L;
+        }
+        try {
+            return Long.parseLong(userId);
+        } catch (NumberFormatException e) {
+            log.warn("无法解析上传者ID: {}", userId);
+            return 0L;
+        }
     }
 
     private void checkImageOwnership(ImageDO imageDO) {
