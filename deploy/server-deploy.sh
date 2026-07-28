@@ -213,7 +213,9 @@ step_sync_nginx() {
     log_success "Nginx 已重启"
 
     log_info "验证 Nginx 实际加载的配置:"
-    nginx -T 2>&1 | grep -A 5 "location.*uploads" | tee -a "$DEPLOY_LOG"
+    # 必须 sudo（nginx -T 要读 error.log 等 root 权限文件）；|| true 保证该行
+    # 的任何失败都不会在 set -euo pipefail 下中断脚本，使 step_verify 总能执行
+    sudo nginx -T 2>&1 | grep -A 5 "location.*uploads" | tee -a "$DEPLOY_LOG" || true
 }
 
 step_verify() {
