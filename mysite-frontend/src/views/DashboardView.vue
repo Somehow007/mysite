@@ -3,17 +3,17 @@ import { ref, onMounted, computed } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useRouter } from 'vue-router'
 import {
-  FileText, Plus, Trash2, Edit, Eye,
-  Heart, Clock, MoreHorizontal, Lock,
+  FileText, Plus, Trash2, Edit, Eye, EyeOff,
+  Heart, Clock, MoreHorizontal, Lock, Globe, FolderPlus,
 } from 'lucide-vue-next'
-import { getArticles, deleteArticle, batchDeleteArticles } from '@/api/article'
+import { getArticles, deleteArticle, batchDeleteArticles, batchUpdateArticleVisibility } from '@/api/article'
 import { getCategories } from '@/api/category'
-import { getCollections } from '@/api/collection'
+import { getCollections, batchAddArticles } from '@/api/collection'
 import { useUserStore } from '@/stores/user'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import { Pagination, PageHeader, SearchFilterBar, DataTable, Badge } from '@/components/ui'
+import { Pagination, PageHeader, SearchFilterBar, DataTable, Badge, Modal } from '@/components/ui'
 import type { ArticleListItem, Pagination as PaginationType, Category, Collection } from '@/types'
 import type { Column } from '@/components/ui/DataTable.vue'
 
@@ -36,6 +36,11 @@ const collections = ref<Collection[]>([])
 
 // 批量选择
 const selectedIds = ref<Set<string>>(new Set())
+
+// 批量加入合集弹窗
+const collectionModalOpen = ref(false)
+const batchCollectionId = ref('')
+const batchAdding = ref(false)
 
 // 筛选和排序参数
 const keyword = ref('')
@@ -192,6 +197,84 @@ async function handleBatchDelete() {
   }
 }
 
+async function handleBatchVisibility(target: 0 | 1) {
+  if (selectedIds.value.size === 0) return
+
+  const selected = articles.value.filter((a) => selectedIds.value.has(a.id))
+
+  // 前端预检：选中文章混合公开/隐藏状态时直接拒绝（后端同样会拒绝，双保险）
+  const visSet = new Set(selected.map((a) => a.visibility ?? 0))
+  if (visSet.size > 1) {
+    toast.error('选中的文章包含公开和隐藏两种状态，无法批量操作')
+    return
+  }
+  if (visSet.size === 1 && visSet.has(target)) {
+    toast.info(target === 1 ? '选中的文章已全部处于隐藏状态' : '选中的文章已全部处于公开状态')
+    return
+  }
+
+  const actionText = target === 1 ? '隐藏（仅自己可见）' : '公开'
+  const ok = await confirm({
+    message: `确定要将选中的 ${selected.length} 篇文章设为${actionText}吗？`,
+    confirmText: '确定',
+  })
+  if (!ok) return
+
+  // 乐观更新：记录旧值，立即切换本地状态
+  const backup = new Map(selected.map((a) => [a.id, a.visibility]))
+  articles.value = articles.value.map((a) =>
+    selectedIds.value.has(a.id) ? { ...a, visibility: target } : a
+  )
+
+  try {
+    await batchUpdateArticleVisibility(Array.from(selectedIds.value), target)
+    toast.success(target === 1 ? `已隐藏 ${selected.length} 篇文章` : `已公开 ${selected.length} 篇文章`)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '批量修改可见性失败'
+    toast.error(msg)
+    // 失败时回滚
+    articles.value = articles.value.map((a) =>
+      backup.has(a.id) ? { ...a, visibility: backup.get(a.id) } : a
+    )
+  }
+}
+
+// 可选合集：管理员可选任意合集，其他用户只能选自己的（后端 checkCollectionOwnership 同样校验）
+const availableCollections = computed(() =>
+  isAdmin.value
+    ? collections.value
+    : collections.value.filter((c) => c.authorId === userStore.user?.id)
+)
+
+function openCollectionModal() {
+  if (selectedIds.value.size === 0) return
+  batchCollectionId.value = ''
+  collectionModalOpen.value = true
+}
+
+async function confirmBatchAddToCollection() {
+  if (!batchCollectionId.value) {
+    toast.error('请先选择一个合集')
+    return
+  }
+  const ids = Array.from(selectedIds.value)
+  const collectionTitle =
+    collections.value.find((c) => c.id === batchCollectionId.value)?.title ?? ''
+
+  batchAdding.value = true
+  try {
+    await batchAddArticles(batchCollectionId.value, ids)
+    toast.success(`已将 ${ids.length} 篇文章加入合集「${collectionTitle}」`)
+    collectionModalOpen.value = false
+    selectedIds.value = new Set()
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '加入合集失败'
+    toast.error(msg)
+  } finally {
+    batchAdding.value = false
+  }
+}
+
 function handleSearch() {
   fetchArticles(1)
 }
@@ -330,6 +413,15 @@ onMounted(() => {
       <div v-if="hasSelection" class="flex justify-center mb-4">
         <div class="inline-flex items-center gap-3 px-4 py-2 rounded-full border border-accent/30 bg-bg-elevated shadow-md">
           <span class="text-[13px] font-semibold text-accent">已选 {{ selectedIds.size }} 项</span>
+          <button @click="handleBatchVisibility(0)" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] rounded-full bg-bg-secondary text-text-primary hover:bg-accent/10 hover:text-accent transition-colors">
+            <Globe :size="12" />批量公开
+          </button>
+          <button @click="handleBatchVisibility(1)" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] rounded-full bg-bg-secondary text-text-primary hover:bg-accent/10 hover:text-accent transition-colors">
+            <EyeOff :size="12" />批量隐藏
+          </button>
+          <button @click="openCollectionModal" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] rounded-full bg-bg-secondary text-text-primary hover:bg-accent/10 hover:text-accent transition-colors">
+            <FolderPlus :size="12" />加入合集
+          </button>
           <button @click="handleBatchDelete" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] rounded-full bg-danger-subtle text-danger hover:bg-danger/20 transition-colors">
             <Trash2 :size="12" />批量删除
           </button>
@@ -445,6 +537,37 @@ onMounted(() => {
         </div>
       </template>
     </DataTable>
+
+    <!-- 批量加入合集弹窗 -->
+    <Modal v-model:open="collectionModalOpen" title="加入合集" :description="`将选中的 ${selectedIds.size} 篇文章加入指定合集（已在合集中的文章会自动跳过）`" max-width="max-w-md">
+      <div v-if="availableCollections.length > 0" class="flex flex-col gap-1.5 max-h-[45vh] overflow-y-auto">
+        <label
+          v-for="col in availableCollections"
+          :key="col.id"
+          class="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors"
+          :class="batchCollectionId === col.id ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/40'"
+        >
+          <input type="radio" name="batch-collection" :value="col.id" v-model="batchCollectionId" class="accent-accent" />
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium text-text-primary truncate">{{ col.title }}</p>
+            <p class="text-xs text-text-muted mt-0.5">{{ col.articleCount }} 篇文章</p>
+          </div>
+        </label>
+      </div>
+      <div v-else class="py-8 text-center text-sm text-text-muted">
+        还没有可用的合集{{ isAdmin ? '' : '（只能选择自己创建的合集）' }}
+      </div>
+      <template #footer>
+        <button class="btn-ghost" @click="collectionModalOpen = false">取消</button>
+        <button
+          class="btn-primary"
+          :disabled="!batchCollectionId || batchAdding"
+          @click="confirmBatchAddToCollection"
+        >
+          {{ batchAdding ? '加入中…' : '确认加入' }}
+        </button>
+      </template>
+    </Modal>
   </div>
 </template>
 

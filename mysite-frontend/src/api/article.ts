@@ -72,6 +72,11 @@ export function batchDeleteArticles(ids: string[]): Promise<void> {
   return del<void>('/v1/articles/batch', { ids })
 }
 
+/** 批量修改可见性：0=公开，1=仅自己可见。选中文章混合公开/隐藏状态时后端会拒绝 */
+export function batchUpdateArticleVisibility(ids: string[], visibility: number): Promise<void> {
+  return put<void>('/v1/articles/visibility/batch', { ids, visibility })
+}
+
 export interface FavoriteResult {
   favorited: boolean
   favoriteCount: number

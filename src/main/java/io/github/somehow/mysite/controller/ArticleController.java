@@ -57,6 +57,13 @@ public class ArticleController {
         return Results.success();
     }
 
+    @Operation(summary = "批量修改文章可见性（选中文章必须同为公开或同为隐藏，混合状态拒绝操作）")
+    @PutMapping("/v1/articles/visibility/batch")
+    public Result<Void> batchUpdateVisibility(@Valid @RequestBody ArticleBatchVisibilityReqDTO requestParam) {
+        articleService.batchUpdateVisibility(requestParam.getIds(), requestParam.getVisibility());
+        return Results.success();
+    }
+
     @Operation(summary = "分页搜索文章信息")
     @GetMapping("/v1/articles")
     public Result<IPage<ArticlePageQueryRespDTO>> pageQueryArticle(ArticlePageQueryReqDTO requestParam) {

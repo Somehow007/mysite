@@ -239,6 +239,60 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     }
 
     @Override
+    @Transactional
+    public void batchUpdateVisibility(List<Long> ids, Integer visibility) {
+        if (CollectionUtils.isEmpty(ids)) {
+            return;
+        }
+        if (visibility == null || (visibility != 0 && visibility != 1)) {
+            throw new ClientException(ErrorCode.ARTICLE_PARAM_REQUIRED);
+        }
+
+        List<ArticleDO> articles = baseMapper.selectList(Wrappers.lambdaQuery(ArticleDO.class)
+                .in(ArticleDO::getId, ids)
+                .eq(ArticleDO::getDelFlag, 0));
+        if (articles.size() != ids.size()) {
+            throw new ClientException(ErrorCode.ARTICLE_NOT_FOUND);
+        }
+
+        // 权限校验：管理员可操作任意文章，其他用户只能操作自己的
+        if (!UserRole.ADMIN.equals(UserContext.getRole())) {
+            String currentUserId = UserContext.getUserId();
+            if (currentUserId == null) {
+                throw new ClientException(ErrorCode.ARTICLE_OWNERSHIP_VERIFY_FAILED);
+            }
+            boolean allOwned = articles.stream()
+                    .allMatch(a -> currentUserId.equals(a.getAuthorId().toString()));
+            if (!allOwned) {
+                throw new ClientException(ErrorCode.ARTICLE_PERMISSION_DENIED);
+            }
+        }
+
+        // 异常兜底：选中文章必须同为公开或同为隐藏，混合状态直接拒绝整批操作
+        Set<Integer> currentVisibility = articles.stream()
+                .map(a -> a.getVisibility() == null ? 0 : a.getVisibility())
+                .collect(Collectors.toSet());
+        if (currentVisibility.size() > 1) {
+            throw new ClientException(ErrorCode.ARTICLE_VISIBILITY_MIXED);
+        }
+
+        int rows = baseMapper.update(Wrappers.lambdaUpdate(ArticleDO.class)
+                .set(ArticleDO::getVisibility, visibility)
+                .in(ArticleDO::getId, ids)
+                .eq(ArticleDO::getDelFlag, 0));
+        if (rows <= 0) {
+            throw new ClientException(ErrorCode.ARTICLE_UPDATE_FAILED);
+        }
+
+        // 刷新搜索索引（ES 索引了 visibility 字段）与文章详情缓存（详情接口按 visibility 鉴权）
+        for (ArticleDO article : articles) {
+            article.setVisibility(visibility);
+            articleSearchService.updateArticle(article);
+            articleCacheService.evictArticleDetail(article.getId());
+        }
+    }
+
+    @Override
     public IPage<ArticlePageQueryRespDTO> pageQueryArticle(ArticlePageQueryReqDTO requestParam) {
         return articleSearchService.searchArticles(requestParam);
     }

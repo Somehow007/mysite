@@ -48,6 +48,7 @@ public enum ErrorCode implements IErrorCode {
     ARTICLE_FAVORITE_PARAM_INCOMPLETE("A030107", "收藏参数不完整"),
     ARTICLE_OWNERSHIP_VERIFY_FAILED("A030108", "无法验证文章所有权，请重新登录"),
     ARTICLE_PERMISSION_DENIED("A030109", "权限不足，只能操作自己的文章"),
+    ARTICLE_VISIBILITY_MIXED("A030110", "选中的文章包含公开和隐藏两种状态，无法批量操作"),
 
     // ---------- A04: 分类模块错误 ----------
     CATEGORY_ERROR("A040001", "分类模块错误"),
