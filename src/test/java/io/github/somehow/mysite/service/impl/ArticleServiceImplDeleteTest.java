@@ -142,10 +142,12 @@ class ArticleServiceImplDeleteTest {
 
     @Test
     void deleteArticle_asDeveloper_shouldSucceed() {
+        // DEVELOPER 角色已废弃：旧 token 中的 ROLE_DEVELOPER 经 fromAuthority() 自动映射为 ADMIN，
+        // 生产环境的 UserContext 中不会出现 DEVELOPER 角色，这里验证该兼容映射的删除行为
         UserContext.removeUser();
         UserContext.setUser(UserInfoDTO.builder()
                 .userId("1")
-                .role(UserRole.DEVELOPER)
+                .role(UserRole.fromAuthority("ROLE_DEVELOPER"))
                 .build());
 
         when(articleMapper.delete(any())).thenReturn(1);

@@ -86,12 +86,13 @@ class ChatRateLimiterTest {
         @Test
         @DisplayName("超限 → 抛出异常")
         void exceedingLimitShouldThrow() {
-            when(valueOps.increment("rag:chat:rl:127.0.0.1")).thenReturn(21L);
+            // USER 限流阈值：10 次/小时
+            when(valueOps.increment("rag:chat:rl:127.0.0.1")).thenReturn(11L);
 
             ChatRateLimiter.RateLimitExceededException ex = assertThrows(
                 ChatRateLimiter.RateLimitExceededException.class,
                 () -> rateLimiter.check("127.0.0.1", "问题", UserRole.USER));
-            assertTrue(ex.getMessage().contains("20"));
+            assertTrue(ex.getMessage().contains("10"));
         }
 
         @Test

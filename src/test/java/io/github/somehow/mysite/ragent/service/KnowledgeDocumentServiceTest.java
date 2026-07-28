@@ -30,7 +30,7 @@ import static org.mockito.Mockito.*;
  *   - 正常流程：文章 → 分块 → embedding → 入库 → READY
  *   - 幂等：重复同步删旧建新
  *   - 失败：embedding API 异常 → FAILED + fail_reason
- *   - 知识库不存在 → 自动创建
+ *   - 没有启用的知识库 → 跳过同步
  */
 @DisplayName("KnowledgeDocumentService")
 class KnowledgeDocumentServiceTest {
@@ -69,6 +69,8 @@ class KnowledgeDocumentServiceTest {
 
         // 默认：返回默认知识库
         when(kbMapper.selectList(any())).thenReturn(List.of(defaultKb));
+        // syncArticle(article, kbId) 会先通过 selectById 加载知识库
+        when(kbMapper.selectById(anyLong())).thenReturn(defaultKb);
 
         // embedding → 1024 维全 0.5
         when(embeddingService.embedBatch(anyList())).thenAnswer(inv -> {
@@ -202,8 +204,10 @@ class KnowledgeDocumentServiceTest {
     }
 
     @Test
-    @DisplayName("默认知识库不存在 → 自动创建")
-    void shouldCreateDefaultKbWhenMissing() {
+    @DisplayName("没有启用的知识库 → 跳过同步（不再自动创建默认 KB）")
+    void shouldSkipSyncWhenNoEnabledKb() {
+        // 当前设计（对齐 Dify/FastGPT）：不设"默认 KB"，数据源显式绑定 KB；
+        // 没有启用的知识库时直接跳过同步，而不是自动建库
         when(kbMapper.selectList(any())).thenReturn(List.of());
 
         ArticleDO article = new ArticleDO();
@@ -211,13 +215,10 @@ class KnowledgeDocumentServiceTest {
         article.setTitle("第一篇");
         article.setContent("内容");
 
-        when(docMapper.findBySourceRef(anyLong(), anyString(), anyString())).thenReturn(null);
-
         service.syncArticle(article);
 
-        verify(kbMapper).insert(argThat((KnowledgeBaseDO kb) ->
-            "default".equals(kb.getCollectionName()) &&
-            "text-embedding-v4".equals(kb.getEmbeddingModel())
-        ));
+        verify(kbMapper, never()).insert(any(KnowledgeBaseDO.class));
+        verify(docMapper, never()).insert(any(KnowledgeDocumentDO.class));
+        verify(embeddingService, never()).embedBatch(anyList());
     }
 }

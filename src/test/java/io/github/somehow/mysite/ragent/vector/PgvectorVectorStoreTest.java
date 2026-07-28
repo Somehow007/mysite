@@ -79,7 +79,8 @@ class PgvectorVectorStoreTest {
             float[] embedding = randomVector(1024);
             store.insert(List.of(new VectorStore.VectorEntry(10001L, 99999L, embedding, "text-embedding-v4")));
 
-            List<VectorStore.SearchResult> results = store.search(embedding, 5, null);
+            // 限定测试知识库范围，避免共享开发库中的其他 KB 数据干扰精确数量断言
+            List<VectorStore.SearchResult> results = store.search(embedding, 5, List.of(99999L));
 
             assertEquals(1, results.size());
             assertEquals(10001L, results.get(0).chunkId());
@@ -149,7 +150,7 @@ class PgvectorVectorStoreTest {
             store.insert(List.of(new VectorStore.VectorEntry(40001L, kb1, vec, "v4")));
             store.insert(List.of(new VectorStore.VectorEntry(40002L, kb2, vec, "v4")));
 
-            List<VectorStore.SearchResult> results = store.search(vec, 10, kb1);
+            List<VectorStore.SearchResult> results = store.search(vec, 10, List.of(kb1));
 
             // 清理 kb2
             try {
@@ -237,7 +238,7 @@ class PgvectorVectorStoreTest {
         @DisplayName("search 无匹配结果 → 返回空列表")
         void searchWithNoMatchShouldReturnEmpty() {
             float[] vec = randomVector(1024);
-            List<VectorStore.SearchResult> results = store.search(vec, 5, 99999L);
+            List<VectorStore.SearchResult> results = store.search(vec, 5, List.of(99999L));
             // 99999 知识库应该没有数据（setUp 已清理）
             assertTrue(results.isEmpty());
         }

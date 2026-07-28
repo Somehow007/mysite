@@ -168,6 +168,8 @@ class Phase3IntegrationTest {
         defaultKb.setChunkSize(800);
         defaultKb.setChunkOverlap(100);
         when(kbMapper.selectList(any())).thenReturn(List.of(defaultKb));
+        // syncArticle(article, kbId) 会先通过 selectById 加载知识库
+        when(kbMapper.selectById(anyLong())).thenReturn(defaultKb);
 
         // insert 自动给 ID
         doAnswer(inv -> {
@@ -483,7 +485,7 @@ class Phase3IntegrationTest {
             seedTestArticle();
 
             Flux<ChatEvent> stream = ragChatService.chat(
-                "JWT 过滤器怎么配置？", null, "test-visitor", "127.0.0.1", UserRole.ADMIN);
+                "JWT 过滤器怎么配置？", null, "test-visitor", "127.0.0.1", UserRole.ADMIN, List.of(TEST_KB_ID));
 
             List<ChatEvent> events = stream.collectList().block(Duration.ofSeconds(120));
             assertNotNull(events);
@@ -524,7 +526,7 @@ class Phase3IntegrationTest {
             seedTestArticle();
 
             Flux<ChatEvent> stream = ragChatService.chat(
-                "JWT 过滤器怎么配置？", null, "test-visitor", "127.0.0.1", UserRole.ADMIN);
+                "JWT 过滤器怎么配置？", null, "test-visitor", "127.0.0.1", UserRole.ADMIN, List.of(TEST_KB_ID));
 
             List<ChatEvent> events = stream.collectList().block(Duration.ofSeconds(120));
             assertNotNull(events);
@@ -552,7 +554,7 @@ class Phase3IntegrationTest {
         void noResultsShouldFallbackToGeneralChat() {
             // 不灌数据 → 检索必然为空
             Flux<ChatEvent> stream = ragChatService.chat(
-                "今天天气怎么样？", null, "test-visitor", "127.0.0.1", UserRole.ADMIN);
+                "今天天气怎么样？", null, "test-visitor", "127.0.0.1", UserRole.ADMIN, List.of(TEST_KB_ID));
 
             List<ChatEvent> events = stream.collectList().block(Duration.ofSeconds(120));
             assertNotNull(events);
@@ -583,7 +585,7 @@ class Phase3IntegrationTest {
             testLLMProvider.setShouldFail(true);
 
             Flux<ChatEvent> stream = ragChatService.chat(
-                "测试问题", null, "test-visitor", "127.0.0.1", UserRole.ADMIN);
+                "测试问题", null, "test-visitor", "127.0.0.1", UserRole.ADMIN, List.of(TEST_KB_ID));
 
             List<ChatEvent> events = stream.collectList().block(Duration.ofSeconds(120));
             assertNotNull(events);
@@ -611,7 +613,7 @@ class Phase3IntegrationTest {
                 .when(rateLimiter).check(anyString(), anyString(), eq(UserRole.ADMIN));
 
             Flux<ChatEvent> stream = ragChatService.chat(
-                "问题", null, "test-visitor", "127.0.0.1", UserRole.ADMIN);
+                "问题", null, "test-visitor", "127.0.0.1", UserRole.ADMIN, List.of(TEST_KB_ID));
 
             List<ChatEvent> events = stream.collectList().block(Duration.ofSeconds(120));
             assertNotNull(events);

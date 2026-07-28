@@ -186,6 +186,8 @@ class Phase2EndToEndTest {
             defaultKb.setChunkOverlap(100);
 
             when(kbMapper.selectList(any())).thenReturn(List.of(defaultKb));
+            // syncArticle(article, kbId) 会先通过 selectById 加载知识库
+            when(kbMapper.selectById(anyLong())).thenReturn(defaultKb);
 
             // insert 时自动给 ID（模拟雪花算法）
             doAnswer(inv -> {
