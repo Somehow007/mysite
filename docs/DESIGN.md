@@ -2,6 +2,43 @@
 
 ## 更新日志
 
+### 2026-07-28: WebP 副本生成平台兼容性修复（Apple Silicon 原生库告警）
+
+> 更新于 2026-07-28：消除本地（Apple Silicon）每次上传图片都报 `生成WebP副本失败 ... UnsatisfiedLinkError` 的 WARN 刷屏。
+
+#### 决策背景
+
+`org.sejda.imageio:webp-imageio:0.1.6` 捆绑的原生库仅含 x86_64（macOS/Linux/Windows）。Apple Silicon（arm64）JVM 上 dlopen 提取出的 x86_64 dylib 失败抛 `UnsatisfiedLinkError`，且该错误发生在实际写入触发原生库加载时——原代码每次上传都走到写入、每次都被 `catch(Throwable)` 兜住并 WARN，日志刷屏。上传本身不受影响（原图正常落盘入库），失败的只是 WebP 压缩副本优化（生产 Linux x86_64 正常，Nginx 依赖 `.webp` 副本做内容协商）。
+
+#### 决策内容
+
+1. **一次性探测 + 缓存**：`ImageServiceImpl.isWebpWriterAvailable()` 用 1×1 像素真实试写触发原生库加载，结果缓存到静态字段（double-checked locking）。探测必须用真实写入——仅查 writer 注册发现不了 dlopen 失败。
+2. **不支持平台静默跳过**：arm64 macOS 等环境后续上传不再生成 WebP、不再告警；首次探测时输出一次 WARN（含原因）。生产 x86_64 探测通过 → 输出 INFO，行为与之前完全一致。
+3. 未更换依赖（存在 arm64 支持的替代库，但 WebP 副本是锦上添花，探测跳过方案零风险且跨平台通用）。
+
+#### 影响范围
+
+- `src/main/java/io/github/somehow/mysite/service/impl/ImageServiceImpl.java`
+
+### 2026-07-28: 本地 PG 表权限修复（t_rag_intent permission denied）
+
+> 更新于 2026-07-28：修复本地开发环境 AI 聊天报 `permission denied for table t_rag_intent` 的问题。
+
+#### 决策背景
+
+本地 5432 端口跑的是 macOS 本地 PostgreSQL（Homebrew，超级用户 `somehow`），不是 Docker 容器。ragent 库的 7 张表全部由 `somehow` 创建并持有（owner），应用以非超级用户 `ragent` 连接。旧 6 张表早期手动 GRANT 过 `ragent` 全量 DML 权限，但 **GRANT 是快照、对授权之后新建的表不追溯**——Phase 6 的 `t_rag_intent` 在授权之后创建，`ragent` 对它无任何权限，意图识别查询直接报错。
+
+#### 决策内容
+
+1. **补授权**：`GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES ON TABLE t_rag_intent TO ragent`，与其余 6 张表权限对齐。
+2. **防复发**：`ALTER DEFAULT PRIVILEGES FOR ROLE somehow IN SCHEMA public GRANT ... ON TABLES/SEQUENCES TO ragent` —— 今后由 `somehow` 在 public schema 新建的表/序列自动授权给 `ragent`，彻底终结"新表又没权限"的循环。
+3. **种子补齐**：本地 `t_rag_intent` 缺第 5 条「全局检索」种子（schema 文件有 5 条），已按 `docker/init/ragent-schema.sql` 补齐。
+4. **生产无此问题**：生产 PG 跑在 Docker 内，`POSTGRES_USER: ragent` 即超级用户且是所有表的 owner，不存在跨用户授权问题。
+
+#### 影响范围
+
+- 本地 PG `ragent` 库权限（无代码改动）；同类问题的排查模式可复用：`permission denied for table X` → 查 `pg_tables.tableowner` 与 `\dp X`，表 owner 与应用连接用户不一致即为此类问题。
+
 ### 2026-07-28: 文章编辑器图片上传功能恢复 + 上传链路加固
 
 > 更新于 2026-07-28：修复"写文章时无法上传/粘贴图片"的问题，并对整条上传链路（前端编辑器 → API → 后端服务 → Nginx）做健壮性排查与加固。

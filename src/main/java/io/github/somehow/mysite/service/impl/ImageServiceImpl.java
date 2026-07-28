@@ -26,6 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -68,6 +69,47 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
     );
 
     private static final float WEBP_QUALITY = 0.8f;
+
+    /** WebP 编码器可用性（首次使用时探测一次并缓存，避免不支持的平台每次上传都触发原生库加载失败） */
+    private static volatile Boolean webpWriterAvailable;
+    private static final Object WEBP_PROBE_LOCK = new Object();
+
+    /**
+     * 探测当前平台 WebP 编码器是否可用。
+     *
+     * <p>org.sejda.imageio:webp-imageio 捆绑的原生库仅含 x86_64，在 Apple Silicon（arm64）
+     * macOS 上 dlopen 会抛 UnsatisfiedLinkError，且该错误发生在「实际写入触发原生库加载」时，
+     * 仅检查 writer 注册情况发现不了。因此用 1x1 像素真实试写探测，结果缓存：
+     * 不支持的平台后续静默跳过 WebP 副本生成（原图上传不受影响），生产 x86_64 环境行为不变。</p>
+     */
+    private static boolean isWebpWriterAvailable() {
+        Boolean available = webpWriterAvailable;
+        if (available != null) {
+            return available;
+        }
+        synchronized (WEBP_PROBE_LOCK) {
+            if (webpWriterAvailable == null) {
+                boolean ok = false;
+                Throwable failure = null;
+                try {
+                    BufferedImage probe = new BufferedImage(1, 1, BufferedImage.TYPE_INT_RGB);
+                    ok = ImageIO.write(probe, "webp", new ByteArrayOutputStream());
+                } catch (Throwable e) {
+                    failure = e;
+                }
+                if (ok) {
+                    log.info("WebP 编码器可用，图片上传后将生成 WebP 副本");
+                } else if (failure != null) {
+                    log.warn("WebP 编码器不可用（{}），跳过 WebP 副本生成（不影响原图上传）。原因: {}",
+                            failure.getClass().getSimpleName(), failure.getMessage());
+                } else {
+                    log.warn("未注册 WebP 图片写入器，跳过 WebP 副本生成");
+                }
+                webpWriterAvailable = ok;
+            }
+            return webpWriterAvailable;
+        }
+    }
 
     @Override
     public ImageUploadRespDTO uploadImage(MultipartFile file) {
@@ -368,6 +410,11 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
     }
 
     private void generateWebpCopy(BufferedImage image, Path originalPath) {
+        // 平台不支持 WebP 编码（如 Apple Silicon 缺 arm64 原生库）时静默跳过，不重复告警
+        if (!isWebpWriterAvailable()) {
+            return;
+        }
+
         String originalName = originalPath.getFileName().toString();
         if (originalName.endsWith(".webp") || originalName.endsWith(".svg")) {
             return;
