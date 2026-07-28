@@ -113,6 +113,15 @@ data: {"type":"error","message":"提问太频繁，请稍后再试"}        ← 
 - 面板：桌面端 `w-[380px] h-[560px] max-h-[70vh]`，`fixed bottom-24 right-6 z-50`；移动端（`<640px`）**全屏抽屉**：`inset-0 w-full h-full rounded-none`。
 - 面板材质：`glass glass-lg rounded-2xl border border-glass-border`（复用 `SearchDialog.vue` 已验证的毛玻璃语言），进入动画复用 `animate-scale-in`，收起用 `fade`。
 
+> 更新于 2026-07-28：移动端真机体验反馈——全屏抽屉在软键盘弹起时会盖住输入框与对话，且"打开即全屏"压迫感强。**移动端形态已改为底部 sheet**（桌面端不变，实际尺寸为 `520px × 680px`、`max-h: calc(100dvh - 80px)`，锚定右下角）：
+>
+> - **形态**：`fixed inset-x-0 bottom-0`，`rounded-t-2xl` + 拖拽把手，顶部留 24px 缝隙可见背后页面；下滑把手超过阈值可关闭，点遮罩/✕/ESC 同样可关闭。
+> - **键盘适配**：面板高度 = `min(100dvh - 24px, var(--vvh) - 8px)`。`--vvh` 由新增的 `useVisualViewport` composable（visualViewport API）实时注入——iOS 键盘弹起时布局视口不收缩，但 visualViewport 收缩，面板随之压缩到键盘上方，输入框始终可见。viewport meta 同步追加 `interactive-widget=resizes-content`（Android Chrome 108+ 布局视口随键盘收缩）。
+> - **聚焦策略**：打开面板**不再自动聚焦** textarea（移动端），避免打开瞬间键盘弹起盖住半个面板；用户点输入框时才弹键盘。键盘弹起时消息列表自动滚到最新（用户上翻时不打扰）。
+> - **输入细节**：textarea 移动端 16px（防 iOS 对 <16px 输入框聚焦自动缩放页面）、`enterkeyhint="send"`、底部 `pb-[max(0.75rem,env(safe-area-inset-bottom))]`（home indicator 机型）。
+> - **滚动卫生**：消息列表 `overscroll-contain`，遮罩拦截 touchmove，防 iOS 背景滚动穿透；历史抽屉宽度 `min(236px, 80vw)`。
+> - 入场动画：移动端 sheet 上滑（300ms spring 曲线），桌面端缩放入/出（替代原单向 `animate-scale-in`）。
+
 **为什么是浮窗而不是独立页面**：与后端方案 Phase 4 一致——读者在阅读文章时随时提问，上下文不中断；这也是 `ChatWidget` 挂在 `DefaultLayout`（而非某个 view）的原因。
 
 ### 3.2 面板内部结构
@@ -716,7 +725,7 @@ export interface KnowledgeDocument {
 UI 集成：
 
 - [ ] 8 套主题（classic/aurora/rose-garden/ocean-breeze/warm-sunset/liquid-glass × 明暗）逐一切换走查，无硬编码颜色穿帮
-- [ ] 聊天内代码块高亮与文章页一致；移动端（<640px）面板全屏可用
+- [ ] 聊天内代码块高亮与文章页一致；移动端（<640px）底部 sheet：打开不弹键盘、键盘弹起面板压缩到键盘上方、可下滑关闭、iOS 聚焦不缩放页面
 - [ ] 无任何对现有组件的侵入式修改（`git diff` 只含 §4.1 列出的文件）
 
 工程：

@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8">
     <link rel="icon" type="image/jpeg" href="/favicon.jpg">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <!-- interactive-widget=resizes-content：Android Chrome 108+ 软键盘弹起时同步收缩布局视口，
+         配合 dvh / --vvh 让 fixed 弹层（如 AI 聊天 sheet）不被键盘遮挡；iOS Safari 忽略该值，由 useVisualViewport 兜底 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, interactive-widget=resizes-content">
     <meta name="description" content="MySite - 个人博客">
     <meta name="theme-color" content="#FAFAFA" media="(prefers-color-scheme: light)">
     <meta name="theme-color" content="#09090B" media="(prefers-color-scheme: dark)">

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, nextTick, watch, onScopeDispose, onBeforeUnmount, computed, onMounted } from 'vue'
+import { ref, nextTick, watch, onScopeDispose, onBeforeUnmount, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Sparkles, X, RotateCw, PanelLeftOpen, AlertTriangle, Clock, LogIn, Bot, Library } from 'lucide-vue-next'
+import { Sparkles, X, RotateCw, PanelLeftOpen, AlertTriangle, Clock, LogIn, Library } from 'lucide-vue-next'
+import { useMediaQuery } from '@vueuse/core'
 import { useChat } from '@/composables/useChat'
 import { useFabStack } from '@/composables/useFabStack'
+import { useVisualViewport } from '@/composables/useVisualViewport'
 import { getVisitorId, getKnowledgeBases } from '@/api/rag'
 import { useUserStore } from '@/stores/user'
 import type { KnowledgeBase } from '@/types'
@@ -28,6 +30,12 @@ const inputComponentRef = ref<InstanceType<typeof ChatInput> | null>(null)
 
 const chat = useChat()
 const isUserScrolledUp = ref(false)
+
+// ── 移动端适配：断点 + 可视视口高度 ──────────────────────────
+// isMobile 对齐 Tailwind sm 断点（640px）：< 640px 走底部 sheet 形态
+const isMobile = useMediaQuery('(max-width: 639px)')
+// vvHeight：软键盘弹起时实时收缩的可视高度（iOS 布局视口不收缩，必须用它）
+const { vvHeight } = useVisualViewport()
 
 // ── 知识库选择 ────────────────────────────────────────────────
 const kbs = ref<KnowledgeBase[]>([])
@@ -82,7 +90,7 @@ function handleDeleteConversation(id: string) {
   chat.conversations.value = chat.conversations.value.filter(c => c.id !== id)
 }
 
-function handleRenameConversation(_id: string, _title: string) {
+function handleRenameConversation() {
   chat.loadConversations(getVisitorId())
 }
 
@@ -91,7 +99,7 @@ const rateLimitSeconds = ref(0)
 let rateLimitTimer: ReturnType<typeof setInterval> | null = null
 
 watch(() => chat.lastError.value, (err) => {
-  if (err && err.kind === 'http' && (err as any).status === 429) {
+  if (err && err.kind === 'http' && err.status === 429) {
     rateLimitSeconds.value = 60
     if (rateLimitTimer) clearInterval(rateLimitTimer)
     rateLimitTimer = setInterval(() => {
@@ -189,9 +197,14 @@ watch(isOpen, (open) => {
 
 function open() {
   isOpen.value = true
+  closingByDrag = false // 重置下滑关闭标记（面板重建后需允许再次拖拽）
   nextTick(() => {
-    const textarea = inputComponentRef.value?.$el?.querySelector?.('textarea') as HTMLTextAreaElement | null
-    textarea?.focus()
+    // 移动端不自动聚焦输入框 —— 打开面板瞬间弹软键盘会直接盖住半个面板，
+    // 用户点输入框时才弹键盘；桌面端保留自动聚焦
+    if (!isMobile.value) {
+      const textarea = inputComponentRef.value?.$el?.querySelector?.('textarea') as HTMLTextAreaElement | null
+      textarea?.focus()
+    }
     scrollToBottom()
   })
 }
@@ -200,11 +213,64 @@ function close() {
   isOpen.value = false
 }
 
-// ── 移动端全屏时阻止 body 背景滚动 ──
+// 键盘弹起/收起 → 面板高度（--vvh 驱动）变化后，把最新消息滚回视野
+// （用户主动上翻时不打扰，沿用 isUserScrolledUp 守卫）
+watch(vvHeight, () => {
+  if (!isOpen.value || isUserScrolledUp.value) return
+  nextTick(() => scrollToBottom())
+})
+
+// ── 移动端下滑关闭 ──────────────────────────────────────────
+const panelRef = ref<HTMLElement | null>(null)
+let dragStartY = 0
+let dragDy = 0
+let closingByDrag = false
+
+function onDragStart(e: TouchEvent) {
+  if (closingByDrag) return
+  const touch = e.touches[0]
+  if (!touch) return // 防御：touches 为空（极端边界事件）
+  dragStartY = touch.clientY
+  dragDy = 0
+  if (panelRef.value) panelRef.value.style.transition = 'none'
+}
+
+function onDragMove(e: TouchEvent) {
+  if (closingByDrag) return
+  const touch = e.touches[0]
+  if (!touch) return // 防御：手指已全部离开（此时应触发 touchend/touchcancel）
+  dragDy = Math.max(0, touch.clientY - dragStartY) // 只响应下拉
+  if (panelRef.value && dragDy > 0) {
+    panelRef.value.style.transform = `translateY(${dragDy}px)`
+  }
+}
+
+function onDragEnd() {
+  const panel = panelRef.value
+  if (!panel || closingByDrag) return
+  if (dragDy > 100) {
+    // 下拉超过阈值：手动滑出屏幕后再卸载，避免与 leave 过渡的 transform 冲突
+    closingByDrag = true
+    panel.style.transition = 'transform 200ms ease-in'
+    panel.style.transform = 'translateY(100%)'
+    window.setTimeout(() => close(), 200)
+  } else {
+    // 未达阈值（或未移动）：回弹并恢复 stylesheet 的 height transition
+    // 注意必须恢复 —— onDragStart 设的 inline transition:none 会吞掉键盘联动的高度过渡
+    if (dragDy > 0) {
+      panel.style.transition = 'transform 150ms ease-out'
+    }
+    panel.style.transform = ''
+    window.setTimeout(() => {
+      if (panelRef.value) panelRef.value.style.transition = ''
+    }, 200)
+  }
+  dragDy = 0
+}
+
+// ── 移动端打开 sheet 时阻止 body 背景滚动 ──
 watch(isOpen, (open) => {
-  // Only prevent scroll on mobile (sm breakpoint and below)
-  const isMobile = window.innerWidth < 640
-  document.body.style.overflow = (open && isMobile) ? 'hidden' : ''
+  document.body.style.overflow = (open && isMobile.value) ? 'hidden' : ''
 })
 
 onBeforeUnmount(() => {
@@ -234,33 +300,50 @@ onScopeDispose(() => {
     <Sparkles :size="22" />
   </button>
 
-  <!-- 面板 -->
+  <!-- 遮罩 + 面板：独立 Transition，各自播放进出场动画 -->
   <Teleport to="body">
-    <div
-      v-if="isOpen"
-      class="fixed inset-0 z-50 flex items-end sm:items-end justify-end
-             p-0 sm:p-0"
-    >
-      <!-- 桌面端：仅面板，无全屏遮罩 -->
-      <!-- 移动端遮罩 -->
+    <!-- 移动端遮罩（桌面端面板不挡页面，无遮罩）；
+         touchmove.prevent 拦截 iOS 背景滚动穿透 -->
+    <Transition name="fade">
       <div
-        class="absolute inset-0 bg-black/40 sm:hidden"
+        v-if="isOpen"
+        class="fixed inset-0 z-40 bg-black/40 sm:hidden"
         @click="close"
+        @touchmove.stop.prevent
       />
+    </Transition>
 
-      <!-- 面板主体：桌面端锚定右下角 -->
+    <!-- 面板主体：移动端底部 sheet（顶部留缝、圆角、可下滑关闭），
+         桌面端锚定右下角 520×680；高度逻辑见 scoped style .chat-panel。
+         定位统一用物理属性（left/right），避免 Tailwind v4 inset-x 的逻辑属性
+         （inset-inline）与 sm:left-auto 等物理覆盖产生级联歧义 -->
+    <Transition :name="isMobile ? 'sheet' : 'zoom'">
       <div
-        class="relative w-full h-full rounded-none
-               sm:fixed sm:right-10 sm:bottom-10
-               sm:w-[520px] sm:h-[680px] sm:max-h-[calc(100vh-80px)] sm:rounded-2xl
+        v-if="isOpen"
+        ref="panelRef"
+        class="chat-panel fixed left-0 right-0 bottom-0 z-50
+               sm:left-auto sm:right-10 sm:bottom-10 sm:w-[520px]
+               rounded-t-2xl sm:rounded-2xl
                bg-bg-elevated border border-border
                flex flex-col overflow-hidden
-               sm:shadow-[0_24px_64px_-12px_rgba(17,24,39,0.22),0_8px_24px_-8px_rgba(79,70,229,0.12)]
-               animate-scale-in"
+               sm:shadow-[0_24px_64px_-12px_rgba(17,24,39,0.22),0_8px_24px_-8px_rgba(79,70,229,0.12)]"
       >
-        <!-- Header：60px -->
-        <div class="flex items-center gap-2.5 px-3.5 shrink-0 border-b border-border"
-             style="height: 60px;">
+        <!-- 拖拽区：把手 + Header（移动端下滑关闭；touch-action: none 独占手势） -->
+        <div
+          class="shrink-0 touch-none select-none sm:touch-auto"
+          @touchstart.passive="onDragStart"
+          @touchmove.passive="onDragMove"
+          @touchend="onDragEnd"
+          @touchcancel="onDragEnd"
+        >
+          <!-- 拖拽把手（仅移动端） -->
+          <div class="sm:hidden flex justify-center pt-2 pb-1">
+            <div class="w-9 h-1 rounded-full bg-border" />
+          </div>
+
+          <!-- Header：60px -->
+          <div class="flex items-center gap-2.5 px-3.5 border-b border-border"
+               style="height: 60px;">
           <!-- 历史按钮 -->
           <button
             class="icon-btn w-[34px] h-[34px] rounded-lg flex items-center justify-center shrink-0
@@ -303,7 +386,9 @@ onScopeDispose(() => {
           >
             <X :size="17" />
           </button>
+          </div>
         </div>
+        <!-- 拖拽区结束 -->
 
         <!-- KB 选择标签栏 -->
         <div
@@ -332,8 +417,7 @@ onScopeDispose(() => {
           <Transition name="slide-left">
             <div
               v-if="showHistory"
-              class="absolute inset-y-0 left-0 z-10 bg-bg-elevated border-r border-border flex flex-col shadow-lg"
-              style="width: 236px;"
+              class="absolute inset-y-0 left-0 z-10 w-[min(236px,80vw)] bg-bg-elevated border-r border-border flex flex-col shadow-lg"
             >
               <div class="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
                 <span class="text-xs font-semibold text-text-secondary">历史对话 · {{ chat.conversations.value.length }} 条</span>
@@ -363,10 +447,10 @@ onScopeDispose(() => {
             @click="showHistory = false"
           />
 
-          <!-- 消息列表 -->
+          <!-- 消息列表（overscroll-contain：滚动到顶/底不链到背后页面） -->
           <div
             ref="messagesContainer"
-            class="h-full overflow-y-auto px-4 py-4 scrollbar-thin"
+            class="h-full overflow-y-auto overscroll-contain px-4 py-4 scrollbar-thin"
             role="log"
             aria-live="polite"
             @scroll="handleScroll"
@@ -473,11 +557,88 @@ onScopeDispose(() => {
           @cancel="chat.cancelGeneration()"
         />
       </div>
-    </div>
+    </Transition>
   </Teleport>
 </template>
 
 <style scoped>
+/* ── 面板高度 ────────────────────────────────────────────────
+   移动端底部 sheet：min(100dvh - 24px, var(--vvh) - 8px)
+   - 100dvh - 24px：顶部留 24px 缝隙可见背后页面，不再全屏吞掉内容
+   - var(--vvh) - 8px：useVisualViewport 注入的实时可视高度；
+     软键盘弹起时 --vvh 收缩，面板随之压缩到键盘上方，输入框始终可见
+   桌面端（≥640px）：固定 680px，受视口封顶。
+   注意：scoped style 不带 @layer，优先级高于 Tailwind utilities，
+   高度统一在此管理（模板不再写 sm:h-[680px]）。 */
+.chat-panel {
+  height: min(calc(100vh - 24px), calc(var(--vvh, 100vh) - 8px));
+  transition: height 200ms ease-out;
+}
+@supports (height: 100dvh) {
+  .chat-panel {
+    height: min(calc(100dvh - 24px), calc(var(--vvh, 100dvh) - 8px));
+  }
+}
+@media (min-width: 640px) {
+  .chat-panel {
+    height: 680px;
+    max-height: calc(100vh - 80px);
+  }
+}
+
+/* 移动端底部 sheet 滑入/滑出 */
+.sheet-enter-active {
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sheet-leave-active {
+  transition: transform 200ms ease-in;
+}
+.sheet-enter-from,
+.sheet-leave-to {
+  transform: translateY(100%);
+}
+
+/* 桌面端缩放入/出（替代原单向 animate-scale-in，补上退场动画） */
+.zoom-enter-active {
+  transition:
+    opacity 200ms var(--ease-out),
+    transform 200ms var(--ease-out);
+}
+.zoom-leave-active {
+  transition:
+    opacity 150ms ease-in,
+    transform 150ms ease-in;
+}
+.zoom-enter-from,
+.zoom-leave-to {
+  opacity: 0;
+  transform: scale(0.96) translateY(8px);
+}
+
+/* 遮罩淡入/淡出 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 200ms ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-enter-active,
+  .sheet-leave-active,
+  .zoom-enter-active,
+  .zoom-leave-active,
+  .fade-enter-active,
+  .fade-leave-active {
+    transition-duration: 1ms !important;
+  }
+  .chat-panel {
+    transition: none;
+  }
+}
+
 .slide-left-enter-active,
 .slide-left-leave-active {
   transition: transform 0.2s ease;

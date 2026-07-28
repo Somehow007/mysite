@@ -70,18 +70,23 @@ function autoResize() {
 </script>
 
 <template>
-  <div class="border-t border-border p-3 shrink-0">
+  <!-- 底部留白取 max(常规间距, safe-area)：iPhone home indicator 机型不被遮挡
+       （main.css 的 body safe-area padding 对 fixed 弹层无效，需在此单独处理） -->
+  <div class="border-t border-border px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shrink-0">
     <!-- 输入行：999px 胶囊 -->
     <div
       class="flex items-end gap-2 px-3 py-1.5 rounded-full border border-border bg-bg-secondary transition-all duration-200"
       :class="overLimit ? '!border-danger' : 'focus-within:border-accent focus-within:shadow-[0_0_0_3px_rgba(79,70,229,0.14)]'"
     >
+      <!-- 移动端字号 16px（text-base）：iOS 对 < 16px 的输入框聚焦时会自动缩放页面；
+           桌面端恢复 14px。enterkeyhint 让软键盘回车键显示"发送" -->
       <textarea
         ref="textareaRef"
         v-model="input"
         :maxlength="MAX_LENGTH + 50"
         rows="1"
-        class="flex-1 resize-none bg-transparent text-sm text-text-primary placeholder:text-text-muted/60 outline-none max-h-[120px] py-1.5"
+        enterkeyhint="send"
+        class="flex-1 resize-none bg-transparent text-base sm:text-sm text-text-primary placeholder:text-text-muted/60 outline-none max-h-[120px] py-1.5"
         :class="overLimit ? 'text-danger' : ''"
         placeholder="输入你的问题..."
         :disabled="streaming"
