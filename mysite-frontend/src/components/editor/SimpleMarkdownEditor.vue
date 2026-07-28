@@ -162,7 +162,7 @@ function onPaste(e: ClipboardEvent) {
   const imageFiles: File[] = []
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
-    if (item.kind === 'file' && item.type.startsWith('image/')) {
+    if (item && item.kind === 'file' && item.type.startsWith('image/')) {
       const file = item.getAsFile()
       if (file) imageFiles.push(file)
     }
