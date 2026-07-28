@@ -2,24 +2,6 @@
 
 ## 更新日志
 
-### 2026-07-28: AI 聊天移动端体验优化（底部 sheet + 视口基建）
-
-> 更新于 2026-07-28：移动端聊天面板由全屏抽屉改为底部 sheet，并新建全站 visualViewport 视口基建，解决"打开即全屏、键盘弹起遮住对话"的体验问题。
-
-#### 决策背景
-
-移动端真机使用反馈：① 聊天面板打开即吞掉全屏，压迫感强；② 软键盘弹起后输入框与对话被遮挡（iOS Safari 键盘弹起时布局视口不收缩，而面板高度基于布局视口）。调研确认根因：原设计有意采用全屏抽屉（见 ragent-frontend-design.md）；`open()` 无条件聚焦 textarea 导致打开即弹键盘；全项目无 visualViewport 代码。
-
-#### 决策内容
-
-1. **移动端形态改为底部 sheet**（用户确认）：顶部留 24px 缝隙、圆角 + 拖拽把手、下滑超阈值关闭；桌面端 520×680 右下角面板不变。属局部体验优化，不改变"移动端重构不在本期"的范围边界（见 2026-07-27 手帐条目）。
-2. **视口基建**：新增 `useVisualViewport` composable（visualViewport API → `--vvh` CSS 变量 + `vvHeight` ref），面板高度 = `min(100dvh - 24px, var(--vvh) - 8px)`，键盘弹起时面板实时压缩到键盘上方；viewport meta 追加 `interactive-widget=resizes-content`（Android Chrome 108+ 生效，iOS 由 visualViewport 兜底）。该基建为后续所有 fixed 弹层的键盘适配提供统一方案。
-3. **输入体验**：移动端打开不自动聚焦；textarea 移动端 16px（防 iOS 聚焦缩放）+ `enterkeyhint="send"` + safe-area 底边距；消息列表 `overscroll-contain` + 遮罩 touchmove 拦截防滚动穿透。
-
-#### 影响范围
-
-- `mysite-frontend/index.html`、`src/composables/useVisualViewport.ts`（新增）、`src/components/chat/ChatWidget.vue`、`src/components/chat/ChatInput.vue`、`docs/ragent-frontend-design.md`
-
 ### 2026-07-28: WebP 副本生成平台兼容性修复（Apple Silicon 原生库告警）
 
 > 更新于 2026-07-28：消除本地（Apple Silicon）每次上传图片都报 `生成WebP副本失败 ... UnsatisfiedLinkError` 的 WARN 刷屏。
