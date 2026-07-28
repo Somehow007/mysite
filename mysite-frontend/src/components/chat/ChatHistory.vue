@@ -6,7 +6,7 @@ import { useToast } from '@/composables/useToast'
 import { renameConversation, deleteConversation } from '@/api/rag'
 import type { ConversationSummary } from '@/api/rag'
 
-const props = defineProps<{
+defineProps<{
   conversations: ConversationSummary[]
   currentId: string | null
   loading: boolean
@@ -107,9 +107,11 @@ function handleKeydown(e: KeyboardEvent, convId: string) {
 </script>
 
 <template>
-  <div class="flex flex-col h-full">
+  <!-- flex-1 min-h-0：在抽屉 flex 列中取"剩余高度"而非 h-full（100% 父高）——
+       h-full 会与抽屉头部叠加溢出，底部条目被裁切且滚不到（历史显示不全的根因） -->
+  <div class="flex flex-col flex-1 min-h-0">
     <!-- New conversation button -->
-    <div class="px-3 pt-3 pb-2">
+    <div class="px-3 pt-3 pb-2 shrink-0">
       <button
         class="w-full flex items-center gap-2 px-3 py-2 rounded-lg
                border border-dashed border-border text-text-secondary

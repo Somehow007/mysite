@@ -178,10 +178,14 @@ function handleScroll() {
 
 // ── 开合控制 ────────────────────────────────────────────────
 
-/** ESC 关闭面板 */
+/** ESC 分级退出：先收历史抽屉，再关面板 */
 function handleEsc(e: KeyboardEvent) {
   if (e.key === 'Escape' && isOpen.value) {
     e.preventDefault()
+    if (showHistory.value) {
+      showHistory.value = false
+      return
+    }
     close()
   }
 }
@@ -410,42 +414,8 @@ onScopeDispose(() => {
           <span v-if="kbsLoading" class="text-[11px] text-text-muted ml-1">加载中...</span>
         </div>
 
-        <!-- 内容区（含侧栏） -->
+        <!-- 内容区（历史抽屉已提升为面板级覆盖层，见 ChatInput 之后） -->
         <div class="flex-1 relative overflow-hidden">
-
-          <!-- 历史侧栏 236px 抽屉 + 遮罩 -->
-          <Transition name="slide-left">
-            <div
-              v-if="showHistory"
-              class="absolute inset-y-0 left-0 z-10 w-[min(236px,80vw)] bg-bg-elevated border-r border-border flex flex-col shadow-lg"
-            >
-              <div class="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
-                <span class="text-xs font-semibold text-text-secondary">历史对话 · {{ chat.conversations.value.length }} 条</span>
-                <button
-                  class="p-0.5 rounded text-text-muted hover:text-text-primary transition-colors"
-                  @click="showHistory = false"
-                >
-                  <X :size="14" />
-                </button>
-              </div>
-              <ChatHistory
-                :conversations="chat.conversations.value"
-                :current-id="chat.conversationId.value"
-                :loading="chat.loadingHistory.value"
-                @select="handleSelectConversation"
-                @new="handleNewConversation"
-                @deleted="handleDeleteConversation"
-                @renamed="handleRenameConversation"
-              />
-            </div>
-          </Transition>
-
-          <!-- 侧栏打开时的半透明遮罩 -->
-          <div
-            v-if="showHistory"
-            class="absolute inset-0 bg-black/15 z-[5]"
-            @click="showHistory = false"
-          />
 
           <!-- 消息列表（overscroll-contain：滚动到顶/底不链到背后页面） -->
           <div
@@ -556,6 +526,43 @@ onScopeDispose(() => {
           @send="chat.sendMessage"
           @cancel="chat.cancelGeneration()"
         />
+
+        <!-- 历史对话抽屉：面板内最上层（z-20/30），覆盖 header 到输入框的完整高度。
+             旧实现内嵌在内容区：头部/输入框外露可误操作，且列表底部被裁切导致
+             历史"显示不全"。提升为面板级覆盖层后，浏览历史时优先展示历史。 -->
+        <Transition name="fade">
+          <div
+            v-if="showHistory"
+            class="absolute inset-0 z-20 bg-black/15"
+            @click="showHistory = false"
+          />
+        </Transition>
+        <Transition name="slide-left">
+          <div
+            v-if="showHistory"
+            class="absolute inset-y-0 left-0 z-30 w-[min(236px,80vw)] bg-bg-elevated border-r border-border flex flex-col shadow-lg"
+          >
+            <div class="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
+              <span class="text-xs font-semibold text-text-secondary">历史对话 · {{ chat.conversations.value.length }} 条</span>
+              <button
+                class="p-0.5 rounded text-text-muted hover:text-text-primary transition-colors"
+                aria-label="关闭历史对话"
+                @click="showHistory = false"
+              >
+                <X :size="14" />
+              </button>
+            </div>
+            <ChatHistory
+              :conversations="chat.conversations.value"
+              :current-id="chat.conversationId.value"
+              :loading="chat.loadingHistory.value"
+              @select="handleSelectConversation"
+              @new="handleNewConversation"
+              @deleted="handleDeleteConversation"
+              @renamed="handleRenameConversation"
+            />
+          </div>
+        </Transition>
       </div>
     </Transition>
   </Teleport>
