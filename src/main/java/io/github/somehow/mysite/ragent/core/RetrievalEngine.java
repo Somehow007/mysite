@@ -81,8 +81,8 @@ public class RetrievalEngine {
             return List.of();
         }
 
-        // Stage 2: Rerank 精排
-        return rerank(candidates, topK, t0);
+        // Stage 2: Rerank 精排（把用户问题透传给 rerank 模型，按 query↔doc 相关性重排）
+        return rerank(question, candidates, topK, t0);
     }
 
     /**
@@ -130,19 +130,42 @@ public class RetrievalEngine {
             merged = merged.subList(0, properties.getRetrieval().getTopK());
         }
 
-        return rerank(merged, topK, t0);
+        // 多子问题合并后的统一精排：用全部子问题拼接作为 rerank query，
+        // 让 rerank 模型看到完整的问题语境（而非空串）
+        return rerank(String.join("\n", subQueries), merged, topK, t0);
     }
 
     // ── private helpers ──
 
-    private List<SearchResult> rerank(List<SearchResult> candidates, int topK, long startTime) {
+    /**
+     * Rerank 精排 + 精排后二次阈值过滤。
+     *
+     * @param query      用户问题（透传给 rerank 模型做 query↔doc 相关性打分，不能为空）
+     * @param candidates 粗排候选（已通过向量 scoreThreshold）
+     * @param topK       最终返回数量上限
+     */
+    private List<SearchResult> rerank(String query, List<SearchResult> candidates,
+                                      int topK, long startTime) {
         if (rerankService != null && candidates.size() > topK) {
             long tr = System.currentTimeMillis();
-            candidates = rerankService.rerank("", candidates, topK);
+            candidates = rerankService.rerank(query, candidates, topK);
             log.info("[retrieval] rerank done: {} results ({}ms)",
                 candidates.size(), System.currentTimeMillis() - tr);
         } else if (candidates.size() > topK) {
             candidates = candidates.subList(0, topK);
+        }
+
+        // 精排后二次过滤：rerank 的 relevance_score 会替换向量分，
+        // 必须按精排阈值再卡一道，否则低相关性来源（如 34%）也会混进 prompt。
+        // 降级路径（无 rerank）下分数仍是向量相似度、已过粗排阈值，此过滤天然兼容。
+        double rerankThreshold = properties.getRetrieval().getRerankScoreThreshold();
+        int before = candidates.size();
+        candidates = candidates.stream()
+            .filter(r -> r.score() >= rerankThreshold)
+            .toList();
+        if (candidates.size() < before) {
+            log.info("[retrieval] post-rerank filter (threshold={}): {} → {} results",
+                rerankThreshold, before, candidates.size());
         }
 
         log.info("[retrieval] done: {} final results, total={}ms",

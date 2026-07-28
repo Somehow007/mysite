@@ -5,6 +5,100 @@
 
 ---
 
+## 2026-07-28 — 检索质量修复：rerank 空 query + 双阈值过滤
+
+### 背景（现象）
+
+用户反馈：AI 回答时引用的来源与问题不相关，**甚至相关度仅 34% 的来源也被列入参考**。
+排查 `RagChatService → RetrievalEngine → BaiLianRerankProvider` 检索链路，定位到三个叠加的根因。
+
+### 问题根源
+
+1. **rerank 精排传空 query（核心 bug）**
+   `RetrievalEngine.rerank()` 调用 `rerankService.rerank("", candidates, topK)`，
+   第一个参数写死了空字符串。DashScope rerank API 的核心是 query↔document
+   相关性打分，query 为空时精排模型只能盲打分，**精排层形同虚设**——
+   排序和截断与"按向量分取前 N"几乎没有区别，粗排混入的无关内容原样进入 prompt。
+
+2. **向量粗排阈值 0.3 对中文 embedding 过宽松**
+   `text-embedding-v4` 对中文文本的余弦相似度普遍偏高，
+   实测无关主题之间也能拿到 0.3~0.4 的分数。0.3 的门槛几乎只挡得住完全乱码，
+   大量"语义沾边但答非所问"的候选通过粗排（用户看到的 34% 来源即来自这一档）。
+
+3. **rerank 后不做二次阈值过滤**
+   rerank 返回的 `relevance_score` 会替换掉向量分，但替换后没有任何过滤，
+   `top_n=5` 要几条就给几条。即使精排模型明确判定某来源相关度只有 0.34，
+   只要候选不足 5 个或它排进前 5，就会被送进 prompt 和前端 sources。
+
+### 解决方案
+
+| # | 修复 | 文件 |
+|---|------|------|
+| 1 | `rerank()` helper 增加 `query` 参数：单问题检索透传用户问题；多子问题检索用全部子问题拼接作为 rerank query | `core/RetrievalEngine.java` |
+| 2 | 向量粗排阈值 `score-threshold` 0.3 → **0.5** | `application.yaml`、`config/RagProperties.java` |
+| 3 | 新增 `rerank-score-threshold: 0.5`：精排后按 relevance_score 二次过滤，低于阈值的来源丢弃（降级到向量截断的路径天然兼容，因其分数已过粗排阈值） | 同上 + `core/RetrievalEngine.java` |
+| 4 | 新增 Part 3 live 测试（真实百炼 embedding + qwen3-rerank API）：相关问题质量断言、无关问题零来源断言、集成链路 rerank 真实调用断言 | `Phase3IntegrationTest.java` |
+| 5 | 同步设计文档示例配置 | `docs/ragent-integration-design.md` |
+
+最终配置：
+
+```yaml
+rag:
+  retrieval:
+    top-k: 10                      # 向量粗排候选数
+    rerank-top-k: 5                # 精排后最终来源数
+    score-threshold: 0.5           # 向量粗排相似度下限
+    rerank-score-threshold: 0.5    # 精排 relevance_score 下限
+```
+
+### 实测效果（2026-07-28，真实 API，`./mvnw test -Dtest='Phase3IntegrationTest$RerankQuality'`）
+
+**① 相关问题「JWT 过滤器怎么配置？」（7 篇多主题语料）**
+
+```
+【粗排原始分数】                      【修复后最终来源】
+  0.9643  Spring Security JWT…         0.9643  Spring Security JWT…   ← 仅此 1 条
+  0.3728  Redis 缓存最佳实践      ✂
+  0.3439  Nginx 反向代理与缓存配置 ✂  ← 用户反馈的"34% 来源"就在这一档
+  0.3357  Docker Compose 多服务编排 ✂
+  0.3210  Vue 3 组合式 API        ✂
+  0.2934  Spring 事务传播机制      ✂
+  0.1825  MySQL 索引优化实战       ✂
+```
+
+修复前（阈值 0.3 + 空 query rerank）：Nginx 0.34 / Docker 0.34 / Vue 0.32 都会通过并被引用；
+修复后：6 条无关来源全部被阈值拦下，来源数 7 → 1。
+
+**② 无关问题「红烧肉怎么做才好吃？」**
+
+```
+【粗排原始分数】最高仅 0.1792（7 篇全部 < 0.5）
+【rerank 真实相关性（query 透传后）】最高 0.1743，全部 < 0.5
+→ 双阈值过滤后最终来源数: 0（AI 如实回答"知识库里没有"而不是硬凑来源）
+```
+
+**③ 集成链路 rerank API 真实调用验证（3 篇 JWT 同主题文章，rerankTopK=2）**
+
+```
+【过 0.5 向量阈值的候选】3 条：0.7826 / 0.6739 / 0.5313 → > 2，触发 rerank API
+[retrieval] rerank done: 2 results (123ms)     ← 日志确认真调了 API
+【集成链路结果】 0.9605 过滤器配置 / 0.8370 令牌校验
+【直接 API 基准】 0.9605 过滤器配置 / 0.8370 令牌校验   ← 完全一致，证明 query 透传生效
+```
+
+**回归**：全量 `./mvnw test` 279 个测试通过（0 失败，3 个 ES 环境跳过为既有行为）。
+
+### 经验沉淀
+
+- rerank 是 cross-encoder，**没有 query 就没有相关性**——调用方必须把用户问题透传到底；
+  降级兜底（截断）可以接受，静默失效（传空串照常返回 200）最危险。
+- 中文 embedding 相似度分布整体偏高，阈值要按**实测分数分布**定（本项目不相关档 0.1~0.37、
+  相关档 0.65+），0.5 正好落在两档之间的空档区。
+- 分数语义在链路中会变化（向量分 → rerank relevance_score），**每一段都要有对应的阈值关卡**，
+  不能假设上游过滤对下游分数仍然有效。
+
+---
+
 ## 2026-07-21 (续) — API Key 读取修复 + 完整链路跑通
 
 ### 改动

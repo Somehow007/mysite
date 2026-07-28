@@ -2,6 +2,82 @@
 
 ## 更新日志
 
+### 2026-07-28: RAG 检索质量修复（rerank 空 query + 双阈值过滤）
+
+> 更新于 2026-07-28：修复 AI 回答引用不相关来源（甚至 34% 相关度也被引用）的问题。三个叠加根因：① rerank 精排调用传空字符串 query，cross-encoder 失去 query↔doc 相关性判据、形同虚设；② 向量粗排阈值 0.3 对中文 embedding 过宽松（无关主题实测也有 0.3~0.4 分）；③ rerank 的 relevance_score 替换向量分后无二次过滤，top_n 要几条给几条。
+
+#### 决策内容
+
+1. **query 透传**：`RetrievalEngine.rerank()` 增加 query 参数，单问题透传用户问题、多子问题用全部子问题拼接，让精排真正按问题相关性重排。
+2. **双阈值关卡**：向量粗排阈值 `score-threshold` 0.3 → 0.5；新增 `rerank-score-threshold: 0.5`，精排后按 relevance_score 二次过滤。分数语义在链路中会变（向量分 → 精排分），每一段都必须有自己的阈值。
+3. **阈值依据实测分布**：不相关档 0.1~0.37、相关档 0.65+，0.5 恰好落在两档之间的空档区。
+4. **回归验证**：Phase3 集成测试新增 Part 3（真实百炼 API live 测试）——相关问题来源从 7 条收敛到 1 条（0.9643），无关问题（红烧肉）零来源，集成链路 rerank 结果与直接 API 调用基准完全一致。全量 279 测试通过。
+
+#### 影响范围
+
+- `ragent/core/RetrievalEngine.java`、`ragent/config/RagProperties.java`、`application.yaml`、`Phase3IntegrationTest.java`；详细根源分析与实测数据见 `docs/ragent-integration-log.md`（2026-07-28 条目）
+
+### 2026-07-28: 管理表格长标题挤压修复（table-layout: fixed 标准实践）
+
+> 更新于 2026-07-28：修复知识库文档表格中"文章标题过长挤掉状态/操作列"的问题，全站管理表格统一切换到 `table-layout: fixed`。
+
+#### 决策背景
+
+现象：知识库文档表格里文章标题一长，后面几列就被挤变形（甚至表头逐字换行）。此前 e9734d1 已给标题加过 `truncate + :title`，但没根治——因为 `DataTable` 的 `<table>` 用浏览器默认的 `table-layout: auto`：该模式下 `width` 只是"建议值"，浏览器按内容重新分配列宽，而 `white-space: nowrap` 单元格的"理想宽度"等于全文长度，长标题把整列撑宽、挤压其余列。truncate 只在单元格宽度被硬性约束时才生效，auto 布局下恰恰没有约束。
+
+#### 决策内容
+
+1. **切换到业界标准做法**（Ant Design / Element Plus / TanStack Table 同款）：`<table class="table-fixed">`（`table-layout: fixed`）。列宽只由表头 `width` 声明决定，内容无法把列撑宽；第一个不设 `width` 的列自动吸收剩余宽度作为**弹性列**。
+2. **全站约定**（已写入 `Column` 接口注释）：每张表留一个弹性列（通常是标题/名称列），弹性列内的长文本单元格必须自行 `min-w-0 + truncate + :title`（原生 tooltip，悬浮显示全称——零依赖、稳定、无障碍友好）。
+3. **4 个使用方全部排查**（知识库文档 / 仪表盘文章 / 用户管理 / 标签管理），均为「弹性首列 + 其余列显式定宽」的健康模式，全局切换安全；用户、标签两处的弹性列原本没有截断处理，一并补齐（长用户名、长标签名现在也正常收敛）。
+
+#### 经验沉淀
+
+表格长文本溢出的判断顺序：① 先看 `table-layout`——auto 模式下给单元格加 truncate 是无效的（列宽先被内容撑开）；② `fixed` 模式下 truncate 三件套是 `min-w-0`（flex 父容器）+ `truncate`（ellipsis）+ `:title`（悬浮全称）；③ flex 布局里 inline 元素天然是弹性项，但要显式 `min-w-0` 才允许收缩到内容宽度以下（flex item 默认 `min-width: auto`）。
+
+#### 影响范围
+
+- `mysite-frontend/src/components/ui/DataTable.vue`（table-fixed + 接口语义注释）、`views/UserManageView.vue`、`views/TagManageView.vue`（弹性列截断补齐）
+
+### 2026-07-28: SPA 部署后仍渲染旧版——index.html 缓存策略修复
+
+> 更新于 2026-07-28：修复"线上重新部署后，页面（如知识库管理文档表格）仍显示旧版本"的问题。根因是 index.html 无缓存头被浏览器启发式缓存，叠加 hash 资源 immutable 1y，旧版整套从磁盘缓存渲染、不碰网络。
+
+#### 决策背景
+
+现象：服务器侧一切正常（仓库 HEAD 最新、`/var/www/mysite` 是当天新构建、产物里 grep 得到修复标记），但浏览器看到的仍是旧 UI。排查路径（可复用）：
+
+1. **先排除服务端**：服务器 `git log -1` 确认代码 → `ls -la /var/www/mysite` 确认文件时间戳 → 在部署产物 chunk 里 grep 修复提交的标记字符串（本次是 `truncate`）→ 三者都对，说明部署链路没问题。
+2. **再看缓存头**：`curl -sI https://域名/` 发现 index.html **没有任何 `Cache-Control`**，只有 ETag/Last-Modified；而 assets 是 `expires 1y; Cache-Control: public, immutable`。
+3. **根因**（RFC 7234 启发式缓存）：响应无显式新鲜度信息时，浏览器允许按"文件年龄的 ~10%"启发式缓存，期间**连协商请求都不发**。于是旧 index.html（缓存）→ 引用旧 hash chunk（immutable 1y，也在缓存）→ 整套旧应用从磁盘缓存本地组装，网络层零流量。部署多少次都无效，必须强制刷新。
+
+#### 决策内容
+
+1. **缓存策略改为 SPA 行业标准**：HTML 永不缓存（每次协商）、hash 资源永久缓存。在 443 与 8080 两个 server 块的 `location /` 内加：
+   ```nginx
+   location = /index.html {
+       add_header Cache-Control "no-cache" always;
+   }
+   ```
+   `no-cache` ≠ 不缓存：浏览器会存副本但每次带 ETag 协商，未变返回 304（开销极小），变了拿新版——**部署即时生效，访客无需手动刷新**。hash 资源的 `immutable 1y` 保持不变（文件名含 hash，内容变则名变，长缓存永远安全）。
+2. **精确匹配而非正则**：刻意用 `location = /index.html` 而不是 `location ~* \.html$` —— nginx 正则 location 会全局参与匹配，`\.html$` 会抢走 `/journal/index.html` 的内部重定向，把子应用 fallback 劫持到博客根目录。精确匹配只命中入口 HTML。（踩点：nginx 嵌套 location 在内部重定向后会重新参与全局匹配，嵌套层级不限制正则候选。）
+3. **服务器已验证**：`/` 与 SPA 深链（`/dashboard`）返回 `no-cache`；assets 仍 `max-age=31536000, immutable`；journal 深链兜底 200 且无 no-cache 头。旧配置备份于 `mysite.conf.bak.20260728`。
+
+#### 经验沉淀（可复用的排查清单）
+
+"部署了但线上还是旧的"按此顺序排查，多数停在第 2 步：
+
+1. 服务端是否真新：`git log -1` + web 根目录文件 mtime + 产物内 grep 修复标记
+2. 入口 HTML 缓存头：`curl -sI https://域名/`，无 `Cache-Control` 即中招；有则看是不是被设成了长缓存
+3. CDN/反代层：有 CDN 时还需刷 CDN 缓存（本站无 CDN，Nginx 即边缘）
+4. 浏览器层：前 3 步都正常才让用户 Cmd/Ctrl+Shift+R 或换无痕窗口
+
+通用原则：**凡是"文件名不含内容 hash"的入口文件（index.html、robots.txt、SW），一律 `no-cache`；含 hash 的资源才配 `immutable` 长缓存。** 二者是同一策略的两半，缺一半就出本次这种问题。
+
+#### 影响范围
+
+- `deploy/nginx/mysite.conf`（443 与 8080 两个 server 块）、服务器 `/etc/nginx/sites-available/mysite.conf`（已 reload 生效）
+
 ### 2026-07-28: WebP 副本生成平台兼容性修复（Apple Silicon 原生库告警）
 
 > 更新于 2026-07-28：消除本地（Apple Silicon）每次上传图片都报 `生成WebP副本失败 ... UnsatisfiedLinkError` 的 WARN 刷屏。

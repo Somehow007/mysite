@@ -18,6 +18,7 @@ import io.github.somehow.mysite.ragent.llm.LLMProvider;
 import io.github.somehow.mysite.ragent.llm.RoutingLLMService;
 import io.github.somehow.mysite.ragent.llm.embedding.BaiLianEmbeddingService;
 import io.github.somehow.mysite.ragent.llm.embedding.EmbeddingService;
+import io.github.somehow.mysite.ragent.llm.rerank.BaiLianRerankProvider;
 import io.github.somehow.mysite.ragent.llm.model.ChatEvent;
 import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
@@ -623,6 +624,460 @@ class Phase3IntegrationTest {
             assertTrue(events.get(0).message().contains("过于频繁"));
 
             System.out.println("  ✅ 限流拒绝: " + events.get(0).message());
+        }
+    }
+
+    // ============ Part 3: Rerank 精排质量验证（真实 API）============
+
+    /**
+     * 2026-07-28 检索质量修复的回归验证。
+     *
+     * <p>修复前的三个问题：
+     * <ol>
+     *   <li>rerank 调用传空字符串 query，精排模型无法按 query↔doc 相关性打分，形同虚设</li>
+     *   <li>向量粗排阈值 0.3 对中文 embedding 过宽松，无关内容混入候选</li>
+     *   <li>rerank 的 relevance_score 替换向量分后不做二次过滤，
+     *       34% 相关度的来源也会进 prompt / 前端 sources</li>
+     * </ol>
+     * 本 Part 用真实百炼 embedding + qwen3-rerank API 验证修复效果（生产同款配置）。</p>
+     */
+    @Nested
+    @DisplayName("Part 3 — Rerank 精排 + 双阈值过滤（真实 API）")
+    class RerankQuality {
+
+        private RetrievalEngine rerankEngine;
+        private BaiLianRerankProvider rerankProvider;
+
+        @BeforeEach
+        void setUpRerankEngine() {
+            // 生产同款检索配置：topK=10 / rerankTopK=5 / 双阈值 0.5
+            RagProperties props = new RagProperties();
+            props.getRetrieval().setTopK(10);
+            props.getRetrieval().setRerankTopK(5);
+            props.getRetrieval().setScoreThreshold(0.5);
+            props.getRetrieval().setRerankScoreThreshold(0.5);
+
+            RagProperties.Provider bailian = new RagProperties.Provider();
+            bailian.setEnabled(true);
+            bailian.setApiKey(loadApiKey());
+            bailian.setRerankModel("qwen3-rerank");
+            props.getLlm().getProviders().put("bailian", bailian);
+
+            rerankProvider = new BaiLianRerankProvider(props, new ObjectMapper());
+            rerankEngine = new RetrievalEngine(
+                vectorStore, embeddingService, rerankProvider, props);
+        }
+
+        /** 灌入 3 篇长文（保证 chunk 总数 > 5，真正触发 rerank API 而非截断降级） */
+        private void seedCorpus() {
+            ArticleDO jwt = new ArticleDO();
+            jwt.setId(93001L);
+            jwt.setTitle("Spring Security JWT 认证配置指南");
+            jwt.setContent("""
+                ## JWT 过滤器配置
+
+                Spring Security 中的 JWT 认证主要通过 OncePerRequestFilter 实现。
+                它可以确保每个请求只被过滤一次，避免在转发和包含时重复执行。
+
+                ### 核心配置步骤
+
+                1. 创建 JwtAuthenticationFilter 继承 OncePerRequestFilter
+                2. 在 SecurityFilterChain 中注册过滤器
+                3. 配置 permitAll 和 authenticated 路径
+
+                ### 令牌解析与校验
+
+                JwtService 负责令牌的生成与解析，内部使用 JJWT 库。
+                解析时需要配置签名密钥，推荐使用 HS256 算法加 256 位以上密钥。
+                校验流程包括：签名验证、过期时间检查、claims 完整性检查。
+                任何一个环节失败都应返回 401 而不是 500。
+
+                ### 注意事项
+
+                过滤器必须注册在 UsernamePasswordAuthenticationFilter 之前，
+                否则表单登录会先拦截请求。推荐使用 addFilterBefore 方法。
+                无状态会话需要在 SessionManagement 中配置 STATELESS 策略。
+
+                ### 双令牌刷新机制
+
+                访问令牌有效期短（如 2 小时），刷新令牌有效期长（如 7 天）。
+                访问令牌过期后，客户端用刷新令牌换取新的访问令牌，避免频繁登录。
+                刷新令牌应存储在 HttpOnly Cookie 中，防止 XSS 窃取。
+                刷新令牌一旦使用就应轮换作废旧的，防止重放攻击。
+
+                ### 异常处理与响应规范
+
+                认证失败统一由 AuthenticationEntryPoint 处理，返回 401 和标准错误码。
+                授权失败由 AccessDeniedHandler 处理，返回 403。
+                不要在过滤器里直接写响应体，应该委托给统一的异常处理组件，
+                保证所有错误响应的 JSON 结构一致。
+                """);
+
+            ArticleDO redis = new ArticleDO();
+            redis.setId(93002L);
+            redis.setTitle("Redis 缓存最佳实践");
+            redis.setContent("""
+                ## 缓存策略
+
+                Redis 常用于缓存热点数据，减少数据库压力。
+                推荐使用旁路缓存模式（Cache Aside）：
+                先读缓存，未命中再查数据库，并写回缓存。
+
+                ### 过期时间与淘汰策略
+
+                每个 key 都应设置 TTL，避免内存无限增长。
+                热点数据 TTL 可以长一些（如 30 分钟），冷数据短一些。
+                maxmemory-policy 推荐 allkeys-lru，内存满时淘汰最近最少使用的 key。
+
+                ### 缓存三大问题
+
+                缓存穿透：查询不存在的数据，绕过缓存直击数据库，可用布隆过滤器拦截。
+                缓存击穿：热点 key 过期瞬间大量并发查库，可用互斥锁或逻辑过期。
+                缓存雪崩：大量 key 同时过期，可在 TTL 上加随机抖动。
+
+                ### 缓存与数据库一致性
+
+                更新数据时推荐先更新数据库再删除缓存（Cache Aside 标准做法）。
+                删除缓存失败时可以用消息队列重试，或者订阅 binlog 异步删除。
+                强一致性要求高的场景可以用读写锁串行化同一 key 的更新，
+                但多数业务接受秒级的最终一致。
+
+                ### 大 key 与热 key 治理
+
+                单个 value 超过 10KB 就算大 key，会阻塞单线程的 Redis 事件循环。
+                大 key 要拆分：Hash 按字段分桶，List 按区间分段。
+                热 key 可以在应用层加本地缓存（Caffeine）分摊读压力，
+                或者把同一 key 复制多份加随机后缀分散到不同分片。
+                """);
+
+            ArticleDO mysql = new ArticleDO();
+            mysql.setId(93003L);
+            mysql.setTitle("MySQL 索引优化实战");
+            mysql.setContent("""
+                ## 索引基础
+
+                InnoDB 使用 B+ 树组织索引，聚簇索引的叶子节点存整行数据，
+                二级索引的叶子节点存主键值，因此回表查询需要两次 B+ 树查找。
+
+                ### 联合索引与最左前缀
+
+                联合索引 (a, b, c) 可以服务于 a、a+b、a+b+c 三种查询条件，
+                但跳过最左列的查询（如只按 b 过滤）无法使用该索引。
+                设计联合索引时应把等值查询列放前面，范围查询列放最后。
+
+                ### 覆盖索引与回表
+
+                如果查询列全部包含在索引中，就不需要回表，性能最好。
+                EXPLAIN 结果中 Extra 列出现 Using index 即表示覆盖索引生效。
+                高频查询可以考虑建覆盖索引来消除回表开销。
+
+                ### 索引失效的常见场景
+
+                对索引列做函数运算或隐式类型转换会导致索引失效，全表扫描。
+                LIKE 以通配符开头（'%abc'）无法使用索引，后缀匹配可以。
+                OR 连接的条件如果有一侧无索引，整个查询也可能放弃索引。
+                优化器估算回表成本过高时，会主动选择全表扫描而非走索引。
+
+                ### 慢查询排查流程
+
+                开启 slow_query_log，把 long_query_time 设为 1 秒。
+                用 EXPLAIN 分析执行计划，重点看 type、rows、Extra 三列。
+                type 从好到差：const > eq_ref > ref > range > index > ALL，
+                出现 ALL 就是全表扫描，通常是缺索引或索引失效的信号。
+                """);
+
+            ArticleDO tx = new ArticleDO();
+            tx.setId(93004L);
+            tx.setTitle("Spring 事务传播机制详解");
+            tx.setContent("""
+                ## 七种传播行为
+
+                Spring 事务传播行为决定方法之间如何共享事务上下文。
+                REQUIRED 是默认值：有事务就加入，没有就新建。
+                REQUIRES_NEW 总是新建事务并挂起当前事务，适合审计日志等
+                不允许被外层回滚影响的场景。NESTED 使用 savepoint 实现嵌套事务，
+                内层回滚不影响外层，但外层回滚会连内层一起回滚。
+                SUPPORTS 和 NOT_SUPPORTED 的区别在于是否挂起当前事务，
+                MANDATORY 要求必须在事务中调用否则抛异常，NEVER 则相反。
+                实际开发中 90% 的场景用默认 REQUIRED 就够了，
+                只有明确需要隔离提交或嵌套回滚语义时才考虑其他行为。
+                """);
+
+            ArticleDO docker = new ArticleDO();
+            docker.setId(93005L);
+            docker.setTitle("Docker Compose 多服务编排实践");
+            docker.setContent("""
+                ## 服务依赖与健康检查
+
+                docker-compose 的 depends_on 只保证启动顺序，不保证服务就绪。
+                MySQL 容器启动后还需要几十秒初始化，应用立刻连接会失败。
+                正确做法是给数据库配置 healthcheck（如 mysqladmin ping），
+                应用服务用 depends_on 的 condition: service_healthy 等待健康检查通过。
+                卷挂载初始化脚本（docker-entrypoint-initdb.d）可以在首次启动时
+                自动建库建表，但注意该目录只在数据卷为空时执行一次，
+                修改脚本后必须 docker compose down -v 清空卷才会重新执行。
+                生产环境建议把初始化脚本纳入版本控制并配合迁移工具使用。
+                """);
+
+            ArticleDO vue = new ArticleDO();
+            vue.setId(93006L);
+            vue.setTitle("Vue 3 组合式 API 设计模式");
+            vue.setContent("""
+                ## Composable 的抽象原则
+
+                组合式函数（composable）是把可复用逻辑抽取成 use 开头的函数。
+                好的 composable 只关心自己的状态生命周期：在 onMounted 里订阅，
+                在 onUnmounted 里清理，避免内存泄漏。useTheme、useToast、
+                useChat 都是典型例子。状态用 ref 和 reactive 管理，
+                返回时解构会丢失响应性，应该用 toRefs 包一层再返回。
+                副作用密集的逻辑（SSE 连接、轮询、事件监听）最值得抽取，
+                纯展示逻辑留在组件里反而更直观。命名上 use 前缀是社区约定，
+                参数尽量接受 ref 类型以便响应式联动，而不是原始值。
+                """);
+
+            ArticleDO nginx = new ArticleDO();
+            nginx.setId(93007L);
+            nginx.setTitle("Nginx 反向代理与缓存配置");
+            nginx.setContent("""
+                ## 反向代理基础
+
+                Nginx 作为反向代理时，location 块的 proxy_pass 把请求转发给后端。
+                转发时要设置 Host、X-Real-IP、X-Forwarded-For 头，
+                否则后端拿到的是代理地址而不是真实客户端信息。
+                WebSocket 代理需要额外配置 Upgrade 和 Connection 头的转发。
+
+                ### 静态资源缓存
+
+                带内容 hash 的静态资源可以配置超长缓存：
+                expires 1y 加 Cache-Control: public, immutable。
+                文件名含 hash，内容变化文件名必然变化，长缓存永远安全。
+                但入口 HTML 绝不能长缓存，否则部署后用户拿到的还是旧版资源引用，
+                HTML 应该配置 no-cache，每次都带 ETag 协商，未变化返回 304。
+                这一长一短的搭配是 SPA 部署缓存策略的行业标准做法。
+                """);
+
+            docService.syncArticle(jwt);
+            docService.syncArticle(redis);
+            docService.syncArticle(mysql);
+            docService.syncArticle(tx);
+            docService.syncArticle(docker);
+            docService.syncArticle(vue);
+            docService.syncArticle(nginx);
+        }
+
+        private int countChunks() throws SQLException {
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement ps = conn.prepareStatement(
+                     "SELECT count(*) FROM t_knowledge_chunk WHERE kb_id = ?")) {
+                ps.setLong(1, TEST_KB_ID);
+                ResultSet rs = ps.executeQuery();
+                rs.next();
+                return rs.getInt(1);
+            }
+        }
+
+        @Test
+        @DisplayName("相关问题：精排后所有来源 relevance ≥ 0.5 且 top-1 主题正确")
+        void relevantQueryShouldReturnHighQualitySources() throws Exception {
+            seedCorpus();
+            int chunks = countChunks();
+            System.out.println("  语料 chunk 总数: " + chunks);
+            assumeTrue(chunks > 5, "chunk 数需 > 5 才能触发 rerank API，实际: " + chunks);
+
+            String question = "JWT 过滤器怎么配置？";
+
+            // 对照组：粗排原始向量分数
+            float[] qe = embeddingService.embed(question);
+            List<VectorStore.SearchResult> raw = vectorStore.search(qe, 10, List.of(TEST_KB_ID));
+            System.out.println("  【粗排原始分数】");
+            raw.forEach(r -> System.out.println("    " + String.format("%.4f", r.score())
+                + "  " + r.docTitle()));
+
+            // 修复后的完整链路：向量阈值 0.5 → rerank(query 透传) → 精排阈值 0.5
+            List<VectorStore.SearchResult> results =
+                rerankEngine.retrieve(question, 5, List.of(TEST_KB_ID));
+
+            System.out.println("  【精排最终来源】");
+            results.forEach(r -> System.out.println("    " + String.format("%.4f", r.score())
+                + "  " + r.docTitle()));
+
+            assertFalse(results.isEmpty(), "相关问题应有检索结果");
+            assertTrue(results.size() <= 5, "最终来源数不应超过 rerankTopK");
+            assertTrue(results.stream().allMatch(r -> r.score() >= 0.5f),
+                "精排后所有来源的 relevance_score 必须 ≥ 0.5，实际: "
+                    + results.stream().map(r -> String.format("%.3f", r.score())).toList());
+            assertTrue(results.get(0).docTitle().contains("JWT")
+                    || results.get(0).content().contains("JWT"),
+                "top-1 必须是 JWT 相关文章，实际: " + results.get(0).docTitle());
+        }
+
+        @Test
+        @DisplayName("无关问题：双阈值过滤后零来源（修复前 34% 相关度也会被引用）")
+        void irrelevantQueryShouldYieldNoSources() throws Exception {
+            seedCorpus();
+            int chunks = countChunks();
+            System.out.println("  语料 chunk 总数: " + chunks);
+            assumeTrue(chunks > 5, "chunk 数需 > 5 才能触发 rerank API，实际: " + chunks);
+
+            String question = "红烧肉怎么做才好吃？";
+
+            // 对照组：粗排原始向量分数（即使主题无关，中文 embedding 也可能给出中等分数）
+            float[] qe = embeddingService.embed(question);
+            List<VectorStore.SearchResult> raw = vectorStore.search(qe, 10, List.of(TEST_KB_ID));
+            System.out.println("  【无关问题的粗排原始分数】");
+            raw.forEach(r -> System.out.println("    " + String.format("%.4f", r.score())
+                + "  " + r.docTitle()));
+
+            // 单独验证精排层：即使粗排候选都放过，rerank 真实相关性也应远低于 0.5
+            if (!raw.isEmpty()) {
+                List<VectorStore.SearchResult> reranked =
+                    rerankProvider.rerank(question, raw, Math.min(5, raw.size()));
+                System.out.println("  【rerank 真实相关性（query 透传后）】");
+                reranked.forEach(r -> System.out.println("    " + String.format("%.4f", r.score())
+                    + "  " + r.docTitle()));
+                assertTrue(reranked.stream().allMatch(r -> r.score() < 0.5f),
+                    "无关问题的 rerank relevance 应全部 < 0.5（证明精排层能识别不相关）");
+            }
+
+            // 完整链路：向量阈值 + 精排阈值双重过滤后应为空
+            List<VectorStore.SearchResult> results =
+                rerankEngine.retrieve(question, 5, List.of(TEST_KB_ID));
+            assertTrue(results.isEmpty(),
+                "无关问题经双阈值过滤后不应产生任何来源，实际: " + results.size()
+                    + " 条，分数: " + results.stream().map(r -> String.format("%.3f", r.score())).toList());
+            System.out.println("  ✅ 无关问题最终来源数: 0（修复前此类查询会返回多条低分来源）");
+        }
+
+        /** 灌入 3 篇同主题 JWT 文章 + 1 篇干扰文章，保证多个候选能过向量阈值 */
+        private void seedJwtFamily() {
+            ArticleDO filter = new ArticleDO();
+            filter.setId(94001L);
+            filter.setTitle("Spring Security JWT 过滤器配置指南");
+            filter.setContent("""
+                ## JWT 过滤器配置
+
+                Spring Security 中的 JWT 认证主要通过 OncePerRequestFilter 实现。
+                创建 JwtAuthenticationFilter 继承 OncePerRequestFilter，
+                重写 doFilterInternal 方法：从请求头提取 Bearer 令牌，
+                调用 JwtService 校验签名和过期时间，校验通过后
+                把 Authentication 写入 SecurityContextHolder。
+                过滤器必须用 addFilterBefore 注册在
+                UsernamePasswordAuthenticationFilter 之前，
+                并在 SessionManagement 中配置 STATELESS 无状态会话策略，
+                否则 Spring Security 仍会尝试创建 HttpSession。
+                """);
+
+            ArticleDO refresh = new ArticleDO();
+            refresh.setId(94002L);
+            refresh.setTitle("JWT 双令牌刷新机制实现");
+            refresh.setContent("""
+                ## 双令牌设计
+
+                JWT 双令牌机制用短效访问令牌加长效刷新令牌解决安全与体验的平衡。
+                访问令牌有效期设为 2 小时，只携带用户 ID 和角色等必要 claims；
+                刷新令牌有效期 7 天，仅用于换取新的访问令牌。
+                刷新接口校验刷新令牌有效后签发新访问令牌，
+                同时轮换刷新令牌——旧的立即作废，防止被截获后重放。
+                刷新令牌应放在 HttpOnly 加 Secure 的 Cookie 里，
+                让前端脚本无法读取，从根本上防 XSS 窃取。
+                """);
+
+            ArticleDO validate = new ArticleDO();
+            validate.setId(94003L);
+            validate.setTitle("JWT 令牌校验与异常处理");
+            validate.setContent("""
+                ## 令牌校验流程
+
+                JwtService 的校验分三步：先用签名密钥验证签名完整性，
+                再检查 exp 声明是否过期，最后校验 claims 必填字段。
+                JJWT 库解析时会自动抛 ExpiredJwtException 和
+                SignatureException 等异常，过滤器里要分类捕获：
+                过期返回 401 并带 TOKEN_EXPIRED 错误码让前端触发刷新流程，
+                签名错误直接拒绝。任何认证失败都交给 AuthenticationEntryPoint
+                统一响应，不要在过滤器里零散地写 response，
+                保证错误 JSON 结构与全站接口规范一致。
+                """);
+
+            ArticleDO distractor = new ArticleDO();
+            distractor.setId(94004L);
+            distractor.setTitle("Redis 缓存最佳实践");
+            distractor.setContent("""
+                ## 缓存策略
+
+                Redis 常用于缓存热点数据，减少数据库压力。
+                推荐使用旁路缓存模式（Cache Aside）：
+                先读缓存，未命中再查数据库，并写回缓存。
+                每个 key 都应设置 TTL，避免内存无限增长，
+                maxmemory-policy 推荐 allkeys-lru。
+                """);
+
+            docService.syncArticle(filter);
+            docService.syncArticle(refresh);
+            docService.syncArticle(validate);
+            docService.syncArticle(distractor);
+        }
+
+        @Test
+        @DisplayName("集成链路：query 透传使 rerank API 真实生效（修复前传空串精排失效）")
+        void engineRetrieveShouldInvokeRealRerankWithQuery() throws Exception {
+            seedJwtFamily();
+
+            // rerankTopK=2：3 个 JWT 候选过 0.5 向量阈值后 > 2，必触发 rerank API
+            RagProperties props = new RagProperties();
+            props.getRetrieval().setTopK(10);
+            props.getRetrieval().setRerankTopK(2);
+            props.getRetrieval().setScoreThreshold(0.5);
+            props.getRetrieval().setRerankScoreThreshold(0.5);
+            RagProperties.Provider bailian = new RagProperties.Provider();
+            bailian.setEnabled(true);
+            bailian.setApiKey(loadApiKey());
+            bailian.setRerankModel("qwen3-rerank");
+            props.getLlm().getProviders().put("bailian", bailian);
+
+            BaiLianRerankProvider provider = new BaiLianRerankProvider(props, new ObjectMapper());
+            RetrievalEngine engine = new RetrievalEngine(
+                vectorStore, embeddingService, provider, props);
+
+            String question = "JWT 过滤器怎么配置？";
+
+            // 前提检查：过向量阈值的候选数需 > rerankTopK，rerank API 才会被调用
+            float[] qe = embeddingService.embed(question);
+            List<VectorStore.SearchResult> overThreshold = vectorStore
+                .search(qe, 10, List.of(TEST_KB_ID)).stream()
+                .filter(r -> r.score() >= 0.5f).toList();
+            System.out.println("  【过 0.5 向量阈值的候选】");
+            overThreshold.forEach(r -> System.out.println("    "
+                + String.format("%.4f", r.score()) + "  " + r.docTitle()));
+            assumeTrue(overThreshold.size() > 2,
+                "需 >2 个候选过阈值才能触发 rerank API，实际: " + overThreshold.size());
+
+            // 基准：直接调 rerank（query 透传）
+            List<VectorStore.SearchResult> direct = provider.rerank(question, overThreshold, 2);
+
+            // 集成链路：engine.retrieve 内部的 rerank 调用
+            List<VectorStore.SearchResult> viaEngine =
+                engine.retrieve(question, 2, List.of(TEST_KB_ID));
+
+            System.out.println("  【直接 rerank 基准】");
+            direct.forEach(r -> System.out.println("    "
+                + String.format("%.4f", r.score()) + "  " + r.docTitle()));
+            System.out.println("  【集成链路结果】");
+            viaEngine.forEach(r -> System.out.println("    "
+                + String.format("%.4f", r.score()) + "  " + r.docTitle()));
+
+            assertEquals(direct.size(), viaEngine.size(), "结果数应与基准一致");
+            for (int i = 0; i < viaEngine.size(); i++) {
+                assertEquals(direct.get(i).chunkId(), viaEngine.get(i).chunkId(),
+                    "排序应与基准一致");
+                // 分数一致 = 分数来自 rerank API 的 relevance_score（而非截断保留的向量分）
+                assertEquals(direct.get(i).score(), viaEngine.get(i).score(), 5e-3,
+                    "分数应与 rerank API 基准一致（证明集成链路真调了 rerank 而非向量截断）");
+            }
+            assertTrue(viaEngine.stream().allMatch(r -> r.score() >= 0.5f),
+                "精排后所有来源 relevance ≥ 0.5");
+            assertTrue(viaEngine.stream().allMatch(r ->
+                    r.docTitle().contains("JWT") || r.content().contains("JWT")),
+                "top-2 应全部是 JWT 主题文章");
         }
     }
 

@@ -89,7 +89,10 @@ public class RagProperties {
     public static class RetrievalProperties {
         private int topK = 10;
         private int rerankTopK = 5;
-        private double scoreThreshold = 0.3;
+        /** 向量粗排置信度下限（余弦相似度），低于此值的候选在粗排后直接丢弃 */
+        private double scoreThreshold = 0.5;
+        /** Rerank 精排后的相关性下限（relevance_score），低于此值的来源不进 prompt / 前端 sources */
+        private double rerankScoreThreshold = 0.5;
     }
 
     @Data

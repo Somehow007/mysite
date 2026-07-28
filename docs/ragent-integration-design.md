@@ -886,11 +886,12 @@ rag:
     overlap: 100        # 重叠字符数
     max-chunks-per-doc: 50  # 单文档最大分块数
 
-  # 检索参数
+  # 检索参数（更新于 2026-07-28：阈值 0.3→0.5 + 新增精排阈值，见集成日志）
   retrieval:
     top-k: 10           # 向量检索候选数
     rerank-top-k: 5     # Rerank 后保留数
-    score-threshold: 0.3  # 最低相似度阈值
+    score-threshold: 0.5        # 向量粗排相似度下限（0.3 对中文 embedding 过宽松）
+    rerank-score-threshold: 0.5 # rerank relevance_score 下限，精排后二次过滤
 
   # 对话记忆
   memory:
