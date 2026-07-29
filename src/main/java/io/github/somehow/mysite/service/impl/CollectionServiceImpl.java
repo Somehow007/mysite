@@ -147,7 +147,7 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = CACHE_DETAIL, key = "#id + ':' + #current + ':' + #size")
+    @Cacheable(value = CACHE_DETAIL, key = "#id + ':' + #current + ':' + #size + ':' + T(io.github.somehow.mysite.commons.context.UserContext).getUserId() + ':' + T(io.github.somehow.mysite.commons.context.UserContext).isAdmin()")
     public CollectionDetailRespDTO getCollectionDetail(Long id, Integer current, Integer size) {
         CollectionDO collection = getCollectionOrThrow(id);
 
@@ -171,6 +171,22 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
             List<Long> articleIds = collectionArticles.stream()
                     .map(CollectionArticleDO::getArticleId)
                     .collect(Collectors.toList());
+
+            // 可见性过滤：私有文章（visibility=1，仅自己可见）只有作者本人和管理员能在合集中看到
+            if (!UserContext.isAdmin()) {
+                String currentUserId = UserContext.getUserId();
+                List<ArticleDO> visibilityCheck = articleMapper.selectList(Wrappers.<ArticleDO>lambdaQuery()
+                        .select(ArticleDO::getId, ArticleDO::getVisibility, ArticleDO::getAuthorId)
+                        .in(ArticleDO::getId, articleIds)
+                        .eq(ArticleDO::getDelFlag, 0));
+                articleIds = visibilityCheck.stream()
+                        .filter(a -> a.getVisibility() == null || a.getVisibility() == 0
+                                || (currentUserId != null && currentUserId.equals(String.valueOf(a.getAuthorId()))))
+                        .map(ArticleDO::getId)
+                        .collect(Collectors.toList());
+                // 文章计数按当前访问者可见数量修正，避免"共 5 篇"却只列出 3 篇
+                detail.setArticleCount(articleIds.size());
+            }
 
             // 分页处理
             int totalArticles = articleIds.size();
@@ -373,7 +389,7 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = CACHE_NAV, key = "#articleId")
+    @Cacheable(value = CACHE_NAV, key = "#articleId + ':' + T(io.github.somehow.mysite.commons.context.UserContext).getUserId() + ':' + T(io.github.somehow.mysite.commons.context.UserContext).isAdmin()")
     public ArticleNavInfoRespDTO getArticleNavigation(Long articleId) {
         ArticleNavInfoRespDTO navInfo = new ArticleNavInfoRespDTO();
 
@@ -412,10 +428,11 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
 
             if (currentIndex > 0) {
                 Long prevArticleId = allArticles.get(currentIndex - 1).getArticleId();
-                ArticleDO prevArticle = articleMapper.selectOne(Wrappers.<ArticleDO>lambdaQuery()
-                        .eq(ArticleDO::getId, prevArticleId)
-                        .eq(ArticleDO::getDelFlag, 0)
-                        .eq(ArticleDO::getPublished, 1));
+                ArticleDO prevArticle = articleMapper.selectOne(applyVisibilityFilter(
+                        Wrappers.<ArticleDO>lambdaQuery()
+                                .eq(ArticleDO::getId, prevArticleId)
+                                .eq(ArticleDO::getDelFlag, 0)
+                                .eq(ArticleDO::getPublished, 1)));
                 if (prevArticle != null && Integer.valueOf(1).equals(prevArticle.getPublished())) {
                     ArticleNavInfoRespDTO.NavArticle prev = new ArticleNavInfoRespDTO.NavArticle();
                     prev.setId(prevArticleId.toString());
@@ -426,10 +443,11 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
 
             if (currentIndex < allArticles.size() - 1) {
                 Long nextArticleId = allArticles.get(currentIndex + 1).getArticleId();
-                ArticleDO nextArticle = articleMapper.selectOne(Wrappers.<ArticleDO>lambdaQuery()
-                        .eq(ArticleDO::getId, nextArticleId)
-                        .eq(ArticleDO::getDelFlag, 0)
-                        .eq(ArticleDO::getPublished, 1));
+                ArticleDO nextArticle = articleMapper.selectOne(applyVisibilityFilter(
+                        Wrappers.<ArticleDO>lambdaQuery()
+                                .eq(ArticleDO::getId, nextArticleId)
+                                .eq(ArticleDO::getDelFlag, 0)
+                                .eq(ArticleDO::getPublished, 1)));
                 if (nextArticle != null && Integer.valueOf(1).equals(nextArticle.getPublished())) {
                     ArticleNavInfoRespDTO.NavArticle next = new ArticleNavInfoRespDTO.NavArticle();
                     next.setId(nextArticleId.toString());
@@ -451,12 +469,13 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
             }
 
             // 上一篇：创建时间早于当前文章的最近一篇
-            ArticleDO prevArticle = articleMapper.selectOne(Wrappers.<ArticleDO>lambdaQuery()
-                    .eq(ArticleDO::getDelFlag, 0)
-                    .eq(ArticleDO::getPublished, 1)
-                    .lt(ArticleDO::getCreateTime, currentArticle.getCreateTime())
-                    .orderByDesc(ArticleDO::getCreateTime)
-                    .last("LIMIT 1"));
+            ArticleDO prevArticle = articleMapper.selectOne(applyVisibilityFilter(
+                    Wrappers.<ArticleDO>lambdaQuery()
+                            .eq(ArticleDO::getDelFlag, 0)
+                            .eq(ArticleDO::getPublished, 1)
+                            .lt(ArticleDO::getCreateTime, currentArticle.getCreateTime())
+                            .orderByDesc(ArticleDO::getCreateTime)
+                            .last("LIMIT 1")));
             if (prevArticle != null) {
                 ArticleNavInfoRespDTO.NavArticle prev = new ArticleNavInfoRespDTO.NavArticle();
                 prev.setId(prevArticle.getId().toString());
@@ -465,12 +484,13 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
             }
 
             // 下一篇：创建时间晚于当前文章的最早一篇
-            ArticleDO nextArticle = articleMapper.selectOne(Wrappers.<ArticleDO>lambdaQuery()
-                    .eq(ArticleDO::getDelFlag, 0)
-                    .eq(ArticleDO::getPublished, 1)
-                    .gt(ArticleDO::getCreateTime, currentArticle.getCreateTime())
-                    .orderByAsc(ArticleDO::getCreateTime)
-                    .last("LIMIT 1"));
+            ArticleDO nextArticle = articleMapper.selectOne(applyVisibilityFilter(
+                    Wrappers.<ArticleDO>lambdaQuery()
+                            .eq(ArticleDO::getDelFlag, 0)
+                            .eq(ArticleDO::getPublished, 1)
+                            .gt(ArticleDO::getCreateTime, currentArticle.getCreateTime())
+                            .orderByAsc(ArticleDO::getCreateTime)
+                            .last("LIMIT 1")));
             if (nextArticle != null) {
                 ArticleNavInfoRespDTO.NavArticle next = new ArticleNavInfoRespDTO.NavArticle();
                 next.setId(nextArticle.getId().toString());
@@ -526,6 +546,24 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
         if (!currentUserId.equals(collection.getAuthorId().toString())) {
             throw new ClientException(ErrorCode.COLLECTION_PERMISSION_DENIED);
         }
+    }
+
+    /**
+     * 追加文章可见性过滤：私有文章（visibility=1）仅作者本人和管理员可见。
+     * 生成条件：AND (visibility IS NULL OR visibility = 0 [OR (visibility = 1 AND author_id = 当前用户)])
+     */
+    private LambdaQueryWrapper<ArticleDO> applyVisibilityFilter(LambdaQueryWrapper<ArticleDO> wrapper) {
+        if (UserContext.isAdmin()) {
+            return wrapper;
+        }
+        String currentUserId = UserContext.getUserId();
+        return wrapper.and(w -> {
+            w.isNull(ArticleDO::getVisibility).or().eq(ArticleDO::getVisibility, 0);
+            if (currentUserId != null) {
+                w.or(o -> o.eq(ArticleDO::getVisibility, 1)
+                        .eq(ArticleDO::getAuthorId, Long.parseLong(currentUserId)));
+            }
+        });
     }
 
     private Integer getMaxSortOrder(Long collectionId) {
