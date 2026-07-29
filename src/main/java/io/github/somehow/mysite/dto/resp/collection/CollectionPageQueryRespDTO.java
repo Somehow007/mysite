@@ -19,7 +19,13 @@ public class CollectionPageQueryRespDTO {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long authorId;
     private String authorName;
+
+    @Schema(description = "当前访问者可见的文章数量（动态统计，私有文章对非作者不计入）")
     private Integer articleCount;
+
+    @Schema(description = "可见性：0-公开 1-私有")
+    private Integer visibility;
+
     private Integer sortOrder;
     private Date createTime;
     private Date updateTime;

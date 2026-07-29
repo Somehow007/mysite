@@ -2,16 +2,18 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useRouter } from 'vue-router'
-import { Plus, Trash2, Edit3, BookOpen, Loader2 } from 'lucide-vue-next'
-import { getCollections, deleteCollection } from '@/api/collection'
+import { Plus, Trash2, Edit3, BookOpen, Loader2, Lock, Eye, EyeOff } from 'lucide-vue-next'
+import { getCollections, deleteCollection, updateCollection } from '@/api/collection'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useUserStore } from '@/stores/user'
 import { PageHeader, SearchFilterBar, Pagination as PaginationBar } from '@/components/ui'
 import type { Collection, Pagination as PaginationMeta } from '@/types'
 
 const router = useRouter()
 const toast = useToast()
 const { confirm } = useConfirm()
+const userStore = useUserStore()
 
 useHead(() => ({ title: '合集管理 - MySite' }))
 
@@ -72,6 +74,23 @@ const sortOptions = [
   { label: '标题', value: 'title' },
   { label: '文章数', value: 'articleCount' },
 ]
+
+/** 仅合集作者和管理员可管理可见性 */
+function canManageVisibility(collection: Collection): boolean {
+  if (userStore.isAdmin) return true
+  return !!userStore.user && collection.authorId === userStore.user.id
+}
+
+async function toggleVisibility(collection: Collection) {
+  const next = collection.visibility === 1 ? 0 : 1
+  try {
+    await updateCollection(collection.id, { visibility: next })
+    collection.visibility = next
+    toast.success(next === 1 ? `合集「${collection.title}」已设为私有` : `合集「${collection.title}」已设为公开`)
+  } catch (e: unknown) {
+    toast.error(e instanceof Error ? e.message : '更新可见性失败')
+  }
+}
 
 async function handleDelete(id: string, title: string) {
   const ok = await confirm({
@@ -149,12 +168,22 @@ onMounted(() => {
         class="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-accent/30 hover:bg-accent-subtle/30 transition-all duration-200"
       >
         <div class="flex-1 min-w-0">
-          <RouterLink
-            :to="`/collection/${collection.id}`"
-            class="text-base font-medium text-text-primary hover:text-accent transition-colors duration-200"
-          >
-            {{ collection.title }}
-          </RouterLink>
+          <div class="flex items-center gap-2">
+            <RouterLink
+              :to="`/collection/${collection.id}`"
+              class="text-base font-medium text-text-primary hover:text-accent transition-colors duration-200"
+            >
+              {{ collection.title }}
+            </RouterLink>
+            <span
+              v-if="collection.visibility === 1"
+              class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-warning-subtle text-warning"
+              title="私有合集，仅作者和管理员可见"
+            >
+              <Lock :size="9" />
+              私有
+            </span>
+          </div>
           <p v-if="collection.description" class="text-sm text-text-muted line-clamp-1 mt-0.5">
             {{ collection.description }}
           </p>
@@ -168,6 +197,15 @@ onMounted(() => {
         </div>
 
         <div class="flex items-center gap-2 shrink-0">
+          <button
+            v-if="canManageVisibility(collection)"
+            @click="toggleVisibility(collection)"
+            class="p-2 rounded-lg text-text-muted hover:bg-accent-subtle hover:text-accent transition-all duration-200"
+            :title="collection.visibility === 1 ? '设为公开' : '设为私有（仅自己可见）'"
+          >
+            <EyeOff v-if="collection.visibility === 1" :size="16" />
+            <Eye v-else :size="16" />
+          </button>
           <button
             @click="router.push(`/dashboard/collections/${collection.id}/edit`)"
             class="p-2 rounded-lg text-text-muted hover:bg-accent-subtle hover:text-accent transition-all duration-200"

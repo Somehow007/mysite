@@ -178,6 +178,7 @@ CREATE TABLE IF NOT EXISTS `t_collection` (
     `cover_image` VARCHAR(500) DEFAULT NULL COMMENT '合集封面图片URL',
     `author_id` BIGINT NOT NULL COMMENT '创建者ID',
     `article_count` INT NOT NULL DEFAULT 0 COMMENT '合集内文章数量',
+    `visibility` TINYINT NOT NULL DEFAULT 0 COMMENT '可见性 0:公开 1:私有(仅作者和管理员可见)',
     `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序序号',
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

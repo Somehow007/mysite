@@ -42,6 +42,12 @@ public interface CollectionService extends IService<CollectionDO> {
     CollectionDO getCollectionByArticleId(Long articleId);
 
     /**
+     * 当前访问者是否可见指定合集。
+     * 私有合集（visibility=1）仅作者本人和管理员可见；合集不存在返回 false。
+     */
+    boolean isCollectionVisibleToCurrentUser(Long collectionId);
+
+    /**
      * 清除合集相关缓存
      */
     void evictCollectionCache();

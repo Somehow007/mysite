@@ -18,7 +18,10 @@ public interface CollectionMapper extends BaseMapper<CollectionDO> {
     int updateArticleCount(@Param("id") Long id, @Param("delta") int delta);
 
     /**
-     * 分页查询合集，含作者名和文章总浏览量，支持按浏览量排序
+     * 分页查询合集（按访问者视角），含作者名、可见文章数和文章总浏览量，支持按浏览量排序。
+     *
+     * @param viewerId 当前访问者ID（游客为 null）
+     * @param isAdmin  是否管理员（管理员跳过全部可见性过滤）
      */
     IPage<CollectionPageQueryRespDTO> selectCollectionsPage(
             Page<CollectionPageQueryRespDTO> page,
@@ -26,5 +29,7 @@ public interface CollectionMapper extends BaseMapper<CollectionDO> {
             @Param("authorId") Long authorId,
             @Param("sortBy") String sortBy,
             @Param("sortField") String sortField,
-            @Param("sortOrder") String sortOrder);
+            @Param("sortOrder") String sortOrder,
+            @Param("viewerId") Long viewerId,
+            @Param("isAdmin") boolean isAdmin);
 }

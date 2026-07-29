@@ -73,6 +73,9 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
         collectionDO.setId(IdUtil.getSnowflakeNextId());
         collectionDO.setAuthorId(Long.parseLong(currentUserId));
         collectionDO.setArticleCount(0);
+        if (collectionDO.getVisibility() == null) {
+            collectionDO.setVisibility(0);
+        }
         if (collectionDO.getSortOrder() == null) {
             collectionDO.setSortOrder(0);
         }
@@ -96,6 +99,7 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
             existing.setCoverImage(StrUtil.isBlank(requestParam.getCoverImage()) ? null : requestParam.getCoverImage());
         }
         if (requestParam.getSortOrder() != null) existing.setSortOrder(requestParam.getSortOrder());
+        if (requestParam.getVisibility() != null) existing.setVisibility(requestParam.getVisibility());
 
         collectionMapper.updateById(existing);
     }
@@ -117,16 +121,22 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
 
     @Override
     @Transactional(readOnly = true)
-    @Cacheable(value = CACHE_HOME, key = "'page:' + #requestParam.current + ':' + #requestParam.size + ':' + #requestParam.keyword + ':' + #requestParam.authorId + ':' + #requestParam.sortBy + ':' + #requestParam.sortField + ':' + #requestParam.sortOrder")
+    @Cacheable(value = CACHE_HOME, key = "'page:' + #requestParam.current + ':' + #requestParam.size + ':' + #requestParam.keyword + ':' + #requestParam.authorId + ':' + #requestParam.sortBy + ':' + #requestParam.sortField + ':' + #requestParam.sortOrder + ':' + T(io.github.somehow.mysite.commons.context.UserContext).getUserId() + ':' + T(io.github.somehow.mysite.commons.context.UserContext).isAdmin()")
     public IPage<CollectionPageQueryRespDTO> pageQueryCollection(CollectionPageQueryReqDTO requestParam) {
         Page<CollectionPageQueryRespDTO> page = new Page<>(requestParam.getCurrent(), requestParam.getSize());
+        // 列表按访问者视角过滤：私有合集/私有文章仅作者和管理员可见
+        boolean isAdmin = UserContext.isAdmin();
+        String currentUserId = UserContext.getUserId();
+        Long viewerId = currentUserId != null ? Long.parseLong(currentUserId) : null;
         IPage<CollectionPageQueryRespDTO> result = collectionMapper.selectCollectionsPage(
                 page,
                 requestParam.getKeyword(),
                 requestParam.getAuthorId(),
                 requestParam.getSortBy(),
                 requestParam.getSortField(),
-                requestParam.getSortOrder());
+                requestParam.getSortOrder(),
+                viewerId,
+                isAdmin);
 
         if (result == null || CollectionUtils.isEmpty(result.getRecords())) {
             return new Page<>();
@@ -150,6 +160,11 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
     @Cacheable(value = CACHE_DETAIL, key = "#id + ':' + #current + ':' + #size + ':' + T(io.github.somehow.mysite.commons.context.UserContext).getUserId() + ':' + T(io.github.somehow.mysite.commons.context.UserContext).isAdmin()")
     public CollectionDetailRespDTO getCollectionDetail(Long id, Integer current, Integer size) {
         CollectionDO collection = getCollectionOrThrow(id);
+
+        // 私有合集仅作者本人和管理员可见，其他人按"不存在"处理
+        if (!isCollectionVisible(collection)) {
+            throw new ClientException(ErrorCode.COLLECTION_NOT_FOUND);
+        }
 
         CollectionDetailRespDTO detail = BeanUtil.toBean(collection, CollectionDetailRespDTO.class);
 
@@ -399,14 +414,22 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
                 .eq(CollectionArticleDO::getDelFlag, 0)
                 .last("LIMIT 1"));
 
+        CollectionDO collection = null;
+        if (ca != null) {
+            collection = collectionMapper.selectOne(Wrappers.<CollectionDO>lambdaQuery()
+                    .eq(CollectionDO::getId, ca.getCollectionId())
+                    .eq(CollectionDO::getDelFlag, 0));
+            // 私有合集对当前访问者不可见时，按"不属于合集"回退到时间线导航，避免泄露合集信息
+            if (!isCollectionVisible(collection)) {
+                ca = null;
+            }
+        }
+
         if (ca != null) {
             // 文章属于合集
             navInfo.setInCollection(true);
             navInfo.setCollectionId(ca.getCollectionId().toString());
 
-            CollectionDO collection = collectionMapper.selectOne(Wrappers.<CollectionDO>lambdaQuery()
-                    .eq(CollectionDO::getId, ca.getCollectionId())
-                    .eq(CollectionDO::getDelFlag, 0));
             if (collection != null) {
                 navInfo.setCollectionTitle(collection.getTitle());
             }
@@ -500,6 +523,34 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
         }
 
         return navInfo;
+    }
+
+    @Override
+    public boolean isCollectionVisibleToCurrentUser(Long collectionId) {
+        if (collectionId == null) {
+            return false;
+        }
+        CollectionDO collection = collectionMapper.selectOne(Wrappers.<CollectionDO>lambdaQuery()
+                .eq(CollectionDO::getId, collectionId)
+                .eq(CollectionDO::getDelFlag, 0));
+        return isCollectionVisible(collection);
+    }
+
+    /**
+     * 合集可见性规则：公开合集所有人可见；私有合集（visibility=1）仅作者本人和管理员可见
+     */
+    private boolean isCollectionVisible(CollectionDO collection) {
+        if (collection == null) {
+            return false;
+        }
+        if (!Integer.valueOf(1).equals(collection.getVisibility())) {
+            return true;
+        }
+        if (UserContext.isAdmin()) {
+            return true;
+        }
+        String currentUserId = UserContext.getUserId();
+        return currentUserId != null && currentUserId.equals(collection.getAuthorId().toString());
     }
 
     @Override

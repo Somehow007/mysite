@@ -1,6 +1,8 @@
 package io.github.somehow.mysite.dto.req.collection;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
@@ -21,4 +23,9 @@ public class CollectionUpdateReqDTO {
 
     @Schema(description = "排序序号")
     private Integer sortOrder;
+
+    @Schema(description = "可见性：0-公开 1-私有（仅自己可见）")
+    @Min(value = 0, message = "可见性只能是 0(公开) 或 1(私有)")
+    @Max(value = 1, message = "可见性只能是 0(公开) 或 1(私有)")
+    private Integer visibility;
 }

@@ -2,7 +2,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { ArrowLeft, BookOpen, Calendar, Eye, Clock } from 'lucide-vue-next'
+import { ArrowLeft, BookOpen, Calendar, Eye, Clock, Lock } from 'lucide-vue-next'
 import { getCollectionById } from '@/api/collection'
 import { formatDate, calculateReadingTime } from '@/utils/date'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
@@ -100,6 +100,14 @@ onMounted(() => {
         <h1 class="text-3xl sm:text-4xl font-bold text-text-primary leading-tight tracking-tight mb-3">
           {{ collection.title }}
         </h1>
+
+        <div
+          v-if="collection.visibility === 1"
+          class="mb-4 p-3 rounded-lg bg-warning-subtle border border-warning/30 text-warning text-sm flex items-center gap-2 max-w-2xl"
+        >
+          <Lock :size="14" />
+          这是一个私有合集，仅你本人和管理员可见。
+        </div>
 
         <p v-if="collection.description" class="text-lg text-text-secondary leading-relaxed mb-4 max-w-2xl">
           {{ collection.description }}

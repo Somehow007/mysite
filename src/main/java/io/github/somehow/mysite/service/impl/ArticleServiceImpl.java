@@ -327,6 +327,15 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             }
         }
 
+        // 合集归属信息可见性：私有合集对非作者/非管理员隐藏
+        // （文章详情缓存跨用户共享，归属信息必须按请求者实时校验）
+        if (result.getCollectionId() != null
+                && !collectionService.isCollectionVisibleToCurrentUser(result.getCollectionId())) {
+            result.setCollectionId(null);
+            result.setCollectionTitle(null);
+            result.setCollectionSortOrder(null);
+        }
+
         // 浏览量：从 Redis 获取未刷盘的增量，叠加到基础值
         long pendingViews = articleViewCountService.getPendingViewCount(id);
         result.setViewCount(result.getViewCount() + (int) pendingViews);

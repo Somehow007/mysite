@@ -2,6 +2,52 @@
 
 ## 更新日志
 
+### 2026-07-29: 合集可见性功能（手动隐藏 + 空合集自动隐藏 + 按访问者动态计数）
+
+> 更新于 2026-07-29：合集支持两层可见性管理——"手动隐藏"（所有者把合集设为私有）与"自动隐藏"（合集对某访问者可见文章数为 0 时对其自动隐藏）；合集列表的文章数/浏览量改为按访问者视角动态统计，解决游客看到合集显示 7 篇文章、进去却可见 0 篇的一致性问题。变更清单见根目录 `CHANGELOG.md`。
+
+#### 决策背景
+
+- 私有文章泄露修复（见下条）之后，合集列表仍在"统计层面"泄露私有文章：`selectCollectionsPage` 直接取存储值 `c.article_count`、`SUM(view_count)` 全量统计所有关联文章（含私有），游客在合集卡片上看到虚高的文章数；点进详情页私有文章又被过滤，出现"外面 7 篇、进去 0 篇"的体验断层，像 bug。
+- 合集缺少与文章侧对等的可见性管理能力（文章已有 visibility 0/1 + 批量隐藏/公开），作者无法隐藏整个合集。
+
+#### 决策内容
+
+1. **语义与文章对齐**：`t_collection` 新增 `visibility TINYINT DEFAULT 0`（0=公开，1=私有）；私有合集仅作者本人和管理员可见；其他访问者访问详情统一抛 `COLLECTION_NOT_FOUND`（不提示"无权限"，避免暴露合集存在性）。
+2. **手动隐藏**：创建/更新合集接口新增可选 `visibility`（JSR-303 校验 0/1）；合集管理页提供快速公开/隐藏按钮（仅对作者本人和管理员渲染，后端 `checkCollectionOwnership` 兜底强校验）；新建/编辑页提供与文章编辑器一致的「公开 / 仅自己可见」切换按钮。
+3. **自动隐藏**：列表 SQL 注入访问者条件（`viewerId` / `isAdmin` 由 Service 从 `UserContext` 传入）——`WHERE` 过滤私有合集（`c.visibility = 0 OR c.author_id = viewer`）；可见文章数用 `SUM(CASE WHEN 可见条件 THEN 1 END)` 统计；`HAVING article_count > 0 OR c.author_id = viewer` 对非所有者隐藏空合集。**所有者始终可见自己的合集（含空合集）**，否则管理入口断裂；管理员跳过全部过滤。
+4. **动态计数**：`articleCount` / `totalViewCount` 输出动态统计值，可见条件与详情页过滤口径完全一致（`a.visibility IS NULL/0 OR a.author_id = viewer`）；按文章数排序的分支改用动态别名 `article_count`（MySQL 允许 ORDER BY / HAVING 引用 SELECT 别名）。
+5. **缓存隔离**：`home_collections` / `collection_detail` / `article_nav` 三个缓存键全部加入 `UserContext.getUserId() + isAdmin()`（SpEL `T(...)` 静态调用）——结果集按访问者不同，用户无关键会把作者视图端给游客；evict 维持 `allEntries = true` 不受影响。
+6. **泄露点打通**：文章上/下一篇导航发现所属合集私有且不可见时，回退为时间线导航（不暴露合集标题/ID）；文章详情缓存 `article_detail` 跨用户共享，不能在缓存层按用户过滤，故私有合集的归属信息在 `ArticleServiceImpl.selectOneArticle` 中按请求者实时校验并抹除（新增 `CollectionService.isCollectionVisibleToCurrentUser` 公开方法）。
+
+#### 影响范围
+
+- 数据库：`docker/init/schema.sql`（新库）+ `docker/init/migrations/20260729-collection-visibility.sql`（存量库迁移，本地开发库已执行）
+- 后端：`CollectionDO`、`CollectionMapper(.xml)`（selectCollectionsPage +viewerId/isAdmin）、`CollectionService(Impl)`（创建/更新支持 visibility、详情鉴权、导航回退、isCollectionVisibleToCurrentUser）、创建/更新请求 DTO（+visibility）、`CollectionPageQueryRespDTO` / `CollectionDetailRespDTO`（+visibility）、`ArticleServiceImpl.selectOneArticle`（抹除私有合集归属）
+- 前端：`types`（Collection 与 Create/Update 请求 +visibility）、`CollectionCard`（私有徽章）、`CollectionManageView`（快速公开/隐藏按钮 + 徽章）、`CollectionEditView`（可见性切换）、`CollectionView`（私有横幅）
+- 测试与验证：`CollectionServiceVisibilityTest` 扩充至 11 用例；后端全量 300 测试通过，前端 vue-tsc + vite build 通过
+
+### 2026-07-29: 合集私有文章可见性泄露修复（游客可见"仅自己可见"文章）
+
+> 更新于 2026-07-29：修复文章设为"仅自己可见"后仍会展示给游客的合集详情漏洞，以及合集上/下一篇导航泄露私有文章标题的问题。已提交 `81e0175`。
+
+#### 决策背景
+
+- `CollectionServiceImpl.getCollectionDetail` 查询合集内文章只判 `delFlag=0`，完全未检查 `visibility`，私有文章原样返回给任何访问者。
+- `getArticleNavigation` 的 4 个上/下一篇查询只判 `published=1`，私有文章标题经导航泄露。
+- 两个方法均有 `@Cacheable` 且缓存键不含访问者身份——即使方法内加过滤，作者先访问会把含私有文章的视图缓存下来端给游客。
+
+#### 决策内容
+
+1. 过滤口径沿用 `getArchive` 既有模式：`visibility IS NULL/0 OR author = 当前用户`，管理员免过滤。
+2. 合集详情先轻量查询（仅 select id/visibility/author_id）过滤文章 ID 再分页，保证页码连续；`articleCount` 修正为可见数量。
+3. 缓存键加入 `getUserId() + isAdmin()`，按访问者隔离结果集。
+4. 新增 `CollectionServiceVisibilityTest` 单测覆盖 游客 / 其他用户 / 作者 / 管理员 × 详情 / 导航。
+
+#### 影响范围
+
+- `CollectionServiceImpl`（详情过滤 + 导航 `applyVisibilityFilter` + 两处缓存键）、`CollectionServiceVisibilityTest`（新增）
+
 ### 2026-07-28: 文章管理批量操作增强（批量隐藏/公开、批量加入合集）+ 删除联动 RAG 清理
 
 > 更新于 2026-07-28：文章管理页批量选中原先只有批量删除，补齐两类批量操作，并修复文章删除后 RAG 知识库数据残留（AI 聊天仍能检索到已删除文章）的问题。

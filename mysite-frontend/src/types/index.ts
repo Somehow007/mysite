@@ -243,7 +243,10 @@ export interface Collection {
   coverImage: string | null
   authorId: string
   authorName: string
+  /** 当前访问者可见的文章数量（后端动态统计） */
   articleCount: number
+  /** 可见性：0-公开 1-私有（仅作者和管理员可见） */
+  visibility?: number
   sortOrder: number
   totalViewCount?: number
   createTime: string
@@ -283,6 +286,8 @@ export interface CreateCollectionRequest {
   description?: string
   coverImage?: string
   sortOrder?: number
+  /** 可见性：0-公开（默认） 1-私有 */
+  visibility?: number
 }
 
 export interface UpdateCollectionRequest {
@@ -290,6 +295,8 @@ export interface UpdateCollectionRequest {
   description?: string
   coverImage?: string
   sortOrder?: number
+  /** 可见性：0-公开 1-私有 */
+  visibility?: number
 }
 
 // ========== RAG / AI 助手 ==========

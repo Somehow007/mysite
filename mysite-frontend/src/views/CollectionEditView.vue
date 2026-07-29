@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { ArrowLeft, Save, Loader2, Plus, X, GripVertical, AlertCircle, BookOpen, FilePlus, ChevronUp, ChevronDown } from 'lucide-vue-next'
+import { ArrowLeft, Save, Loader2, Plus, X, GripVertical, AlertCircle, BookOpen, FilePlus, ChevronUp, ChevronDown, Globe, Lock } from 'lucide-vue-next'
 import { createCollection, updateCollection, getCollectionById, addArticleToCollection, removeArticleFromCollection, updateArticleSort, batchAddArticles } from '@/api/collection'
 import { getArticles } from '@/api/article'
 import { uploadImage, MAX_IMAGE_FILE_SIZE } from '@/api/image'
@@ -22,6 +22,8 @@ const title = ref('')
 const description = ref('')
 const coverImage = ref('')
 const sortOrder = ref(0)
+// 可见性：0-公开 1-私有（仅自己可见）
+const visibility = ref(0)
 const saving = ref(false)
 const loading = ref(false)
 const error = ref('')
@@ -57,6 +59,7 @@ async function fetchCollectionDetail(id: string) {
         description.value = detail.description || ''
         coverImage.value = detail.coverImage || ''
         sortOrder.value = detail.sortOrder
+        visibility.value = detail.visibility ?? 0
       }
       const pageArticles = detail.articles || []
       allArticles.push(...pageArticles)
@@ -183,6 +186,7 @@ async function handleSave() {
         description: description.value.trim() || undefined,
         coverImage: coverImage.value.trim() || undefined,
         sortOrder: sortOrder.value,
+        visibility: visibility.value,
       })
     } else {
       collectionId = await createCollection({
@@ -190,6 +194,7 @@ async function handleSave() {
         description: description.value.trim() || undefined,
         coverImage: coverImage.value.trim() || undefined,
         sortOrder: sortOrder.value,
+        visibility: visibility.value,
       })
     }
 
@@ -363,6 +368,35 @@ onMounted(() => {
         <div>
           <label class="block text-sm font-medium text-text-primary mb-1.5">排序序号</label>
           <input v-model.number="sortOrder" type="number" min="0" class="input-base w-32" />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">可见性</label>
+          <div class="flex gap-2">
+            <button
+              type="button"
+              @click="visibility = 0"
+              class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-all duration-200"
+              :class="visibility === 0
+                ? 'border-accent bg-accent text-text-inverse'
+                : 'border-border text-text-muted hover:border-accent hover:text-accent'"
+            >
+              <Globe :size="14" />
+              公开
+            </button>
+            <button
+              type="button"
+              @click="visibility = 1"
+              class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm border transition-all duration-200"
+              :class="visibility === 1
+                ? 'border-accent bg-accent text-text-inverse'
+                : 'border-border text-text-muted hover:border-accent hover:text-accent'"
+            >
+              <Lock :size="14" />
+              仅自己可见
+            </button>
+          </div>
+          <p class="text-xs text-text-muted mt-1.5">私有合集仅你本人和管理员可见；当合集中没有对访问者可见的文章时，合集也会自动对其隐藏。</p>
         </div>
       </div>
 

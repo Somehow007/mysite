@@ -22,5 +22,7 @@ public class CollectionDO extends BaseDO {
     private String coverImage;
     private Long authorId;
     private Integer articleCount;
+    /** 可见性：0-公开 1-私有（仅作者和管理员可见） */
+    private Integer visibility;
     private Integer sortOrder;
 }

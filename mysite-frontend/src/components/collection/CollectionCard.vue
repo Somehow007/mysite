@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { BookOpen, Library, Eye } from 'lucide-vue-next'
+import { BookOpen, Library, Eye, Lock } from 'lucide-vue-next'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
 import { gsap } from 'gsap'
 import type { Collection } from '@/types'
@@ -70,6 +70,14 @@ function onMouseLeave() {
       <h3 class="text-lg font-semibold text-text-primary group-hover:text-accent transition-colors duration-200 mb-1 line-clamp-1 flex items-center gap-1.5">
         <Library :size="16" class="text-accent shrink-0" />
         {{ collection.title }}
+        <span
+          v-if="collection.visibility === 1"
+          class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-warning-subtle text-warning font-normal shrink-0"
+          title="私有合集，仅自己可见"
+        >
+          <Lock :size="9" />
+          私有
+        </span>
       </h3>
       <p v-if="collection.description" class="text-sm text-text-secondary line-clamp-2 mb-3 leading-relaxed">
         {{ collection.description }}

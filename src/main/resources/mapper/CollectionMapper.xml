@@ -3,12 +3,26 @@
         PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
         "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="io.github.somehow.mysite.dao.mapper.CollectionMapper">
+
+    <!-- 当前访问者可见的文章判定条件（关联行存在 且 文章公开/为访问者本人所写） -->
+    <sql id="visibleArticleCondition">
+        a.id IS NOT NULL AND (a.visibility IS NULL OR a.visibility = 0
+        <if test="viewerId != null"> OR a.author_id = #{viewerId}</if>)
+    </sql>
+
     <select id="selectByAuthorId" resultType="io.github.somehow.mysite.dao.entity.CollectionDO">
         SELECT * FROM t_collection
         WHERE author_id = #{authorId} AND del_flag = 0
         ORDER BY sort_order ASC, create_time DESC
     </select>
 
+    <!--
+        合集分页查询（按访问者视角）：
+        - viewerId/isAdmin 由 Service 从 UserContext 注入
+        - 私有合集(visibility=1)仅作者本人和管理员可见
+        - articleCount/totalViewCount 动态统计"访问者可见的文章"，与合集详情页保持一致
+        - 管理员跳过全部过滤；可见文章数为 0 的合集对非所有者自动隐藏
+    -->
     <select id="selectCollectionsPage" resultType="io.github.somehow.mysite.dto.resp.collection.CollectionPageQueryRespDTO">
         SELECT
             c.id,
@@ -16,17 +30,29 @@
             c.description,
             c.cover_image,
             c.author_id,
-            c.article_count,
+            c.visibility,
             c.sort_order,
             c.create_time,
             c.update_time,
             u.username AS author_name,
-            COALESCE(SUM(a.view_count), 0) AS total_view_count
+            <choose>
+                <when test="isAdmin">
+                    COUNT(a.id) AS article_count,
+                    COALESCE(SUM(a.view_count), 0) AS total_view_count
+                </when>
+                <otherwise>
+                    SUM(CASE WHEN <include refid="visibleArticleCondition"/> THEN 1 ELSE 0 END) AS article_count,
+                    COALESCE(SUM(CASE WHEN <include refid="visibleArticleCondition"/> THEN a.view_count ELSE 0 END), 0) AS total_view_count
+                </otherwise>
+            </choose>
         FROM t_collection c
         LEFT JOIN t_user u ON u.id = c.author_id
         LEFT JOIN t_collection_article ca ON ca.collection_id = c.id AND ca.del_flag = 0
         LEFT JOIN t_article a ON a.id = ca.article_id AND a.del_flag = 0
         WHERE c.del_flag = 0
+        <if test="!isAdmin">
+            AND (c.visibility = 0 <if test="viewerId != null"> OR c.author_id = #{viewerId}</if>)
+        </if>
         <if test="keyword != null and keyword != ''">
             AND c.title LIKE CONCAT('%', #{keyword}, '%')
         </if>
@@ -34,6 +60,10 @@
             AND c.author_id = #{authorId}
         </if>
         GROUP BY c.id, u.username
+        <if test="!isAdmin">
+            <!-- 自动隐藏：可见文章数为 0 的合集对非所有者不可见；所有者始终可见自己的合集（便于管理空合集） -->
+            HAVING article_count &gt; 0 <if test="viewerId != null"> OR c.author_id = #{viewerId}</if>
+        </if>
         <choose>
             <when test="sortBy == 'viewCount'">
                 ORDER BY c.sort_order ASC, total_view_count DESC, c.create_time DESC
@@ -46,8 +76,8 @@
             </when>
             <when test="sortField == 'articleCount'">
                 <choose>
-                    <when test="sortOrder == 'asc'">ORDER BY c.article_count ASC</when>
-                    <otherwise>ORDER BY c.article_count DESC</otherwise>
+                    <when test="sortOrder == 'asc'">ORDER BY article_count ASC</when>
+                    <otherwise>ORDER BY article_count DESC</otherwise>
                 </choose>
             </when>
             <when test="sortField == 'createTime'">
