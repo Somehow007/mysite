@@ -27,7 +27,7 @@ A modern, production-ready blog system featuring article management, collections
 
 ### Content Management
 
-- **Rich Markdown Editor** -- CodeMirror 6-based editor with Obsidian-style live preview, LaTeX math formula rendering (KaTeX), Callout blocks (`[!NOTE]`, `[!TIP]`, `[!WARNING]`, etc.), Enter-key continuation for lists and blockquotes, and auto-conversion shortcuts
+- **Rich Markdown Editor** -- Milkdown Crepe-based WYSIWYG editor (Typora/Notion-style), LaTeX math formula rendering (KaTeX), Callout blocks (`[!NOTE]`, `[!TIP]`, `[!WARNING]`, etc.), slash menu and floating toolbar, paste/drag image upload
 - **Article Collections** -- Organize articles into ordered series with drag-to-sort, per-article navigation (previous/next), and dedicated collection pages
 - **Categories & Tags** -- Hierarchical category tree with SEO metadata fields; tag-based article filtering
 - **Draft System** -- Articles support draft/published states for work-in-progress content
@@ -74,7 +74,7 @@ A modern, production-ready blog system featuring article management, collections
 
 - **Redis Caching** -- Multi-strategy TTL cache for categories (2h), tags (1h), article details (30min), collections (30min), homepage (10min)
 - **Image Optimization** -- Nginx-side WebP conversion based on `Accept` header; frontend lazy loading via `MutationObserver`
-- **Vite Build Optimization** -- Manual chunk splitting (Vue vendor, Markdown libs, UI vendor, CodeMirror); ES2020 target; CSS code splitting
+- **Vite Build Optimization** -- Manual chunk splitting (Vue vendor, Markdown libs, UI vendor, editor); ES2020 target; CSS code splitting
 - **Database** -- Connection pool tuning, batch write optimization, logical deletion across all tables
 
 ### SEO
@@ -94,7 +94,7 @@ A modern, production-ready blog system featuring article management, collections
 | **Database** | MySQL 8.4 |
 | **Cache** | Redis 7 (Lettuce) |
 | **Search** | Elasticsearch (optional, with DB fallback) |
-| **Editor** | CodeMirror 6 with custom Lezer extensions |
+| **Editor** | Milkdown Crepe 7 (ProseMirror-based WYSIWYG) |
 | **Markdown** | Marked + PrismJS + KaTeX |
 | **API Docs** | Knife4j (OpenAPI 3 / Swagger) |
 | **Deploy** | Docker Compose, Nginx, Let's Encrypt |

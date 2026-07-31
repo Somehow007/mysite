@@ -23,6 +23,8 @@ import 'prismjs/components/prism-diff'
 import 'prismjs/components/prism-docker'
 import 'prismjs/components/prism-nginx'
 
+import { CALLOUT_TYPES, getCalloutConfig } from '@/utils/callouts'
+
 export interface TocItem {
   id: string
   text: string
@@ -96,35 +98,7 @@ function protectMath(markdown: string): { processed: string; mathBlocks: Map<str
 }
 
 // ── Callout rendering ─────────────────────────────────────────────────
-
-interface CalloutConfig {
-  icon: string
-  color: string
-}
-
-const CALLOUT_CONFIG: Record<string, CalloutConfig> = {
-  note: { icon: '📝', color: '#448aff' },
-  info: { icon: 'ℹ️', color: '#448aff' },
-  todo: { icon: '☑️', color: '#448aff' },
-  tip: { icon: '💡', color: '#00c853' },
-  success: { icon: '✅', color: '#00c853' },
-  check: { icon: '✔️', color: '#00c853' },
-  done: { icon: '🏁', color: '#00c853' },
-  warning: { icon: '⚠️', color: '#ff9100' },
-  caution: { icon: '⚠️', color: '#ff9100' },
-  question: { icon: '❓', color: '#ff9100' },
-  attention: { icon: '👀', color: '#ff9100' },
-  error: { icon: '❌', color: '#ff1744' },
-  danger: { icon: '⚡', color: '#ff1744' },
-  failure: { icon: '🚫', color: '#ff1744' },
-  bug: { icon: '🐛', color: '#ff1744' },
-  example: { icon: '📋', color: '#7c4dff' },
-  quote: { icon: '💬', color: '#9e9e9e' },
-  cite: { icon: '📖', color: '#9e9e9e' },
-  abstract: { icon: '📄', color: '#9e9e9e' },
-  summary: { icon: '📊', color: '#9e9e9e' },
-  tldr: { icon: '⚡', color: '#9e9e9e' },
-}
+// 类型表与颜色/图标映射统一维护在 utils/callouts.ts（编辑器插件共用）
 
 /**
  * Transform <blockquote> elements that start with [!TYPE] into styled callout divs.
@@ -143,8 +117,10 @@ function renderCallouts(html: string): string {
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
 
-  const CALLOUT_TYPE_RE =
-    /^\s*<p>\[!(NOTE|INFO|TODO|TIP|SUCCESS|CHECK|DONE|QUESTION|WARNING|CAUTION|ATTENTION|FAILURE|FAIL|MISSING|ERROR|DANGER|BUG|EXAMPLE|QUOTE|CITE|ABSTRACT|SUMMARY|TLDR)\]([\s\S]*?)<\/p>([\s\S]*)$/i
+  const CALLOUT_TYPE_RE = new RegExp(
+    `^\\s*<p>\\[!(${CALLOUT_TYPES.join('|')})\\]([\\s\\S]*?)</p>([\\s\\S]*)$`,
+    'i',
+  )
 
   return html.replace(
     /<blockquote>([\s\S]*?)<\/blockquote>/g,
@@ -154,7 +130,7 @@ function renderCallouts(html: string): string {
 
       const [, type, titlePart, rest] = calloutMatch
       const typeLower = type!.toLowerCase()
-      const config = CALLOUT_CONFIG[typeLower] ?? CALLOUT_CONFIG['note']!
+      const config = getCalloutConfig(typeLower)
 
       // The titlePart contains everything from "] " to the closing </p>,
       // possibly including newlines. Split at the first newline:

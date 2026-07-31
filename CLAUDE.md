@@ -102,7 +102,7 @@ mysite-frontend/src/
 │   ├── comment/        # CommentSection, CommentItem
 │   ├── common/         # AppHeader, AppFooter, ThemeToggle, SearchDialog, BackToTop, ToastContainer, etc.
 │   ├── dashboard/      # DashboardSidebar
-│   └── editor/         # MarkdownEditor, SimpleMarkdownEditor
+│   └── editor/         # MarkdownWysiwygEditor (Milkdown Crepe WYSIWYG), editorTheme.css
 ├── composables/        # 14 composables: useChat, useMarkdown, useTheme, useSearch, useToast, usePermission, etc.
 ├── api/                # 11 API modules: client.ts (axios), rag.ts (fetch SSE), article, auth, etc.
 ├── stores/             # Pinia stores (user)

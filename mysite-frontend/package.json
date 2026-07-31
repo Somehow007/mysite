@@ -18,13 +18,9 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
-    "@codemirror/commands": "^6.10.3",
-    "@codemirror/lang-markdown": "^6.5.0",
-    "@codemirror/language": "^6.12.3",
-    "@codemirror/search": "^6.7.0",
-    "@codemirror/state": "^6.6.0",
-    "@codemirror/view": "^6.43.1",
     "@floating-ui/vue": "^2.0.1",
+    "@milkdown/crepe": "7.21.3",
+    "@milkdown/kit": "7.21.3",
     "@unhead/vue": "^2.0.0",
     "@vueuse/core": "^13.0.0",
     "axios": "^1.12.2",
@@ -55,6 +51,7 @@
     "jiti": "^2.5.1",
     "npm-run-all2": "^8.0.4",
     "oxlint": "~1.11.0",
+    "playwright": "^1.62.1",
     "prettier": "3.6.2",
     "tailwindcss": "^4.1.0",
     "typescript": "~5.9.0",

@@ -1,0 +1,195 @@
+/**
+ * Crepe（Milkdown）主题覆盖：对接站点设计系统的 CSS 变量。
+ *
+ * 加载顺序：先引入 @milkdown/crepe 官方 frame 主题（见 createEditor.ts），
+ * 再用本文件以更高优先级（.crepe-container 前缀）覆盖变量与排版，
+ * 亮/暗主题随站点 CSS 变量自动切换。
+ */
+
+.crepe-container .milkdown {
+  /* ── 调色板：全部映射到站点变量，暗色主题自动跟随 ── */
+  --crepe-color-background: transparent;
+  --crepe-color-on-background: var(--text-primary);
+  --crepe-color-surface: var(--bg-elevated);
+  --crepe-color-surface-low: var(--bg-code);
+  --crepe-color-on-surface: var(--text-primary);
+  --crepe-color-on-surface-variant: var(--text-secondary);
+  --crepe-color-outline: var(--border);
+  --crepe-color-primary: var(--accent);
+  --crepe-color-secondary: var(--accent-subtle);
+  --crepe-color-on-secondary: var(--accent);
+  --crepe-color-inverse: var(--text-primary);
+  --crepe-color-on-inverse: var(--bg-primary);
+  --crepe-color-inline-code: var(--accent);
+  --crepe-color-error: var(--danger);
+  --crepe-color-hover: var(--bg-code);
+  --crepe-color-selected: var(--accent-subtle);
+  --crepe-color-inline-area: var(--bg-code);
+
+  /* ── 字体：对齐站点字体栈 ── */
+  --crepe-font-title: var(--font-sans);
+  --crepe-font-default: var(--font-sans);
+  --crepe-font-code: var(--font-mono);
+
+  /* ── 阴影：使用站点阴影色 ── */
+  --crepe-shadow-1: 0 1px 3px 1px var(--shadow-color), 0 1px 2px 0 var(--shadow-color);
+  --crepe-shadow-2: 0 2px 6px 2px var(--shadow-color), 0 1px 2px 0 var(--shadow-color);
+
+  background: transparent;
+  color: var(--text-primary);
+}
+
+/* ── 编辑区排版：对齐 .prose 正文样式（编辑即所得 ≈ 阅读所见） ── */
+.crepe-container .milkdown .ProseMirror {
+  padding: 1.25rem 1.5rem 35vh; /* 底部留白，保证末行可滚动到视口中部 */
+  min-height: 100%;
+  font-size: 0.9375rem;
+  line-height: 1.75;
+  caret-color: var(--text-primary);
+  outline: none;
+}
+
+.crepe-container .milkdown .ProseMirror p {
+  margin: 0.5em 0;
+}
+
+.crepe-container .milkdown .ProseMirror h1,
+.crepe-container .milkdown .ProseMirror h2,
+.crepe-container .milkdown .ProseMirror h3,
+.crepe-container .milkdown .ProseMirror h4,
+.crepe-container .milkdown .ProseMirror h5,
+.crepe-container .milkdown .ProseMirror h6 {
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.crepe-container .milkdown .ProseMirror a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.crepe-container .milkdown .ProseMirror a:hover {
+  text-decoration: underline;
+}
+
+.crepe-container .milkdown .ProseMirror blockquote {
+  border-left: 3px solid var(--border);
+  color: var(--text-secondary);
+  padding-left: 1em;
+  margin-left: 0;
+}
+
+.crepe-container .milkdown .ProseMirror hr {
+  border-color: var(--border);
+}
+
+.crepe-container .milkdown .ProseMirror code {
+  background: var(--bg-code);
+  color: var(--crepe-color-inline-code);
+  border-radius: 4px;
+  padding: 0.15em 0.35em;
+  font-size: 0.875em;
+}
+
+/* 选中态与光标占位 */
+.crepe-container .milkdown .ProseMirror ::selection {
+  background: var(--accent-subtle);
+}
+
+/* 占位符颜色 */
+.crepe-container .milkdown .crepe-placeholder,
+.crepe-container .milkdown .ProseMirror .placeholder {
+  color: var(--text-muted);
+}
+
+/* ── 代码块：融入站点卡片风格 ── */
+.crepe-container .milkdown .milkdown-code-block {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 0.75em 0;
+}
+
+.crepe-container .milkdown .milkdown-code-block .cm-editor,
+.crepe-container .milkdown .milkdown-code-block .cm-gutters {
+  background: var(--bg-code);
+}
+
+.crepe-container .milkdown .milkdown-code-block .cm-gutters {
+  color: var(--text-muted);
+  border-right: 1px solid var(--border);
+}
+
+/* ── 图片：圆角与站点一致 ── */
+.crepe-container .milkdown .ProseMirror img {
+  border-radius: 8px;
+}
+
+/* ── 表格：使用站点边框色 ── */
+.crepe-container .milkdown .ProseMirror table td,
+.crepe-container .milkdown .ProseMirror table th {
+  border-color: var(--border);
+}
+
+.crepe-container .milkdown .ProseMirror table th {
+  background: var(--bg-code);
+}
+
+/* ── Callout 卡片：对齐 styles/typography.css 的 .prose .callout ── */
+.crepe-container .milkdown .ProseMirror .callout {
+  --callout-color: #448aff;
+  margin: 0.75em 0;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--callout-color) 20%, transparent);
+  border-left: 4px solid var(--callout-color);
+  background-color: color-mix(in srgb, var(--callout-color) 6%, transparent);
+  overflow: hidden;
+}
+
+.crepe-container .milkdown .ProseMirror .callout-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 0.25rem;
+  font-family: var(--font-sans);
+  user-select: none;
+}
+
+.crepe-container .milkdown .ProseMirror .callout-icon {
+  font-size: 1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* 标题输入框：融入卡片头部，无边框感 */
+.crepe-container .milkdown .ProseMirror .callout-title-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+  user-select: text;
+}
+
+.crepe-container .milkdown .ProseMirror .callout-title-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.crepe-container .milkdown .ProseMirror .callout-body {
+  padding: 0 1rem 0.5rem;
+}
+
+.crepe-container .milkdown .ProseMirror .callout-body > p:first-child {
+  margin-top: 0.25em;
+}
+
+.crepe-container .milkdown .ProseMirror .callout-body > p:last-child {
+  margin-bottom: 0.25em;
+}

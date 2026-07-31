@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X, Plus, Search, TrendingUp, Library, Check, ChevronDown, Lock, Globe } from 'lucide-vue-next'
+import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X, Plus, Search, TrendingUp, Library, Check, ChevronDown, Lock, Globe, Keyboard } from 'lucide-vue-next'
 import { createArticle, updateArticle, getArticleById } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { getTags, createTag } from '@/api/tag'
@@ -10,7 +10,7 @@ import { getCollections, addArticleToCollection, removeArticleFromCollection } f
 import { uploadImage, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useUserStore } from '@/stores/user'
 import { useToast } from '@/composables/useToast'
-import SimpleMarkdownEditor from '@/components/editor/SimpleMarkdownEditor.vue'
+import MarkdownWysiwygEditor from '@/components/editor/MarkdownWysiwygEditor.vue'
 import type { Category, Tag, Collection } from '@/types'
 
 const route = useRoute()
@@ -47,6 +47,51 @@ const showMetaPanel = ref(false)
 const showSummaryHint = ref(false)
 const coverUploading = ref(false)
 let summaryHintTimer: ReturnType<typeof setTimeout> | null = null
+
+// 编辑器使用说明弹层（快捷键与 Milkdown Crepe 内置 keymap 保持一致）
+const showEditorHelp = ref(false)
+const isMac = /mac/i.test(navigator.platform)
+const K = {
+  mod: isMac ? '⌘' : 'Ctrl',
+  alt: isMac ? '⌥' : 'Alt',
+  shift: isMac ? '⇧' : 'Shift',
+}
+const editorHelpGroups = [
+  {
+    label: '通用',
+    items: [
+      [`${K.mod} S`, '保存文章'],
+      [`${K.mod} Z`, '撤销'],
+      [`${K.mod} ${K.shift} Z`, '重做'],
+    ],
+  },
+  {
+    label: '行内格式',
+    items: [
+      [`${K.mod} B`, '加粗'],
+      [`${K.mod} I`, '斜体'],
+      [`${K.mod} E`, '行内代码'],
+      [`${K.mod} ${K.alt} X`, '删除线'],
+    ],
+  },
+  {
+    label: '块级结构',
+    items: [
+      [`${K.mod} ${K.alt} 1~6`, '标题 H1–H6'],
+      [`${K.mod} ${K.alt} 0`, '正文'],
+      [`${K.mod} ${K.shift} B`, '引用块'],
+      [`${K.mod} ${K.alt} 7 / 8`, '有序 / 无序列表'],
+      [`${K.mod} ${K.alt} C`, '代码块'],
+    ],
+  },
+] as const
+const editorHelpTips = [
+  '输入 / 唤起斜杠菜单：标注 Callout、图片、表格、公式等',
+  '选中文字弹出浮动格式工具栏',
+  '直接粘贴截图或拖入图片，自动上传插入',
+  '从 IDE 复制的 Markdown 粘贴后自动渲染为排版',
+  '引用块首行输入 [!note] + 空格，生成标注卡片',
+] as const
 
 const tagSearchQuery = ref('')
 const newTagName = ref('')
@@ -404,10 +449,49 @@ function removeCover() {
           class="w-full px-0 py-3 text-2xl font-semibold bg-transparent border-none outline-none text-text-primary placeholder:text-text-muted"
         />
 
-        <div class="flex-1 min-h-[500px] rounded-xl border border-border overflow-hidden bg-bg-secondary card-shadow">
-          <SimpleMarkdownEditor
+        <div class="relative flex justify-end">
+          <button
+            type="button"
+            class="flex items-center gap-1.5 text-xs text-text-muted hover:text-accent transition-colors"
+            :class="{ 'text-accent': showEditorHelp }"
+            @click="showEditorHelp = !showEditorHelp"
+          >
+            <Keyboard :size="14" />
+            <span>使用说明 · 快捷键</span>
+          </button>
+
+          <!-- 点击外部关闭 -->
+          <div v-if="showEditorHelp" class="fixed inset-0 z-40" @click="showEditorHelp = false"></div>
+
+          <div
+            v-if="showEditorHelp"
+            class="absolute right-0 top-full mt-2 z-50 w-84 rounded-xl border border-border bg-bg-elevated card-shadow p-4"
+          >
+            <h3 class="text-sm font-semibold text-text-primary mb-2.5">编辑器使用说明</h3>
+            <ul class="space-y-1.5 text-xs text-text-secondary mb-4">
+              <li v-for="tip in editorHelpTips" :key="tip" class="flex gap-1.5">
+                <span class="text-accent flex-shrink-0">•</span>
+                <span>{{ tip }}</span>
+              </li>
+            </ul>
+            <div v-for="group in editorHelpGroups" :key="group.label" class="mb-3 last:mb-0">
+              <h4 class="text-xs font-medium text-text-muted mb-1.5">{{ group.label }}</h4>
+              <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                <div v-for="[keys, desc] in group.items" :key="keys" class="flex items-center justify-between gap-2">
+                  <span class="text-xs text-text-secondary">{{ desc }}</span>
+                  <kbd class="px-1.5 py-0.5 rounded border border-border bg-bg-code text-text-secondary font-mono text-[11px] whitespace-nowrap">
+                    {{ keys }}
+                  </kbd>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="h-[calc(100vh-280px)] min-h-[500px] rounded-xl border border-border overflow-hidden bg-bg-secondary card-shadow">
+          <MarkdownWysiwygEditor
             v-model="content"
-            placeholder="将写好的 Markdown 内容粘贴到这里..."
+            placeholder="开始创作，输入 / 唤起更多功能..."
             @save="handleSave(false)"
           />
         </div>
