@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MySite is a full-featured personal blog platform with AI-powered RAG (Retrieval-Augmented Generation) chat. The backend runs on port 8081, the frontend dev server on port 5173 with proxy to backend.
+MySite is a full-featured personal blog platform with AI-powered RAG (Retrieval-Augmented Generation) chat, plus an admin-only study journal API. The backend runs on port 8081, the frontend dev server on port 5173 with proxy to backend.
+
+Cursor 会话记忆：`.cursor/rules/`（架构 alwaysApply；后端/前端/RAG/手帐按文件 glob 加载）。新会话不要为摸结构再扫全库。
 
 | Layer | Stack |
 |-------|-------|
@@ -71,6 +73,7 @@ src/main/java/io/github/somehow/mysite/
 ├── security/        # JWT dual-token auth, Spring Security filter chain
 ├── elasticsearch/   # ES integration (optional, with DB LIKE fallback)
 ├── utils/           # ReadingTimeCalculator, etc.
+├── journal/         # 学习手帐（花期 Blossom）：/api/journal，仅 ADMIN，MySQL sj_*
 │
 └── ragent/          # ★ RAG AI subsystem (separate PG datasource)
     ├── config/      # RagProperties, RagentDataSourceConfig, RagAsyncConfig, SchemaMigration
@@ -78,7 +81,7 @@ src/main/java/io/github/somehow/mysite/
     ├── service/     # RagChatService, KnowledgeBaseService, KnowledgeDocumentService, ChatRateLimiter
     ├── dto/         # KnowledgeBaseDTO, SourceChunkDTO, ChatMessageDTO, ChatStreamRequest
     ├── dao/         # RAG entities + mappers (entity/, mapper/, handler/)
-    ├── core/        # RAG pipeline: PromptTemplate, ConversationManager, RetrievalEngine, QueryRewriter
+    ├── core/        # RAG pipeline: PromptTemplate, ConversationManager, RetrievalEngine, QueryRewriter, IntentClassifier
     ├── llm/         # LLM integration (multi-provider routing + circuit breaker)
     │   ├── model/       # ChatEvent, ChatMessage, ChatRequest, ChatResponse
     │   ├── provider/    # AbstractOpenAiProvider, BaiLian, Deepseek, Ollama, SiliconFlow
@@ -93,7 +96,8 @@ src/main/java/io/github/somehow/mysite/
 
 ```
 mysite-frontend/src/
-├── views/              # 23 page components (routes)
+├── app/                # App.vue, layouts/ (DefaultLayout, DashboardLayout), router/
+├── views/              # Page components (前台博客 + /dashboard 管理页)
 ├── components/
 │   ├── article/        # ArticleCard, ArticleContent, ArticleToc, ArticleMeta, TocTree, etc.
 │   ├── auth/           # LoginForm, RegisterForm
@@ -102,10 +106,12 @@ mysite-frontend/src/
 │   ├── comment/        # CommentSection, CommentItem
 │   ├── common/         # AppHeader, AppFooter, ThemeToggle, SearchDialog, BackToTop, ToastContainer, etc.
 │   ├── dashboard/      # DashboardSidebar
-│   └── editor/         # MarkdownWysiwygEditor (Milkdown Crepe WYSIWYG), editorTheme.css
-├── composables/        # 14 composables: useChat, useMarkdown, useTheme, useSearch, useToast, usePermission, etc.
-├── api/                # 11 API modules: client.ts (axios), rag.ts (fetch SSE), article, auth, etc.
-├── stores/             # Pinia stores (user)
+│   ├── editor/         # MarkdownWysiwygEditor (Milkdown Crepe WYSIWYG)
+│   └── ui/             # 后台通用：DataTable, Pagination, EmptyState, Modal, Drawer, etc.
+├── editor/             # Milkdown 创建/插件/图片上传
+├── composables/        # useChat, useMarkdown, useTheme, useSearch, useToast, usePermission, etc.
+├── api/                # client.ts (axios), rag.ts (fetch SSE), article, auth, etc.
+├── stores/             # Pinia: user.ts, site.ts
 ├── types/              # TypeScript interfaces (all Snowflake IDs: string)
 └── utils/              # gravatar, validators, date formatting, storage
 ```
@@ -120,7 +126,7 @@ mysite-frontend/src/
 
 ### Database Schema
 
-**MySQL (13 tables, all with `del_flag` logical deletion):**
+**MySQL — 博客 13 张表（均有 `del_flag` 逻辑删除）：**
 
 ```
 t_user, t_article, t_category, t_tag, t_article_tag,
@@ -128,17 +134,24 @@ t_collection, t_collection_article, t_comment, t_comment_like,
 t_image, t_user_follow, t_user_article_favorites, t_user_operation_log
 ```
 
-**PostgreSQL + pgvector (6 tables for RAG):**
+**MySQL — 学习手帐 3 张表（无 del_flag，`/api/journal`，仅 ADMIN）：**
 
 ```
-t_knowledge_base         # KB definitions (collection name, embedding model, chunk config)
-t_knowledge_document     # Documents in KB (sourceType: ARTICLE|UPLOAD, status: PENDING→CHUNKING→READY|FAILED)
-t_knowledge_chunk        # Text chunks from documents
-t_knowledge_vector       # pgvector vector(1024) embeddings, HNSW index, cosine distance (<=>)
-t_conversation           # Chat conversations (visitorId/userId + title)
-t_conversation_message   # Chat history messages (role, content, sources JSONB)
+sj_day_record, sj_learning_item, sj_custom_mood
+```
 
-Schema init: docker/init/ragent-schema.sql (auto-loaded by postgres container)
+**PostgreSQL + pgvector（RAG）：**
+
+```
+t_knowledge_base         # KB definitions
+t_knowledge_document     # sourceType: ARTICLE|UPLOAD, status: PENDING→CHUNKING→READY|FAILED
+t_knowledge_chunk        # Text chunks
+t_knowledge_vector       # vector(1024), HNSW, cosine (<=>)
+t_conversation           # visitorId/userId + title
+t_conversation_message   # role, content, sources JSONB
+t_rag_intent             # 扁平意图：KB_RETRIEVAL / CHAT，绑定 kb_id
+
+Schema init: docker/init/schema.sql + ragent-schema.sql（手帐增量见 journal-schema.sql）
 ```
 
 ### RAG Pipeline (SSE event sequence)
@@ -148,14 +161,17 @@ Client GET /v1/rag/chat/stream?q=...&visitorId=...&conversationId=...
   │
   ▼
 RagChatService.chat()
-  ├─ Step 0: Rate limit check (sync, boundedElastic)
-  ├─ Step 1: Get or create conversation (visitorId → DB)
-  ├─ Step 2: Load chat history (sliding window, default 6 turns)
-  ├─ Step 3: Vector retrieval (pgvector cosine distance) → Rerank
-  ├─ Step 4: Build prompt (RAG with sources or general chat)
-  ├─ Step 5: LLM streaming via WebClient (multi-provider routing + circuit breaker)
+  ├─ Step 0: Rate limit + question length
+  ├─ Step 1: Get or create conversation + load history
+  ├─ Step 2: QueryRewriter（指代消解 / 拆分 / 口语正规化）
+  ├─ Step 3: IntentClassifier（KB_RETRIEVAL / CHAT / MCP；失败降级，不阻塞）
+  ├─ [短路] 非 KB_RETRIEVAL 跳过检索
+  ├─ Step 4: 按前端传入的 kbIds 检索（未选 KB = 纯 LLM）→ Rerank
+  ├─ Step 5: Build prompt → LLM streaming（routing + circuit breaker）
   │   └─ meta → sources → content×N → done/error
   └─ Step 6: Save exchange to DB (boundedElastic, after stream completes)
+
+意图只判断模式，不替用户选择知识库。分类 LLM（cheap model）与聊天主力模型分开。
 
 SSE events:
   data: {"type":"meta","conversationId":"123"}
@@ -224,8 +240,9 @@ npx vite build                   # Must pass
 - **Backend**: `src/main/resources/application.yaml` (MySQL, Redis, JWT, ES, RAG datasource, LLM providers)
 - **Frontend**: `mysite-frontend/vite.config.ts` (proxy, build chunks, dedupe)
 - **Docker**: `docker/docker-compose.yml` (MySQL 8.4, Redis 7, Postgres 17+pgvector)
-- **DB Init**: `docker/init/schema.sql`, `docker/init/ragent-schema.sql`, `docker/init/data.sql`
+- **DB Init**: `docker/init/schema.sql`, `docker/init/ragent-schema.sql`, `docker/init/journal-schema.sql`, `docker/init/data.sql`
 - **Nginx**: `deploy/nginx/mysite.conf` (production HTTPS, WebP, static cache, SPA fallback)
+- **Cursor rules**: `.cursor/rules/*.mdc`
 
 ### API Documentation
 

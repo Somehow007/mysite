@@ -1,0 +1,32 @@
+---
+description: Vue 3 前端路由、API、ID 类型与聊天流式约定
+globs: mysite-frontend/**/*.{ts,vue,css}
+alwaysApply: false
+---
+
+# 前端约定
+
+Vue 3 Composition API + TypeScript + Vite + Pinia + Tailwind。入口 `src/main.ts`，根组件 `src/app/App.vue`。
+
+## 路由
+
+- 前台：`DefaultLayout` — `/` `/post/:id` `/category/:slug` `/tag/:slug` `/archive` `/search` `/collections` `/collection/:id` `/user/:username` `/favorites` `/login` `/register` `/about`
+- 后台：`DashboardLayout`（需登录）— `/dashboard` 及 posts/categories/tags/images/users/comments/collections/settings/knowledge
+- 管理页用 `meta.requiresAdmin`；权限判断走 `usePermission` + `stores/user.ts` 的 `isAdmin` / `isCreator`
+
+## HTTP
+
+- 业务 API 一律 `api/client.ts`（axios）。成功判断 `code === '0'`，分页把 MyBatis `records/current/size/total/pages` 转成 `{ list, pagination }`
+- **SSE 禁止 axios**：`GET /v1/rag/chat/stream` 只在 `api/rag.ts` 用 `fetch + ReadableStream`；状态机在 `composables/useChat.ts`（`idle | streaming | error`，`AbortController` 取消）
+- Token：`localStorage` 的 `access_token`；匿名聊天用 `visitorId` UUID
+
+## 类型
+
+- 所有 Snowflake ID：`string`，不要 `number`
+- 角色：`'ADMIN' | 'CREATOR' | 'USER'`，旧 `DEVELOPER` 在 store 里归一成 `ADMIN`
+- Markdown：文章用 `useMarkdown`（异步 + TOC + KaTeX + Callout）；聊天气泡用 `useChatMarkdown`（同步 + rAF + DOMPurify）
+
+## UI
+
+- 后台表格/空态/分页优先复用 `components/ui/`，不要在 views 里再造一套
+- 主题：`useTheme.ts`，8 套主题；站点配置：`stores/site.ts`

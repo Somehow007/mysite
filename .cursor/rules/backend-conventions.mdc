@@ -1,0 +1,47 @@
+---
+description: 博客后端分层、统一响应、ID 序列化与权限约定
+globs: src/main/java/**/*.java
+alwaysApply: false
+---
+
+# 后端约定
+
+分层：`controller` → `service` / `service.impl` → `dao.entity` + `dao.mapper`。DTO 放 `dto/req|resp`，不要把 DO 直接暴露给前端。
+
+## 响应与异常
+
+```java
+return Results.success(data);          // code = "0"
+throw new ClientException(ErrorCode.X); // 由 GlobalExceptionHandler 转 Result
+```
+
+不要手写 `{code, message, data}` Map。登录用户从 `UserContext.getUserId()` / `getRole()` 取，不要信前端传来的 userId。
+
+## Snowflake ID
+
+响应 DTO 的 `Long` ID 必须：
+
+```java
+@JsonSerialize(using = ToStringSerializer.class)
+private Long id;
+```
+
+Jackson 已允许请求里 String→Long（`JacksonConfig`）。新字段同样处理，否则 JS 精度丢失。
+
+## 数据与缓存
+
+- 博客实体继承 `BaseDO`（`createTime` / `updateTime` / `delFlag`），逻辑删除不要物理删
+- MySQL 表：`t_user, t_article, t_category, t_tag, t_article_tag, t_collection, t_collection_article, t_comment, t_comment_like, t_image, t_user_follow, t_user_article_favorites, t_user_operation_log`
+- Redis cache name：`categories`(2h) `category_tree`(1h) `article_detail`(30m) `tags`(1h) `collection_*`(30m) `home_collections`(10m)
+- RAG 用独立 PG 数据源（`ragent/config/RagentDataSourceConfig`），禁止用博客 Mapper 打 PG，也禁止用 RAG Mapper 打 MySQL
+
+## 权限（改接口时同步 WebSecurityConfig）
+
+| 能力 | 角色 |
+|---|---|
+| 文章 CRUD | ADMIN + CREATOR |
+| 分类/标签/用户/评论审核/合集管理/知识库写 | ADMIN |
+| 匿名可读 | 文章/分类/标签/合集 GET、RAG stream、KB 列表 GET |
+| 手帐 `/api/journal/**` | 仅 ADMIN |
+
+角色枚举：`commons.enums.UserRole`。新代码不要分配 `DEVELOPER`。

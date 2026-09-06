@@ -1,0 +1,50 @@
+---
+description: MySite 整体架构地图。新建会话先用这份，不要再全库扫目录。
+alwaysApply: true
+---
+
+# MySite 架构地图
+
+个人博客 + RAG 问答 + 学习手帐。新会话默认相信本规则与 `CLAUDE.md`，不要为「摸清结构」去 glob 整个仓库。
+
+## 运行时
+
+| 层 | 位置 | 端口 / 说明 |
+|---|---|---|
+| 后端 | 仓库根 `src/` | Spring Boot **8081**，`./mvnw spring-boot:run` |
+| 前端 | `mysite-frontend/` | Vite **5173**，`/v1` 代理到 8081 |
+| MySQL 8.4 | `docker/` | 博客 13 张 `t_*` + 手帐 3 张 `sj_*`，逻辑删除 |
+| Redis 7 | `docker/` | 按 cache name 配 TTL |
+| PG 17 + pgvector | `docker/` | 仅 RAG，独立数据源 |
+| 生产 | `deploy/` | 后端 8081，Nginx 8080 反代 `/v1/` |
+
+## 三个子系统（互不混数据源）
+
+1. **博客** `io.github.somehow.mysite.{controller,service,dao}` → MySQL `t_*`，API 前缀 **`/v1/*`**
+2. **RAG** `io.github.somehow.mysite.ragent` → PostgreSQL，API 前缀 **`/v1/rag/*`**
+3. **手帐** `io.github.somehow.mysite.journal` → MySQL `sj_*`，API 前缀 **`/api/journal/*`**（仅 ADMIN）
+
+文章发布通过 Spring Event 解耦进 RAG（`ragent/ingestion/`），博客模块不要直接调向量化。
+
+## 后端入口（改功能时直达）
+
+- Controller：`controller/`（博客）、`ragent/controller/`、`journal/controller/`
+- 安全：`config/WebSecurityConfig.java` + `security/`（JWT 双 token）
+- 统一响应：`commons/framework/result/Result`，成功码 `"0"`，用 `Results.success()`
+- 当前用户：`commons.context.UserContext`（TTL ThreadLocal）
+- 异常：`commons/framework/exception/` + `GlobalExceptionHandler`
+- 搜索：`ArticleSearchService`，ES 可关，回退 DB LIKE
+
+## 前端入口
+
+- 路由/布局：`mysite-frontend/src/app/router/index.ts`、`app/layouts/`
+- 页面：`views/`；业务组件：`components/{article,chat,comment,...}`；通用 UI：`components/ui/`
+- HTTP：`api/client.ts`（axios）；**SSE 只用** `api/rag.ts`（fetch）
+- 状态：Pinia `stores/user.ts`、`stores/site.ts`
+- 编辑器：Milkdown Crepe，`editor/` + `components/editor/`
+
+## 硬约束
+
+- Snowflake `Long` ID：后端 DTO `@JsonSerialize(ToStringSerializer)`，前端类型一律 `string`
+- 角色：`ADMIN` / `CREATOR` / `USER`；旧 `DEVELOPER` 映射为 `ADMIN`
+- Git commit 作者必须是用户本人，禁止 `Co-authored-by`

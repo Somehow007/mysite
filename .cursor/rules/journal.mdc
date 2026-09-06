@@ -1,0 +1,31 @@
+---
+description: 学习手帐（花期 Blossom）后端约定：/api/journal、ADMIN、user_id 隔离
+globs: "**/journal/**,docker/init/journal-schema.sql"
+alwaysApply: false
+---
+
+# 学习手帐
+
+本仓库目前 **只有后端**。前缀 `/api/journal`（不是 `/v1`），`WebSecurityConfig` 中 `hasRole("ADMIN")`。
+
+`user_id` 只从 `UserContext` 解析，请求体/路径里不要接收 userId。数据按用户隔离。
+
+## 表（MySQL，无 del_flag）
+
+| 表 | 作用 |
+|---|---|
+| `sj_day_record` | 单日记录，`(user_id, date)` 唯一，date=`YYYY-MM-DD` |
+| `sj_learning_item` | 当日学习条目，`client_id` 为前端 nanoid，级联删 |
+| `sj_custom_mood` | 自定义心情，主键即 nanoid |
+
+全新环境由 `docker/init/schema.sql` 建表；已有库用 `docker/init/journal-schema.sql` 增量。
+
+## API
+
+- `GET/PUT/DELETE /api/journal/records/{date}` — 单日 upsert 为 patch 语义
+- `GET /api/journal/records?month=&year=` — 月/年列表
+- `GET /api/journal/search?keyword=`
+- `POST /api/journal/import`、`GET /api/journal/export` — 兼容 v1 数组 / v2 含 customMoods
+- `/api/journal/moods/custom` — 自定义心情 CRUD
+
+时间字段是 Unix 毫秒 `BIGINT`，不要改成 `datetime`。

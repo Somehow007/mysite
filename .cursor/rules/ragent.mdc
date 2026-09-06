@@ -1,0 +1,41 @@
+---
+description: RAG 管道、SSE 事件、意图分类与文章入库解耦
+globs: "**/ragent/**,mysite-frontend/src/api/rag.ts,mysite-frontend/src/composables/useChat.ts,mysite-frontend/src/composables/useChatMarkdown.ts,mysite-frontend/src/components/chat/**"
+alwaysApply: false
+---
+
+# RAG（ragent）
+
+独立 PG 数据源。核心流式类型是 `Flux<ChatEvent>`，入口 `RagChatService.chat()`。
+
+## 管道（按代码现状）
+
+```
+限流 → 会话记忆 → QueryRewriter → IntentClassifier
+  → 非 KB_RETRIEVAL 则跳过检索
+  → 用户传入的 kbIds 决定检索范围（未选 KB = 纯 LLM）
+  → PromptTemplate → RoutingLLMService 流式输出 → 落库
+```
+
+意图只判断模式（检索 / 闲聊 / MCP），**不替用户选 KB**。分类失败降级为全局检索，不阻塞。分类 LLM 用 cheap model（`classificationLLM`），与聊天主力模型分开。
+
+## SSE
+
+`GET /v1/rag/chat/stream?q=&visitorId=&conversationId=&kbIds=`
+
+事件顺序：`meta` → `sources` → `content×N` → `done`；失败发 `error` 事件，不要只断连。
+
+取消链：`SseEmitter.onCompletion` → `subscription.dispose()` → WebClient 取消。前端取消必须能传到 LLM 连接。
+
+## 关键实现
+
+- 检索：`PgvectorVectorStore` 余弦距离 `<=>`，HNSW；rerank 百炼，不可用则按向量分截断
+- LLM：`AbstractOpenAiProvider` + `RoutingLLMService`；熔断 2 次失败打开；**首 token 前**才允许 fallback，禁止混模型拼回复
+- 切片：`MarkdownChunker`，约 800 字 / 100 overlap / 每篇最多 50
+- 入库：`ArticleCreated/Updated/DeletedEvent` → `ArticleEventListener` → `KnowledgeDocumentService.syncArticle`（异步在 service 层）
+
+## PG 表
+
+`t_knowledge_base` `t_knowledge_document` `t_knowledge_chunk` `t_knowledge_vector(1024)` `t_conversation` `t_conversation_message` `t_rag_intent`
+
+文档状态：`PENDING → CHUNKING → READY | FAILED`。限流：ADMIN 无限制，CREATOR 20/h，USER 10/h，问题最长 500 字。
