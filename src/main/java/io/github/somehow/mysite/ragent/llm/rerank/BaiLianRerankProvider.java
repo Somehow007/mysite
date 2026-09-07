@@ -3,6 +3,9 @@ package io.github.somehow.mysite.ragent.llm.rerank;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.ragent.config.RagProperties;
+import io.github.somehow.mysite.ragent.usage.LlmUsageRecorder;
+import io.github.somehow.mysite.ragent.usage.TokenUsage;
+import io.github.somehow.mysite.ragent.usage.UsageContext;
 import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -69,15 +72,20 @@ public class BaiLianRerankProvider implements RerankService {
             return new ArrayList<>(candidates);
         }
 
+        UsageContext.State ctx = UsageContext.snapshot();
         try {
-            return callRerankApi(query, candidates, topN);
+            return callRerankApi(query, candidates, topN, ctx);
         } catch (Exception e) {
             log.warn("Rerank API call failed, falling back to vector truncation: {}", e.getMessage());
+            LlmUsageRecorder.record(ctx, "bailian", model,
+                TokenUsage.estimated(TokenUsage.estimateTokens(query), 0),
+                0, false, e.getMessage());
             return truncate(candidates, topN);
         }
     }
 
-    private List<SearchResult> callRerankApi(String query, List<SearchResult> candidates, int topN) {
+    private List<SearchResult> callRerankApi(String query, List<SearchResult> candidates, int topN,
+                                             UsageContext.State ctx) {
         List<String> documents = candidates.stream()
             .map(SearchResult::content)
             .toList();
@@ -107,7 +115,29 @@ public class BaiLianRerankProvider implements RerankService {
             throw new RuntimeException("Rerank HTTP " + e.getStatusCode() + ": " + e.getResponseBodyAsString(), e);
         }
 
+        int estimated = TokenUsage.estimateTokens(
+            query.length() + documents.stream().mapToInt(String::length).sum());
+        TokenUsage usage = extractUsage(responseBody, estimated);
+        LlmUsageRecorder.record(ctx, "bailian", model, usage, System.currentTimeMillis() - t0, true, null);
+
         return parseRerankResponse(responseBody, candidates, topN);
+    }
+
+    private TokenUsage extractUsage(String responseBody, int estimatedPrompt) {
+        try {
+            JsonNode usage = objectMapper.readTree(responseBody).get("usage");
+            if (usage != null && !usage.isNull()) {
+                int prompt = usage.path("prompt_tokens").asInt(
+                    usage.path("input_tokens").asInt(usage.path("total_tokens").asInt(0)));
+                int total = usage.path("total_tokens").asInt(prompt);
+                if (prompt > 0 || total > 0) {
+                    return TokenUsage.api(prompt, 0, total);
+                }
+            }
+        } catch (Exception ignored) {
+            // fall through
+        }
+        return TokenUsage.estimated(estimatedPrompt, 0);
     }
 
     /**

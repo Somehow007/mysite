@@ -64,8 +64,8 @@ function toggleSortOrder() {
 
 <template>
   <div class="card-solid flex flex-wrap items-center gap-2 px-4 py-3">
-    <!-- Search -->
-    <div class="relative flex-1 min-w-[180px]">
+    <!-- Search：限制最大宽度，避免把筛选控件挤到行尾 -->
+    <div class="relative w-full min-w-[180px] sm:w-auto sm:flex-1 sm:max-w-xs">
       <Search :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
       <input
         :value="localKeyword"
@@ -126,6 +126,9 @@ function toggleSortOrder() {
       </button>
     </template>
 
+    <!-- Extra filters：紧挨内置筛选，而不是跟在重置按钮后面 -->
+    <slot />
+
     <!-- Search button -->
     <button @click="handleSearch" class="btn-primary text-sm">
       <Search :size="14" />
@@ -136,13 +139,10 @@ function toggleSortOrder() {
     <button
       v-if="localKeyword || (filterValue !== undefined && filterValue !== '')"
       @click="handleReset"
-      class="btn-ghost text-sm ml-auto"
+      class="btn-ghost text-sm sm:ml-auto"
     >
       <X :size="14" />
       重置
     </button>
-
-    <!-- Extra slot -->
-    <slot />
   </div>
 </template>

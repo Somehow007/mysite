@@ -3,6 +3,7 @@ package io.github.somehow.mysite.ragent.core;
 import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.llm.embedding.EmbeddingService;
 import io.github.somehow.mysite.ragent.llm.rerank.RerankService;
+import io.github.somehow.mysite.ragent.usage.UsageContext;
 import io.github.somehow.mysite.ragent.vector.VectorStore;
 import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
 import lombok.RequiredArgsConstructor;
@@ -60,6 +61,7 @@ public class RetrievalEngine {
 
         // Stage 1: Embedding + 向量检索
         long t1 = System.currentTimeMillis();
+        UsageContext.setCallType("EMBED");
         float[] queryEmbedding = embeddingService.embed(question);
         log.info("[retrieval] embedding done: {} dims ({}ms)",
             queryEmbedding.length, System.currentTimeMillis() - t1);
@@ -148,6 +150,7 @@ public class RetrievalEngine {
                                       int topK, long startTime) {
         if (rerankService != null && candidates.size() > topK) {
             long tr = System.currentTimeMillis();
+            UsageContext.setCallType("RERANK");
             candidates = rerankService.rerank(query, candidates, topK);
             log.info("[retrieval] rerank done: {} results ({}ms)",
                 candidates.size(), System.currentTimeMillis() - tr);

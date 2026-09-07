@@ -52,6 +52,42 @@ public class RagentSchemaMigration implements InitializingBean {
                 create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
             """, "t_rag_intent");
+
+        execute("""
+            CREATE TABLE IF NOT EXISTS t_llm_usage (
+                id BIGINT PRIMARY KEY,
+                trace_id VARCHAR(36) NOT NULL,
+                call_type VARCHAR(32) NOT NULL,
+                provider VARCHAR(32) NOT NULL,
+                model VARCHAR(64) NOT NULL,
+                user_id BIGINT,
+                username VARCHAR(64),
+                visitor_id VARCHAR(64),
+                user_role VARCHAR(32),
+                conversation_id BIGINT,
+                document_id BIGINT,
+                prompt_tokens INT DEFAULT 0,
+                completion_tokens INT DEFAULT 0,
+                total_tokens INT DEFAULT 0,
+                token_source VARCHAR(16) NOT NULL DEFAULT 'ESTIMATED',
+                cost NUMERIC(12,6) DEFAULT 0,
+                currency VARCHAR(8) DEFAULT 'CNY',
+                latency_ms INT,
+                success BOOLEAN NOT NULL DEFAULT true,
+                error_message TEXT,
+                create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """, "t_llm_usage");
+        execute("CREATE INDEX IF NOT EXISTS idx_llm_usage_time ON t_llm_usage(create_time DESC)",
+            "idx_llm_usage_time");
+        execute("CREATE INDEX IF NOT EXISTS idx_llm_usage_user ON t_llm_usage(user_id, create_time DESC)",
+            "idx_llm_usage_user");
+        execute("CREATE INDEX IF NOT EXISTS idx_llm_usage_trace ON t_llm_usage(trace_id)",
+            "idx_llm_usage_trace");
+        execute("CREATE INDEX IF NOT EXISTS idx_llm_usage_type ON t_llm_usage(call_type, create_time DESC)",
+            "idx_llm_usage_type");
+        execute("CREATE INDEX IF NOT EXISTS idx_llm_usage_model ON t_llm_usage(model, create_time DESC)",
+            "idx_llm_usage_model");
     }
 
     private void execute(String sql, String label) {

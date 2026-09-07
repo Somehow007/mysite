@@ -7,6 +7,7 @@ import io.github.somehow.mysite.ragent.dao.mapper.IntentMapper;
 import io.github.somehow.mysite.ragent.llm.LLMService;
 import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
+import io.github.somehow.mysite.ragent.usage.UsageContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -71,6 +72,7 @@ public class IntentClassifier {
 
         // 3. 调用轻量 LLM 做分类（非流式，fast path）
         try {
+            UsageContext.setCallType("CLASSIFY");
             String llmOutput = classificationLLM.chat(
                 ChatRequest.of("deepseek-chat", classificationPrompt));
 

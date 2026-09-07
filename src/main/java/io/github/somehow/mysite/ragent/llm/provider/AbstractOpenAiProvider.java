@@ -2,55 +2,26 @@ package io.github.somehow.mysite.ragent.llm.provider;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
+import io.github.somehow.mysite.ragent.llm.LLMProvider;
 import io.github.somehow.mysite.ragent.llm.LLMService;
+import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
+import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
+import io.github.somehow.mysite.ragent.usage.LlmUsageRecorder;
+import io.github.somehow.mysite.ragent.usage.TokenUsage;
+import io.github.somehow.mysite.ragent.usage.UsageContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * OpenAI 兼容协议基类 —— 学习价值最高的一个类。
- *
- * 几乎所有国产大模型（百炼、SiliconFlow、DeepSeek 等）都兼容 OpenAI 的 API 格式。
- * 这意味着：学会对接一个，就等于学会对接所有。
- *
- * OpenAI Chat Completions API 格式（关键知识点）：
- *
- * 请求：
- *   POST {baseUrl}/chat/completions
- *   Header: Authorization: Bearer {apiKey}
- *   Body: {
- *     "model": "qwen3-max",
- *     "messages": [
- *       {"role": "system", "content": "你是..."},
- *       {"role": "user", "content": "你好"}
- *     ],
- *     "stream": true,          ← 开启流式输出
- *     "temperature": 0.7
- *   }
- *
- * 响应（stream=true 时，SSE 格式）：
- *   data: {"choices":[{"delta":{"content":"你"},"index":0}]}
- *   data: {"choices":[{"delta":{"content":"好"},"index":0}]}
- *   data: {"choices":[{"delta":{"content":"！"},"index":0}]}
- *   data: {"choices":[{"delta":{},"finish_reason":"stop","index":0}]}
- *   data: [DONE]
- *
- * 响应（stream=false 时，JSON 格式）：
- *   {"choices":[{"message":{"content":"你好！有什么可以帮助你的？"}}]}
- *
- * 当前流行的所有国产模型 API 几乎都遵循这个格式：
- *   - 阿里百炼 DashScope
- *   - SiliconFlow (硅基流动)
- *   - DeepSeek
- *   - 智谱 GLM
- *   - Moonshot (月之暗面)
- *   - 零一万物
- *   - Ollama (本地)
- *   ... 等等
+ * OpenAI 兼容协议基类。流式请求开启 {@code stream_options.include_usage}，
+ * 从末包解析 token 用量；拿不到则按字符估算。记录走 {@link LlmUsageRecorder}，不进入 SSE。
  */
 @Slf4j
 public abstract class AbstractOpenAiProvider implements LLMService {
@@ -59,9 +30,11 @@ public abstract class AbstractOpenAiProvider implements LLMService {
     protected final String model;
     protected final Duration timeout;
     protected final ObjectMapper objectMapper;
+    protected final String baseUrl;
 
     public AbstractOpenAiProvider(String baseUrl, String apiKey, String model,
                                   Duration timeout, ObjectMapper objectMapper) {
+        this.baseUrl = baseUrl;
         this.apiKey = apiKey;
         this.model = model;
         this.timeout = timeout;
@@ -75,7 +48,6 @@ public abstract class AbstractOpenAiProvider implements LLMService {
 
     @Override
     public Flux<String> chatStream(ChatRequest request) {
-        // 使用实际配置的 model（之类可覆盖），而非 request 中的
         ChatRequest actualRequest = ChatRequest.builder()
                 .model(this.model)
                 .messages(request.getMessages())
@@ -83,39 +55,73 @@ public abstract class AbstractOpenAiProvider implements LLMService {
                 .maxTokens(request.getMaxTokens())
                 .build();
 
+        UsageContext.State ctx = UsageContext.snapshot();
+        String providerName = resolveProviderName();
+        int estimatedPrompt = estimatePromptTokens(actualRequest);
+        AtomicReference<TokenUsage> usageRef = new AtomicReference<>();
+        StringBuilder output = new StringBuilder();
         long t0 = System.currentTimeMillis();
+        AtomicBoolean recorded = new AtomicBoolean(false);
+
         log.info("[llm] POST /chat/completions model={} msgs={} stream=true timeout={}",
-            this.model, actualRequest.getMessages().size(), this.timeout);
+            this.model, actualRequest.getMessages() != null ? actualRequest.getMessages().size() : 0, this.timeout);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("model", this.model);
+        body.put("messages", actualRequest.getMessages());
+        body.put("stream", true);
+        body.put("temperature", actualRequest.getTemperature());
+        body.put("max_tokens", actualRequest.getMaxTokens());
+        body.put("stream_options", Map.of("include_usage", true));
 
         return webClient.post()
                 .uri("/chat/completions")
-                .bodyValue(Map.of(
-                        "model", this.model,
-                        "messages", actualRequest.getMessages(),
-                        "stream", true,
-                        "temperature", actualRequest.getTemperature(),
-                        "max_tokens", actualRequest.getMaxTokens()
-                ))
+                .bodyValue(body)
                 .retrieve()
                 .bodyToFlux(String.class)
                 .timeout(this.timeout)
-                // 部分供应商（如 Ollama）返回标准 SSE 格式（data: 前缀），
-                // 百炼兼容模式返回裸 JSON 行。统一处理：有 data: 前缀则去掉，没有则直传
                 .flatMap(chunk -> Flux.fromArray(chunk.split("\n")))
                 .filter(line -> !line.isBlank())
                 .takeUntil(line -> line.contains("[DONE]"))
                 .map(line -> line.startsWith("data: ") ? line.substring(6) : line)
-                .map(this::extractDeltaContent)
-                .filter(content -> content != null && !content.isEmpty())
-                .doOnComplete(() -> log.info("[llm] stream complete for model={}, elapsed={}ms",
-                    this.model, System.currentTimeMillis() - t0))
-                .doOnError(e -> log.warn("[llm] stream error for model={} after {}ms: {}",
-                    this.model, System.currentTimeMillis() - t0, e.getMessage()));
+                .filter(json -> json != null && !json.isBlank() && !json.contains("[DONE]"))
+                .<String>handle((json, sink) -> {
+                    TokenUsage parsed = extractUsage(json);
+                    if (parsed != null) {
+                        usageRef.set(parsed);
+                    }
+                    String content = extractDeltaContent(json);
+                    if (content != null && !content.isEmpty()) {
+                        output.append(content);
+                        sink.next(content);
+                    }
+                })
+                .doOnComplete(() -> {
+                    log.info("[llm] stream complete for model={}, elapsed={}ms",
+                        this.model, System.currentTimeMillis() - t0);
+                    if (recorded.compareAndSet(false, true)) {
+                        recordUsage(ctx, providerName, usageRef.get(), estimatedPrompt, output.length(),
+                            System.currentTimeMillis() - t0, true, null);
+                    }
+                })
+                .doOnError(e -> {
+                    log.warn("[llm] stream error for model={} after {}ms: {}",
+                        this.model, System.currentTimeMillis() - t0, e.getMessage());
+                    if (recorded.compareAndSet(false, true)) {
+                        recordUsage(ctx, providerName, usageRef.get(), estimatedPrompt, output.length(),
+                            System.currentTimeMillis() - t0, false, e.getMessage());
+                    }
+                })
+                .doOnCancel(() -> {
+                    if (recorded.compareAndSet(false, true)) {
+                        recordUsage(ctx, providerName, usageRef.get(), estimatedPrompt, output.length(),
+                            System.currentTimeMillis() - t0, false, "cancelled");
+                    }
+                });
     }
 
     @Override
     public String chat(ChatRequest request) {
-        // 非流式版本：收集所有 token 拼接成完整结果
         return chatStream(request)
                 .collectList()
                 .map(tokens -> String.join("", tokens))
@@ -143,5 +149,67 @@ public abstract class AbstractOpenAiProvider implements LLMService {
             // 解析失败静默跳过（可能是非标准格式的 SSE 行）
         }
         return "";
+    }
+
+    protected TokenUsage extractUsage(String jsonData) {
+        try {
+            JsonNode root = objectMapper.readTree(jsonData);
+            JsonNode usage = root.get("usage");
+            if (usage == null || usage.isNull()) {
+                return null;
+            }
+            int prompt = usage.path("prompt_tokens").asInt(0);
+            int completion = usage.path("completion_tokens").asInt(0);
+            int total = usage.path("total_tokens").asInt(0);
+            if (prompt == 0 && completion == 0 && total == 0) {
+                return null;
+            }
+            return TokenUsage.api(prompt, completion, total);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    protected String resolveProviderName() {
+        if (this instanceof LLMProvider p) {
+            return p.getName();
+        }
+        return inferProviderName(baseUrl);
+    }
+
+    static String inferProviderName(String url) {
+        if (url == null) {
+            return "unknown";
+        }
+        String u = url.toLowerCase();
+        if (u.contains("deepseek")) return "deepseek";
+        if (u.contains("dashscope")) return "bailian";
+        if (u.contains("siliconflow")) return "siliconflow";
+        if (u.contains("aihubmix")) return "aihubmix";
+        if (u.contains("11434") || u.contains("ollama")) return "ollama";
+        return "unknown";
+    }
+
+    private static int estimatePromptTokens(ChatRequest request) {
+        if (request.getMessages() == null) {
+            return 0;
+        }
+        int chars = 0;
+        for (ChatMessage msg : request.getMessages()) {
+            if (msg.getContent() != null) {
+                chars += msg.getContent().length();
+            }
+        }
+        return TokenUsage.estimateTokens(chars);
+    }
+
+    private void recordUsage(UsageContext.State ctx, String providerName, TokenUsage apiUsage,
+                             int estimatedPrompt, int outputChars, long latencyMs,
+                             boolean success, String error) {
+        TokenUsage usage = apiUsage;
+        if (usage == null) {
+            usage = TokenUsage.estimated(estimatedPrompt, TokenUsage.estimateTokens(outputChars));
+        }
+        LlmUsageRecorder.record(ctx, providerName, this.model, usage, latencyMs, success, error);
     }
 }

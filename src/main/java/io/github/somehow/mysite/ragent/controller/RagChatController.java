@@ -78,6 +78,8 @@ public class RagChatController {
         SseEmitter emitter = new SseEmitter(120_000L);  // 120 秒超时
         String clientIp = resolveClientIp(request);
         UserRole userRole = UserContext.getRole();
+        Long userId = parseUserId(UserContext.getUserId());
+        String username = UserContext.getName();
 
         // 将前端传来的 string kbIds 转为 Long（避免 Spring 自动转换的潜在问题）
         List<Long> kbIds = (kbIdStrings != null && !kbIdStrings.isEmpty())
@@ -103,7 +105,7 @@ public class RagChatController {
         ragExecutor.execute(() -> {
             try {
                 Disposable subscription = ragChatService
-                    .chat(question, conversationId, visitorId, clientIp, userRole, kbIds)
+                    .chat(question, conversationId, visitorId, clientIp, userRole, kbIds, userId, username)
                     .subscribe(
                         event -> sendEvent(emitter, event),
                         // service 层已兜底为 error 事件，理论上这里走不到
@@ -206,5 +208,16 @@ public class RagChatController {
             return xff.split(",")[0].trim();
         }
         return request.getRemoteAddr();
+    }
+
+    private static Long parseUserId(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(userId);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }

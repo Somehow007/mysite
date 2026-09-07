@@ -162,6 +162,12 @@ const router = createRouter({
           component: () => import('@/views/KnowledgeManageView.vue'),
           meta: { requiresAdmin: true },
         },
+        {
+          path: 'ai',
+          name: 'ai-manage',
+          component: () => import('@/views/AiManageView.vue'),
+          meta: { requiresAdmin: true },
+        },
       ],
     },
   ],

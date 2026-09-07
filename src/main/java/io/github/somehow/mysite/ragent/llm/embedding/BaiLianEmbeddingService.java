@@ -3,6 +3,9 @@ package io.github.somehow.mysite.ragent.llm.embedding;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.ragent.config.RagProperties;
+import io.github.somehow.mysite.ragent.usage.LlmUsageRecorder;
+import io.github.somehow.mysite.ragent.usage.TokenUsage;
+import io.github.somehow.mysite.ragent.usage.UsageContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -100,6 +103,8 @@ public class BaiLianEmbeddingService implements EmbeddingService {
      */
     private List<float[]> callEmbeddingApi(List<String> inputs) {
         long t0 = System.currentTimeMillis();
+        UsageContext.State ctx = UsageContext.snapshot();
+        int estimated = TokenUsage.estimateTokens(inputs.stream().mapToInt(String::length).sum());
         try {
             String responseBody = webClient.post()
                 .uri("/embeddings")
@@ -115,12 +120,33 @@ public class BaiLianEmbeddingService implements EmbeddingService {
                 inputs.size(), responseBody != null ? responseBody.length() : 0,
                 System.currentTimeMillis() - t0);
 
+            TokenUsage usage = extractUsage(responseBody, estimated);
+            LlmUsageRecorder.record(ctx, "bailian", model, usage,
+                System.currentTimeMillis() - t0, true, null);
             return parseEmbeddingResponse(responseBody);
         } catch (Exception e) {
             log.error("Embedding API call failed after {}ms: model={}, inputCount={}",
                 System.currentTimeMillis() - t0, model, inputs.size(), e);
+            LlmUsageRecorder.record(ctx, "bailian", model, TokenUsage.estimated(estimated, 0),
+                System.currentTimeMillis() - t0, false, e.getMessage());
             throw new RuntimeException("Embedding API call failed: " + e.getMessage(), e);
         }
+    }
+
+    private TokenUsage extractUsage(String responseBody, int estimatedPrompt) {
+        try {
+            JsonNode usage = objectMapper.readTree(responseBody).get("usage");
+            if (usage != null && !usage.isNull()) {
+                int prompt = usage.path("prompt_tokens").asInt(usage.path("total_tokens").asInt(0));
+                int total = usage.path("total_tokens").asInt(prompt);
+                if (prompt > 0 || total > 0) {
+                    return TokenUsage.api(prompt, 0, total);
+                }
+            }
+        } catch (Exception ignored) {
+            // fall through to estimate
+        }
+        return TokenUsage.estimated(estimatedPrompt, 0);
     }
 
     /**

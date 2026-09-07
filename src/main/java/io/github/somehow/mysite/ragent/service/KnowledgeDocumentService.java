@@ -10,12 +10,14 @@ import io.github.somehow.mysite.ragent.dao.mapper.KnowledgeChunkMapper;
 import io.github.somehow.mysite.ragent.dao.mapper.KnowledgeDocumentMapper;
 import io.github.somehow.mysite.ragent.chunking.DocumentChunker;
 import io.github.somehow.mysite.ragent.llm.embedding.EmbeddingService;
+import io.github.somehow.mysite.ragent.usage.UsageContext;
 import io.github.somehow.mysite.ragent.vector.VectorStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 文档管理服务 —— 文章 → 分块 → 向量化 → 入库 的完整流程。
@@ -81,6 +83,10 @@ public class KnowledgeDocumentService {
     @Async("ragAsyncExecutor")
     public void syncArticle(ArticleDO article, Long kbId) {
         KnowledgeDocumentDO doc = null;
+        UsageContext.open(UsageContext.State.builder()
+            .traceId(UUID.randomUUID().toString())
+            .callType("EMBED")
+            .build());
         try {
             KnowledgeBaseDO kb = kbMapper.selectById(kbId);
             if (kb == null) {
@@ -106,6 +112,7 @@ public class KnowledgeDocumentService {
             doc.setFileType("MD");
             doc.setStatus("PENDING");
             docMapper.insert(doc);
+            UsageContext.setDocumentId(doc.getId());
 
             // 4. 分块
             String content = article.getContent();
@@ -152,6 +159,8 @@ public class KnowledgeDocumentService {
                 doc.setFailReason(e.getClass().getSimpleName() + ": " + e.getMessage());
                 docMapper.updateById(doc);
             }
+        } finally {
+            UsageContext.close();
         }
     }
 

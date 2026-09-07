@@ -2,6 +2,7 @@ package io.github.somehow.mysite.ragent.llm;
 
 import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
+import io.github.somehow.mysite.ragent.usage.UsageContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -56,7 +57,9 @@ public class RoutingLLMService implements LLMService{
         log.info("[routing] attempting LLM with {} providers: {}",
             sortedProviders.size(),
             sortedProviders.stream().map(LLMProvider::getName).toList());
-        return attempt(sortedProviders.iterator(), request);
+        UsageContext.State snap = UsageContext.snapshot();
+        UsageContext.setCallType("CHAT");
+        return attempt(sortedProviders.iterator(), request, snap);
     }
 
     @Override
@@ -80,7 +83,7 @@ public class RoutingLLMService implements LLMService{
      *      - 未输出就失败 -> 用户还什么都没看到，可以安全降级到下一个供应商
      *      - 已输出后失败 -> 不能降级（否则前端收到两段拼接的回答），直接报错
      */
-    private Flux<String> attempt(Iterator<LLMProvider> it, ChatRequest request) {
+    private Flux<String> attempt(Iterator<LLMProvider> it, ChatRequest request, UsageContext.State snap) {
         if (!it.hasNext()) {
             return Flux.error(new RuntimeException("All LLM providers failed"));
         }
@@ -88,13 +91,15 @@ public class RoutingLLMService implements LLMService{
         CircuitBreaker cb = breakers.get(provider.getName());
         if (cb != null && !cb.allowRequest()) {
             log.info("[routing] skipping {} (breaker {})", provider.getName(), cb.getState());
-            return attempt(it, request);    // 熔断中，跳过
+            return attempt(it, request, snap);
         }
 
         log.info("[routing] trying provider: {} model={}", provider.getName(),
             request.getModel() != null ? request.getModel() : "(default)");
         long t0 = System.currentTimeMillis();
         AtomicBoolean emitted = new AtomicBoolean(false);
+        UsageContext.open(snap);
+        UsageContext.setCallType("CHAT");
         return provider.chatStream(request)
                 .doOnNext(token -> emitted.set(true))
                 .doOnComplete(() -> {
@@ -107,11 +112,11 @@ public class RoutingLLMService implements LLMService{
                     log.warn("[routing] {} failed after {}ms: {}",
                         provider.getName(), System.currentTimeMillis() - t0, e.getMessage());
                     if (emitted.get()) {
-                        // 已经吐过 token：不能降级，直接失败
                         return Flux.error(e);
                     }
-                    // 尚未输出：降级到下一个供应商
-                    return attempt(it, request);
+                    UsageContext.open(snap);
+                    UsageContext.setCallType("CHAT");
+                    return attempt(it, request, snap);
                 });
     }
 

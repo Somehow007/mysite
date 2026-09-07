@@ -140,6 +140,9 @@ public class WebSecurityConfig {
                                 "/v1/admin/users/**"
                         ).hasRole("ADMIN")
                         .requestMatchers(
+                                "/v1/admin/ai/**"
+                        ).hasRole("ADMIN")
+                        .requestMatchers(
                                 HttpMethod.GET,
                                 "/v1/comments/article/**"
                         ).permitAll()

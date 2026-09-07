@@ -147,3 +147,37 @@ VALUES
  '用户询问博客整体情况、文章总数、主题范围、全站概览等元问题，需要在所有知识库中检索', 9, true,
  '你是博客全局助手的补充：当用户询问博客整体情况时，你需要综合所有知识库的信息来回答，包括文章数量、主题分布、时间跨度等。', NULL, NOW())
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- AI 用量记录（调用记录 + 消费看板）
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS t_llm_usage (
+    id BIGINT PRIMARY KEY,
+    trace_id VARCHAR(36) NOT NULL,
+    call_type VARCHAR(32) NOT NULL,
+    provider VARCHAR(32) NOT NULL,
+    model VARCHAR(64) NOT NULL,
+    user_id BIGINT,
+    username VARCHAR(64),
+    visitor_id VARCHAR(64),
+    user_role VARCHAR(32),
+    conversation_id BIGINT,
+    document_id BIGINT,
+    prompt_tokens INT DEFAULT 0,
+    completion_tokens INT DEFAULT 0,
+    total_tokens INT DEFAULT 0,
+    token_source VARCHAR(16) NOT NULL DEFAULT 'ESTIMATED',
+    cost NUMERIC(12,6) DEFAULT 0,
+    currency VARCHAR(8) DEFAULT 'CNY',
+    latency_ms INT,
+    success BOOLEAN NOT NULL DEFAULT true,
+    error_message TEXT,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_usage_time ON t_llm_usage(create_time DESC);
+CREATE INDEX IF NOT EXISTS idx_llm_usage_user ON t_llm_usage(user_id, create_time DESC);
+CREATE INDEX IF NOT EXISTS idx_llm_usage_trace ON t_llm_usage(trace_id);
+CREATE INDEX IF NOT EXISTS idx_llm_usage_type ON t_llm_usage(call_type, create_time DESC);
+CREATE INDEX IF NOT EXISTS idx_llm_usage_model ON t_llm_usage(model, create_time DESC);

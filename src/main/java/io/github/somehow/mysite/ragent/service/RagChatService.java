@@ -16,14 +16,15 @@ import io.github.somehow.mysite.ragent.llm.model.ChatEvent;
 import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
 import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
+import io.github.somehow.mysite.ragent.usage.UsageContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * RAG 问答核心服务 —— 智能管道。
@@ -88,13 +89,19 @@ public class RagChatService {
     public Flux<ChatEvent> chat(String question, Long conversationId,
                                 String visitorId, String clientIp,
                                 UserRole userRole, List<Long> kbIds) {
-        // Step 0: 成本保护
+        return chat(question, conversationId, visitorId, clientIp, userRole, kbIds, null, null);
+    }
+
+    public Flux<ChatEvent> chat(String question, Long conversationId,
+                                String visitorId, String clientIp,
+                                UserRole userRole, List<Long> kbIds,
+                                Long userId, String username) {
         return Mono.fromCallable(() -> {
                 rateLimiter.check(clientIp, question, userRole);
                 return true;
             })
             .subscribeOn(Schedulers.boundedElastic())
-            .flatMapMany(ok -> doChat(question, conversationId, visitorId, kbIds))
+            .flatMapMany(ok -> doChat(question, conversationId, visitorId, kbIds, userRole, userId, username))
             .onErrorResume(e -> {
                 if (e instanceof ChatRateLimiter.RateLimitExceededException) {
                     return Flux.just(ChatEvent.error(e.getMessage()));
@@ -106,20 +113,33 @@ public class RagChatService {
     // ── 6 阶段管道 ──
 
     private Flux<ChatEvent> doChat(String question, Long conversationId,
-                                   String visitorId, List<Long> kbIds) {
+                                   String visitorId, List<Long> kbIds,
+                                   UserRole userRole, Long userId, String username) {
         long t0 = System.currentTimeMillis();
         boolean hasKbIds = kbIds != null && !kbIds.isEmpty();
 
+        UsageContext.open(UsageContext.State.builder()
+            .traceId(UUID.randomUUID().toString())
+            .callType("CHAT")
+            .userId(userId)
+            .username(username)
+            .visitorId(visitorId)
+            .userRole(userRole != null ? userRole.name() : null)
+            .build());
+
+        try {
         // Stage 1: 获取或创建会话 + 加载对话历史
         ConversationDO conversation = conversationManager
             .getOrCreateConversation(conversationId, visitorId, question);
         Long convId = conversation.getId();
+        UsageContext.setConversationId(convId);
         List<ChatMessage> history = conversationManager.loadHistory(convId);
         log.info("[pipeline] stage1: conv={}, history={}msgs ({}ms)",
             convId, history.size(), System.currentTimeMillis() - t0);
 
         // ── Stage 2: 查询改写 ──
         long t2 = System.currentTimeMillis();
+        UsageContext.setCallType("REWRITE");
         RewriteResult rewritten = queryRewriter.rewrite(question, history);
         String primaryQuery = rewritten.subQueries().get(0);
         log.info("[pipeline] stage2: rewritten={}, subQueries={} ({}ms)",
@@ -128,6 +148,7 @@ public class RagChatService {
 
         // ── Stage 3: 意图分类（判断模式：KB_RETRIEVAL / CHAT / MCP）──
         long t3 = System.currentTimeMillis();
+        UsageContext.setCallType("CLASSIFY");
         IntentResult intent = intentClassifier.classify(primaryQuery, history);
         log.info("[pipeline] stage3: type={}, confidence={}, reason={} ({}ms)",
             intent.getType(), String.format("%.2f", intent.getConfidence()),
@@ -138,6 +159,7 @@ public class RagChatService {
         if (!intent.isKbRetrieval()) {
             log.info("[pipeline] non-retrieval intent ({}) → skipping retrieval", intent.getType());
             List<ChatMessage> messages = promptTemplate.buildGeneralPrompt(primaryQuery, history);
+            UsageContext.setCallType("CHAT");
             return streamLLMResponse(messages, convId, question, List.of());
         }
 
@@ -145,6 +167,7 @@ public class RagChatService {
         if (!hasKbIds) {
             log.info("[pipeline] KB_RETRIEVAL but no KBs selected by user → skipping retrieval");
             List<ChatMessage> messages = promptTemplate.buildGeneralPrompt(primaryQuery, history);
+            UsageContext.setCallType("CHAT");
             return streamLLMResponse(messages, convId, question, List.of());
         }
 
@@ -156,11 +179,9 @@ public class RagChatService {
 
         List<SearchResult> retrieved;
         if (rewritten.subQueries().size() > 1) {
-            // 多子问题：分别检索 → 去重合并 → Rerank
             retrieved = retrievalEngine.multiRetrieve(
                 rewritten.subQueries(), kbIds, topK);
         } else {
-            // 单问题（含原文未改写）
             retrieved = retrievalEngine.retrieve(primaryQuery, topK, kbIds);
         }
         log.info("[pipeline] stage4: {} results, kbIds={}, topK={} ({}ms)",
@@ -179,7 +200,12 @@ public class RagChatService {
             messages.size(), messages.stream().mapToInt(m -> m.getContent().length()).sum());
 
         // ── Stage 6: LLM 流式生成 → SSE 推送 → 落库 ──
+        UsageContext.setCallType("CHAT");
         return streamLLMResponse(messages, convId, question, sources);
+        } catch (RuntimeException e) {
+            UsageContext.close();
+            throw e;
+        }
     }
 
     // ── 流式生成 + 落库（Stage 6）──
@@ -228,6 +254,7 @@ public class RagChatService {
                     return ChatEvent.done();
                 }).subscribeOn(Schedulers.boundedElastic())
             )
+            .doFinally(sig -> UsageContext.close())
             .onErrorResume(e -> {
                 log.error("[pipeline] error", e);
                 return Flux.just(ChatEvent.error("AI 服务暂时不可用，请稍后再试"));

@@ -6,6 +6,14 @@ export function formatDate(dateStr: string): string {
   return `${year}-${month}-${day}`
 }
 
+export function formatDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—'
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return '—'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
 const CHINESE_CHARS_PER_MINUTE = 300
 const ENGLISH_WORDS_PER_MINUTE = 225
 const CODE_CHARS_PER_MINUTE = 200

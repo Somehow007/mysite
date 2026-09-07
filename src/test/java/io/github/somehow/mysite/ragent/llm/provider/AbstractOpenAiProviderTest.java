@@ -2,6 +2,7 @@ package io.github.somehow.mysite.ragent.llm.provider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
+import io.github.somehow.mysite.ragent.usage.TokenUsage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -239,6 +240,35 @@ class AbstractOpenAiProviderTest {
             String result = provider.chat(ChatRequest.of("test-model", "hi"));
 
             assertEquals("Hello World", result);
+        }
+    }
+
+    @Nested
+    @DisplayName("extractUsage — 从末包解析 token")
+    class ExtractUsage {
+
+        @BeforeEach
+        void setUp() {
+            provider = new TestProvider(objectMapper, Flux.empty());
+        }
+
+        @Test
+        @DisplayName("usage 末包可解析 prompt/completion/total")
+        void shouldExtractUsageFromFinalChunk() {
+            String json = "{\"choices\":[],\"usage\":{\"prompt_tokens\":12,\"completion_tokens\":4,\"total_tokens\":16}}";
+            TokenUsage usage = provider.extractUsage(json);
+            assertNotNull(usage);
+            assertEquals(12, usage.promptTokens());
+            assertEquals(4, usage.completionTokens());
+            assertEquals(16, usage.totalTokens());
+            assertTrue(usage.fromApi());
+        }
+
+        @Test
+        @DisplayName("无 usage 字段 → null")
+        void shouldReturnNullWhenNoUsage() {
+            String json = "{\"choices\":[{\"delta\":{\"content\":\"A\"},\"index\":0}]}";
+            assertNull(provider.extractUsage(json));
         }
     }
 }

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.ragent.llm.LLMService;
 import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
+import io.github.somehow.mysite.ragent.usage.UsageContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
@@ -66,6 +67,7 @@ public class QueryRewriter {
         }
 
         try {
+            UsageContext.setCallType("REWRITE");
             String prompt = buildRewritePrompt(question, history);
             String llmOutput = classificationLLM.chat(
                 ChatRequest.of("deepseek-chat", prompt));
