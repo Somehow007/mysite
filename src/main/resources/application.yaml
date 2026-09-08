@@ -107,14 +107,17 @@ rag:
       minimum-idle: 1
 
   # LLM 供应商配置（优先级从高到低）
+  # API Key / chat-model 从环境变量读：本地 source .env；生产由 /opt/mysite/start.sh 加载 /opt/mysite/.env
+  # 后台「模型与 API」保存后会热更新内存，并回写上述 .env（若文件存在），无需改 yaml 再发版
   llm:
+    env-file: ${MYSITE_ENV_FILE:}
     providers:
       deepseek:
         enabled: true
         priority: 1
         base-url: https://api.deepseek.com/v1
         api-key: ${DEEPSEEK_API_KEY:}
-        chat-model: deepseek-v4-flash
+        chat-model: ${DEEPSEEK_CHAT_MODEL:deepseek-v4-flash}
         chat-timeout: 120s
 
       # P1: 阿里百炼 —— 国内首选，延迟低，中文能力强
@@ -124,7 +127,7 @@ rag:
         priority: 2
         base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
         api-key: ${BAILIAN_API_KEY:}
-        chat-model: qwen3-max
+        chat-model: ${BAILIAN_CHAT_MODEL:qwen3-max}
         embedding-model: text-embedding-v4  # 1024 维，与 PG vector(1024) 绑定；更换 = 全量重建向量
         rerank-model: qwen3-rerank            # 走 DashScope 原生接口，非 OpenAI 兼容（见 3.2）
         chat-timeout: 120s
@@ -139,7 +142,7 @@ rag:
         priority: 3
         base-url: https://api.siliconflow.cn/v1
         api-key: ${SILICONFLOW_API_KEY:}
-        chat-model: glm-4.7
+        chat-model: ${SILICONFLOW_CHAT_MODEL:glm-4.7}
         chat-timeout: 120s
 
       # P3: AIHubMix —— 国际模型代理
@@ -148,7 +151,7 @@ rag:
         priority: 4
         base-url: https://aihubmix.com/v1
         api-key: ${AIHUBMIX_API_KEY:}
-        chat-model: gpt-5.4
+        chat-model: ${AIHUBMIX_CHAT_MODEL:gpt-5.4}
         chat-timeout: 120s
 
       # P9: 本地 Ollama —— 最低优先级兜底
@@ -157,7 +160,7 @@ rag:
         priority: 9
         base-url: http://localhost:11434/v1
         api-key: ""
-        chat-model: qwen3:8b
+        chat-model: ${OLLAMA_CHAT_MODEL:qwen3:8b}
         chat-timeout: 180s
 
     # 断路器全局参数

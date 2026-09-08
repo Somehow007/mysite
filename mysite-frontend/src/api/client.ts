@@ -91,8 +91,8 @@ export async function getPaginated<T>(url: string, params?: Record<string, unkno
   return transformIPage<T>(response.data.data)
 }
 
-export async function post<T>(url: string, data?: unknown): Promise<T> {
-  const response = await apiClient.post<ApiResponse<T>>(url, data)
+export async function post<T>(url: string, data?: unknown, config?: { timeout?: number }): Promise<T> {
+  const response = await apiClient.post<ApiResponse<T>>(url, data, config)
   return response.data.data as T
 }
 

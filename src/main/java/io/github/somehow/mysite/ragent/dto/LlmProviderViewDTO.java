@@ -13,4 +13,10 @@ public class LlmProviderViewDTO {
     private String embeddingModel;
     private String rerankModel;
     private boolean configured;
+    private String envApiKeyName;
+    private String envChatModelName;
+    private String envFile;
+    private boolean runtimeBound;
+    private boolean persisted;
+    private boolean requiresApiKey;
 }

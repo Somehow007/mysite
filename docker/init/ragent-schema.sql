@@ -181,3 +181,20 @@ CREATE INDEX IF NOT EXISTS idx_llm_usage_user ON t_llm_usage(user_id, create_tim
 CREATE INDEX IF NOT EXISTS idx_llm_usage_trace ON t_llm_usage(trace_id);
 CREATE INDEX IF NOT EXISTS idx_llm_usage_type ON t_llm_usage(call_type, create_time DESC);
 CREATE INDEX IF NOT EXISTS idx_llm_usage_model ON t_llm_usage(model, create_time DESC);
+
+-- ============================================================
+-- AI 供应商运行时覆盖（后台「模型与 API」；启动时覆盖 yaml+env）
+-- embedding / rerank 列保留但不允许后台改（向量维度绑定）
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS t_llm_provider_setting (
+    name VARCHAR(32) PRIMARY KEY,
+    enabled BOOLEAN NOT NULL DEFAULT true,
+    priority INT NOT NULL DEFAULT 99,
+    base_url VARCHAR(256),
+    chat_model VARCHAR(64),
+    embedding_model VARCHAR(64),
+    rerank_model VARCHAR(64),
+    api_key TEXT,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

@@ -37,29 +37,34 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class RoutingLLMService implements LLMService{
 
     private final Map<String, CircuitBreaker> breakers = new ConcurrentHashMap<>();
-    private final List<LLMProvider> sortedProviders;    // 启动时排序，运行时不变
+    private final List<LLMProvider> allProviders;
+    private final RagProperties properties;
 
     public RoutingLLMService(List<LLMProvider> allowProviders, RagProperties properties) {
-        // Spring 注入所有 LLMProvider 实现（不含本类自身）
-        this.sortedProviders = allowProviders.stream()
+        this.properties = properties;
+        this.allProviders = List.copyOf(allowProviders);
+        int threshold = properties.getCircuitBreaker().getFailureThreshold();
+        long cooldown = properties.getCircuitBreaker().getCooldownSeconds();
+        allProviders.forEach(p ->
+                breakers.put(p.getName(), new CircuitBreaker(p.getName(), threshold, cooldown)));
+    }
+
+    private List<LLMProvider> activeProviders() {
+        return allProviders.stream()
                 .filter(p -> properties.isProviderEnabled(p.getName()))
                 .sorted(Comparator.comparingInt(p -> properties.getProviderPriority(p.getName())))
                 .toList();
-        // 为每个启用的供应商创建独立断路器
-        int threshold = properties.getCircuitBreaker().getFailureThreshold();
-        long cooldown = properties.getCircuitBreaker().getCooldownSeconds();
-        sortedProviders.forEach(p ->
-                breakers.put(p.getName(), new CircuitBreaker(p.getName(), threshold, cooldown)));
     }
 
     @Override
     public Flux<String> chatStream(ChatRequest request) {
+        List<LLMProvider> chain = activeProviders();
         log.info("[routing] attempting LLM with {} providers: {}",
-            sortedProviders.size(),
-            sortedProviders.stream().map(LLMProvider::getName).toList());
+            chain.size(),
+            chain.stream().map(LLMProvider::getName).toList());
         UsageContext.State snap = UsageContext.snapshot();
         UsageContext.setCallType("CHAT");
-        return attempt(sortedProviders.iterator(), request, snap);
+        return attempt(chain.iterator(), request, snap);
     }
 
     @Override
@@ -88,7 +93,7 @@ public class RoutingLLMService implements LLMService{
             return Flux.error(new RuntimeException("All LLM providers failed"));
         }
         LLMProvider provider = it.next();
-        CircuitBreaker cb = breakers.get(provider.getName());
+        CircuitBreaker cb = breaker(provider.getName());
         if (cb != null && !cb.allowRequest()) {
             log.info("[routing] skipping {} (breaker {})", provider.getName(), cb.getState());
             return attempt(it, request, snap);
@@ -120,13 +125,19 @@ public class RoutingLLMService implements LLMService{
                 });
     }
 
+    private CircuitBreaker breaker(String name) {
+        RagProperties.CircuitBreakerProperties cb = properties.getCircuitBreaker();
+        return breakers.computeIfAbsent(name,
+            n -> new CircuitBreaker(n, cb.getFailureThreshold(), cb.getCooldownSeconds()));
+    }
+
     /**
      * 获取各供应商的健康状态（用于 /actuator 健康检查或 Dashboard）
      */
     public Map<String, String> getHealthStatus() {
         Map<String, String> status = new LinkedHashMap<>();
-        for (LLMProvider provider : sortedProviders) {
-            status.put(provider.getName(), breakers.get(provider.getName()).getState().name());
+        for (LLMProvider provider : activeProviders()) {
+            status.put(provider.getName(), breaker(provider.getName()).getState().name());
         }
         return status;
     }

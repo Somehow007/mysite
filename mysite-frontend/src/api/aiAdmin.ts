@@ -1,4 +1,4 @@
-import { get, getPaginated } from './client'
+import { get, getPaginated, post, put } from './client'
 import type { PaginatedResponse } from '@/types'
 
 export type LlmCallType = 'CHAT' | 'REWRITE' | 'CLASSIFY' | 'EMBED' | 'RERANK'
@@ -49,6 +49,29 @@ export interface LlmProviderView {
   embeddingModel?: string
   rerankModel?: string
   configured: boolean
+  envApiKeyName?: string | null
+  envChatModelName?: string | null
+  envFile?: string | null
+  runtimeBound: boolean
+  persisted: boolean
+  requiresApiKey: boolean
+}
+
+export interface LlmProviderUpdate {
+  enabled?: boolean
+  priority?: number
+  baseUrl?: string
+  chatModel?: string
+  apiKey?: string
+}
+
+export interface LlmProviderPing {
+  ok: boolean
+  provider: string
+  model?: string | null
+  preview?: string | null
+  latencyMs: number
+  message?: string | null
 }
 
 export interface UsageQuery {
@@ -85,4 +108,12 @@ export function getAiUsageSummary(params?: { from?: string; to?: string }): Prom
 
 export function getAiProviders(): Promise<LlmProviderView[]> {
   return get<LlmProviderView[]>('/v1/admin/ai/providers')
+}
+
+export function updateAiProvider(name: string, body: LlmProviderUpdate): Promise<LlmProviderView[]> {
+  return put<LlmProviderView[]>(`/v1/admin/ai/providers/${encodeURIComponent(name)}`, body)
+}
+
+export function pingAiProvider(name: string): Promise<LlmProviderPing> {
+  return post<LlmProviderPing>(`/v1/admin/ai/providers/${encodeURIComponent(name)}/ping`, undefined, { timeout: 25000 })
 }

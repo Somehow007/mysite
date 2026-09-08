@@ -37,6 +37,9 @@ public class ClassifierLLMConfig {
     @Qualifier("classificationLLM")
     public LLMService classificationLLM(RagProperties properties, ObjectMapper objectMapper) {
         RagProperties.Provider provider = findBestProvider(properties);
+        if (provider == null) {
+            throw new IllegalStateException("No enabled LLM provider found for classification");
+        }
         String cheapModel = resolveCheapModel(provider);
         Duration timeout = provider.getChatTimeout() != null
             ? provider.getChatTimeout()
@@ -52,26 +55,28 @@ public class ClassifierLLMConfig {
     /**
      * 从已启用的供应商中选择优先级最高的作为分类 LLM 的后端。
      */
-    private RagProperties.Provider findBestProvider(RagProperties properties) {
-        return properties.getLlm().getProviders().values().stream()
-            .filter(RagProperties.Provider::isEnabled)
-            .min(java.util.Comparator.comparingInt(RagProperties.Provider::getPriority))
-            .orElseThrow(() -> new IllegalStateException(
-                "No enabled LLM provider found for classification"));
+    public static RagProperties.Provider findBestProvider(RagProperties properties) {
+        return properties.getLlm().getProviders().entrySet().stream()
+            .filter(e -> e.getValue().isEnabled())
+            .min(java.util.Comparator.comparingInt(e -> e.getValue().getPriority()))
+            .map(Map.Entry::getValue)
+            .orElse(null);
     }
 
     /**
      * 根据供应商类型选择对应的 cheap model 名称。
      */
-    private String resolveCheapModel(RagProperties.Provider provider) {
+    public static String resolveCheapModel(RagProperties.Provider provider) {
+        if (provider == null) {
+            return null;
+        }
         String baseUrl = provider.getBaseUrl();
         if (baseUrl != null && baseUrl.contains("deepseek")) {
-            return "deepseek-chat";       // DeepSeek 的便宜模型
+            return "deepseek-chat";
         }
         if (baseUrl != null && baseUrl.contains("dashscope")) {
-            return "qwen-turbo";          // 百炼的轻量模型
+            return "qwen-turbo";
         }
-        // 兜底：直接用 provider 配置的 chat-model（不会更贵）
         return provider.getChatModel();
     }
 

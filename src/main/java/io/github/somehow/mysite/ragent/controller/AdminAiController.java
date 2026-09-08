@@ -3,6 +3,8 @@ package io.github.somehow.mysite.ragent.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.commons.framework.web.Results;
+import io.github.somehow.mysite.ragent.dto.LlmProviderPingDTO;
+import io.github.somehow.mysite.ragent.dto.LlmProviderUpdateRequest;
 import io.github.somehow.mysite.ragent.dto.LlmProviderViewDTO;
 import io.github.somehow.mysite.ragent.dto.LlmUsageLogDTO;
 import io.github.somehow.mysite.ragent.dto.LlmUsageSummaryDTO;
@@ -12,6 +14,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -52,9 +58,23 @@ public class AdminAiController {
         return Results.success(adminAiService.summary(from, to));
     }
 
-    @Operation(summary = "当前 LLM 供应商（只读，Key 脱敏）")
+    @Operation(summary = "当前 LLM 供应商（Key 脱敏）")
     @GetMapping("/providers")
     public Result<List<LlmProviderViewDTO>> providers() {
         return Results.success(adminAiService.listProviders());
+    }
+
+    @Operation(summary = "更新 LLM 供应商（热生效，并回写 .env）")
+    @PutMapping("/providers/{name}")
+    public Result<List<LlmProviderViewDTO>> updateProvider(
+            @PathVariable String name,
+            @RequestBody LlmProviderUpdateRequest request) {
+        return Results.success(adminAiService.updateProvider(name, request));
+    }
+
+    @Operation(summary = "测试供应商连通性（短请求）")
+    @PostMapping("/providers/{name}/ping")
+    public Result<LlmProviderPingDTO> pingProvider(@PathVariable String name) {
+        return Results.success(adminAiService.pingProvider(name));
     }
 }

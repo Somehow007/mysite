@@ -88,6 +88,20 @@ public class RagentSchemaMigration implements InitializingBean {
             "idx_llm_usage_type");
         execute("CREATE INDEX IF NOT EXISTS idx_llm_usage_model ON t_llm_usage(model, create_time DESC)",
             "idx_llm_usage_model");
+
+        execute("""
+            CREATE TABLE IF NOT EXISTS t_llm_provider_setting (
+                name VARCHAR(32) PRIMARY KEY,
+                enabled BOOLEAN NOT NULL DEFAULT true,
+                priority INT NOT NULL DEFAULT 99,
+                base_url VARCHAR(256),
+                chat_model VARCHAR(64),
+                embedding_model VARCHAR(64),
+                rerank_model VARCHAR(64),
+                api_key TEXT,
+                update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """, "t_llm_provider_setting");
     }
 
     private void execute(String sql, String label) {
@@ -96,7 +110,7 @@ public class RagentSchemaMigration implements InitializingBean {
             stmt.execute(sql);
             log.info("Schema migration applied: {}", label);
         } catch (SQLException e) {
-            log.debug("Schema migration skipped (likely already applied): {} — {}", label, e.getMessage());
+            log.warn("Schema migration skipped: {} — {}", label, e.getMessage());
         }
     }
 }

@@ -38,33 +38,37 @@ import java.util.Map;
 @Component
 public class BaiLianRerankProvider implements RerankService {
 
-    private final WebClient webClient;
-    private final String model;
+    private volatile WebClient webClient;
+    private volatile String model;
     private final ObjectMapper objectMapper;
 
     public BaiLianRerankProvider(RagProperties properties, ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
-        RagProperties.Provider bailian = properties.getLlm().getProviders().get("bailian");
+        applyRuntime(properties.getLlm().getProviders().get("bailian"));
+    }
 
-        if (bailian == null || !bailian.isEnabled() || bailian.getRerankModel() == null) {
-            // 百炼未启用或未配 rerank 模型 → 不初始化客户端，rerank() 退化为截断
+    public synchronized void applyRuntime(RagProperties.Provider bailian) {
+        if (bailian == null || bailian.getRerankModel() == null
+                || bailian.getApiKey() == null || bailian.getApiKey().isBlank()) {
             this.webClient = null;
             this.model = null;
             log.info("BaiLianRerankProvider disabled: bailian not configured for rerank");
-        } else {
-            this.model = bailian.getRerankModel();
-            this.webClient = WebClient.builder()
-                .baseUrl("https://dashscope.aliyuncs.com")
-                .defaultHeader("Authorization", "Bearer " + bailian.getApiKey())
-                .defaultHeader("Content-Type", "application/json")
-                .build();
-            log.info("BaiLianRerankProvider initialized: model={}", model);
+            return;
         }
+        this.model = bailian.getRerankModel();
+        this.webClient = WebClient.builder()
+            .baseUrl("https://dashscope.aliyuncs.com")
+            .defaultHeader("Authorization", "Bearer " + bailian.getApiKey())
+            .defaultHeader("Content-Type", "application/json")
+            .build();
+        log.info("BaiLianRerankProvider runtime config: model={}", model);
     }
 
     @Override
     public List<SearchResult> rerank(String query, List<SearchResult> candidates, int topN) {
-        if (webClient == null || model == null || candidates.isEmpty()) {
+        WebClient client = this.webClient;
+        String currentModel = this.model;
+        if (client == null || currentModel == null || candidates.isEmpty()) {
             return truncate(candidates, topN);
         }
 
@@ -74,10 +78,10 @@ public class BaiLianRerankProvider implements RerankService {
 
         UsageContext.State ctx = UsageContext.snapshot();
         try {
-            return callRerankApi(query, candidates, topN, ctx);
+            return callRerankApi(query, candidates, topN, ctx, client, currentModel);
         } catch (Exception e) {
             log.warn("Rerank API call failed, falling back to vector truncation: {}", e.getMessage());
-            LlmUsageRecorder.record(ctx, "bailian", model,
+            LlmUsageRecorder.record(ctx, "bailian", currentModel,
                 TokenUsage.estimated(TokenUsage.estimateTokens(query), 0),
                 0, false, e.getMessage());
             return truncate(candidates, topN);
@@ -85,23 +89,23 @@ public class BaiLianRerankProvider implements RerankService {
     }
 
     private List<SearchResult> callRerankApi(String query, List<SearchResult> candidates, int topN,
-                                             UsageContext.State ctx) {
+                                             UsageContext.State ctx, WebClient client, String currentModel) {
         List<String> documents = candidates.stream()
             .map(SearchResult::content)
             .toList();
 
         Map<String, Object> body = Map.of(
-            "model", model,
+            "model", currentModel,
             "input", Map.of("query", query, "documents", documents),
             "parameters", Map.of("top_n", topN, "return_documents", false)
         );
 
         long t0 = System.currentTimeMillis();
-        log.info("[rerank] calling {} with {} candidates, topN={}", model, documents.size(), topN);
+        log.info("[rerank] calling {} with {} candidates, topN={}", currentModel, documents.size(), topN);
 
         String responseBody;
         try {
-            responseBody = webClient.post()
+            responseBody = client.post()
                 .uri("/api/v1/services/rerank/text-rerank/text-rerank")
                 .bodyValue(body)
                 .retrieve()
@@ -118,7 +122,7 @@ public class BaiLianRerankProvider implements RerankService {
         int estimated = TokenUsage.estimateTokens(
             query.length() + documents.stream().mapToInt(String::length).sum());
         TokenUsage usage = extractUsage(responseBody, estimated);
-        LlmUsageRecorder.record(ctx, "bailian", model, usage, System.currentTimeMillis() - t0, true, null);
+        LlmUsageRecorder.record(ctx, "bailian", currentModel, usage, System.currentTimeMillis() - t0, true, null);
 
         return parseRerankResponse(responseBody, candidates, topN);
     }

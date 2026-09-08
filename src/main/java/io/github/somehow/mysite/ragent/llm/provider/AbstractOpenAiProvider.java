@@ -22,34 +22,79 @@ import java.util.concurrent.atomic.AtomicReference;
 /**
  * OpenAI 兼容协议基类。流式请求开启 {@code stream_options.include_usage}，
  * 从末包解析 token 用量；拿不到则按字符估算。记录走 {@link LlmUsageRecorder}，不进入 SSE。
+ * <p>
+ * 连接参数可 {@link #applyRuntime} 热更新；单次请求在入口拍快照，避免改 Key 时把进行中的流打乱。
  */
 @Slf4j
 public abstract class AbstractOpenAiProvider implements LLMService {
-    protected final WebClient webClient;
-    protected final String apiKey;
-    protected final String model;
-    protected final Duration timeout;
+
+    private record ClientSnapshot(WebClient webClient, String apiKey, String model,
+                                  Duration timeout, String baseUrl) {
+    }
+
     protected final ObjectMapper objectMapper;
-    protected final String baseUrl;
+    private final AtomicReference<ClientSnapshot> client = new AtomicReference<>();
 
     public AbstractOpenAiProvider(String baseUrl, String apiKey, String model,
                                   Duration timeout, ObjectMapper objectMapper) {
-        this.baseUrl = baseUrl;
-        this.apiKey = apiKey;
-        this.model = model;
-        this.timeout = timeout;
         this.objectMapper = objectMapper;
-        this.webClient = WebClient.builder()
-                .baseUrl(baseUrl)
-                .defaultHeader("Authorization", "Bearer " + apiKey)
+        applyRuntime(baseUrl, apiKey, model, timeout);
+    }
+
+    public final void applyRuntime(String baseUrl, String apiKey, String model, Duration timeout) {
+        Duration t = timeout != null ? timeout : Duration.ofSeconds(120);
+        String url = baseUrl != null ? baseUrl : "";
+        String key = apiKey != null ? apiKey : "";
+        String m = model != null ? model : "";
+        WebClient wc = WebClient.builder()
+                .baseUrl(url)
+                .defaultHeader("Authorization", "Bearer " + key)
                 .defaultHeader("Content-Type", "application/json")
                 .build();
+        client.set(new ClientSnapshot(wc, key, m, t, url));
+        log.info("[llm] {} runtime config: model={} baseUrl={}",
+                resolveProviderName(), m, url);
+    }
+
+    protected WebClient webClient() {
+        return requireClient().webClient();
+    }
+
+    protected String apiKey() {
+        return requireClient().apiKey();
+    }
+
+    protected String model() {
+        return requireClient().model();
+    }
+
+    protected Duration timeout() {
+        return requireClient().timeout();
+    }
+
+    protected String baseUrl() {
+        return requireClient().baseUrl();
+    }
+
+    /** @deprecated 使用 {@link #model()}；保留给旧测试子类编译 */
+    @Deprecated
+    protected String getModel() {
+        return model();
+    }
+
+    private ClientSnapshot requireClient() {
+        ClientSnapshot snap = client.get();
+        if (snap == null) {
+            throw new IllegalStateException("LLM client not initialized");
+        }
+        return snap;
     }
 
     @Override
     public Flux<String> chatStream(ChatRequest request) {
+        ClientSnapshot snap = requireClient();
         ChatRequest actualRequest = ChatRequest.builder()
-                .model(this.model)
+                .model(snap.model())
                 .messages(request.getMessages())
                 .temperature(request.getTemperature())
                 .maxTokens(request.getMaxTokens())
@@ -64,22 +109,22 @@ public abstract class AbstractOpenAiProvider implements LLMService {
         AtomicBoolean recorded = new AtomicBoolean(false);
 
         log.info("[llm] POST /chat/completions model={} msgs={} stream=true timeout={}",
-            this.model, actualRequest.getMessages() != null ? actualRequest.getMessages().size() : 0, this.timeout);
+            snap.model(), actualRequest.getMessages() != null ? actualRequest.getMessages().size() : 0, snap.timeout());
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", this.model);
+        body.put("model", snap.model());
         body.put("messages", actualRequest.getMessages());
         body.put("stream", true);
         body.put("temperature", actualRequest.getTemperature());
         body.put("max_tokens", actualRequest.getMaxTokens());
         body.put("stream_options", Map.of("include_usage", true));
 
-        return webClient.post()
+        return snap.webClient().post()
                 .uri("/chat/completions")
                 .bodyValue(body)
                 .retrieve()
                 .bodyToFlux(String.class)
-                .timeout(this.timeout)
+                .timeout(snap.timeout())
                 .flatMap(chunk -> Flux.fromArray(chunk.split("\n")))
                 .filter(line -> !line.isBlank())
                 .takeUntil(line -> line.contains("[DONE]"))
@@ -98,23 +143,23 @@ public abstract class AbstractOpenAiProvider implements LLMService {
                 })
                 .doOnComplete(() -> {
                     log.info("[llm] stream complete for model={}, elapsed={}ms",
-                        this.model, System.currentTimeMillis() - t0);
+                        snap.model(), System.currentTimeMillis() - t0);
                     if (recorded.compareAndSet(false, true)) {
-                        recordUsage(ctx, providerName, usageRef.get(), estimatedPrompt, output.length(),
+                        recordUsage(ctx, providerName, snap.model(), usageRef.get(), estimatedPrompt, output.length(),
                             System.currentTimeMillis() - t0, true, null);
                     }
                 })
                 .doOnError(e -> {
                     log.warn("[llm] stream error for model={} after {}ms: {}",
-                        this.model, System.currentTimeMillis() - t0, e.getMessage());
+                        snap.model(), System.currentTimeMillis() - t0, e.getMessage());
                     if (recorded.compareAndSet(false, true)) {
-                        recordUsage(ctx, providerName, usageRef.get(), estimatedPrompt, output.length(),
+                        recordUsage(ctx, providerName, snap.model(), usageRef.get(), estimatedPrompt, output.length(),
                             System.currentTimeMillis() - t0, false, e.getMessage());
                     }
                 })
                 .doOnCancel(() -> {
                     if (recorded.compareAndSet(false, true)) {
-                        recordUsage(ctx, providerName, usageRef.get(), estimatedPrompt, output.length(),
+                        recordUsage(ctx, providerName, snap.model(), usageRef.get(), estimatedPrompt, output.length(),
                             System.currentTimeMillis() - t0, false, "cancelled");
                     }
                 });
@@ -125,7 +170,7 @@ public abstract class AbstractOpenAiProvider implements LLMService {
         return chatStream(request)
                 .collectList()
                 .map(tokens -> String.join("", tokens))
-                .block(timeout);
+                .block(timeout());
     }
 
     /**
@@ -174,7 +219,7 @@ public abstract class AbstractOpenAiProvider implements LLMService {
         if (this instanceof LLMProvider p) {
             return p.getName();
         }
-        return inferProviderName(baseUrl);
+        return inferProviderName(baseUrl());
     }
 
     static String inferProviderName(String url) {
@@ -203,13 +248,13 @@ public abstract class AbstractOpenAiProvider implements LLMService {
         return TokenUsage.estimateTokens(chars);
     }
 
-    private void recordUsage(UsageContext.State ctx, String providerName, TokenUsage apiUsage,
+    private void recordUsage(UsageContext.State ctx, String providerName, String model, TokenUsage apiUsage,
                              int estimatedPrompt, int outputChars, long latencyMs,
                              boolean success, String error) {
         TokenUsage usage = apiUsage;
         if (usage == null) {
             usage = TokenUsage.estimated(estimatedPrompt, TokenUsage.estimateTokens(outputChars));
         }
-        LlmUsageRecorder.record(ctx, providerName, this.model, usage, latencyMs, success, error);
+        LlmUsageRecorder.record(ctx, providerName, model, usage, latencyMs, success, error);
     }
 }

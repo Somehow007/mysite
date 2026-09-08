@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { Component } from 'vue'
 import { useHead } from '@unhead/vue'
 import {
-  Bot, Coins, Cpu, KeyRound, List, PieChart, Activity, CheckCircle2,
+  Bot, Coins, Cpu, List, PieChart, Activity, CheckCircle2,
   BarChart3, Users,
 } from 'lucide-vue-next'
 import {
@@ -14,6 +14,7 @@ import { formatDateTime } from '@/utils/date'
 import {
   Badge, DataTable, EmptyState, PageHeader, SearchFilterBar, StatsCard,
 } from '@/components/ui'
+import AiProviderCard from '@/components/dashboard/AiProviderCard.vue'
 import type { Column } from '@/components/ui/DataTable.vue'
 
 useHead(() => ({ title: 'AI 管理 - MySite' }))
@@ -476,8 +477,14 @@ function switchTab(next: Tab) {
   tab.value = next
   if (next === 'logs' && logs.value.length === 0) fetchLogs(1)
   if (next === 'dashboard' && !summary.value) fetchSummary()
-  if (next === 'providers' && providers.value.length === 0) fetchProviders()
+  if (next === 'providers') fetchProviders()
 }
+
+function onProvidersUpdated(list: LlmProviderView[]) {
+  providers.value = list
+}
+
+const providersEnvFile = computed(() => providers.value[0]?.envFile || '')
 
 onMounted(() => {
   fetchLogs(1)
@@ -921,58 +928,22 @@ onBeforeUnmount(() => {
       </template>
     </template>
 
-    <!-- ════ 模型与 API（预留） ════ -->
+    <!-- ════ 模型与 API ════ -->
     <template v-else>
       <p class="text-sm text-text-secondary mb-4">
-        当前配置只读。在线修改将在后续版本开放，现阶段请改
-        <code class="text-xs bg-bg-code px-1 py-0.5 rounded">application.yaml</code>
-        中的
-        <code class="text-xs bg-bg-code px-1 py-0.5 rounded">rag.llm.providers</code>。
+        改动立即对后续对话生效。API Key 与 Chat 模型会回写
+        <code class="text-xs bg-bg-code px-1 py-0.5 rounded">{{ providersEnvFile || '.env' }}</code>
+        （本地为项目根目录，生产为云服务器 <code class="text-xs bg-bg-code px-1 py-0.5 rounded">/opt/mysite/.env</code>）。
       </p>
       <div v-if="providersLoading" class="text-sm text-text-muted">加载供应商…</div>
+      <div v-else-if="providers.length === 0" class="text-sm text-text-muted">暂无供应商配置</div>
       <div v-else class="grid md:grid-cols-2 gap-4">
-        <div
+        <AiProviderCard
           v-for="p in providers"
           :key="p.name"
-          class="card-solid p-5"
-        >
-          <div class="flex items-start justify-between gap-3 mb-4">
-            <div class="flex items-center gap-2 min-w-0">
-              <div class="w-8 h-8 rounded-lg bg-accent-subtle text-accent flex items-center justify-center shrink-0">
-                <Cpu :size="16" />
-              </div>
-              <div class="min-w-0">
-                <h3 class="font-medium text-text-primary truncate">{{ p.name }}</h3>
-                <p class="text-[11px] text-text-muted">优先级 {{ p.priority }}</p>
-              </div>
-            </div>
-            <Badge :variant="p.enabled ? 'success' : 'muted'" dot>{{ p.enabled ? '启用' : '关闭' }}</Badge>
-          </div>
-          <dl class="space-y-2.5 text-sm">
-            <div class="flex items-baseline justify-between gap-4">
-              <dt class="text-xs text-text-muted shrink-0">Chat 模型</dt>
-              <dd class="font-mono text-xs text-text-primary truncate text-right">{{ p.chatModel || '—' }}</dd>
-            </div>
-            <div v-if="p.embeddingModel" class="flex items-baseline justify-between gap-4">
-              <dt class="text-xs text-text-muted shrink-0">Embedding</dt>
-              <dd class="font-mono text-xs text-text-primary truncate text-right">{{ p.embeddingModel }}</dd>
-            </div>
-            <div v-if="p.rerankModel" class="flex items-baseline justify-between gap-4">
-              <dt class="text-xs text-text-muted shrink-0">Rerank</dt>
-              <dd class="font-mono text-xs text-text-primary truncate text-right">{{ p.rerankModel }}</dd>
-            </div>
-            <div class="flex items-baseline justify-between gap-4">
-              <dt class="text-xs text-text-muted shrink-0">Base URL</dt>
-              <dd class="font-mono text-[11px] text-text-secondary truncate text-right" :title="p.baseUrl">{{ p.baseUrl || '—' }}</dd>
-            </div>
-            <div class="flex items-center justify-between gap-4">
-              <dt class="text-xs text-text-muted shrink-0 flex items-center gap-1">
-                <KeyRound :size="12" /> API Key
-              </dt>
-              <dd class="font-mono text-xs text-text-muted">{{ p.apiKeyMasked || '未配置' }}</dd>
-            </div>
-          </dl>
-        </div>
+          :provider="p"
+          @updated="onProvidersUpdated"
+        />
       </div>
     </template>
 

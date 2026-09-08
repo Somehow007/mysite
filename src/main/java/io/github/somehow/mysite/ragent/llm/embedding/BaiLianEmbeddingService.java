@@ -32,8 +32,8 @@ import java.util.Map;
 @Service
 public class BaiLianEmbeddingService implements EmbeddingService {
 
-    private final WebClient webClient;
-    private final String model;
+    private volatile WebClient webClient;
+    private volatile String model;
     private final ObjectMapper objectMapper;
     private final int maxBatchSize;  // API 单次调用上限（text-embedding-v4 = 10）
 
@@ -47,18 +47,30 @@ public class BaiLianEmbeddingService implements EmbeddingService {
             throw new IllegalStateException(
                 "百炼 provider 未启用或未配置，Embedding 服务依赖百炼 text-embedding-v4");
         }
-        this.model = bailian.getEmbeddingModel();
         this.objectMapper = objectMapper;
         this.maxBatchSize = 10;  // text-embedding-v4 单次最多 10 条
+        applyRuntime(bailian);
 
+        log.info("BaiLianEmbeddingService initialized: model={}, baseUrl={}, maxBatchSize={}",
+            model, bailian.getBaseUrl(), maxBatchSize);
+    }
+
+    public synchronized void applyRuntime(RagProperties.Provider bailian) {
+        if (bailian == null || bailian.getEmbeddingModel() == null
+                || bailian.getApiKey() == null || bailian.getApiKey().isBlank()) {
+            this.webClient = null;
+            this.model = bailian != null ? bailian.getEmbeddingModel() : null;
+            log.warn("BaiLianEmbeddingService disabled: missing bailian embedding config or API key");
+            return;
+        }
+        this.model = bailian.getEmbeddingModel();
         this.webClient = WebClient.builder()
             .baseUrl(bailian.getBaseUrl())
             .defaultHeader("Authorization", "Bearer " + bailian.getApiKey())
             .defaultHeader("Content-Type", "application/json")
             .build();
-
-        log.info("BaiLianEmbeddingService initialized: model={}, baseUrl={}, maxBatchSize={}",
-            model, bailian.getBaseUrl(), maxBatchSize);
+        log.info("BaiLianEmbeddingService runtime config: model={}, baseUrl={}",
+            model, bailian.getBaseUrl());
     }
 
     /**
@@ -102,14 +114,19 @@ public class BaiLianEmbeddingService implements EmbeddingService {
      * 返回的向量列表与输入文本列表顺序一一对应（API 保证）。
      */
     private List<float[]> callEmbeddingApi(List<String> inputs) {
+        WebClient client = this.webClient;
+        String currentModel = this.model;
+        if (client == null || currentModel == null) {
+            throw new IllegalStateException("Embedding client is not configured");
+        }
         long t0 = System.currentTimeMillis();
         UsageContext.State ctx = UsageContext.snapshot();
         int estimated = TokenUsage.estimateTokens(inputs.stream().mapToInt(String::length).sum());
         try {
-            String responseBody = webClient.post()
+            String responseBody = client.post()
                 .uri("/embeddings")
                 .bodyValue(Map.of(
-                    "model", model,
+                    "model", currentModel,
                     "input", inputs.size() == 1 ? inputs.get(0) : inputs
                 ))
                 .retrieve()
@@ -121,13 +138,13 @@ public class BaiLianEmbeddingService implements EmbeddingService {
                 System.currentTimeMillis() - t0);
 
             TokenUsage usage = extractUsage(responseBody, estimated);
-            LlmUsageRecorder.record(ctx, "bailian", model, usage,
+            LlmUsageRecorder.record(ctx, "bailian", currentModel, usage,
                 System.currentTimeMillis() - t0, true, null);
             return parseEmbeddingResponse(responseBody);
         } catch (Exception e) {
             log.error("Embedding API call failed after {}ms: model={}, inputCount={}",
-                System.currentTimeMillis() - t0, model, inputs.size(), e);
-            LlmUsageRecorder.record(ctx, "bailian", model, TokenUsage.estimated(estimated, 0),
+                System.currentTimeMillis() - t0, currentModel, inputs.size(), e);
+            LlmUsageRecorder.record(ctx, "bailian", currentModel, TokenUsage.estimated(estimated, 0),
                 System.currentTimeMillis() - t0, false, e.getMessage());
             throw new RuntimeException("Embedding API call failed: " + e.getMessage(), e);
         }

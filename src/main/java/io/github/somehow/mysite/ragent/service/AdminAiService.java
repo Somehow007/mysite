@@ -6,9 +6,13 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.dao.entity.LlmUsageDO;
 import io.github.somehow.mysite.ragent.dao.mapper.LlmUsageMapper;
+import io.github.somehow.mysite.ragent.dto.LlmProviderPingDTO;
+import io.github.somehow.mysite.ragent.dto.LlmProviderUpdateRequest;
 import io.github.somehow.mysite.ragent.dto.LlmProviderViewDTO;
 import io.github.somehow.mysite.ragent.dto.LlmUsageLogDTO;
 import io.github.somehow.mysite.ragent.dto.LlmUsageSummaryDTO;
+import io.github.somehow.mysite.ragent.llm.LlmEnvFile;
+import io.github.somehow.mysite.ragent.llm.LlmRuntimeConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -22,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +34,7 @@ public class AdminAiService {
 
     private final LlmUsageMapper usageMapper;
     private final RagProperties ragProperties;
+    private final LlmRuntimeConfigService runtimeConfig;
 
     public IPage<LlmUsageLogDTO> listLogs(long current, long size,
                                           Instant from, Instant to,
@@ -121,6 +127,9 @@ public class AdminAiService {
 
     public List<LlmProviderViewDTO> listProviders() {
         List<LlmProviderViewDTO> list = new ArrayList<>();
+        String envPath = runtimeConfig.envFile() != null ? runtimeConfig.envFile().toString() : null;
+        Set<String> bound = runtimeConfig.boundProviderNames();
+        Set<String> persisted = runtimeConfig.persistedNames();
         ragProperties.getLlm().getProviders().forEach((name, p) -> {
             LlmProviderViewDTO dto = new LlmProviderViewDTO();
             dto.setName(name);
@@ -131,11 +140,26 @@ public class AdminAiService {
             dto.setChatModel(p.getChatModel());
             dto.setEmbeddingModel(p.getEmbeddingModel());
             dto.setRerankModel(p.getRerankModel());
-            dto.setConfigured(StringUtils.hasText(p.getApiKey()));
+            dto.setConfigured(StringUtils.hasText(p.getApiKey()) || !LlmEnvFile.requiresApiKey(name));
+            dto.setEnvApiKeyName(LlmEnvFile.apiKeyEnvName(name));
+            dto.setEnvChatModelName(LlmEnvFile.chatModelEnvName(name));
+            dto.setEnvFile(envPath);
+            dto.setRuntimeBound(bound.contains(name));
+            dto.setPersisted(persisted.contains(name));
+            dto.setRequiresApiKey(LlmEnvFile.requiresApiKey(name));
             list.add(dto);
         });
         list.sort(Comparator.comparingInt(LlmProviderViewDTO::getPriority));
         return list;
+    }
+
+    public List<LlmProviderViewDTO> updateProvider(String name, LlmProviderUpdateRequest req) {
+        runtimeConfig.update(name, req);
+        return listProviders();
+    }
+
+    public LlmProviderPingDTO pingProvider(String name) {
+        return runtimeConfig.ping(name);
     }
 
     private LlmUsageLogDTO toLogDto(LlmUsageDO row) {

@@ -57,6 +57,11 @@ public class RagProperties {
         private Map<String, Provider> providers = new HashMap<>();
         private CircuitBreakerProperties circuitBreaker = new CircuitBreakerProperties();
         private PricingProperties pricing = new PricingProperties();
+        /**
+         * 后台保存 API Key / chat-model 时回写的 .env 路径。
+         * 空则自动探测：生产 {@code /opt/mysite/.env}，否则 {@code ${user.dir}/.env}。
+         */
+        private String envFile;
     }
 
     @Data
