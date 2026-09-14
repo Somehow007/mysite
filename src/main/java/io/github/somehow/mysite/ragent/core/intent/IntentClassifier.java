@@ -87,6 +87,7 @@ public class IntentClassifier {
 
     /**
      * 恰好一个启用意图的关键词命中时走快路径；0 个或多个冲突则返回 null 交给 LLM。
+     * CHAT 只在整句几乎就是问候/感谢时命中，避免「谢谢，JWT 怎么配」被短路。
      */
     IntentResult matchByKeywords(String question, List<IntentDO> intents) {
         if (question == null || question.isBlank()) {
@@ -95,7 +96,7 @@ public class IntentClassifier {
         String q = question.toLowerCase(Locale.ROOT);
         List<IntentDO> hits = new ArrayList<>();
         for (IntentDO intent : intents) {
-            if (keywordsHit(q, intent.getKeywords())) {
+            if (keywordsHit(q, intent)) {
                 hits.add(intent);
             }
         }
@@ -115,14 +116,31 @@ public class IntentClassifier {
             .build();
     }
 
-    boolean keywordsHit(String questionLower, String keywordsJson) {
-        List<String> keywords = parseKeywords(keywordsJson);
+    /** 去掉空白和标点后超过此长度的句子，不当成闲聊问候。 */
+    static final int CHAT_FAST_PATH_MAX_LEN = 8;
+
+    boolean keywordsHit(String questionLower, IntentDO intent) {
+        List<String> keywords = parseKeywords(intent.getKeywords());
+        if (keywords.isEmpty()) {
+            return false;
+        }
+        String haystack = questionLower;
+        if ("CHAT".equals(intent.getType())) {
+            haystack = compact(questionLower);
+            if (haystack.length() > CHAT_FAST_PATH_MAX_LEN) {
+                return false;
+            }
+        }
         for (String kw : keywords) {
-            if (!kw.isBlank() && questionLower.contains(kw.toLowerCase(Locale.ROOT))) {
+            if (!kw.isBlank() && haystack.contains(kw.toLowerCase(Locale.ROOT))) {
                 return true;
             }
         }
         return false;
+    }
+
+    static String compact(String question) {
+        return question.replaceAll("[\\s\\p{Punct}，。！？、；：\"'“”‘’（）()【】《》…—·]+", "");
     }
 
     List<String> parseKeywords(String keywordsJson) {

@@ -60,15 +60,57 @@ class IntentClassifierTest {
         }
 
         @Test
-        @DisplayName("同时命中多个意图则交给 LLM")
-        void conflictingKeywordsGoToLlm() {
-            when(classificationLLM.chat(any())).thenReturn(
-                "{\"intentId\":1,\"confidence\":0.9,\"reason\":\"目录问题\",\"needsGuidance\":false}");
-
+        @DisplayName("问候后面跟着目录问题：CHAT 不命中，META 快路径")
+        void greetingPlusCatalogUsesMetaFastPath() {
             IntentResult result = classifier.classify("你好，知识库有多少篇文章", List.of(), true);
 
             assertTrue(result.isKbMeta());
+            verify(classificationLLM, never()).chat(any());
+        }
+
+        @Test
+        @DisplayName("谢谢后面跟着技术问题，不走闲聊快路径")
+        void thanksPlusTechQuestionGoesToLlm() {
+            when(classificationLLM.chat(any())).thenReturn(
+                "{\"intentId\":5,\"confidence\":0.9,\"reason\":\"技术内容\",\"needsGuidance\":false}");
+
+            IntentResult result = classifier.classify("谢谢，JWT 怎么配置？", List.of(), true);
+
+            assertTrue(result.isKbRetrieval());
             verify(classificationLLM).chat(any());
+        }
+
+        @Test
+        @DisplayName("「作者」出现在技术问题里，不走目录快路径")
+        void authorInTechnicalQuestionGoesToLlm() {
+            when(classificationLLM.chat(any())).thenReturn(
+                "{\"intentId\":5,\"confidence\":0.86,\"reason\":\"正文\",\"needsGuidance\":false}");
+
+            IntentResult result = classifier.classify("作者在文中怎么约定 Bean 名称？", List.of(), true);
+
+            assertTrue(result.isKbRetrieval());
+            verify(classificationLLM).chat(any());
+        }
+
+        @Test
+        @DisplayName("「有哪些文章讲 JWT」是内容检索，不是目录")
+        void whichArticlesAboutTopicGoesToLlm() {
+            when(classificationLLM.chat(any())).thenReturn(
+                "{\"intentId\":5,\"confidence\":0.9,\"reason\":\"按主题找文章\",\"needsGuidance\":false}");
+
+            IntentResult result = classifier.classify("有哪些文章讲 JWT？", List.of(), true);
+
+            assertTrue(result.isKbRetrieval());
+            verify(classificationLLM).chat(any());
+        }
+
+        @Test
+        @DisplayName("谁上传了文章仍走目录快路径")
+        void whoUploadedStillMeta() {
+            IntentResult result = classifier.classify("谁最后上传了文章？", List.of(), true);
+
+            assertTrue(result.isKbMeta());
+            verify(classificationLLM, never()).chat(any());
         }
 
         @Test
@@ -179,7 +221,7 @@ class IntentClassifierTest {
         i.setId(1L);
         i.setName("知识库统计与概览");
         i.setType("KB_META");
-        i.setKeywords("[\"多少篇\",\"知识库情况\",\"有哪些文章\"]");
+        i.setKeywords("[\"多少篇\",\"知识库情况\",\"知识库有哪些\",\"谁上传\",\"谁最后上传\",\"最后上传\",\"上传人\"]");
         i.setCustomPromptFragment("目录模式");
         return i;
     }

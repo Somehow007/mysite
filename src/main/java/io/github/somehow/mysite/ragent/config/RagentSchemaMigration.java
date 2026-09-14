@@ -118,7 +118,7 @@ public class RagentSchemaMigration implements InitializingBean {
             INSERT INTO t_rag_intent (id, name, type, kb_id, keywords, description, priority, enabled, custom_prompt_fragment, custom_top_k, create_time)
             VALUES
             (1, '知识库统计与概览', 'KB_META', NULL,
-             '["多少篇","几篇文章","文章数量","谁上传","谁写的","作者","最后上传","最近上传","最新文章","知识库情况","有哪些文章","文档数量","覆盖哪些"]',
+             '["多少篇","几篇文章","文章数量","文档数量","谁上传","谁最后上传","最后上传","最近上传","知识库情况","知识库有哪些","库里有哪些","上传人"]',
              '用户询问知识库本身的情况：有多少篇文章、谁写的/谁上传的、谁最后上传、最近入库了什么、知识库里有哪些文章。这类问题必须查目录，禁止用向量检索文章正文。', 10, true,
              '你在回答知识库目录问题：只陈述清单中的篇数、作者和最近文章，不要检索或引用文章正文。', NULL, NOW()),
             (2, '读书笔记检索', 'KB_RETRIEVAL', NULL,
@@ -146,7 +146,7 @@ public class RagentSchemaMigration implements InitializingBean {
                 enabled = EXCLUDED.enabled,
                 custom_prompt_fragment = EXCLUDED.custom_prompt_fragment,
                 custom_top_k = EXCLUDED.custom_top_k
-            """, "t_rag_intent.mode_taxonomy");
+            """, "t_rag_intent.narrow_keywords");
     }
 
     private void execute(String sql, String label) {
