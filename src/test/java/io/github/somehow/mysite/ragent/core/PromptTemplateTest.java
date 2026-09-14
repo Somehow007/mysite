@@ -1,6 +1,8 @@
 package io.github.somehow.mysite.ragent.core;
 
 import io.github.somehow.mysite.ragent.config.RagProperties;
+import io.github.somehow.mysite.ragent.dao.entity.KnowledgeBaseDO;
+import io.github.somehow.mysite.ragent.dao.mapper.KnowledgeBaseMapper;
 import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,6 +76,25 @@ class PromptTemplateTest {
         }
 
         @Test
+        @DisplayName("有知识库 Mapper 时，来源标注用数据库里的真实名称")
+        void shouldUseKbNameFromDatabase() {
+            KnowledgeBaseMapper mapper = mock(KnowledgeBaseMapper.class);
+            KnowledgeBaseDO kb = new KnowledgeBaseDO();
+            kb.setId(2096796814692646913L);
+            kb.setName("默认知识库");
+            when(mapper.selectById(2096796814692646913L)).thenReturn(kb);
+            PromptTemplate named = new PromptTemplate(properties, mapper);
+
+            List<SearchResult> context = List.of(
+                new SearchResult(1L, 100L, "Spring Security 实战",
+                    "JWT 过滤器", 0.9f, 2096796814692646913L)
+            );
+            String formatted = named.formatContextWithKbName(context);
+            assertTrue(formatted.contains("【默认知识库】"),
+                "应使用数据库中的知识库名称，而不是 yaml 兜底");
+        }
+
+        @Test
         @DisplayName("对话历史应插入 system 和 user 之间")
         void historyShouldBeBetweenSystemAndUser() {
             List<ChatMessage> history = List.of(
@@ -122,6 +143,27 @@ class PromptTemplateTest {
             assertEquals("system", messages.get(0).getRole());
             assertTrue(messages.get(0).getContent().contains("xxx"),
                 "空上下文时应使用占位标题");
+        }
+    }
+
+    @Nested
+    @DisplayName("目录 Prompt")
+    class CatalogPrompt {
+
+        @Test
+        @DisplayName("应注入目录事实，且不要求只根据文章片段回答")
+        void shouldInjectCatalogFacts() {
+            List<ChatMessage> messages = template.buildCatalogPrompt(
+                "知识库有多少篇文章？",
+                "就绪文章合计 10 篇。\n",
+                List.of());
+
+            assertEquals(2, messages.size());
+            String sys = messages.get(0).getContent();
+            assertTrue(sys.contains("就绪文章合计 10 篇"));
+            assertTrue(sys.contains("文章作者"));
+            assertFalse(sys.contains("只能基于下面提供的博客文章片段"));
+            assertEquals("知识库有多少篇文章？", messages.get(1).getContent());
         }
     }
 }

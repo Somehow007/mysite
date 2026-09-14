@@ -238,7 +238,7 @@ class Phase3IntegrationTest {
         IntentResult defaultIntent = IntentResult.builder()
             .type("KB_RETRIEVAL").targetKbId(null).confidence(0.8)
             .needsGuidance(false).reason("test").build();
-        when(intentClassifier.classify(anyString(), anyList())).thenReturn(defaultIntent);
+        when(intentClassifier.classify(anyString(), anyList(), anyBoolean())).thenReturn(defaultIntent);
 
         // kbNameCache 惰性初始化需要 knowledgeBases
         RagProperties.KnowledgeBaseMeta kb1 = new RagProperties.KnowledgeBaseMeta();
@@ -253,7 +253,8 @@ class Phase3IntegrationTest {
             retrievalEngine, conversationManager,
             promptTemplate, routingLLMService,
             rateLimiter, ragProps,
-            queryRewriter, intentClassifier);
+            queryRewriter, intentClassifier,
+            mock(io.github.somehow.mysite.ragent.service.KnowledgeCatalogService.class));
     }
 
     @AfterEach

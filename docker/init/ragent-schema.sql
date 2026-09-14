@@ -107,7 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_conv_msg_conv_id ON t_conversation_message(conver
 CREATE TABLE IF NOT EXISTS t_rag_intent (
     id BIGINT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,           -- 意图名称，如 "技术博客检索"、"读书笔记检索"
-    type VARCHAR(20) NOT NULL DEFAULT 'KB_RETRIEVAL',  -- KB_RETRIEVAL / CHAT
+    type VARCHAR(20) NOT NULL DEFAULT 'KB_RETRIEVAL',  -- KB_META / KB_RETRIEVAL / CHAT
     kb_id BIGINT,                          -- 绑定的知识库（CHAT 类型为 NULL）
     keywords TEXT,                         -- 触发关键词，JSON 数组：["Java","Spring","JWT"]
     description TEXT,                      -- 意图描述，给 LLM 分类用的提示
@@ -123,30 +123,39 @@ CREATE INDEX IF NOT EXISTS idx_intent_enabled_type ON t_rag_intent(enabled, type
 -- 索引：按知识库查询
 CREATE INDEX IF NOT EXISTS idx_intent_kb_id ON t_rag_intent(kb_id);
 
--- 种子数据：四类初始意图（覆盖 KB 检索 + 闲聊）
--- 使用 ON CONFLICT DO NOTHING 保证重复执行幂等
+-- 种子数据：三类模式意图（统计/管理、内容检索、闲聊）
+-- ON CONFLICT DO UPDATE：已有卷也能从旧的「领域混模式」种子切过来
 INSERT INTO t_rag_intent (id, name, type, kb_id, keywords, description, priority, enabled, custom_prompt_fragment, custom_top_k, create_time)
 VALUES
-(1, '技术博客检索', 'KB_RETRIEVAL', 1,
- '["Java","Spring","JWT","Redis","Docker","MySQL","Vue","TypeScript","后端","前端","数据库","安全","部署","Nginx","Linux","Git","API","微服务"]',
- '用户询问后端开发、Spring Boot、数据库、前端框架、系统部署等技术问题', 10, true,
- '你是博客技术文章助手的补充：回答要准确，代码示例注明版本和来源文章。', NULL, NOW()),
-(2, '读书笔记检索', 'KB_RETRIEVAL', 2,
+(1, '知识库统计与概览', 'KB_META', NULL,
+ '["多少篇","几篇文章","文章数量","谁上传","谁写的","作者","最后上传","最近上传","最新文章","知识库情况","有哪些文章","文档数量","覆盖哪些"]',
+ '用户询问知识库本身的情况：有多少篇文章、谁写的/谁上传的、谁最后上传、最近入库了什么、知识库里有哪些文章。这类问题必须查目录，禁止用向量检索文章正文。', 10, true,
+ '你在回答知识库目录问题：只陈述清单中的篇数、作者和最近文章，不要检索或引用文章正文。', NULL, NOW()),
+(2, '读书笔记检索', 'KB_RETRIEVAL', NULL,
  '["读书","书籍","推荐","读后感","学习路线","入门","书单","阅读","好书"]',
- '用户询问书籍推荐、读书心得、学习路径等', 5, true,
- '你是博客读书笔记助手的补充：推荐书籍时说明理由，可以结合技术博客内容给出学习路径建议。', 5, NOW()),
-(3, '学习笔记检索', 'KB_RETRIEVAL', 3,
- '["笔记","学习","总结","复习","知识点","面试","教程","整理","备忘","踩坑","实践","笔记整理","知识点总结"]',
- '用户询问学习笔记、知识点总结、面试准备、技术教程、实践踩坑等', 8, true,
- '你是博客学习笔记助手的补充：回答要结构化，给出清晰的知识点梳理和学习路径建议，区分"已掌握"和"待深入"的内容。', 3, NOW()),
+ '（已停用）原领域检索意图，避免与模式分类抢票', 5, false,
+ '你是博客读书笔记助手的补充：推荐书籍时说明理由。', 5, NOW()),
+(3, '学习笔记检索', 'KB_RETRIEVAL', NULL,
+ '["笔记","学习","总结","复习","知识点","面试","教程","整理","备忘","踩坑","实践"]',
+ '（已停用）原领域检索意图，避免与模式分类抢票', 8, false,
+ '你是博客学习笔记助手的补充：回答要结构化。', 3, NOW()),
 (4, '闲聊', 'CHAT', NULL,
- '["你好","谢谢","你是谁","帮助","介绍","再见","早上好","晚上好"]',
- '问候、自我介绍、能力询问、感谢等社交对话', 0, true, NULL, NULL, NOW()),
-(5, '全局检索', 'KB_RETRIEVAL', NULL,
- '["全部","所有","总共","一共","汇总","概览","范围","涵盖","包含哪些","多少","统计"]',
- '用户询问博客整体情况、文章总数、主题范围、全站概览等元问题，需要在所有知识库中检索', 9, true,
- '你是博客全局助手的补充：当用户询问博客整体情况时，你需要综合所有知识库的信息来回答，包括文章数量、主题分布、时间跨度等。', NULL, NOW())
-ON CONFLICT (id) DO NOTHING;
+ '["你好","谢谢","你是谁","再见","早上好","晚上好"]',
+ '问候、感谢、自我介绍、与博客内容无关的闲聊。不包括询问知识库篇数/作者，也不包括具体技术问题。', 0, true, NULL, NULL, NOW()),
+(5, '内容检索', 'KB_RETRIEVAL', NULL,
+ '[]',
+ '用户询问博客文章里的技术内容、实现方法、概念解释、代码或配置。不是在问知识库有多少篇、谁上传。', 9, true,
+ '你是博客内容助手：根据检索到的文章片段回答，引用文章标题。', NULL, NOW())
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    type = EXCLUDED.type,
+    kb_id = EXCLUDED.kb_id,
+    keywords = EXCLUDED.keywords,
+    description = EXCLUDED.description,
+    priority = EXCLUDED.priority,
+    enabled = EXCLUDED.enabled,
+    custom_prompt_fragment = EXCLUDED.custom_prompt_fragment,
+    custom_top_k = EXCLUDED.custom_top_k;
 
 -- ============================================================
 -- AI 用量记录（调用记录 + 消费看板）
@@ -195,6 +204,7 @@ CREATE TABLE IF NOT EXISTS t_llm_provider_setting (
     chat_model VARCHAR(64),
     embedding_model VARCHAR(64),
     rerank_model VARCHAR(64),
+    embedding_dimension INT,
     api_key TEXT,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

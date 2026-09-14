@@ -40,6 +40,7 @@ class RagChatServiceTest {
     private RagProperties properties;
     private QueryRewriter queryRewriter;
     private IntentClassifier intentClassifier;
+    private KnowledgeCatalogService catalogService;
     private RagChatService service;
 
     @BeforeEach
@@ -50,6 +51,7 @@ class RagChatServiceTest {
         rateLimiter = mock(ChatRateLimiter.class);
         queryRewriter = mock(QueryRewriter.class);
         intentClassifier = mock(IntentClassifier.class);
+        catalogService = mock(KnowledgeCatalogService.class);
 
         properties = new RagProperties();
         properties.getRetrieval().setRerankTopK(5);
@@ -64,14 +66,14 @@ class RagChatServiceTest {
         // 默认：不改写、分类为 KB_RETRIEVAL
         when(queryRewriter.rewrite(anyString(), anyList()))
             .thenReturn(RewriteResult.unchanged("测试问题"));
-        when(intentClassifier.classify(anyString(), anyList()))
+        when(intentClassifier.classify(anyString(), anyList(), anyBoolean()))
             .thenReturn(IntentResult.builder()
                 .type("KB_RETRIEVAL").targetKbId(null).confidence(0.8)
                 .needsGuidance(false).reason("test").build());
 
         service = new RagChatService(retrievalEngine, conversationManager,
             promptTemplate, routingLLMService, rateLimiter, properties,
-            queryRewriter, intentClassifier);
+            queryRewriter, intentClassifier, catalogService);
     }
 
     @Nested
@@ -234,6 +236,80 @@ class RagChatServiceTest {
                 .verifyComplete();
 
             verify(conversationManager).loadHistory(5L);
+        }
+    }
+
+    @Nested
+    @DisplayName("意图路由")
+    class IntentRouting {
+
+        private ConversationDO conversation() {
+            ConversationDO conv = new ConversationDO();
+            conv.setId(1L);
+            return conv;
+        }
+
+        @Test
+        @DisplayName("KB_META 查目录、不走向量检索，sources 为空")
+        void metaSkipsVectorSearch() {
+            when(conversationManager.getOrCreateConversation(any(), any(), any())).thenReturn(conversation());
+            when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
+            when(intentClassifier.classify(anyString(), anyList(), anyBoolean()))
+                .thenReturn(IntentResult.builder().type("KB_META").confidence(0.95).reason("keyword").build());
+            when(catalogService.snapshot(any()))
+                .thenReturn(new KnowledgeCatalogService.CatalogSnapshot(List.of(), 0, 0));
+            when(routingLLMService.chatStream(any())).thenReturn(Flux.just("共 0 篇"));
+
+            Flux<ChatEvent> events = service.chat("知识库有多少篇文章", 1L, "v", "127.0.0.1", UserRole.USER, List.of(1L));
+
+            StepVerifier.create(events)
+                .expectNextMatches(e -> "meta".equals(e.type()))
+                .expectNextMatches(e -> "sources".equals(e.type())
+                    && e.sources() != null && e.sources().isEmpty())
+                .expectNextMatches(e -> "content".equals(e.type()))
+                .expectNextMatches(e -> "done".equals(e.type()))
+                .verifyComplete();
+
+            verify(catalogService).snapshot(List.of(1L));
+            verify(retrievalEngine, never()).retrieve(anyString(), anyInt(), any());
+            verify(retrievalEngine, never()).multiRetrieve(any(), any(), anyInt());
+        }
+
+        @Test
+        @DisplayName("CHAT 不检索、不查目录")
+        void chatSkipsRetrievalAndCatalog() {
+            when(conversationManager.getOrCreateConversation(any(), any(), any())).thenReturn(conversation());
+            when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
+            when(intentClassifier.classify(anyString(), anyList(), anyBoolean()))
+                .thenReturn(IntentResult.builder().type("CHAT").confidence(0.95).reason("keyword").build());
+            when(routingLLMService.chatStream(any())).thenReturn(Flux.just("你好"));
+
+            Flux<ChatEvent> events = service.chat("你好", 1L, "v", "127.0.0.1", UserRole.USER, List.of(1L));
+
+            StepVerifier.create(events)
+                .expectNextCount(4)
+                .verifyComplete();
+
+            verify(retrievalEngine, never()).retrieve(anyString(), anyInt(), any());
+            verify(catalogService, never()).snapshot(any());
+        }
+
+        @Test
+        @DisplayName("KB_RETRIEVAL 仍走向量检索")
+        void retrievalStillSearches() {
+            when(conversationManager.getOrCreateConversation(any(), any(), any())).thenReturn(conversation());
+            when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
+            when(retrievalEngine.retrieve(anyString(), anyInt(), any())).thenReturn(List.of());
+            when(routingLLMService.chatStream(any())).thenReturn(Flux.just("答案"));
+
+            Flux<ChatEvent> events = service.chat("JWT 怎么配", 1L, "v", "127.0.0.1", UserRole.USER, List.of(1L));
+
+            StepVerifier.create(events)
+                .expectNextCount(4)
+                .verifyComplete();
+
+            verify(retrievalEngine).retrieve(eq("测试问题"), eq(5), eq(List.of(1L)));
+            verify(catalogService, never()).snapshot(any());
         }
     }
 }

@@ -12,32 +12,25 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * 意图分类器 —— Ragent 的 intent 包精简版。
+ * 意图分类器 —— 三类模式：KB_META / KB_RETRIEVAL / CHAT。
  *
- * <h3>与 Ragent 的对比</h3>
- * <ul>
- *   <li>Ragent: 树形多级（DOMAIN→CATEGORY→TOPIC），Redis 缓存意图树，
- *       LLM 对所有叶子节点打分，score&lt;0.35 过滤，每子问题最多取 3 个意图，
- *       歧义时生成引导选项</li>
- *   <li>MySite: 扁平列表，LLM 从 N 个意图中选最匹配的 1 个，低置信度时降级到全局检索，
- *       不做树形编辑 UI（博客 3-5 个 KB，树形过度设计）</li>
- * </ul>
- *
- * <h3>设计要点</h3>
  * <ol>
- *   <li>用 LLM 做分类而不是关键词匹配 —— "怎么看 Spring 源码？"
- *       "源码"不在 keywords 里，但 LLM 知道这属于技术问题而非读书推荐</li>
- *   <li>分类 LLM 调用用 cheap model（如 deepseek-chat），
- *       不占用聊天生成用的主力模型额度</li>
- *   <li>分类失败时优雅降级为 fallback（全局检索），不阻塞管道</li>
+ *   <li>关键词快路径：恰好一个启用意图的 keywords 命中则跳过 LLM</li>
+ *   <li>cheap LLM 做 JSON 分类（temperature=0）</li>
+ *   <li>解析失败或置信度 &lt; 0.5 时按是否已选 KB 降级，不阻塞管道</li>
  * </ol>
  */
 @Slf4j
 @Component
 public class IntentClassifier {
+
+    static final double MIN_CONFIDENCE = 0.5;
+    static final double KEYWORD_CONFIDENCE = 0.95;
 
     private final IntentMapper intentMapper;
     private final LLMService classificationLLM;
@@ -51,57 +44,128 @@ public class IntentClassifier {
         this.objectMapper = objectMapper;
     }
 
-    /**
-     * 对用户问题做意图分类。
-     *
-     * @param question 用户当前问题（可能是改写后的主查询）
-     * @param history  最近几轮对话（用于指代消解后的上下文中判断意图）
-     * @return 分类结果，包含目标 KB、置信度、是否需要引导
-     */
     public IntentResult classify(String question, List<ChatMessage> history) {
-        // 1. 加载所有已启用的意图（博客规模，全量加载）
+        return classify(question, history, false);
+    }
+
+    /**
+     * @param question  用户当前问题（可能是改写后的主查询）
+     * @param history   最近几轮对话
+     * @param hasKbIds  用户是否勾选了知识库（影响低置信度降级）
+     */
+    public IntentResult classify(String question, List<ChatMessage> history, boolean hasKbIds) {
         List<IntentDO> intents = intentMapper.listEnabled();
 
         if (intents.isEmpty()) {
             log.debug("[intent] no intents configured, using fallback");
-            return IntentResult.fallback();
+            return IntentResult.fallback(hasKbIds);
         }
 
-        // 2. 构造分类 Prompt
+        IntentResult keywordHit = matchByKeywords(question, intents);
+        if (keywordHit != null) {
+            log.info("[intent] keyword fast-path: '{}' (type={}, confidence={})",
+                keywordHit.getReason(), keywordHit.getType(), keywordHit.getConfidence());
+            return keywordHit;
+        }
+
         String classificationPrompt = buildClassificationPrompt(intents, question, history);
 
-        // 3. 调用轻量 LLM 做分类（非流式，fast path）
         try {
             UsageContext.setCallType("CLASSIFY");
             String llmOutput = classificationLLM.chat(
-                ChatRequest.of("deepseek-chat", classificationPrompt));
-
-            // 4. 解析 LLM 输出
-            return parseIntentResult(llmOutput, intents);
+                ChatRequest.builder()
+                    .messages(List.of(ChatMessage.user(classificationPrompt)))
+                    .temperature(0.0)
+                    .maxTokens(256)
+                    .build());
+            return parseIntentResult(llmOutput, intents, hasKbIds);
         } catch (Exception e) {
             log.warn("[intent] classification LLM call failed: {}", e.getMessage());
-            return IntentResult.fallback();
+            return IntentResult.fallback(hasKbIds);
         }
     }
 
     /**
-     * 构造分类 Prompt —— 告诉 LLM 有哪些意图可选、每个意图代表什么，
-     * 让它输出 JSON 格式的分类结果。
+     * 恰好一个启用意图的关键词命中时走快路径；0 个或多个冲突则返回 null 交给 LLM。
      */
+    IntentResult matchByKeywords(String question, List<IntentDO> intents) {
+        if (question == null || question.isBlank()) {
+            return null;
+        }
+        String q = question.toLowerCase(Locale.ROOT);
+        List<IntentDO> hits = new ArrayList<>();
+        for (IntentDO intent : intents) {
+            if (keywordsHit(q, intent.getKeywords())) {
+                hits.add(intent);
+            }
+        }
+        if (hits.size() != 1) {
+            return null;
+        }
+        IntentDO matched = hits.get(0);
+        return IntentResult.builder()
+            .intentId(matched.getId())
+            .type(matched.getType())
+            .targetKbId(matched.getKbId())
+            .confidence(KEYWORD_CONFIDENCE)
+            .needsGuidance(false)
+            .reason("keyword:" + matched.getName())
+            .customPromptFragment(matched.getCustomPromptFragment())
+            .customTopK(matched.getCustomTopK())
+            .build();
+    }
+
+    boolean keywordsHit(String questionLower, String keywordsJson) {
+        List<String> keywords = parseKeywords(keywordsJson);
+        for (String kw : keywords) {
+            if (!kw.isBlank() && questionLower.contains(kw.toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    List<String> parseKeywords(String keywordsJson) {
+        if (keywordsJson == null || keywordsJson.isBlank()) {
+            return List.of();
+        }
+        try {
+            JsonNode node = objectMapper.readTree(keywordsJson);
+            if (!node.isArray()) {
+                return List.of();
+            }
+            List<String> out = new ArrayList<>();
+            for (JsonNode item : node) {
+                if (item.isTextual() && !item.asText().isBlank()) {
+                    out.add(item.asText());
+                }
+            }
+            return out;
+        } catch (Exception e) {
+            log.debug("[intent] skip malformed keywords: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
     String buildClassificationPrompt(List<IntentDO> intents, String question,
                                      List<ChatMessage> history) {
         StringBuilder sb = new StringBuilder();
         sb.append("""
-            你是一个意图分类器。根据用户问题判断它属于以下哪个意图。
+            你是一个意图分类器。根据用户问题判断它属于以下哪个意图。只选一个。
+
+            三类模式的边界（必须遵守）：
+            - KB_META：问知识库本身——有多少篇文章、谁写的/谁上传的、谁最后上传、最近入库了什么、库里有哪些文章。禁止当成内容检索。
+            - KB_RETRIEVAL：问文章里的技术内容、实现方法、概念、代码或配置。
+            - CHAT：问候、感谢、你是谁、与博客内容和知识库目录都无关的闲聊。
 
             输出格式（严格 JSON，不要 markdown code block）：
             {"intentId": <数字>, "confidence": <0.0-1.0>, "reason": "<一句话理由>",
              "needsGuidance": <true|false>}
 
-            needsGuidance = true 的情况（必须判断）：
-            - 问题过于模糊/简短，无法确定用户真正想问什么（例："Spring 怎么样？"）
-            - 问题有歧义，可能匹配多个意图且置信度接近（例："推荐一本好书"——技术书还是小说？）
-            - 问题含代词但缺少上下文（例："那个怎么搞？"，且历史对话为空或未涉及该代词）
+            needsGuidance = true 的情况：
+            - 问题过于模糊/简短，无法确定用户真正想问什么
+            - 问题有歧义，可能匹配多个意图且置信度接近
+            - 问题含代词但缺少上下文
 
             ## 候选意图列表
             """);
@@ -111,10 +175,9 @@ public class IntentClassifier {
                 intent.getId(), intent.getType(), intent.getName(), intent.getDescription()));
         }
 
-        // 附加最近 2 轮对话帮助 LLM 做指代消解后的意图判断
         if (history != null && !history.isEmpty()) {
             sb.append("\n## 对话历史（最近 2 轮）\n");
-            int start = Math.max(0, history.size() - 4);  // 2 轮 = 4 条
+            int start = Math.max(0, history.size() - 4);
             for (int i = start; i < history.size(); i++) {
                 ChatMessage m = history.get(i);
                 sb.append("- [%s]: %s\n".formatted(m.getRole(), m.getContent()));
@@ -127,37 +190,35 @@ public class IntentClassifier {
     }
 
     /**
-     * 解析 LLM 输出的 JSON 分类结果。
-     * <p>
-     * 容错设计：LLM 可能输出格式错误、intentId 不存在等，
-     * 任何解析失败都降级为 fallback（全局检索），不阻塞管道。
+     * 解析 LLM 输出。格式错误、未知 intentId、置信度过低都降级，不阻塞管道。
      */
-    IntentResult parseIntentResult(String llmOutput, List<IntentDO> intents) {
+    IntentResult parseIntentResult(String llmOutput, List<IntentDO> intents, boolean hasKbIds) {
         try {
-            // 清理 LLM 可能包裹的 ```json 标记
-            String json = llmOutput.trim();
-            if (json.startsWith("```")) {
-                json = json.replaceAll("```json\\s*", "").replaceAll("```\\s*$", "").trim();
-            }
-
+            String json = extractJson(llmOutput);
             JsonNode root = objectMapper.readTree(json);
             long intentId = root.get("intentId").asLong();
             double confidence = clamp(root.get("confidence").asDouble(), 0.0, 1.0);
             String reason = root.path("reason").asText("");
             boolean needsGuidance = root.path("needsGuidance").asBoolean(false);
 
+            if (confidence < MIN_CONFIDENCE) {
+                log.info("[intent] low confidence={}, falling back (hasKbIds={})",
+                    confidence, hasKbIds);
+                return IntentResult.fallback(hasKbIds);
+            }
+
             IntentDO matched = intents.stream()
-                .filter(i -> i.getId() == intentId)
+                .filter(i -> i.getId() != null && i.getId() == intentId)
                 .findFirst()
                 .orElse(null);
 
             if (matched == null) {
-                log.warn("[intent] LLM returned unknown intentId={}, falling back to global", intentId);
-                return IntentResult.fallback();
+                log.warn("[intent] LLM returned unknown intentId={}, falling back", intentId);
+                return IntentResult.fallback(hasKbIds);
             }
 
-            log.info("[intent] classified as '{}' (type={}, kbId={}, confidence={:.2f})",
-                matched.getName(), matched.getType(), matched.getKbId(), confidence);
+            log.info("[intent] classified as '{}' (type={}, confidence={})",
+                matched.getName(), matched.getType(), String.format("%.2f", confidence));
 
             return IntentResult.builder()
                 .intentId(intentId)
@@ -172,8 +233,24 @@ public class IntentClassifier {
 
         } catch (Exception e) {
             log.warn("[intent] failed to parse classification result: {}", e.getMessage());
-            return IntentResult.fallback();
+            return IntentResult.fallback(hasKbIds);
         }
+    }
+
+    static String extractJson(String llmOutput) {
+        if (llmOutput == null) {
+            return "";
+        }
+        String json = llmOutput.trim();
+        if (json.startsWith("```")) {
+            json = json.replaceAll("```json\\s*", "").replaceAll("```\\s*$", "").trim();
+        }
+        int start = json.indexOf('{');
+        int end = json.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return json.substring(start, end + 1);
+        }
+        return json;
     }
 
     private static double clamp(double value, double min, double max) {

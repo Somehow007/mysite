@@ -34,15 +34,16 @@ import java.util.UUID;
  *   0. 成本保护（限流 + 问题长度）
  *   1. 加载对话记忆
  *   2. 查询改写（指代消解 / 拆分 / 口语正规化）
- *   3. 意图分类（LLM 分类器 → KB_RETRIEVAL / CHAT / MCP）
- *   [短路] 闲聊/MCP 直回 —— 非 KB_RETRIEVAL 类型跳过检索
+ *   3. 意图分类（KB_META / KB_RETRIEVAL / CHAT）
+ *   [短路] KB_META → 目录快照，不检索正文
+ *   [短路] CHAT/MCP → 通用 Prompt
  *   4. 用户指定 KB 检索（前端传来的 kbIds 决定检索范围）
  *   5. 意图感知 Prompt（customPromptFragment + KB 名称标注）
  *   6. LLM 流式生成 → SSE 推送 → 落库
  * </pre>
  *
- * <p>意图分类判断模式（检索/闲聊/MCP），但具体检索哪个 KB 由用户在前端手动选择。
- * 用户未选择任何 KB 时跳过检索，纯 LLM 回复。</p>
+ * <p>意图只判模式。内容检索的范围由用户勾选的 kbIds 决定；
+ * 目录问答在未选 KB 时统计全部启用库。</p>
  */
 @Slf4j
 @Service
@@ -57,6 +58,7 @@ public class RagChatService {
 
     private final QueryRewriter queryRewriter;
     private final IntentClassifier intentClassifier;
+    private final KnowledgeCatalogService catalogService;
 
     public RagChatService(RetrievalEngine retrievalEngine,
                           ConversationManager conversationManager,
@@ -65,7 +67,8 @@ public class RagChatService {
                           ChatRateLimiter rateLimiter,
                           RagProperties properties,
                           QueryRewriter queryRewriter,
-                          IntentClassifier intentClassifier) {
+                          IntentClassifier intentClassifier,
+                          KnowledgeCatalogService catalogService) {
         this.retrievalEngine = retrievalEngine;
         this.conversationManager = conversationManager;
         this.promptTemplate = promptTemplate;
@@ -74,6 +77,7 @@ public class RagChatService {
         this.properties = properties;
         this.queryRewriter = queryRewriter;
         this.intentClassifier = intentClassifier;
+        this.catalogService = catalogService;
     }
 
     /**
@@ -146,15 +150,23 @@ public class RagChatService {
             rewritten.rewritten(), rewritten.subQueries().size(),
             System.currentTimeMillis() - t2);
 
-        // ── Stage 3: 意图分类（判断模式：KB_RETRIEVAL / CHAT / MCP）──
+        // ── Stage 3: 意图分类（KB_META / KB_RETRIEVAL / CHAT）──
         long t3 = System.currentTimeMillis();
         UsageContext.setCallType("CLASSIFY");
-        IntentResult intent = intentClassifier.classify(primaryQuery, history);
+        IntentResult intent = intentClassifier.classify(primaryQuery, history, hasKbIds);
         log.info("[pipeline] stage3: type={}, confidence={}, reason={} ({}ms)",
             intent.getType(), String.format("%.2f", intent.getConfidence()),
             intent.getReason(), System.currentTimeMillis() - t3);
 
-        // ── 短路: 非检索类型直接 LLM 回复 ──
+        if (intent.isKbMeta()) {
+            log.info("[pipeline] KB_META → catalog snapshot, skipping vector search");
+            KnowledgeCatalogService.CatalogSnapshot catalog = catalogService.snapshot(kbIds);
+            List<ChatMessage> messages = promptTemplate.buildCatalogPrompt(
+                primaryQuery, catalog.toPromptFacts(), history);
+            UsageContext.setCallType("CHAT");
+            return streamLLMResponse(messages, convId, question, List.of());
+        }
+
         // CHAT = 闲聊，MCP = 工具调用（预留），均不检索
         if (!intent.isKbRetrieval()) {
             log.info("[pipeline] non-retrieval intent ({}) → skipping retrieval", intent.getType());

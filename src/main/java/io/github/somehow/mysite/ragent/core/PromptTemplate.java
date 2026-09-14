@@ -2,12 +2,15 @@ package io.github.somehow.mysite.ragent.core;
 
 import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.core.intent.IntentResult;
+import io.github.somehow.mysite.ragent.dao.entity.KnowledgeBaseDO;
+import io.github.somehow.mysite.ragent.dao.mapper.KnowledgeBaseMapper;
 import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -24,10 +27,20 @@ import java.util.Map;
  * </ol>
  */
 @Component
-@RequiredArgsConstructor
 public class PromptTemplate {
 
     private final RagProperties properties;
+    private final KnowledgeBaseMapper kbMapper;
+
+    public PromptTemplate(RagProperties properties) {
+        this(properties, null);
+    }
+
+    @Autowired
+    public PromptTemplate(RagProperties properties, KnowledgeBaseMapper kbMapper) {
+        this.properties = properties;
+        this.kbMapper = kbMapper;
+    }
 
     private static final String RAG_SYSTEM = """
         你是"somehow 的博客"的 AI 助手，帮助读者理解博客中的技术内容。
@@ -52,6 +65,20 @@ public class PromptTemplate {
         你是"somehow 的博客"的 AI 助手。用户可以和你聊天或询问技术问题。
         如果用户询问博客相关的内容而你无法回答，建议他们去博客上查看相关文章。
         保持友好、专业的语气，使用 Markdown 格式回复。
+        """;
+
+    private static final String CATALOG_SYSTEM = """
+        你是"somehow 的博客"的知识库助手。用户在询问知识库本身的情况（文章数量、作者、最近入库的文章等），不是在检索某篇文章的技术内容。
+
+        ## 核心规则
+        1. 只能根据下面的「知识库目录」回答。数字、作者、时间必须与清单一致，禁止估算或编造。
+        2. 「上传人/作者」指文章作者，不是执行向量化（embedding）的操作人。
+        3. 清单没有的信息就说没有，不要用文章正文去补，也不要假装检索过。
+        4. 使用 Markdown，条理清晰。
+        5. 若目录为空或没有就绪文章，如实告知。
+
+        ## 知识库目录
+        %s
         """;
 
     // ── Phase 3: 基础 Prompt ──
@@ -79,6 +106,23 @@ public class PromptTemplate {
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(ChatMessage.system(GENERAL_SYSTEM));
         messages.addAll(history);
+        messages.add(ChatMessage.user(question));
+        return messages;
+    }
+
+    /**
+     * 知识库目录问答 Prompt —— 只根据结构化清单回答，不走向量检索。
+     */
+    public List<ChatMessage> buildCatalogPrompt(String question, String catalogFacts,
+                                                List<ChatMessage> history) {
+        String facts = (catalogFacts == null || catalogFacts.isBlank())
+            ? "当前没有可统计的知识库。"
+            : catalogFacts;
+        List<ChatMessage> messages = new ArrayList<>();
+        messages.add(ChatMessage.system(CATALOG_SYSTEM.replace("%s", facts)));
+        if (history != null) {
+            messages.addAll(history);
+        }
         messages.add(ChatMessage.user(question));
         return messages;
     }
@@ -150,17 +194,27 @@ public class PromptTemplate {
      * 每条来源前面加 "【知识库名】《文章标题》"，让用户和 LLM 都知道来源属于哪个 KB。
      */
     String formatContextWithKbName(List<SearchResult> results) {
-        Map<Long, String> kbNameCache = properties.getKbNameCache();
+        Map<Long, String> names = new HashMap<>();
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < results.size(); i++) {
             SearchResult r = results.get(i);
-            String kbName = kbNameCache.getOrDefault(r.kbId(), "博客");
+            String kbName = names.computeIfAbsent(r.kbId(), this::kbName);
             sb.append("---\n");
             sb.append("[来源%d] 【%s】《%s》（相关性: %.2f）\n\n".formatted(
                 i + 1, kbName, r.docTitle(), r.score()));
             sb.append(r.content()).append("\n\n");
         }
         return sb.toString();
+    }
+
+    private String kbName(Long id) {
+        if (id != null && kbMapper != null) {
+            KnowledgeBaseDO kb = kbMapper.selectById(id);
+            if (kb != null && kb.getName() != null && !kb.getName().isBlank()) {
+                return kb.getName();
+            }
+        }
+        return properties.getKbNameCache().getOrDefault(id, "博客");
     }
 
     /**
