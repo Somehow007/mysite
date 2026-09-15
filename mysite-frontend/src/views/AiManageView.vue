@@ -931,8 +931,9 @@ onBeforeUnmount(() => {
     <!-- ════ 模型与 API ════ -->
     <template v-else>
       <p class="text-sm text-text-secondary mb-4">
-        改动立即对后续对话生效。API Key 与 Chat 模型会回写
-        <code class="text-xs bg-bg-code px-1 py-0.5 rounded">{{ providersEnvFile || '.env' }}</code>
+        改动立即对后续对话生效。API Key 加密入库，不回写
+        <code class="text-xs bg-bg-code px-1 py-0.5 rounded">{{ providersEnvFile || '.env' }}</code>；
+        Chat / Embedding / Rerank 模型名会回写该文件
         （本地为项目根目录，生产为云服务器 <code class="text-xs bg-bg-code px-1 py-0.5 rounded">/opt/mysite/.env</code>）。
       </p>
       <div v-if="providersLoading" class="text-sm text-text-muted">加载供应商…</div>

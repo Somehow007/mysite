@@ -74,10 +74,20 @@ public class RetrievalEngine {
         log.info("[retrieval] vector search: {} candidates, kbIds={} ({}ms total)",
             candidates.size(), kbIds, System.currentTimeMillis() - t0);
 
-        // 过滤低分结果
+        double threshold = properties.getRetrieval().getScoreThreshold();
+        if (!candidates.isEmpty()) {
+            float min = candidates.stream().map(SearchResult::score).min(Float::compare).orElse(0f);
+            float max = candidates.stream().map(SearchResult::score).max(Float::compare).orElse(0f);
+            log.info("[retrieval] vector scores: min={}, max={}, threshold={}", min, max, threshold);
+        }
+        int beforeFilter = candidates.size();
         candidates = candidates.stream()
-            .filter(r -> r.score() >= properties.getRetrieval().getScoreThreshold())
+            .filter(r -> r.score() >= threshold)
             .toList();
+        if (candidates.size() < beforeFilter) {
+            log.info("[retrieval] score filter (threshold={}): {} → {}",
+                threshold, beforeFilter, candidates.size());
+        }
 
         if (candidates.isEmpty()) {
             return List.of();

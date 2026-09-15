@@ -107,8 +107,9 @@ rag:
       minimum-idle: 1
 
   # LLM 供应商配置（优先级从高到低）
-  # API Key / chat-model 从环境变量读：本地 source .env；生产由 /opt/mysite/start.sh 加载 /opt/mysite/.env
-  # 后台「模型与 API」保存后会热更新内存，并回写上述 .env（若文件存在），无需改 yaml 再发版
+  # chat-model 等从环境变量读：本地 .env；生产由 /opt/mysite/start.sh 加载 /opt/mysite/.env
+  # yaml 里的 ${DEEPSEEK_API_KEY:} 仅首次引导；后台保存后 Key 以 PG 密文为准，不再回写 .env
+  # 入库加密主密钥 MYSITE_CRYPTO_KEY（32 字节 Base64，openssl rand -base64 32）只在 .env，不在此绑定以免打印
   llm:
     env-file: ${MYSITE_ENV_FILE:}
     providers:
@@ -128,8 +129,9 @@ rag:
         base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
         api-key: ${BAILIAN_API_KEY:}
         chat-model: ${BAILIAN_CHAT_MODEL:qwen3-max}
-        embedding-model: text-embedding-v4  # 1024 维，与 PG vector(1024) 绑定；更换 = 全量重建向量
-        rerank-model: qwen3-rerank            # 走 DashScope 原生接口，非 OpenAI 兼容（见 3.2）
+        embedding-model: ${BAILIAN_EMBEDDING_MODEL:text-embedding-v4}
+        embedding-dimension: ${BAILIAN_EMBEDDING_DIMENSION:1024}      # 与 PG vector(n) 绑定；更换 = 改列并清空已有向量
+        rerank-model: ${BAILIAN_RERANK_MODEL:qwen3-rerank}            # 走 DashScope 原生接口，非 OpenAI 兼容（见 3.2）
         chat-timeout: 120s
         embedding-timeout: 30s
 
@@ -228,7 +230,7 @@ rag:
     admin-max-per-hour: 0       # 管理员无限制（0 = 不限）
     max-question-length: 500    # 单次问题最大字符数
 
-  # ── Phase 6: 知识库元数据（用于 Prompt 中标注 KB 来源名称）──
+  # Prompt 里知识库名称优先读 PG；下面只是 DB 查不到时的兜底，id 不必等于真实雪花 ID
   knowledge-bases:
     - id: 1
       name: "技术博客"

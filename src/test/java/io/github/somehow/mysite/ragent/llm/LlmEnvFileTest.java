@@ -53,4 +53,15 @@ class LlmEnvFileTest {
         assertTrue(text.contains("BAILIAN_API_KEY=keep"));
         assertTrue(text.contains("BAILIAN_CHAT_MODEL=qwen-plus"));
     }
+
+    @Test
+    @DisplayName("百炼绑定 embedding / rerank 环境变量名")
+    void bailianEmbeddingAndRerankEnvNames() {
+        assertEquals("BAILIAN_EMBEDDING_MODEL", LlmEnvFile.embeddingModelEnvName("bailian"));
+        assertEquals("BAILIAN_EMBEDDING_DIMENSION", LlmEnvFile.embeddingDimensionEnvName("bailian"));
+        assertEquals("BAILIAN_RERANK_MODEL", LlmEnvFile.rerankModelEnvName("bailian"));
+        assertNull(LlmEnvFile.embeddingModelEnvName("deepseek"));
+        assertNull(LlmEnvFile.embeddingDimensionEnvName("deepseek"));
+        assertNull(LlmEnvFile.rerankModelEnvName("deepseek"));
+    }
 }

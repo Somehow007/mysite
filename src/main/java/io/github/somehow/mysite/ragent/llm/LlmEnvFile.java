@@ -14,8 +14,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * 探测并回写 LLM 相关环境变量。生产由 {@code start.sh} 读 {@code /opt/mysite/.env}，
- * 本地开发读项目根 {@code .env}。值不带引号，与 start.sh 的 {@code load_env()} 一致。
+ * 探测并回写 LLM 非秘密环境变量（模型名等）。API Key 只加密进 PG，不回写本文件。
+ * 生产由 {@code start.sh} 读 {@code /opt/mysite/.env}，本地开发读项目根 {@code .env}。
  */
 public final class LlmEnvFile {
 
@@ -53,6 +53,27 @@ public final class LlmEnvFile {
             case "ollama" -> "OLLAMA_CHAT_MODEL";
             default -> null;
         };
+    }
+
+    public static String embeddingModelEnvName(String provider) {
+        if (provider == null || !"bailian".equalsIgnoreCase(provider)) {
+            return null;
+        }
+        return "BAILIAN_EMBEDDING_MODEL";
+    }
+
+    public static String embeddingDimensionEnvName(String provider) {
+        if (provider == null || !"bailian".equalsIgnoreCase(provider)) {
+            return null;
+        }
+        return "BAILIAN_EMBEDDING_DIMENSION";
+    }
+
+    public static String rerankModelEnvName(String provider) {
+        if (provider == null || !"bailian".equalsIgnoreCase(provider)) {
+            return null;
+        }
+        return "BAILIAN_RERANK_MODEL";
     }
 
     public static Path resolve(RagProperties properties) {

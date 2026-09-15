@@ -1,7 +1,5 @@
 package io.github.somehow.mysite.ragent.llm;
 
-import io.github.somehow.mysite.ragent.llm.embedding.BaiLianEmbeddingService;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.ragent.llm.embedding.BaiLianEmbeddingService;
 import okhttp3.mockwebserver.MockResponse;
@@ -212,6 +210,24 @@ class BaiLianEmbeddingServiceTest {
 
             assertTrue(results.isEmpty());
             assertEquals(0, mockServer.getRequestCount());
+        }
+
+        @Test
+        @DisplayName("配置 dimensions 时请求体包含该字段")
+        void embedShouldSendDimensions() throws Exception {
+            WebClient webClient = WebClient.builder()
+                .baseUrl(mockServer.url("/").toString())
+                .build();
+            service = new BaiLianEmbeddingService(webClient, "text-embedding-v4", objectMapper, 10, 768);
+            mockServer.enqueue(new MockResponse()
+                .setBody(buildEmbeddingResponse(new float[][]{ makeVec(768, 0.2f) }))
+                .addHeader("Content-Type", "application/json"));
+
+            float[] vec = service.embed("dim");
+
+            assertEquals(768, vec.length);
+            String body = mockServer.takeRequest().getBody().readUtf8();
+            assertTrue(body.contains("\"dimensions\":768"), body);
         }
 
         @Test

@@ -10,7 +10,7 @@ import {
   getKnowledgeBases, createKnowledgeBase, updateKnowledgeBase, deleteKnowledgeBase,
   toggleKnowledgeBase,
   getKnowledgeDocuments, getAvailableArticles, addArticlesToKb,
-  deleteKnowledgeDocument, reprocessDocument, getDocumentChunks,
+  deleteKnowledgeDocument, reprocessDocument, getDocumentChunks, syncKnowledgeBase,
   type KnowledgeChunk,
 } from '@/api/rag'
 import { useToast } from '@/composables/useToast'
@@ -19,6 +19,7 @@ import { Pagination, PageHeader, DataTable, Badge, StatusDot, Modal } from '@/co
 import type { KnowledgeBase, KnowledgeDocument } from '@/types'
 import type { AvailableArticle } from '@/api/rag'
 import type { Column } from '@/components/ui/DataTable.vue'
+import { getAiProviders } from '@/api/aiAdmin'
 
 const PAGE = 20
 
@@ -68,10 +69,20 @@ const editorForm = ref({
   chunkSize: 800, chunkOverlap: 100, chunkingMode: 'MARKDOWN_HEADING',
 })
 const showAdvancedConfig = ref(false)
+const defaultEmbedding = ref({ model: 'text-embedding-v4', dimension: 1024 })
+
+function emptyEditorForm() {
+  return {
+    name: '', description: '',
+    embeddingModel: defaultEmbedding.value.model,
+    embeddingDimension: defaultEmbedding.value.dimension,
+    chunkSize: 800, chunkOverlap: 100, chunkingMode: 'MARKDOWN_HEADING',
+  }
+}
 
 function openCreate() {
   editingKb.value = null
-  editorForm.value = { name: '', description: '', embeddingModel: 'text-embedding-v4', embeddingDimension: 1024, chunkSize: 800, chunkOverlap: 100, chunkingMode: 'MARKDOWN_HEADING' }
+  editorForm.value = emptyEditorForm()
   showAdvancedConfig.value = false
   showEditor.value = true
 }
@@ -207,6 +218,29 @@ async function reprocess(doc: KnowledgeDocument) {
     // Start polling if there are processing docs
     if (hasActiveDocs()) startPolling()
   } catch (e: unknown) { toast.error((e as Error).message || '操作失败') }
+}
+
+const rebuilding = ref(false)
+async function rebuildVectors() {
+  if (!selectedKbId.value) return
+  const ok = await confirm({
+    title: '按当前模型重建向量',
+    message: '会用当前 Embedding 模型重新向量化本库全部文章。重建期间检索可能暂时变少，完成后即可恢复。',
+    confirmText: '开始重建',
+  })
+  if (!ok) return
+  rebuilding.value = true
+  try {
+    const r = await syncKnowledgeBase(selectedKbId.value)
+    toast.success(`已提交 ${r.synced} 篇文档重建`)
+    await fetchDocs()
+    await fetchKbs()
+    if (hasActiveDocs()) startPolling()
+  } catch (e: unknown) {
+    toast.error((e as Error).message || '重建失败')
+  } finally {
+    rebuilding.value = false
+  }
 }
 	function setDocFilter(f: typeof docStatusFilter.value) {
 	  docStatusFilter.value = f
@@ -409,8 +443,23 @@ const docColumns: Column<KnowledgeDocument>[] = [
 
 onMounted(() => {
   fetchKbs()
+  fetchEmbeddingDefaults()
   document.addEventListener('visibilitychange', handleVisibilityChange)
 })
+
+async function fetchEmbeddingDefaults() {
+  try {
+    const providers = await getAiProviders()
+    const bailian = providers.find(p => p.name === 'bailian')
+    if (!bailian) return
+    defaultEmbedding.value = {
+      model: bailian.embeddingModel || 'text-embedding-v4',
+      dimension: bailian.embeddingDimension || 1024,
+    }
+  } catch {
+    /* 非管理员或接口失败时沿用默认 1024 */
+  }
+}
 
 onBeforeUnmount(() => {
   stopPolling()
@@ -670,9 +719,10 @@ watch(selectedKbId, () => {
             <template #cell-actions="{ item }">
               <div class="flex items-center justify-center gap-0.5">
                 <button
-                  v-if="item.status === 'FAILED'"
+                  v-if="item.status === 'FAILED' || item.status === 'READY'"
                   class="p-1.5 rounded text-text-muted hover:text-accent hover:bg-accent-subtle transition-colors"
-                  title="重新处理" @click="reprocess(item)"
+                  :title="item.status === 'FAILED' ? '重新处理' : '按当前模型重建'"
+                  @click="reprocess(item)"
                 ><RotateCw :size="13" /></button>
                 <button
                   class="p-1.5 rounded text-text-muted hover:text-danger hover:bg-danger-subtle transition-colors"
@@ -898,6 +948,17 @@ watch(selectedKbId, () => {
                 />
               </div>
             </div>
+            <p class="text-xs text-text-muted mt-3">
+              更换 Embedding 模型后必须重建向量，否则查询向量与库存向量不在同一语义空间，检索会几乎失效。
+            </p>
+            <button
+              class="mt-3 btn-secondary text-sm inline-flex items-center gap-2"
+              :disabled="rebuilding"
+              @click="rebuildVectors"
+            >
+              <RefreshCw :size="14" :class="{ 'animate-spin': rebuilding }" />
+              {{ rebuilding ? '正在提交…' : '按当前模型重建向量' }}
+            </button>
           </div>
           <p class="text-xs text-text-muted">
             提示：修改以上设置请通过右上角「编辑」按钮进入知识库编辑界面。

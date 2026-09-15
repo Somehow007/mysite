@@ -128,6 +128,36 @@ public class KnowledgeDocumentController {
         return Results.success(result);
     }
 
+    /** 按当前 Embedding 模型重建本库全部文章向量。 */
+    @PostMapping("/sync")
+    public Result<Map<String, Object>> syncKb(@PathVariable Long kbId) {
+        KnowledgeBaseDO kb = kbMapper.selectById(kbId);
+        if (kb == null) {
+            throw new ClientException("知识库不存在");
+        }
+        List<KnowledgeDocumentDO> docs = docMapper.selectList(
+            new LambdaQueryWrapper<KnowledgeDocumentDO>()
+                .eq(KnowledgeDocumentDO::getKbId, kbId)
+                .eq(KnowledgeDocumentDO::getSourceType, "ARTICLE"));
+        int queued = 0;
+        for (KnowledgeDocumentDO doc : docs) {
+            if (doc.getSourceRef() == null) {
+                continue;
+            }
+            ArticleDO article = articleMapper.selectById(Long.valueOf(doc.getSourceRef()));
+            if (article == null || article.getContent() == null) {
+                continue;
+            }
+            docService.syncArticle(article, kbId);
+            queued++;
+        }
+        log.info("Queued knowledge-base re-embed: kbId={}, queued={}, total={}", kbId, queued, docs.size());
+        Map<String, Object> result = new HashMap<>();
+        result.put("synced", queued);
+        result.put("total", docs.size());
+        return Results.success(result);
+    }
+
     /** 删除文档 */
     @DeleteMapping("/docs/{docId}")
     public Result<Void> deleteDoc(@PathVariable Long kbId, @PathVariable Long docId) {
@@ -148,8 +178,8 @@ public class KnowledgeDocumentController {
         if (doc == null || !doc.getKbId().equals(kbId)) {
             throw new ClientException("文档不存在");
         }
-        if (!"FAILED".equals(doc.getStatus())) {
-            throw new ClientException("只有 FAILED 状态的文档才需要重新处理");
+        if (!"FAILED".equals(doc.getStatus()) && !"READY".equals(doc.getStatus())) {
+            throw new ClientException("只有 READY 或 FAILED 状态的文档可以重新处理");
         }
         vectorStore.deleteByDocId(docId);
         chunkMapper.deleteByDocId(docId);

@@ -12,7 +12,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Types;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -175,6 +175,74 @@ public class PgvectorVectorStore implements VectorStore{
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to delete vectors by docId: " + docId, e);
+        }
+    }
+
+    @Override
+    public void deleteAll() {
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            int n = stmt.executeUpdate("DELETE FROM t_knowledge_vector");
+            log.info("Deleted {} embedding vectors (model rebuild)", n);
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to delete all vectors", e);
+        }
+    }
+
+    @Override
+    public Integer embeddingColumnDimension() {
+        String sql = """
+                SELECT format_type(a.atttypid, a.atttypmod)
+                FROM pg_attribute a
+                WHERE a.attrelid = 't_knowledge_vector'::regclass
+                  AND a.attname = 'embedding'
+                  AND NOT a.attisdropped
+                """;
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (!rs.next()) {
+                return null;
+            }
+            String type = rs.getString(1);
+            if (type == null) {
+                return null;
+            }
+            int start = type.lastIndexOf('(');
+            int end = type.lastIndexOf(')');
+            if (start < 0 || end <= start) {
+                return null;
+            }
+            return Integer.parseInt(type.substring(start + 1, end));
+        } catch (SQLException e) {
+            log.warn("Failed to read embedding column dimension: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    @Override
+    public boolean migrateEmbeddingDimension(int dimension) {
+        if (dimension < 64 || dimension > 4096) {
+            throw new IllegalArgumentException("Embedding 维度须在 64–4096 之间: " + dimension);
+        }
+        Integer current = embeddingColumnDimension();
+        if (current != null && current == dimension) {
+            return false;
+        }
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute("DROP INDEX IF EXISTS idx_vector_embedding");
+            stmt.execute("DELETE FROM t_knowledge_vector");
+            stmt.execute("ALTER TABLE t_knowledge_vector ALTER COLUMN embedding TYPE vector(" + dimension + ")");
+            stmt.execute("""
+                    CREATE INDEX idx_vector_embedding ON t_knowledge_vector
+                        USING hnsw (embedding vector_cosine_ops)
+                        WITH (m = 16, ef_construction = 64)
+                    """);
+            log.info("Migrated t_knowledge_vector.embedding from vector({}) to vector({})", current, dimension);
+            return true;
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to migrate embedding dimension to " + dimension, e);
         }
     }
 }

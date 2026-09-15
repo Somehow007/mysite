@@ -13,15 +13,17 @@ import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 百炼 Embedding 服务 —— 锁定 text-embedding-v4（1024 维）。
+ * 百炼 Embedding 服务。模型名与输出维度可在后台「模型与 API」热更新。
+ * 请求会带 {@code dimensions}，与 PG {@code vector(n)} 对齐。
  *
  * 为什么不做多供应商降级？查询向量与入库向量必须同模型、同维度。
- * 各供应商 embedding 维度不同（百炼 = 1024，OpenAI text-embedding-3-small = 1536），
- * 降级后往 PG vector(1024) 列里插直接报错。更换模型 = 全量重建向量，属于运维操作。
+ * 各供应商 embedding 维度不同（百炼 v4 = 1024，OpenAI text-embedding-3-small = 1536），
+ * 降级后往 PG vector(1024) 列里插直接报错。更换模型 = 全量重建向量。
  *
  * API 格式（OpenAI 兼容）：
  *   POST {baseUrl}/embeddings
@@ -34,6 +36,7 @@ public class BaiLianEmbeddingService implements EmbeddingService {
 
     private volatile WebClient webClient;
     private volatile String model;
+    private volatile Integer dimensions;
     private final ObjectMapper objectMapper;
     private final int maxBatchSize;  // API 单次调用上限（text-embedding-v4 = 10）
 
@@ -60,17 +63,19 @@ public class BaiLianEmbeddingService implements EmbeddingService {
                 || bailian.getApiKey() == null || bailian.getApiKey().isBlank()) {
             this.webClient = null;
             this.model = bailian != null ? bailian.getEmbeddingModel() : null;
+            this.dimensions = bailian != null ? bailian.getEmbeddingDimension() : null;
             log.warn("BaiLianEmbeddingService disabled: missing bailian embedding config or API key");
             return;
         }
         this.model = bailian.getEmbeddingModel();
+        this.dimensions = bailian.getEmbeddingDimension() != null ? bailian.getEmbeddingDimension() : 1024;
         this.webClient = WebClient.builder()
             .baseUrl(bailian.getBaseUrl())
             .defaultHeader("Authorization", "Bearer " + bailian.getApiKey())
             .defaultHeader("Content-Type", "application/json")
             .build();
-        log.info("BaiLianEmbeddingService runtime config: model={}, baseUrl={}",
-            model, bailian.getBaseUrl());
+        log.info("BaiLianEmbeddingService runtime config: model={}, dimensions={}, baseUrl={}",
+            model, dimensions, bailian.getBaseUrl());
     }
 
     /**
@@ -78,10 +83,16 @@ public class BaiLianEmbeddingService implements EmbeddingService {
      * public 以便跨 package 的集成测试使用；生产代码应使用 @Autowired 构造器。
      */
     public BaiLianEmbeddingService(WebClient webClient, String model, ObjectMapper objectMapper, int maxBatchSize) {
+        this(webClient, model, objectMapper, maxBatchSize, null);
+    }
+
+    public BaiLianEmbeddingService(WebClient webClient, String model, ObjectMapper objectMapper,
+                                   int maxBatchSize, Integer dimensions) {
         this.webClient = webClient;
         this.model = model;
         this.objectMapper = objectMapper;
         this.maxBatchSize = maxBatchSize;
+        this.dimensions = dimensions;
     }
 
     @Override
@@ -91,6 +102,11 @@ public class BaiLianEmbeddingService implements EmbeddingService {
             throw new RuntimeException("Embedding API returned empty result");
         }
         return results.get(0);
+    }
+
+    @Override
+    public String currentModel() {
+        return model;
     }
 
     @Override
@@ -123,12 +139,16 @@ public class BaiLianEmbeddingService implements EmbeddingService {
         UsageContext.State ctx = UsageContext.snapshot();
         int estimated = TokenUsage.estimateTokens(inputs.stream().mapToInt(String::length).sum());
         try {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("model", currentModel);
+            body.put("input", inputs.size() == 1 ? inputs.get(0) : inputs);
+            Integer dim = this.dimensions;
+            if (dim != null && dim > 0) {
+                body.put("dimensions", dim);
+            }
             String responseBody = client.post()
                 .uri("/embeddings")
-                .bodyValue(Map.of(
-                    "model", currentModel,
-                    "input", inputs.size() == 1 ? inputs.get(0) : inputs
-                ))
+                .bodyValue(body)
                 .retrieve()
                 .bodyToMono(String.class)
                 .block(Duration.ofSeconds(30));

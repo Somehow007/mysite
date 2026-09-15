@@ -38,6 +38,24 @@ public interface VectorStore {
      */
     void deleteByDocId(Long docId);
 
+    /**
+     * 清空全部向量（换 embedding 模型、维度不变时使用）。
+     */
+    void deleteAll();
+
+    /**
+     * 当前 PG {@code embedding} 列声明维度；读不到时返回 {@code null}。
+     */
+    Integer embeddingColumnDimension();
+
+    /**
+     * 将 {@code t_knowledge_vector.embedding} 改为 {@code vector(n)}。
+     * 不同维度无法原地转换，会先清空已有向量。维度未变则 no-op。
+     *
+     * @return 是否实际改了列
+     */
+    boolean migrateEmbeddingDimension(int dimension);
+
     // === 内嵌数据类 ===
 
     record VectorEntry(

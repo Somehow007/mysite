@@ -18,6 +18,7 @@ public class LlmProviderSettingDO {
     private String baseUrl;
     private String chatModel;
     private String embeddingModel;
+    private Integer embeddingDimension;
     private String rerankModel;
     private String apiKey;
     private LocalDateTime updateTime;

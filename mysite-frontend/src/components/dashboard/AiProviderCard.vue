@@ -23,10 +23,23 @@ const CHAT_MODEL_HINTS: Record<string, string[]> = {
   ollama: ['qwen3:8b', 'qwen2.5:7b'],
 }
 
+const EMBEDDING_MODEL_HINTS: Record<string, string[]> = {
+  bailian: ['text-embedding-v4', 'text-embedding-v3', 'text-embedding-v2'],
+}
+
+const RERANK_MODEL_HINTS: Record<string, string[]> = {
+  bailian: ['qwen3-rerank', 'gte-rerank', 'gte-rerank-hybrid'],
+}
+
+const EMBEDDING_DIM_HINTS = [2048, 1536, 1024, 768, 512, 256]
+
 const form = reactive({
   enabled: false,
   priority: 1,
   chatModel: '',
+  embeddingModel: '',
+  embeddingDimension: 1024,
+  rerankModel: '',
   baseUrl: '',
   apiKey: '',
 })
@@ -37,6 +50,9 @@ watch(
     form.enabled = p.enabled
     form.priority = p.priority
     form.chatModel = p.chatModel || ''
+    form.embeddingModel = p.embeddingModel || ''
+    form.embeddingDimension = p.embeddingDimension || 1024
+    form.rerankModel = p.rerankModel || ''
     form.baseUrl = p.baseUrl || ''
     form.apiKey = ''
   },
@@ -49,6 +65,9 @@ const dirty = computed(() => {
     form.enabled !== p.enabled
     || form.priority !== p.priority
     || form.chatModel !== (p.chatModel || '')
+    || form.embeddingModel !== (p.embeddingModel || '')
+    || form.embeddingDimension !== (p.embeddingDimension || 1024)
+    || form.rerankModel !== (p.rerankModel || '')
     || form.baseUrl !== (p.baseUrl || '')
     || form.apiKey.trim() !== ''
   )
@@ -59,7 +78,22 @@ const pinging = ref(false)
 const pingResult = ref<{ ok: boolean; text: string } | null>(null)
 
 const hints = computed(() => CHAT_MODEL_HINTS[props.provider.name] ?? [])
+const embeddingHints = computed(() => EMBEDDING_MODEL_HINTS[props.provider.name] ?? [])
+const rerankHints = computed(() => RERANK_MODEL_HINTS[props.provider.name] ?? [])
 const listId = computed(() => `chat-model-${props.provider.name}`)
+const embeddingListId = computed(() => `embedding-model-${props.provider.name}`)
+const dimListId = computed(() => `embedding-dim-${props.provider.name}`)
+const rerankListId = computed(() => `rerank-model-${props.provider.name}`)
+const showEmbedding = computed(() =>
+  props.provider.name === 'bailian' || !!props.provider.embeddingModel || !!form.embeddingModel,
+)
+const showRerank = computed(() =>
+  props.provider.name === 'bailian' || !!props.provider.rerankModel || !!form.rerankModel,
+)
+const embeddingChanged = computed(() =>
+  form.embeddingModel !== (props.provider.embeddingModel || '')
+  || form.embeddingDimension !== (props.provider.embeddingDimension || 1024),
+)
 
 async function save() {
   saving.value = true
@@ -69,6 +103,9 @@ async function save() {
       enabled: form.enabled,
       priority: form.priority,
       chatModel: form.chatModel.trim(),
+      embeddingModel: form.embeddingModel.trim() || undefined,
+      embeddingDimension: form.embeddingDimension || undefined,
+      rerankModel: form.rerankModel.trim() || undefined,
       baseUrl: form.baseUrl.trim(),
       apiKey: form.apiKey.trim() || undefined,
     })
@@ -166,17 +203,54 @@ async function ping() {
       </label>
     </div>
 
-    <dl v-if="provider.embeddingModel || provider.rerankModel" class="space-y-1.5 text-xs border-t border-border pt-3">
-      <div v-if="provider.embeddingModel" class="flex items-baseline justify-between gap-3">
-        <dt class="text-text-muted shrink-0">Embedding</dt>
-        <dd class="font-mono text-text-secondary truncate">{{ provider.embeddingModel }}</dd>
+    <div v-if="showEmbedding || showRerank" class="grid gap-3 border-t border-border pt-3">
+      <div v-if="showEmbedding" class="flex flex-col sm:flex-row gap-3">
+        <label class="block flex-1 min-w-0">
+          <span class="text-xs text-text-muted">Embedding 模型</span>
+          <input
+            v-model="form.embeddingModel"
+            class="input-base mt-1 font-mono text-xs"
+            :list="embeddingListId"
+            autocomplete="off"
+          />
+          <datalist :id="embeddingListId">
+            <option v-for="m in embeddingHints" :key="m" :value="m" />
+          </datalist>
+        </label>
+        <label class="block w-full sm:w-28 shrink-0">
+          <span class="text-xs text-text-muted">维度</span>
+          <input
+            v-model.number="form.embeddingDimension"
+            type="number"
+            min="64"
+            max="4096"
+            step="1"
+            class="input-base mt-1 font-mono text-xs"
+            :list="dimListId"
+          />
+          <datalist :id="dimListId">
+            <option v-for="d in EMBEDDING_DIM_HINTS" :key="d" :value="d" />
+          </datalist>
+        </label>
       </div>
-      <div v-if="provider.rerankModel" class="flex items-baseline justify-between gap-3">
-        <dt class="text-text-muted shrink-0">Rerank</dt>
-        <dd class="font-mono text-text-secondary truncate">{{ provider.rerankModel }}</dd>
-      </div>
-      <p class="text-[11px] text-text-muted">向量 / 精排模型与库维度绑定，不在此修改。</p>
-    </dl>
+      <label v-if="showRerank" class="block">
+        <span class="text-xs text-text-muted">Rerank 模型</span>
+        <input
+          v-model="form.rerankModel"
+          class="input-base mt-1 font-mono text-xs"
+          :list="rerankListId"
+          autocomplete="off"
+        />
+        <datalist :id="rerankListId">
+          <option v-for="m in rerankHints" :key="m" :value="m" />
+        </datalist>
+      </label>
+      <p v-if="showEmbedding" class="text-[11px]" :class="embeddingChanged ? 'text-[var(--warning)]' : 'text-text-muted'">
+        {{ embeddingChanged
+          ? '更换模型或维度后须重建知识库向量。保存新维度会清空已有向量并调整 PG 列。'
+          : 'v4 常用 1024/768/512；改维度会清空已入库向量。' }}
+      </p>
+    </div>
 
     <p v-if="pingResult" class="text-[11px]" :class="pingResult.ok ? 'text-[var(--success)]' : 'text-[var(--danger)]'">
       {{ pingResult.text }}

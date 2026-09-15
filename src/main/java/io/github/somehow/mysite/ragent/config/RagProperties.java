@@ -58,7 +58,7 @@ public class RagProperties {
         private CircuitBreakerProperties circuitBreaker = new CircuitBreakerProperties();
         private PricingProperties pricing = new PricingProperties();
         /**
-         * 后台保存 API Key / chat-model 时回写的 .env 路径。
+         * 后台保存 chat-model 等非秘密配置时回写的 .env 路径（API Key 不回写）。
          * 空则自动探测：生产 {@code /opt/mysite/.env}，否则 {@code ${user.dir}/.env}。
          */
         private String envFile;
@@ -85,6 +85,8 @@ public class RagProperties {
         private String apiKey;
         private String chatModel;
         private String embeddingModel;
+        /** 百炼 embedding 输出维度，写入 PG vector(n)；更换须重建向量 */
+        private Integer embeddingDimension;
         private String rerankModel;
         private Duration chatTimeout = Duration.ofSeconds(120);
         private Duration embeddingTimeout = Duration.ofSeconds(30);

@@ -64,7 +64,7 @@ public class AdminAiController {
         return Results.success(adminAiService.listProviders());
     }
 
-    @Operation(summary = "更新 LLM 供应商（热生效，并回写 .env）")
+    @Operation(summary = "更新 LLM 供应商（热生效；Key 加密入库，模型名回写 .env）")
     @PutMapping("/providers/{name}")
     public Result<List<LlmProviderViewDTO>> updateProvider(
             @PathVariable String name,

@@ -141,11 +141,16 @@ public class KnowledgeDocumentService {
                 chunkMapper.insert(chunkDO);
 
                 vectorStore.insert(List.of(new VectorStore.VectorEntry(
-                    chunkDO.getId(), kb.getId(), embeddings.get(i), kb.getEmbeddingModel()
+                    chunkDO.getId(), kb.getId(), embeddings.get(i), embeddingModelName(kb)
                 )));
             }
 
-            // 7. 标记完成
+            // 7. 标记完成，并把知识库上的模型名同步成实际入库用的模型
+            String usedModel = embeddingModelName(kb);
+            if (usedModel != null && !usedModel.equals(kb.getEmbeddingModel())) {
+                kb.setEmbeddingModel(usedModel);
+                kbMapper.updateById(kb);
+            }
             doc.setStatus("READY");
             docMapper.updateById(doc);
             log.info("文章向量化完成: articleId={}, title={}, chunks={}",
@@ -186,5 +191,14 @@ public class KnowledgeDocumentService {
         } catch (Exception e) {
             log.error("清理文章 RAG 数据失败, articleId={}", articleId, e);
         }
+    }
+
+    /** 入库向量必须标运行时模型名，否则改模型后检索会拿新旧向量交叉比较。 */
+    private String embeddingModelName(KnowledgeBaseDO kb) {
+        String runtime = embeddingService.currentModel();
+        if (runtime != null && !runtime.isBlank()) {
+            return runtime;
+        }
+        return kb.getEmbeddingModel();
     }
 }

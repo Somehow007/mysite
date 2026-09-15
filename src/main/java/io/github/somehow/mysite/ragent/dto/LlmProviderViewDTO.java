@@ -11,6 +11,7 @@ public class LlmProviderViewDTO {
     private String apiKeyMasked;
     private String chatModel;
     private String embeddingModel;
+    private Integer embeddingDimension;
     private String rerankModel;
     private boolean configured;
     private String envApiKeyName;

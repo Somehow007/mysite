@@ -47,6 +47,7 @@ export interface LlmProviderView {
   apiKeyMasked?: string
   chatModel?: string
   embeddingModel?: string
+  embeddingDimension?: number
   rerankModel?: string
   configured: boolean
   envApiKeyName?: string | null
@@ -62,6 +63,9 @@ export interface LlmProviderUpdate {
   priority?: number
   baseUrl?: string
   chatModel?: string
+  embeddingModel?: string
+  embeddingDimension?: number
+  rerankModel?: string
   apiKey?: string
 }
 

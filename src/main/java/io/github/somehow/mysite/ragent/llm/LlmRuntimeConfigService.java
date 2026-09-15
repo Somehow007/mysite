@@ -12,12 +12,14 @@ import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
 import io.github.somehow.mysite.ragent.llm.provider.AbstractOpenAiProvider;
 import io.github.somehow.mysite.ragent.llm.rerank.BaiLianRerankProvider;
+import io.github.somehow.mysite.ragent.service.KnowledgeBaseService;
+import io.github.somehow.mysite.ragent.vector.VectorStore;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.DependsOn;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -32,12 +34,12 @@ import java.util.stream.Collectors;
 
 /**
  * 后台修改模型 / API Key 的运行时入口：覆盖 {@link RagProperties}、热更新客户端、
- * 写入 PG，并在探测到 .env 时回写 Key / chat-model，与生产 {@code start.sh load_env()} 对齐。
+ * API Key 加密写入 PG；.env 只回写模型名，不再回写 Key。
  */
 @Slf4j
 @Service
 @DependsOn("ragentSchemaMigration")
-public class LlmRuntimeConfigService {
+public class LlmRuntimeConfigService implements ApplicationRunner {
 
     private final RagProperties ragProperties;
     private final LlmProviderSettingMapper settingMapper;
@@ -45,36 +47,52 @@ public class LlmRuntimeConfigService {
     private final LLMService classificationLLM;
     private final ObjectProvider<BaiLianEmbeddingService> embedding;
     private final ObjectProvider<BaiLianRerankProvider> rerank;
+    private final ObjectProvider<VectorStore> vectorStore;
+    private final ObjectProvider<KnowledgeBaseService> knowledgeBases;
+    private final SecretCrypto secretCrypto;
 
     public LlmRuntimeConfigService(RagProperties ragProperties,
                                    LlmProviderSettingMapper settingMapper,
                                    List<LLMProvider> providers,
                                    @Qualifier("classificationLLM") LLMService classificationLLM,
                                    ObjectProvider<BaiLianEmbeddingService> embedding,
-                                   ObjectProvider<BaiLianRerankProvider> rerank) {
+                                   ObjectProvider<BaiLianRerankProvider> rerank,
+                                   ObjectProvider<VectorStore> vectorStore,
+                                   ObjectProvider<KnowledgeBaseService> knowledgeBases,
+                                   SecretCrypto secretCrypto) {
         this.ragProperties = ragProperties;
         this.settingMapper = settingMapper;
         this.providers = providers;
         this.classificationLLM = classificationLLM;
         this.embedding = embedding;
         this.rerank = rerank;
+        this.vectorStore = vectorStore;
+        this.knowledgeBases = knowledgeBases;
+        this.secretCrypto = secretCrypto;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
+    @Override
+    public void run(ApplicationArguments args) {
+        onReady();
+    }
+
     public void onReady() {
+        List<LlmProviderSettingDO> rows;
         try {
-            List<LlmProviderSettingDO> rows = settingMapper.selectList(null);
-            if (rows == null || rows.isEmpty()) {
-                return;
-            }
-            for (LlmProviderSettingDO row : rows) {
-                overlay(row);
-            }
-            refreshLiveClients();
-            log.info("Applied {} persisted LLM provider override(s)", rows.size());
+            rows = settingMapper.selectList(null);
         } catch (Exception e) {
-            log.warn("Failed to apply persisted LLM settings, using yaml/env: {}", e.getMessage());
+            log.warn("Failed to load persisted LLM settings, using yaml/env: {}", e.getMessage());
+            return;
         }
+        if (rows == null || rows.isEmpty()) {
+            return;
+        }
+        for (LlmProviderSettingDO row : rows) {
+            overlay(row);
+        }
+        migratePlaintextKeys(rows);
+        refreshLiveClients();
+        log.info("Applied {} persisted LLM provider override(s)", rows.size());
     }
 
     public Path envFile() {
@@ -107,6 +125,8 @@ public class LlmRuntimeConfigService {
 
     public synchronized void update(String name, LlmProviderUpdateRequest req) {
         RagProperties.Provider p = requireProvider(name);
+        String previousModel = p.getEmbeddingModel();
+        int previousDim = effectiveDimension(p);
         if (req.getEnabled() != null) {
             p.setEnabled(req.getEnabled());
         }
@@ -119,6 +139,15 @@ public class LlmRuntimeConfigService {
         if (req.getChatModel() != null && !req.getChatModel().isBlank()) {
             p.setChatModel(req.getChatModel().trim());
         }
+        if (req.getEmbeddingModel() != null && !req.getEmbeddingModel().isBlank()) {
+            p.setEmbeddingModel(req.getEmbeddingModel().trim());
+        }
+        if (req.getEmbeddingDimension() != null) {
+            p.setEmbeddingDimension(validateDimension(req.getEmbeddingDimension()));
+        }
+        if (req.getRerankModel() != null && !req.getRerankModel().isBlank()) {
+            p.setRerankModel(req.getRerankModel().trim());
+        }
         boolean keyChanged = StringUtils.hasText(req.getApiKey());
         if (keyChanged) {
             p.setApiKey(req.getApiKey().trim());
@@ -128,8 +157,58 @@ public class LlmRuntimeConfigService {
         }
 
         persist(name, p, keyChanged);
-        syncEnvFile(name, p, keyChanged);
+        syncEnvFile(name, p);
+        if ("bailian".equalsIgnoreCase(name)) {
+            invalidateEmbeddingsIfNeeded(p, previousModel, previousDim);
+        }
         refreshLiveClients();
+    }
+
+    /**
+     * 换 embedding 模型或维度后，旧向量与新查询不在同一语义空间。
+     * 维度变了要改 PG 列；只换模型则清空向量。两种情况都把文档标 FAILED，等重建。
+     */
+    private void invalidateEmbeddingsIfNeeded(RagProperties.Provider p, String previousModel, int previousDim) {
+        int newDim = effectiveDimension(p);
+        boolean dimChanged = newDim != previousDim;
+        boolean modelChanged = StringUtils.hasText(previousModel)
+                && StringUtils.hasText(p.getEmbeddingModel())
+                && !previousModel.equals(p.getEmbeddingModel());
+        if (!dimChanged && !modelChanged) {
+            return;
+        }
+        VectorStore store = vectorStore.getIfAvailable();
+        if (store == null) {
+            log.warn("Skip embedding invalidate: VectorStore unavailable");
+            return;
+        }
+        try {
+            if (dimChanged) {
+                store.migrateEmbeddingDimension(newDim);
+            } else {
+                store.deleteAll();
+            }
+            KnowledgeBaseService kbs = knowledgeBases.getIfAvailable();
+            if (kbs != null) {
+                kbs.onGlobalEmbeddingChanged(p.getEmbeddingModel(), newDim);
+            }
+        } catch (Exception e) {
+            throw new ClientException("更新 Embedding 后清理旧向量失败: " + e.getMessage());
+        }
+    }
+
+    static int validateDimension(int dimension) {
+        if (dimension < 64 || dimension > 4096) {
+            throw new ClientException("Embedding 维度须在 64–4096 之间");
+        }
+        return dimension;
+    }
+
+    static int effectiveDimension(RagProperties.Provider p) {
+        if (p == null || p.getEmbeddingDimension() == null || p.getEmbeddingDimension() <= 0) {
+            return 1024;
+        }
+        return p.getEmbeddingDimension();
     }
 
     public LlmProviderPingDTO ping(String name) {
@@ -209,8 +288,17 @@ public class LlmRuntimeConfigService {
         if (StringUtils.hasText(row.getChatModel())) {
             p.setChatModel(row.getChatModel());
         }
+        if (StringUtils.hasText(row.getEmbeddingModel())) {
+            p.setEmbeddingModel(row.getEmbeddingModel());
+        }
+        if (row.getEmbeddingDimension() != null && row.getEmbeddingDimension() > 0) {
+            p.setEmbeddingDimension(row.getEmbeddingDimension());
+        }
+        if (StringUtils.hasText(row.getRerankModel())) {
+            p.setRerankModel(row.getRerankModel());
+        }
         if (StringUtils.hasText(row.getApiKey())) {
-            p.setApiKey(row.getApiKey());
+            p.setApiKey(secretCrypto.decrypt(row.getApiKey()));
         }
     }
 
@@ -223,9 +311,10 @@ public class LlmRuntimeConfigService {
         row.setBaseUrl(p.getBaseUrl());
         row.setChatModel(p.getChatModel());
         row.setEmbeddingModel(p.getEmbeddingModel());
+        row.setEmbeddingDimension(p.getEmbeddingDimension());
         row.setRerankModel(p.getRerankModel());
         if (includeKey) {
-            row.setApiKey(p.getApiKey());
+            row.setApiKey(secretCrypto.encrypt(p.getApiKey()));
         } else if (existing == null) {
             row.setApiKey(null);
         }
@@ -237,21 +326,49 @@ public class LlmRuntimeConfigService {
         }
     }
 
-    private void syncEnvFile(String name, RagProperties.Provider p, boolean includeKey) {
+    /** 启动时把历史明文 API Key 就地升级为 enc:v1 密文。缺主密钥且已有密文由 {@link SecretCrypto#decrypt} 直接失败。 */
+    private void migratePlaintextKeys(List<LlmProviderSettingDO> rows) {
+        boolean anyPlaintext = false;
+        for (LlmProviderSettingDO row : rows) {
+            String stored = row.getApiKey();
+            if (!StringUtils.hasText(stored) || secretCrypto.isCiphertext(stored)) {
+                continue;
+            }
+            anyPlaintext = true;
+            if (!secretCrypto.isConfigured()) {
+                continue;
+            }
+            row.setApiKey(secretCrypto.encrypt(stored));
+            row.setUpdateTime(LocalDateTime.now());
+            settingMapper.updateById(row);
+            log.info("Migrated plaintext LLM API key for {} to {}", row.getName(), SecretCrypto.PREFIX);
+        }
+        if (anyPlaintext && !secretCrypto.isConfigured()) {
+            log.warn("PG 中仍有明文 LLM API Key；配置 {} 后将在下次启动加密", SecretCrypto.ENV_NAME);
+        }
+    }
+
+    private void syncEnvFile(String name, RagProperties.Provider p) {
         Path file = envFile();
         if (file == null) {
             return;
         }
         Map<String, String> updates = new LinkedHashMap<>();
-        if (includeKey) {
-            String keyName = LlmEnvFile.apiKeyEnvName(name);
-            if (keyName != null) {
-                updates.put(keyName, p.getApiKey() != null ? p.getApiKey() : "");
-            }
-        }
         String modelName = LlmEnvFile.chatModelEnvName(name);
         if (modelName != null && StringUtils.hasText(p.getChatModel())) {
             updates.put(modelName, p.getChatModel());
+        }
+        String embeddingName = LlmEnvFile.embeddingModelEnvName(name);
+        if (embeddingName != null && StringUtils.hasText(p.getEmbeddingModel())) {
+            updates.put(embeddingName, p.getEmbeddingModel());
+        }
+        String dimName = LlmEnvFile.embeddingDimensionEnvName(name);
+        if (dimName != null && p.getEmbeddingDimension() != null && p.getEmbeddingDimension() > 0) {
+            updates.put(dimName, String.valueOf(p.getEmbeddingDimension()));
+        }
+        String rerankName = LlmEnvFile.rerankModelEnvName(name);
+        if (rerankName != null && StringUtils.hasText(p.getRerankModel())) {
+            updates.put(rerankName, p.getRerankModel());
         }
         if (updates.isEmpty()) {
             return;

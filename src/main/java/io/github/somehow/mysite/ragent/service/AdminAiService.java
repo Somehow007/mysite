@@ -139,6 +139,7 @@ public class AdminAiService {
             dto.setApiKeyMasked(maskKey(p.getApiKey()));
             dto.setChatModel(p.getChatModel());
             dto.setEmbeddingModel(p.getEmbeddingModel());
+            dto.setEmbeddingDimension(p.getEmbeddingDimension());
             dto.setRerankModel(p.getRerankModel());
             dto.setConfigured(StringUtils.hasText(p.getApiKey()) || !LlmEnvFile.requiresApiKey(name));
             dto.setEnvApiKeyName(LlmEnvFile.apiKeyEnvName(name));

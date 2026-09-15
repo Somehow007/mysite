@@ -22,4 +22,12 @@ public interface EmbeddingService {
      * @return      向量列表，每个向量对应一条输入文本
      */
     List<float[]> embedBatch(List<String> texts);
+
+    /**
+     * 当前实际用来生成向量的模型名。入库必须写这个名字，而不是知识库创建时记下的旧值。
+     * 未实现时返回 {@code null}，调用方回退到知识库上的 {@code embeddingModel}。
+     */
+    default String currentModel() {
+        return null;
+    }
 }

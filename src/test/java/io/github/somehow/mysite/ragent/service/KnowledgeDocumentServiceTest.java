@@ -17,6 +17,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import org.mockito.ArgumentCaptor;
+
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -103,6 +105,28 @@ class KnowledgeDocumentServiceTest {
     @Nested
     @DisplayName("正常流程")
     class HappyPath {
+
+        @Test
+        @DisplayName("入库向量使用运行时 embedding 模型名，而不是知识库上的旧值")
+        void shouldPersistRuntimeEmbeddingModel() {
+            when(embeddingService.currentModel()).thenReturn("qwen3.7-text-embedding");
+
+            ArticleDO article = new ArticleDO();
+            article.setId(110L);
+            article.setTitle("向量模型对齐");
+            article.setContent("## 模型\n\n查询向量与库存向量必须同一模型。");
+            when(docMapper.findBySourceRef(1L, "ARTICLE", "110")).thenReturn(null);
+
+            service.syncArticle(article);
+
+            ArgumentCaptor<List<VectorStore.VectorEntry>> captor = ArgumentCaptor.forClass(List.class);
+            verify(vectorStore, atLeastOnce()).insert(captor.capture());
+            assertTrue(captor.getAllValues().stream()
+                .flatMap(List::stream)
+                .allMatch(e -> "qwen3.7-text-embedding".equals(e.model())));
+            verify(kbMapper).updateById(argThat((KnowledgeBaseDO kb) ->
+                "qwen3.7-text-embedding".equals(kb.getEmbeddingModel())));
+        }
 
         @Test
         @DisplayName("新文章 → 分块 → embedding → 入库 → READY")

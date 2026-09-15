@@ -1,6 +1,8 @@
 package io.github.somehow.mysite.ragent.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeBaseDO;
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeDocumentDO;
 import io.github.somehow.mysite.ragent.dao.mapper.KnowledgeBaseMapper;
@@ -12,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +28,7 @@ public class KnowledgeBaseService {
     private final KnowledgeDocumentMapper docMapper;
     private final KnowledgeChunkMapper chunkMapper;
     private final VectorStore vectorStore;
+    private final RagProperties ragProperties;
 
     public List<KnowledgeBaseDTO> listAll() {
         List<KnowledgeBaseDO> kbs = kbMapper.selectList(null);
@@ -57,6 +61,7 @@ public class KnowledgeBaseService {
         if (kb.getChunkingMode() == null || kb.getChunkingMode().isBlank()) {
             kb.setChunkingMode("MARKDOWN_HEADING");
         }
+        applyGlobalEmbedding(kb);
         kbMapper.insert(kb);
         return toDTO(kb, 0);
     }
@@ -98,6 +103,43 @@ public class KnowledgeBaseService {
             .eq(KnowledgeDocumentDO::getKbId, id));
         kbMapper.deleteById(id);
         log.info("知识库已删除: id={}, name={}, docs={}", id, kb.getName(), docs.size());
+    }
+
+    /**
+     * 全局 embedding 模型或维度变更后：同步各知识库元数据，并把文档标为 FAILED 以便重新处理。
+     */
+    public void onGlobalEmbeddingChanged(String model, int dimension) {
+        List<KnowledgeBaseDO> kbs = kbMapper.selectList(null);
+        if (kbs == null) {
+            return;
+        }
+        for (KnowledgeBaseDO kb : kbs) {
+            if (StringUtils.hasText(model)) {
+                kb.setEmbeddingModel(model);
+            }
+            kb.setEmbeddingDimension(dimension);
+            kbMapper.updateById(kb);
+        }
+        int n = docMapper.update(null, new LambdaUpdateWrapper<KnowledgeDocumentDO>()
+                .in(KnowledgeDocumentDO::getStatus, List.of("READY", "PENDING", "CHUNKING"))
+                .set(KnowledgeDocumentDO::getStatus, "FAILED")
+                .set(KnowledgeDocumentDO::getFailReason,
+                    "Embedding 已切换为 " + model + "（维度 " + dimension + "），请重新处理文档"));
+        log.info("Global embedding changed to model={}, dim={}, kbs={}, docsMarkedFailed={}",
+            model, dimension, kbs.size(), n);
+    }
+
+    private void applyGlobalEmbedding(KnowledgeBaseDO kb) {
+        RagProperties.Provider bailian = ragProperties.getLlm().getProviders().get("bailian");
+        if (bailian == null) {
+            return;
+        }
+        if (bailian.getEmbeddingDimension() != null && bailian.getEmbeddingDimension() > 0) {
+            kb.setEmbeddingDimension(bailian.getEmbeddingDimension());
+        }
+        if (StringUtils.hasText(bailian.getEmbeddingModel())) {
+            kb.setEmbeddingModel(bailian.getEmbeddingModel());
+        }
     }
 
     private KnowledgeBaseDTO toDTO(KnowledgeBaseDO kb, int docCount) {
