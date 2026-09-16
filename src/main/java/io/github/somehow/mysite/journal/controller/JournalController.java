@@ -10,6 +10,7 @@ import io.github.somehow.mysite.journal.dto.DayRecordDTO;
 import io.github.somehow.mysite.journal.dto.DayRecordUpsertReqDTO;
 import io.github.somehow.mysite.journal.dto.ExportRespDTO;
 import io.github.somehow.mysite.journal.dto.ImportResultDTO;
+import io.github.somehow.mysite.journal.dto.StreakDTO;
 import io.github.somehow.mysite.journal.service.JournalService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,7 +47,7 @@ public class JournalController {
         return Results.success(journalService.getRecordByDate(currentUserId(), date));
     }
 
-    @Operation(summary = "按月/年查询记录（month=YYYY-MM 优先于 year；皆空返回全部）")
+    @Operation(summary = "按月/年查询记录（month=YYYY-MM 优先于 year；时光页请传 year 或 month，勿无参拉全量）")
     @GetMapping("/records")
     public Result<List<DayRecordDTO>> listRecords(
             @RequestParam(required = false) String month,
@@ -69,7 +70,13 @@ public class JournalController {
         return Results.success();
     }
 
-    @Operation(summary = "日记全文搜索（按更新时间倒序）")
+    @Operation(summary = "连续有记录天数（心情或日记或至少一条学习；以今天为终点）")
+    @GetMapping("/streak")
+    public Result<StreakDTO> getStreak() {
+        return Results.success(journalService.getStreak(currentUserId()));
+    }
+
+    @Operation(summary = "搜索日记与学习条目（subject/note），按更新时间倒序")
     @GetMapping("/search")
     public Result<List<DayRecordDTO>> search(@RequestParam String keyword) {
         return Results.success(journalService.searchDiary(currentUserId(), keyword));

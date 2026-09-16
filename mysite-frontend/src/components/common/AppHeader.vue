@@ -88,7 +88,7 @@ async function handleAvatarUpload(e: Event) {
           {{ item.label }}
         </RouterLink>
 
-        <!-- 学习手帐（花期）：子路径独立应用，仅管理员可见；用原生 a 避免被 vue-router 拦截 -->
+        <!-- 学习手帐：子路径独立应用，仅管理员可见；用原生 a 避免被 vue-router 拦截 -->
         <a
           v-if="userStore.isAdmin"
           href="/journal/"

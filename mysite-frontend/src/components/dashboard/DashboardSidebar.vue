@@ -4,7 +4,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import {
   FileText, PenSquare, FolderTree, Users, Settings, LogOut, ChevronLeft,
   Image as ImageIcon, Tags, MessageSquare, BookOpen, Database, Bot,
-  LayoutDashboard, Home,
+  LayoutDashboard, Home, NotebookPen,
 } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { usePermission } from '@/composables/usePermission'
@@ -176,6 +176,16 @@ const profileUrl = computed(() =>
         >
           <Home :size="16" class="shrink-0" />
           <span v-if="!isCollapsed">回到主页</span>
+        </a>
+        <a
+          v-if="isAdmin"
+          href="/journal/"
+          :title="isCollapsed ? '手帐' : ''"
+          class="flex items-center gap-2.5 rounded-lg text-[13px] text-text-muted hover:text-text-primary hover:bg-bg-code transition-all duration-150"
+          :class="isCollapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2'"
+        >
+          <NotebookPen :size="16" class="shrink-0" />
+          <span v-if="!isCollapsed">手帐</span>
         </a>
       </div>
 

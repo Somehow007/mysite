@@ -5,6 +5,7 @@ import io.github.somehow.mysite.journal.dto.DayRecordDTO;
 import io.github.somehow.mysite.journal.dto.DayRecordUpsertReqDTO;
 import io.github.somehow.mysite.journal.dto.ExportRespDTO;
 import io.github.somehow.mysite.journal.dto.ImportResultDTO;
+import io.github.somehow.mysite.journal.dto.StreakDTO;
 
 import java.util.List;
 
@@ -17,8 +18,14 @@ public interface JournalService {
     /** 单日详情（含 learnings 数组）；记录不存在返回 null */
     DayRecordDTO getRecordByDate(Long userId, String date);
 
-    /** month（'YYYY-MM'）优先于 year；两者皆空返回全部，按 date 升序 */
+    /** month（'YYYY-MM'）优先于 year；两者皆空返回全部，按 date 升序。时光/回顾请传 year 或 month */
     List<DayRecordDTO> listRecords(Long userId, String month, Integer year);
+
+    /**
+     * 以今天为终点的连续有记录天数。有记录 = mood 非空 或 diary 非空 或至少一条 learning。
+     * date 按 YYYY-MM-DD 字符串处理，不做时区换算；今天无记录则 days=0。
+     */
+    StreakDTO getStreak(Long userId);
 
     /**
      * 创建或更新单日记录（patch 语义）：
@@ -30,7 +37,7 @@ public interface JournalService {
     /** 删除整日记录，学习条目经外键级联删除；幂等 */
     void deleteRecord(Long userId, String date);
 
-    /** 日记全文搜索（LIKE），按 updatedAt 倒序 */
+    /** 日记 / 学习 subject / note LIKE 搜索，按 date 去重、updatedAt 倒序，上限 200 */
     List<DayRecordDTO> searchDiary(Long userId, String keyword);
 
     /** 导出全部数据，保持既有 v2 JSON 格式 */

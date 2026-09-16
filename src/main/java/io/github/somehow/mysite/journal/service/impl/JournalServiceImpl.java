@@ -18,6 +18,7 @@ import io.github.somehow.mysite.journal.dto.DayRecordUpsertReqDTO;
 import io.github.somehow.mysite.journal.dto.ExportRespDTO;
 import io.github.somehow.mysite.journal.dto.ImportResultDTO;
 import io.github.somehow.mysite.journal.dto.LearningItemDTO;
+import io.github.somehow.mysite.journal.dto.StreakDTO;
 import io.github.somehow.mysite.journal.service.CustomMoodService;
 import io.github.somehow.mysite.journal.service.JournalService;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +28,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +90,14 @@ public class JournalServiceImpl implements JournalService {
     }
 
     @Override
+    public StreakDTO getStreak(Long userId) {
+        // 今天取服务器本地日历日；已存 CHAR(10) 只做字符串比较，不做时区换算
+        String today = LocalDate.now().toString();
+        List<String> dates = dayRecordMapper.listRecordedDatesOnOrBefore(userId, today);
+        return new StreakDTO(countConsecutiveDaysEndingAt(dates, today));
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public DayRecordDTO upsertRecord(Long userId, String date, DayRecordUpsertReqDTO request) {
         validateDate(date);
@@ -134,12 +145,7 @@ public class JournalServiceImpl implements JournalService {
         if (!StringUtils.hasText(keyword)) {
             return List.of();
         }
-        List<SjDayRecordDO> records = dayRecordMapper.selectList(
-                new LambdaQueryWrapper<SjDayRecordDO>()
-                        .eq(SjDayRecordDO::getUserId, userId)
-                        .like(SjDayRecordDO::getDiary, keyword)
-                        .orderByDesc(SjDayRecordDO::getUpdatedAt)
-                        .last("LIMIT " + SEARCH_LIMIT));
+        List<SjDayRecordDO> records = dayRecordMapper.searchByKeyword(userId, keyword, SEARCH_LIMIT);
         Map<Long, List<LearningItemDTO>> learnings =
                 loadLearnings(records.stream().map(SjDayRecordDO::getId).toList());
         return records.stream()
@@ -230,6 +236,24 @@ public class JournalServiceImpl implements JournalService {
         if (date == null || !DATE_PATTERN.matcher(date).matches()) {
             throw new ClientException(ErrorCode.JOURNAL_DATE_INVALID);
         }
+    }
+
+    /**
+     * 从 today 起向前数连续日期。today 当天不在集合里则返回 0。
+     * 日期一律 YYYY-MM-DD 字符串，LocalDate 只用于日历进位，不涉及时区。
+     */
+    static int countConsecutiveDaysEndingAt(List<String> dates, String today) {
+        if (dates == null || dates.isEmpty() || !dates.contains(today)) {
+            return 0;
+        }
+        Set<String> recorded = new HashSet<>(dates);
+        LocalDate cursor = LocalDate.parse(today);
+        int streak = 0;
+        while (recorded.contains(cursor.toString())) {
+            streak++;
+            cursor = cursor.minusDays(1);
+        }
+        return streak;
     }
 
     /** mood 空值归一化为 null；非空时校验为预设枚举或该用户的自定义心情 */

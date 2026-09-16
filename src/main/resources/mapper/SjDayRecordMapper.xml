@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="io.github.somehow.mysite.journal.dao.mapper.SjDayRecordMapper">
+
+    <!-- 日记 / 学科学习条目 subject / note 任一命中即返回该日；按 date 天然去重 -->
+    <select id="searchByKeyword" resultType="io.github.somehow.mysite.journal.dao.entity.SjDayRecordDO">
+        SELECT r.id, r.user_id, r.date, r.mood, r.diary, r.created_at, r.updated_at
+        FROM sj_day_record r
+        WHERE r.user_id = #{userId}
+          AND (
+              r.diary LIKE CONCAT('%', #{keyword}, '%')
+              OR EXISTS (
+                  SELECT 1
+                  FROM sj_learning_item i
+                  WHERE i.record_id = r.id
+                    AND (
+                        i.subject LIKE CONCAT('%', #{keyword}, '%')
+                        OR i.note LIKE CONCAT('%', #{keyword}, '%')
+                    )
+              )
+          )
+        ORDER BY r.updated_at DESC
+        LIMIT #{limit}
+    </select>
+
+    <!-- 有心情或非空日记或至少一条学习的日期，CHAR(10) 按字符串比较，不做时区换算 -->
+    <select id="listRecordedDatesOnOrBefore" resultType="java.lang.String">
+        SELECT r.date
+        FROM sj_day_record r
+        WHERE r.user_id = #{userId}
+          AND r.date &lt;= #{today}
+          AND (
+              (r.mood IS NOT NULL AND TRIM(r.mood) != '')
+              OR (r.diary IS NOT NULL AND TRIM(r.diary) != '')
+              OR EXISTS (
+                  SELECT 1 FROM sj_learning_item i WHERE i.record_id = r.id
+              )
+          )
+        ORDER BY r.date DESC
+    </select>
+
+</mapper>
