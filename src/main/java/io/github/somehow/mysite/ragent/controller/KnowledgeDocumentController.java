@@ -8,6 +8,7 @@ import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.commons.framework.web.Results;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.dao.mapper.ArticleMapper;
+import io.github.somehow.mysite.ragent.dto.KnowledgeDocStatsDTO;
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeBaseDO;
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeChunkDO;
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeDocumentDO;
@@ -55,6 +56,24 @@ public class KnowledgeDocumentController {
             wrapper.eq(KnowledgeDocumentDO::getStatus, status);
         }
         return Results.success(docMapper.selectPage(page, wrapper));
+    }
+
+    /** 知识库文档状态统计（全量，不受列表分页/筛选影响） */
+    @GetMapping("/document-stats")
+    public Result<KnowledgeDocStatsDTO> documentStats(@PathVariable Long kbId) {
+        long total = docMapper.selectCount(new LambdaQueryWrapper<KnowledgeDocumentDO>()
+                .eq(KnowledgeDocumentDO::getKbId, kbId));
+        long ready = countDocs(kbId, "READY");
+        long failed = countDocs(kbId, "FAILED");
+        long processing = countDocs(kbId, "PENDING") + countDocs(kbId, "CHUNKING");
+        return Results.success(new KnowledgeDocStatsDTO(
+                Math.toIntExact(total), (int) ready, (int) processing, (int) failed));
+    }
+
+    private long countDocs(Long kbId, String status) {
+        return docMapper.selectCount(new LambdaQueryWrapper<KnowledgeDocumentDO>()
+                .eq(KnowledgeDocumentDO::getKbId, kbId)
+                .eq(KnowledgeDocumentDO::getStatus, status));
     }
 
     /** 获取文档的分块列表（分页），用于分块预览 */

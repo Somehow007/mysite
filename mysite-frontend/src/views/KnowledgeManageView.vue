@@ -9,7 +9,7 @@ import {
 import {
   getKnowledgeBases, createKnowledgeBase, updateKnowledgeBase, deleteKnowledgeBase,
   toggleKnowledgeBase,
-  getKnowledgeDocuments, getAvailableArticles, addArticlesToKb,
+  getKnowledgeDocuments, getKnowledgeDocStats, getAvailableArticles, addArticlesToKb,
   deleteKnowledgeDocument, reprocessDocument, getDocumentChunks, syncKnowledgeBase,
   type KnowledgeChunk,
 } from '@/api/rag'
@@ -46,6 +46,7 @@ async function fetchKbs() {
 function selectKb(kbId: string) {
   if (selectedKbId.value === kbId) {
     selectedKbId.value = null
+    kbDocStats.value = { ...emptyDocStats }
     return
   }
   selectedKbId.value = kbId
@@ -140,12 +141,20 @@ const docPageSize = 20
 const expandedDocId = ref<string | null>(null)
 let docSearchTimer: ReturnType<typeof setTimeout> | null = null
 
-const docStats = computed(() => ({
-  total: docTotal.value,
-  ready: docs.value.filter(d => d.status === 'READY').length,
-  processing: docs.value.filter(d => d.status === 'PENDING' || d.status === 'CHUNKING').length,
-  failed: docs.value.filter(d => d.status === 'FAILED').length,
-}))
+const emptyDocStats = { total: 0, ready: 0, processing: 0, failed: 0 }
+const kbDocStats = ref({ ...emptyDocStats })
+const docStats = computed(() => kbDocStats.value)
+
+async function fetchDocStats() {
+  if (!selectedKbId.value) return
+  try {
+    kbDocStats.value = await getKnowledgeDocStats(selectedKbId.value)
+    const kb = kbs.value.find(k => k.id === selectedKbId.value)
+    if (kb) kb.docCount = kbDocStats.value.total
+  } catch {
+    kbDocStats.value = { ...emptyDocStats }
+  }
+}
 
 async function fetchDocs(page?: number) {
   if (!selectedKbId.value) return
@@ -158,10 +167,16 @@ async function fetchDocs(page?: number) {
       keyword: docSearch.value.trim() || undefined,
       status: docStatusFilter.value !== 'ALL' ? docStatusFilter.value : undefined,
     }
-    const result = await getKnowledgeDocuments(selectedKbId.value, params)
+    const [result] = await Promise.all([
+      getKnowledgeDocuments(selectedKbId.value, params),
+      fetchDocStats(),
+    ])
     docs.value = result.list
     docTotal.value = result.pagination.total
     docPage.value = result.pagination.page
+    if (kbDocStats.value.total === 0 && docStatusFilter.value === 'ALL' && !docSearch.value.trim()) {
+      kbDocStats.value = { ...kbDocStats.value, total: docTotal.value }
+    }
   } catch { docs.value = []; docTotal.value = 0 } finally { loadingDocs.value = false }
 }
 
@@ -205,7 +220,9 @@ async function delDoc(doc: KnowledgeDocument) {
   try {
     await deleteKnowledgeDocument(selectedKbId.value, doc.id)
     docs.value = docs.value.filter(d => d.id !== doc.id)
+    docTotal.value = Math.max(0, docTotal.value - 1)
     if (expandedDocId.value === doc.id) expandedDocId.value = null
+    await fetchDocStats()
     toast.success('文档已移除')
   } catch (e: unknown) { toast.error((e as Error).message || '操作失败') }
 }
@@ -354,7 +371,8 @@ const POLL_START = 5000
 const POLL_MAX_FAILURES = 5
 
 function hasActiveDocs(): boolean {
-  return docs.value.some(d => d.status === 'PENDING' || d.status === 'CHUNKING')
+  return kbDocStats.value.processing > 0
+    || docs.value.some(d => d.status === 'PENDING' || d.status === 'CHUNKING')
 }
 
 function startPolling() {
@@ -378,6 +396,9 @@ function schedulePoll() {
         status: docStatusFilter.value !== 'ALL' ? docStatusFilter.value : undefined,
       })
       docs.value = result.list
+      docTotal.value = result.pagination.total
+      docPage.value = result.pagination.page
+      await fetchDocStats()
       consecutiveFailures = 0
       // Gradually reduce to base interval
       pollInterval = POLL_START
@@ -601,7 +622,7 @@ watch(selectedKbId, () => {
               class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px"
               :class="activeTab === 'docs' ? 'border-accent text-accent' : 'border-transparent text-text-muted hover:text-text-secondary'"
               @click="activeTab = 'docs'"
-            ><FileText :size="14" />已同步文档<span class="text-xs opacity-70 tabular-nums">({{ docs.length }})</span></button>
+            ><FileText :size="14" />已同步文档<span class="text-xs opacity-70 tabular-nums">({{ docStats.total }})</span></button>
             <button
               class="flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors border-b-2 -mb-px"
               :class="activeTab === 'articles' ? 'border-accent text-accent' : 'border-transparent text-text-muted hover:text-text-secondary'"
@@ -678,6 +699,7 @@ watch(selectedKbId, () => {
             :total="docTotal"
             :current-page="docPage"
             :page-size="docPageSize"
+            show-total
             @toggle-expand="toggleDocExpand($event)"
             @update:current-page="fetchDocs($event)"
           >

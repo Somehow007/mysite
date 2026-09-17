@@ -45,10 +45,13 @@ const props = withDefaults(defineProps<{
   /** Row expansion: clicking a row emits toggle-expand; render detail via #expand slot */
   expandable?: boolean
   expandedId?: string | null
+  /** 底部分页条始终展示「共 N 条」，即使只有一页 */
+  showTotal?: boolean
 }>(), {
   idKey: 'id',
   pageSize: 10,
   expandedId: null,
+  showTotal: false,
 })
 
 const emit = defineEmits<{
@@ -247,10 +250,11 @@ function getSortIcon(field: string) {
 
     <!-- Pagination -->
     <Pagination
-      v-if="total && total > pageSize"
+      v-if="total != null && (showTotal || total > pageSize)"
       :current="currentPage || 1"
       :total="total"
       :page-size="pageSize"
+      :in-card="showTotal"
       @update:current="emit('update:currentPage', $event)"
     />
   </div>

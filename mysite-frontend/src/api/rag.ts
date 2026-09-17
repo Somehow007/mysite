@@ -257,6 +257,17 @@ export function getKnowledgeDocuments(kbId: string, params?: Record<string, unkn
   return getPaginated<KnowledgeDocument>(`/v1/rag/knowledge-bases/${kbId}/docs`, params)
 }
 
+export interface KnowledgeDocStats {
+  total: number
+  ready: number
+  processing: number
+  failed: number
+}
+
+export function getKnowledgeDocStats(kbId: string): Promise<KnowledgeDocStats> {
+  return get<KnowledgeDocStats>(`/v1/rag/knowledge-bases/${kbId}/document-stats`)
+}
+
 export function syncKnowledgeBase(kbId: string): Promise<{ synced: number; total: number }> {
   return post<{ synced: number; total: number }>(`/v1/rag/knowledge-bases/${kbId}/sync`)
 }
