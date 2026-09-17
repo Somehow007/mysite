@@ -13,7 +13,7 @@ alwaysApply: true
 |---|---|---|
 | 后端 | 仓库根 `src/` | Spring Boot **8081**，`./mvnw spring-boot:run` |
 | 前端 | `mysite-frontend/` | Vite **5173**，`/v1` 代理到 8081 |
-| MySQL 8.4 | `docker/` | 博客 13 张 `t_*` + 手帐 3 张 `sj_*`，逻辑删除 |
+| MySQL 8.4 | `docker/` | 博客 13 张 `t_*` + 手帐 `sj_*`（日记录 3 张 + 月计划 3 张），逻辑删除 |
 | Redis 7 | `docker/` | 按 cache name 配 TTL |
 | PG 17 + pgvector | `docker/` | 仅 RAG，独立数据源 |
 | 生产 | `deploy/` | 后端 8081，Nginx 8080 反代 `/v1/` |

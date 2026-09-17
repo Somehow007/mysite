@@ -6,19 +6,24 @@ alwaysApply: false
 
 # 学习手帐
 
-本仓库目前 **只有后端**。前缀 `/api/journal`（不是 `/v1`），`WebSecurityConfig` 中 `hasRole("ADMIN")`。
+本仓库目前 **只有后端**（前端在独立仓库 `study-journey/`）。前缀 `/api/journal`（不是 `/v1`），`WebSecurityConfig` 中 `hasRole("ADMIN")`。
 
 `user_id` 只从 `UserContext` 解析，请求体/路径里不要接收 userId。数据按用户隔离。
 
-## 表（MySQL，无 del_flag）
+## 表（MySQL，无 del_flag，时间 Unix 毫秒）
 
 | 表 | 作用 |
 |---|---|
 | `sj_day_record` | 单日记录，`(user_id, date)` 唯一，date=`YYYY-MM-DD` |
 | `sj_learning_item` | 当日学习条目，`client_id` 为前端 nanoid，级联删 |
 | `sj_custom_mood` | 自定义心情，主键即 nanoid |
+| `sj_goal` | 月计划大任务，主键 nanoid；`type`=`COUNT`/`CHECKLIST`，`period`=`YYYY-MM` |
+| `sj_goal_task` | 清单型子任务，级联删；可绑 `due_date` 或 `week_start` |
+| `sj_goal_checkin` | 数量型打卡，`(goal_id, date)` 唯一 |
 
 全新环境由 `docker/init/schema.sql` 建表；已有库用 `docker/init/journal-schema.sql` 增量。
+
+进度读时计算，不落 percent。`COUNT` = `sum(quantity)/target`；`CHECKLIST` = `doneCount/total`。
 
 ## API
 
@@ -27,5 +32,12 @@ alwaysApply: false
 - `GET /api/journal/search?keyword=`
 - `POST /api/journal/import`、`GET /api/journal/export` — 兼容 v1 数组 / v2 含 customMoods
 - `/api/journal/moods/custom` — 自定义心情 CRUD
+- `/api/journal/goals?period=YYYY-MM` — 月目标列表 + 进度 + `dayMarks`
+- `GET /api/journal/goals/today?date=` — 当日待办
+- `POST/GET/PUT/DELETE /api/journal/goals/{id}` — 目标 CRUD
+- `POST/PUT/DELETE /api/journal/goals/{id}/tasks` — 清单子任务
+- `POST /api/journal/goals/{id}/tasks/{taskId}/complete` — 勾选/取消（可 `syncLearning`）
+- `PUT/DELETE /api/journal/goals/{id}/checkins/{date}` — 数量型打卡
+- `POST /api/journal/goals/{id}/carry-over` — 结转到下月
 
 时间字段是 Unix 毫秒 `BIGINT`，不要改成 `datetime`。

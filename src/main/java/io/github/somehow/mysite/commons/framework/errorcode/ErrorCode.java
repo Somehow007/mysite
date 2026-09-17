@@ -123,6 +123,12 @@ public enum ErrorCode implements IErrorCode {
     JOURNAL_MOOD_NOT_FOUND("A110102", "自定义心情不存在"),
     JOURNAL_MOOD_DUPLICATE("A110103", "自定义心情 ID 已存在"),
     JOURNAL_IMPORT_INVALID("A110104", "导入数据格式无效"),
+    JOURNAL_GOAL_NOT_FOUND("A110200", "学习目标不存在"),
+    JOURNAL_GOAL_TYPE_MISMATCH("A110201", "目标类型不匹配"),
+    JOURNAL_PERIOD_INVALID("A110202", "月份格式无效，应为 YYYY-MM"),
+    JOURNAL_GOAL_TARGET_INVALID("A110203", "数量型目标值必须大于 0"),
+    JOURNAL_GOAL_DUPLICATE("A110204", "学习目标 ID 已存在"),
+    JOURNAL_TASK_NOT_FOUND("A110205", "子任务不存在"),
 
     // ==================== B: 服务端错误 ====================
     SERVICE_ERROR("B000001", "系统执行出错"),

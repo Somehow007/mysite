@@ -5,6 +5,7 @@ import io.github.somehow.mysite.journal.dto.DayRecordDTO;
 import io.github.somehow.mysite.journal.dto.DayRecordUpsertReqDTO;
 import io.github.somehow.mysite.journal.dto.ExportRespDTO;
 import io.github.somehow.mysite.journal.dto.ImportResultDTO;
+import io.github.somehow.mysite.journal.dto.LearningItemDTO;
 import io.github.somehow.mysite.journal.dto.StreakDTO;
 
 import java.util.List;
@@ -45,4 +46,10 @@ public interface JournalService {
 
     /** 导入备份 JSON（兼容 v1 纯数组 / v2 含 customMoods），按 (user_id, date) 幂等 upsert */
     ImportResultDTO importData(Long userId, JsonNode body);
+
+    /** 按 clientId 追加或更新当日学习条目（任务打卡同步台账用） */
+    void upsertLearningItem(Long userId, String date, LearningItemDTO item);
+
+    /** 按 clientId 删除当日学习条目；记录或条目不存在时幂等 */
+    void removeLearningItem(Long userId, String date, String clientId);
 }

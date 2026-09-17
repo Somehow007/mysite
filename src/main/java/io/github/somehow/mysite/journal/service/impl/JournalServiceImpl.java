@@ -202,6 +202,65 @@ public class JournalServiceImpl implements JournalService {
         return new ImportResultDTO(recordCount, moodCount);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void upsertLearningItem(Long userId, String date, LearningItemDTO item) {
+        validateDate(date);
+        if (item == null
+                || !StringUtils.hasText(item.getId())
+                || !StringUtils.hasText(item.getSubject())
+                || item.getDurationMin() == null
+                || item.getDurationMin() < 1
+                || !StringUtils.hasText(item.getColor())) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        SjDayRecordDO record = findRecord(userId, date);
+        if (record == null) {
+            record = new SjDayRecordDO();
+            record.setUserId(userId);
+            record.setDate(date);
+            record.setCreatedAt(now);
+            record.setUpdatedAt(now);
+            dayRecordMapper.insert(record);
+        } else {
+            record.setUpdatedAt(now);
+            dayRecordMapper.updateById(record);
+        }
+        List<LearningItemDTO> items = new ArrayList<>(loadItems(record.getId()));
+        boolean found = false;
+        for (int i = 0; i < items.size(); i++) {
+            if (item.getId().equals(items.get(i).getId())) {
+                items.set(i, item);
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            items.add(item);
+        }
+        replaceLearnings(record.getId(), items);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removeLearningItem(Long userId, String date, String clientId) {
+        validateDate(date);
+        if (!StringUtils.hasText(clientId)) {
+            return;
+        }
+        SjDayRecordDO record = findRecord(userId, date);
+        if (record == null) {
+            return;
+        }
+        List<LearningItemDTO> items = loadItems(record.getId()).stream()
+                .filter(item -> !clientId.equals(item.getId()))
+                .collect(Collectors.toCollection(ArrayList::new));
+        replaceLearnings(record.getId(), items);
+        record.setUpdatedAt(System.currentTimeMillis());
+        dayRecordMapper.updateById(record);
+    }
+
     // ─── 内部工具 ────────────────────────────────────
 
     /** 导入单条记录：按 (user_id, date) upsert，保留原始 createdAt/updatedAt */
