@@ -114,6 +114,15 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
     @Override
     public ImageUploadRespDTO uploadImage(MultipartFile file) {
         checkUploadRateLimit();
+        return doUploadImage(file);
+    }
+
+    @Override
+    public ImageUploadRespDTO uploadImageForImport(MultipartFile file) {
+        return doUploadImage(file);
+    }
+
+    private ImageUploadRespDTO doUploadImage(MultipartFile file) {
 
         if (file == null || file.isEmpty()) {
             throw new ClientException(ErrorCode.IMAGE_UPLOAD_FAILED);

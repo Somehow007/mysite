@@ -2,8 +2,9 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X, Plus, Search, TrendingUp, Library, Check, ChevronDown, Lock, Globe, Keyboard } from 'lucide-vue-next'
-import { createArticle, updateArticle, getArticleById } from '@/api/article'
+import { Loader2, Save, ArrowLeft, FileText, ChevronRight, AlertCircle, X, Plus, Search, TrendingUp, Library, Check, ChevronDown, Lock, Globe, Keyboard, Upload, FileUp, ImageOff } from 'lucide-vue-next'
+import { createArticle, updateArticle, getArticleById, importArticle } from '@/api/article'
+import type { ArticleImportImage } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { getTags, createTag } from '@/api/tag'
 import { getCollections, addArticleToCollection, removeArticleFromCollection } from '@/api/collection'
@@ -48,6 +49,193 @@ const showSummaryHint = ref(false)
 const coverUploading = ref(false)
 let summaryHintTimer: ReturnType<typeof setTimeout> | null = null
 
+// ── 文档导入（txt / md）──
+const importInputRef = ref<HTMLInputElement | null>(null)
+const repairInputRef = ref<HTMLInputElement | null>(null)
+const importing = ref(false)
+const repairing = ref(false)
+const importNotice = ref<{ failed: ArticleImportImage[]; uploaded: number; kept: number } | null>(null)
+
+function triggerImportPicker() {
+  if (importing.value) return
+  importInputRef.value?.click()
+}
+
+const DOC_EXT = /\.(txt|md|markdown)$/i
+const IMG_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
+
+function fileBaseName(path: string): string {
+  return path.split(/[\\/]/).pop() || path
+}
+
+/**
+ * 把「图片待补传」占位（或残留的 Obsidian / Markdown 引用）替换为已上传图片。
+ */
+function replaceImagePlaceholder(markdown: string, originalRef: string, newUrl: string): string {
+  const esc = originalRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  // 与 ArticleDocumentParser.buildPlaceholder 生成格式一一对应
+  const callout = new RegExp(
+    '\\n{0,2}> \\[!warning\\] 图片待补传\\n' +
+      '> 原引用：`' + esc + '`\\n' +
+      '> 未能自动上传。[^\\n]*\\n?',
+    'g',
+  )
+  const asImage = `\n\n![](${newUrl})\n\n`
+  let out = markdown.replace(callout, asImage)
+  if (out !== markdown) return out
+
+  const obs = new RegExp('!\\[\\[' + esc + '(?:\\|[^\\]]*)?\\]\\]', 'g')
+  out = markdown.replace(obs, `![](${newUrl})`)
+  if (out !== markdown) return out
+
+  const mdImg = new RegExp('!\\[[^\\]]*\\]\\(' + esc + '\\)', 'g')
+  return markdown.replace(mdImg, `![](${newUrl})`)
+}
+
+async function onImportFile(e: Event) {
+  const input = e.target as HTMLInputElement
+  const selected = Array.from(input.files || [])
+  // 允许重复选同一文件
+  input.value = ''
+  if (selected.length === 0) return
+
+  // 多选：文档 1 个 + 图片附件若干（Obsidian ![[图]] 按文件名匹配）
+  const docs = selected.filter(f => DOC_EXT.test(f.name))
+  const images = selected.filter(f => IMG_EXT.test(f.name))
+  const ignored = selected.filter(f => !DOC_EXT.test(f.name) && !IMG_EXT.test(f.name))
+
+  if (docs.length === 0) {
+    toast.error('请选择 TXT / Markdown 文档（可同时选中图片附件）')
+    return
+  }
+  if (docs.length > 1) {
+    toast.error('一次只能导入一个文档，请只选一个 txt/md')
+    return
+  }
+  if (ignored.length > 0) {
+    toast.error(`已忽略 ${ignored.length} 个不支持的文件（仅识别图片附件）`)
+  }
+
+  const file = docs[0]!
+  if (file.size > 2 * 1024 * 1024) {
+    toast.error('文档文件过大（最大 2MB）')
+    return
+  }
+
+  // 编辑区已有内容时确认覆盖，避免误操作丢稿
+  const hasBody = content.value.trim().length > 0 || title.value.trim().length > 0
+  if (hasBody && !window.confirm('导入将覆盖当前标题和正文，确定继续？')) {
+    return
+  }
+
+  importing.value = true
+  importNotice.value = null
+  error.value = ''
+  try {
+    const result = await importArticle(file, images)
+    content.value = result.content
+    if (!title.value.trim() && result.title) {
+      title.value = result.title
+    }
+
+    const imgResults = result.images || []
+    const failed = imgResults.filter(i => i.status === 'FAILED')
+    const uploaded = imgResults.filter(i => i.status === 'UPLOADED').length
+    const kept = imgResults.filter(i => i.status === 'KEPT').length
+
+    if (failed.length > 0) {
+      importNotice.value = { failed, uploaded, kept }
+      toast.error(`导入完成，${failed.length} 张图片未自动上传——点上方「选择图片补传」即可`)
+    } else if (uploaded > 0) {
+      toast.success(`导入成功，已自动上传 ${uploaded} 张图片`)
+    } else {
+      toast.success('导入成功，内容已填入编辑器')
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : '导入失败'
+    error.value = msg
+    toast.error(msg)
+  } finally {
+    importing.value = false
+  }
+}
+
+/**
+ * 二次补传：单独选图片文件（可来自任意目录，如 Obsidian attachments/），
+ * 按文件名匹配失败项，上传后替换正文占位。
+ */
+function triggerRepairPicker() {
+  if (repairing.value || !importNotice.value) return
+  repairInputRef.value?.click()
+}
+
+async function onRepairFiles(e: Event) {
+  const input = e.target as HTMLInputElement
+  const files = Array.from(input.files || []).filter(f => IMG_EXT.test(f.name))
+  input.value = ''
+  if (files.length === 0 || !importNotice.value) return
+
+  repairing.value = true
+  const failed = importNotice.value.failed
+  const byBase = new Map<string, ArticleImportImage>()
+  for (const img of failed) {
+    byBase.set(fileBaseName(img.originalRef).toLowerCase(), img)
+  }
+
+  let patched = content.value
+  const doneKeys = new Set<string>()
+  const errorByKey = new Map<string, string>()
+  let ok = 0
+
+  for (const file of files) {
+    const key = file.name.toLowerCase()
+    const target = byBase.get(key)
+    if (!target || doneKeys.has(key)) continue
+    if (file.size > MAX_IMAGE_FILE_SIZE) {
+      errorByKey.set(key, `图片超过 ${MAX_IMAGE_FILE_SIZE / (1024 * 1024)}MB`)
+      continue
+    }
+    try {
+      const uploaded = await uploadImage(file)
+      patched = replaceImagePlaceholder(patched, target.originalRef, uploaded.url)
+      doneKeys.add(key)
+      ok++
+    } catch (err) {
+      errorByKey.set(key, err instanceof Error ? err.message : '上传失败')
+    }
+  }
+
+  content.value = patched
+
+  const remaining: ArticleImportImage[] = []
+  for (const img of failed) {
+    const key = fileBaseName(img.originalRef).toLowerCase()
+    if (doneKeys.has(key)) continue
+    const reason = errorByKey.get(key)
+    remaining.push(reason ? { ...img, reason } : img)
+  }
+
+  if (remaining.length === 0) {
+    importNotice.value = null
+    toast.success(`补传完成，${ok} 张图片已替换到正文`)
+  } else {
+    importNotice.value = {
+      failed: remaining,
+      uploaded: importNotice.value.uploaded + ok,
+      kept: importNotice.value.kept,
+    }
+    if (ok > 0) {
+      toast.error(`已补传 ${ok} 张，仍有 ${remaining.length} 张待处理`)
+    } else {
+      toast.error('所选图片未能匹配到待补传项（请确认文件名一致）')
+    }
+  }
+}
+
+function dismissImportNotice() {
+  importNotice.value = null
+}
+
 // 编辑器使用说明弹层（快捷键与 Milkdown Crepe 内置 keymap 保持一致）
 const showEditorHelp = ref(false)
 const isMac = /mac/i.test(navigator.platform)
@@ -89,6 +277,7 @@ const editorHelpTips = [
   '输入 / 唤起斜杠菜单：标注 Callout、图片、表格、公式等',
   '选中文字弹出浮动格式工具栏',
   '直接粘贴截图或拖入图片，自动上传插入',
+  '支持导入 TXT / Markdown；可一并选中图片附件（匹配 Obsidian ![[图]]）',
   '从 IDE 复制的 Markdown 粘贴后自动渲染为排版',
   '引用块首行输入 [!note] + 空格，生成标注卡片',
 ] as const
@@ -396,6 +585,33 @@ function removeCover() {
       </div>
 
       <div class="flex items-center gap-3">
+        <input
+          ref="importInputRef"
+          type="file"
+          multiple
+          accept=".txt,.md,.markdown,text/plain,text/markdown,image/*,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.avif"
+          class="hidden"
+          @change="onImportFile"
+        />
+        <input
+          ref="repairInputRef"
+          type="file"
+          multiple
+          accept="image/*,.png,.jpg,.jpeg,.gif,.webp,.svg,.bmp,.avif"
+          class="hidden"
+          @change="onRepairFiles"
+        />
+        <button
+          type="button"
+          class="btn-secondary"
+          :disabled="importing"
+          title="导入 TXT / Markdown 文档（可同时选中图片附件，按文件名匹配 ![[图片]]）"
+          @click="triggerImportPicker"
+        >
+          <Loader2 v-if="importing" :size="14" class="animate-spin" />
+          <Upload v-else :size="14" />
+          <span class="hidden sm:inline">{{ importing ? '导入中…' : '导入文档' }}</span>
+        </button>
         <button
           @click="toggleMetaPanel"
           class="btn-secondary"
@@ -434,6 +650,70 @@ function removeCover() {
     <div v-if="error" class="mb-6 p-3 rounded-lg bg-danger-subtle text-danger text-sm flex items-center gap-2">
       <AlertCircle :size="16" />
       {{ error }}
+    </div>
+
+    <!-- 导入后图片补传提示（不阻断编辑） -->
+    <div
+      v-if="importNotice"
+      class="mb-4 rounded-xl border border-accent/30 bg-accent-subtle/60 p-4"
+      role="status"
+    >
+      <div class="flex items-start gap-3">
+        <ImageOff :size="18" class="text-accent flex-shrink-0 mt-0.5" />
+        <div class="flex-1 min-w-0">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-sm font-medium text-text-primary">
+                导入完成，{{ importNotice.failed.length }} 张图片未能自动上传
+              </p>
+              <p class="text-xs text-text-secondary mt-1">
+                远程图会自动转存；本地 / Obsidian 图需文件名对上附件。正文已用「图片待补传」标出位置。
+                <template v-if="importNotice.uploaded || importNotice.kept">
+                  已自动上传 {{ importNotice.uploaded }} 张、保留本站图片 {{ importNotice.kept }} 张。
+                </template>
+              </p>
+            </div>
+            <button
+              type="button"
+              class="p-1 rounded text-text-muted hover:text-text-primary hover:bg-bg-secondary transition-colors"
+              aria-label="关闭补传提示"
+              @click="dismissImportNotice"
+            >
+              <X :size="14" />
+            </button>
+          </div>
+
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              class="btn-primary"
+              :disabled="repairing"
+              @click="triggerRepairPicker"
+            >
+              <Loader2 v-if="repairing" :size="14" class="animate-spin" />
+              <FileUp v-else :size="14" />
+              选择图片补传
+            </button>
+            <span class="text-xs text-text-muted">
+              可多选（如 Obsidian attachments/ 里的图），按文件名自动替换占位
+            </span>
+          </div>
+
+          <ul class="mt-3 space-y-1.5">
+            <li
+              v-for="(img, idx) in importNotice.failed"
+              :key="idx"
+              class="flex items-start gap-2 text-xs text-text-secondary"
+            >
+              <FileUp :size="12" class="mt-0.5 flex-shrink-0 text-danger/70" />
+              <div class="min-w-0">
+                <span class="font-mono break-all text-text-primary/80">{{ img.originalRef }}</span>
+                <span v-if="img.reason" class="text-text-muted"> — {{ img.reason }}</span>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <div v-if="loading" class="py-16 text-center text-text-muted">

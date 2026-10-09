@@ -6,15 +6,19 @@ import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.commons.framework.web.Results;
 import io.github.somehow.mysite.dto.req.article.*;
 import io.github.somehow.mysite.dto.resp.ArchiveRespDTO;
+import io.github.somehow.mysite.dto.resp.ArticleImportRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticlePageQueryRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleSelectRespDTO;
 import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
+import io.github.somehow.mysite.service.ArticleImportService;
 import io.github.somehow.mysite.service.ArticleService;
 import io.github.somehow.mysite.service.impl.ArticleViewCountService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.validation.Valid;
 import java.util.List;
@@ -27,6 +31,15 @@ public class ArticleController {
 
     private final ArticleService articleService;
     private final ArticleViewCountService articleViewCountService;
+    private final ArticleImportService articleImportService;
+
+    @Operation(summary = "导入 TXT/Markdown 文档（可附带图片附件按文件名匹配；自动转存可上传的图片，失败写入补传占位）")
+    @PostMapping(value = "/v1/articles/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Result<ArticleImportRespDTO> importDocument(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "attachments", required = false) List<MultipartFile> attachments) {
+        return Results.success(articleImportService.importDocument(file, attachments));
+    }
 
     @Operation(summary = "创建文章")
     @PostMapping("/v1/articles")

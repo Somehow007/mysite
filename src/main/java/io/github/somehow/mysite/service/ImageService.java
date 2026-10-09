@@ -12,6 +12,11 @@ public interface ImageService extends IService<ImageDO> {
 
     ImageUploadRespDTO uploadImage(MultipartFile file);
 
+    /**
+     * 文档导入批量转存用：跳过单次上传限流（由导入服务控制批量与超时）。
+     */
+    ImageUploadRespDTO uploadImageForImport(MultipartFile file);
+
     ImageUploadRespDTO uploadImageByUrl(String url);
 
     IPage<ImagePageQueryRespDTO> pageQueryImages(ImagePageQueryReqDTO requestParam);

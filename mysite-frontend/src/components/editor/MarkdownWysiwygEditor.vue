@@ -87,13 +87,19 @@ onMounted(async () => {
   try {
     // 动态引入：Milkdown 体积较大，仅在进入编辑页时加载
     const { createEditor } = await import('@/editor/createEditor')
+    const initialValue = props.modelValue
     handle = await createEditor({
       root: container,
-      defaultValue: props.modelValue,
+      defaultValue: initialValue,
       placeholder: props.placeholder,
       onChange: onEditorChange,
     })
+    // 初始化期间外部可能已改写 modelValue（如文档导入），补同步一次
+    if (props.modelValue !== initialValue) {
+      handle.setMarkdown(props.modelValue)
+    }
     lastEmittedValue = props.modelValue
+    pendingValue = null
   } catch (e) {
     console.error('[MarkdownWysiwygEditor] init failed, falling back to textarea:', e)
     fallbackMode.value = true

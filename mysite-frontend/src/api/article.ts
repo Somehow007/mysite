@@ -113,3 +113,35 @@ export function searchArticles(params: SearchParams): Promise<PaginatedResponse<
     size: params.size || 10,
   })
 }
+
+/** 文档导入图片处理明细 */
+export interface ArticleImportImage {
+  originalRef: string
+  status: 'UPLOADED' | 'KEPT' | 'FAILED'
+  url?: string | null
+  reason?: string | null
+}
+
+/** 文档导入结果：content 可直接写入编辑器 */
+export interface ArticleImportResult {
+  title?: string | null
+  content: string
+  fileName: string
+  images: ArticleImportImage[]
+}
+
+/**
+ * 导入 TXT / Markdown 文档；可附带图片附件（Obsidian ![[file]] / 相对路径按文件名匹配）。
+ * 后端会自动转存可上传的图片；失败的图片在 content 里以「图片待补传」callout 标出。
+ */
+export function importArticle(file: File, attachments?: File[]): Promise<ArticleImportResult> {
+  const formData = new FormData()
+  formData.append('file', file)
+  if (attachments && attachments.length > 0) {
+    for (const att of attachments) {
+      formData.append('attachments', att)
+    }
+  }
+  // 图片阶段有独立预算，导入接口给足超时
+  return post<ArticleImportResult>('/v1/articles/import', formData, { timeout: 90000 })
+}

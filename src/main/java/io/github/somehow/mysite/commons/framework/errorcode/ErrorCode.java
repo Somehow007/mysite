@@ -49,6 +49,12 @@ public enum ErrorCode implements IErrorCode {
     ARTICLE_OWNERSHIP_VERIFY_FAILED("A030108", "无法验证文章所有权，请重新登录"),
     ARTICLE_PERMISSION_DENIED("A030109", "权限不足，只能操作自己的文章"),
     ARTICLE_VISIBILITY_MIXED("A030110", "选中的文章包含公开和隐藏两种状态，无法批量操作"),
+    ARTICLE_IMPORT_FILE_REQUIRED("A030111", "请选择要导入的文档"),
+    ARTICLE_IMPORT_TYPE_NOT_ALLOWED("A030112", "仅支持导入 TXT / Markdown 文档"),
+    ARTICLE_IMPORT_FILE_TOO_LARGE("A030113", "文档文件过大（最大 2MB）"),
+    ARTICLE_IMPORT_EMPTY("A030114", "文档内容为空"),
+    ARTICLE_IMPORT_READ_FAILED("A030115", "文档读取失败"),
+    ARTICLE_IMPORT_ENCODING_UNSUPPORTED("A030116", "无法识别文档编码，请另存为 UTF-8 后重试"),
 
     // ---------- A04: 分类模块错误 ----------
     CATEGORY_ERROR("A040001", "分类模块错误"),

@@ -111,6 +111,10 @@ public class WebSecurityConfig {
                         .requestMatchers(
                                 HttpMethod.POST, "/v1/articles"
                         ).hasAnyRole("ADMIN", "CREATOR")
+                        // 写文章页文档导入（txt/md）
+                        .requestMatchers(
+                                HttpMethod.POST, "/v1/articles/import"
+                        ).hasAnyRole("ADMIN", "CREATOR")
                         .requestMatchers(
                                 HttpMethod.PUT, "/v1/articles/**"
                         ).hasAnyRole("ADMIN", "CREATOR")
