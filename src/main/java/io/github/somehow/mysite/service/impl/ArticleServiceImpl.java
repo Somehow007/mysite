@@ -26,6 +26,7 @@ import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.ArticleService;
 import io.github.somehow.mysite.service.CategoryService;
 import io.github.somehow.mysite.service.CollectionService;
+import io.github.somehow.mysite.service.ImageService;
 import io.github.somehow.mysite.service.TagService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+import io.github.somehow.mysite.utils.ArticleDocumentParser;
 import io.github.somehow.mysite.utils.ReadingTimeCalculator;
 
 import java.text.SimpleDateFormat;
@@ -61,6 +63,7 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     private final ArticleViewCountService articleViewCountService;
     private final ArticleCacheService articleCacheService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ImageService imageService;
 
     @Override
     @Transactional
@@ -119,6 +122,9 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         articleSearchService.indexArticle(articleDO);
         categoryService.evictCategoryCache();
         tagService.evictTagCache();
+
+        // 编辑器粘贴/导入的暂存图：保存成功后转正，避免弃稿孤儿图占盘
+        promoteStagingImagesQuietly(requestParam.getContent(), requestParam.getCoverImage());
 
         // ★ RAG 集成：发布文章创建事件，触发异步向量化
         eventPublisher.publishEvent(new ArticleCreatedEvent(articleDO));
@@ -179,9 +185,22 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         tagService.evictTagCache();
         articleCacheService.evictArticleDetail(requestParam.getId());
 
+        // 同步转正本次内容里引用的暂存图
+        promoteStagingImagesQuietly(requestParam.getContent(), requestParam.getCoverImage());
+
         // ★ RAG 集成：发布文章更新事件，触发异步重新向量化
         if (updatedArticle != null) {
             eventPublisher.publishEvent(new ArticleUpdatedEvent(updatedArticle));
+        }
+    }
+
+    /** 保存文章时把暂存图片转正；失败不影响保存主流程 */
+    private void promoteStagingImagesQuietly(String content, String coverImage) {
+        try {
+            imageService.promoteStagingImages(
+                    ArticleDocumentParser.extractUploadImageUrls(content, coverImage));
+        } catch (Exception e) {
+            log.warn("暂存图片转正失败（不影响文章保存）: {}", e.getMessage());
         }
     }
 

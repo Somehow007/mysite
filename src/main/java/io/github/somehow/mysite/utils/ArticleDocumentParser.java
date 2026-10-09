@@ -292,6 +292,62 @@ public final class ArticleDocumentParser {
         return sb.toString();
     }
 
+    /** 站内图片 URL：/uploads/images/... */
+    private static final Pattern UPLOADED_URL = Pattern.compile("/uploads/images/[^\\s)\"'<>\\]]+");
+
+    /**
+     * 从文章内容/封面中抽取站内图片 URL（去重，保序）。
+     * 用于保存文章时把暂存图片转正。
+     */
+    public static List<String> extractUploadImageUrls(String... parts) {
+        Map<String, Boolean> seen = new LinkedHashMap<>();
+        if (parts != null) {
+            for (String part : parts) {
+                if (part == null || part.isEmpty()) {
+                    continue;
+                }
+                // 先取结构化图片引用
+                for (ImageRef ref : findImageRefs(part)) {
+                    String path = normalizeUploadPath(ref.url());
+                    if (path != null) {
+                        seen.putIfAbsent(path, Boolean.TRUE);
+                    }
+                }
+                // 再扫正文里裸露的 /uploads/images/（HTML、手写 URL）
+                Matcher m = UPLOADED_URL.matcher(part);
+                while (m.find()) {
+                    String path = normalizeUploadPath(m.group());
+                    if (path != null) {
+                        seen.putIfAbsent(path, Boolean.TRUE);
+                    }
+                }
+            }
+        }
+        return new ArrayList<>(seen.keySet());
+    }
+
+    /** 归一为 /uploads/images/...；非本站上传路径返回 null。 */
+    public static String normalizeUploadPath(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String u = raw.trim();
+        int idx = u.indexOf("/uploads/images/");
+        if (idx < 0) {
+            return null;
+        }
+        String path = u.substring(idx);
+        int q = path.indexOf('?');
+        if (q >= 0) {
+            path = path.substring(0, q);
+        }
+        int h = path.indexOf('#');
+        if (h >= 0) {
+            path = path.substring(0, h);
+        }
+        return path;
+    }
+
     /** 生成「图片待补传」callout 占位（与编辑器 callout 语法一致）。 */
     public static String buildPlaceholder(String originalRef) {
         String ref = originalRef == null ? "" : originalRef.trim();

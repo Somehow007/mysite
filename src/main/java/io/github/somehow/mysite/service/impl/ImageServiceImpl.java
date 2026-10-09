@@ -4,6 +4,7 @@ import cn.hutool.core.util.HexUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -20,6 +21,7 @@ import io.github.somehow.mysite.service.ImageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -40,6 +42,10 @@ import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -215,6 +221,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
                 .sourceType(0)
                 .uploaderId(uploaderId)
                 .articleCount(0)
+                .status(ImageDO.STATUS_STAGING)
                 .build();
         imageDO.setDelFlag(0);
 
@@ -373,12 +380,136 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
                 .sourceUrl(imageUrl)
                 .uploaderId(uploaderId)
                 .articleCount(0)
+                .status(ImageDO.STATUS_STAGING)
                 .build();
         imageDO.setDelFlag(0);
 
         baseMapper.insert(imageDO);
 
         return buildUploadResp(imageDO);
+    }
+
+    /**
+     * 暂存图保留期：超过该时长仍未被文章引用则可安全删除。
+     */
+    static final long STAGING_TTL_MS = 48L * 60 * 60 * 1000;
+
+    @Override
+    public int promoteStagingImages(Collection<String> imageUrls) {
+        if (imageUrls == null || imageUrls.isEmpty()) {
+            return 0;
+        }
+        List<String> normalized = new ArrayList<>();
+        for (String u : imageUrls) {
+            String n = normalizeUploadUrl(u);
+            if (n != null && !normalized.contains(n)) {
+                normalized.add(n);
+            }
+        }
+        if (normalized.isEmpty()) {
+            return 0;
+        }
+
+        List<ImageDO> staging = baseMapper.selectList(Wrappers.lambdaQuery(ImageDO.class)
+                .in(ImageDO::getUrl, normalized)
+                .eq(ImageDO::getStatus, ImageDO.STATUS_STAGING)
+                .eq(ImageDO::getDelFlag, 0));
+        if (staging.isEmpty()) {
+            return 0;
+        }
+
+        List<Long> ids = staging.stream().map(ImageDO::getId).toList();
+        // 仅暂存→正式 时 +1，避免每次编辑文章重复累加
+        LambdaUpdateWrapper<ImageDO> uw = Wrappers.lambdaUpdate(ImageDO.class)
+                .in(ImageDO::getId, ids)
+                .eq(ImageDO::getStatus, ImageDO.STATUS_STAGING)
+                .set(ImageDO::getStatus, ImageDO.STATUS_ACTIVE)
+                .setSql("article_count = article_count + 1");
+        return baseMapper.update(null, uw);
+    }
+
+    @Override
+    public int cleanupExpiredStagingImages() {
+        Date cutoff = new Date(System.currentTimeMillis() - STAGING_TTL_MS);
+        List<ImageDO> expired = baseMapper.selectList(Wrappers.lambdaQuery(ImageDO.class)
+                .eq(ImageDO::getStatus, ImageDO.STATUS_STAGING)
+                .eq(ImageDO::getArticleCount, 0)
+                .eq(ImageDO::getDelFlag, 0)
+                .lt(ImageDO::getCreateTime, cutoff));
+        if (expired.isEmpty()) {
+            return 0;
+        }
+
+        int removed = 0;
+        for (ImageDO image : expired) {
+            try {
+                deleteImageFiles(image);
+                int rows = baseMapper.update(null, Wrappers.lambdaUpdate(ImageDO.class)
+                        .eq(ImageDO::getId, image.getId())
+                        .eq(ImageDO::getStatus, ImageDO.STATUS_STAGING)
+                        .set(ImageDO::getDelFlag, 1));
+                if (rows > 0) {
+                    removed++;
+                }
+            } catch (Exception e) {
+                log.warn("清理暂存图片失败: id={}, url={}", image.getId(), image.getUrl(), e);
+            }
+        }
+        if (removed > 0) {
+            log.info("清理过期暂存图片 {} 张（保留期 {} 小时）", removed, STAGING_TTL_MS / 3600000);
+        }
+        return removed;
+    }
+
+    /** 每天 04:10 清理过期暂存图（编辑器里粘贴/导入后未保存进文章的孤儿图） */
+    @Scheduled(cron = "0 10 4 * * *")
+    public void scheduledCleanupStagingImages() {
+        try {
+            cleanupExpiredStagingImages();
+        } catch (Exception e) {
+            log.warn("定时清理暂存图片失败", e);
+        }
+    }
+
+    /**
+     * 把可能带域名前缀的图片 URL 归一成站内相对路径（/uploads/images/...）。
+     * 非本站上传路径返回 null。
+     */
+    private static String normalizeUploadUrl(String raw) {
+        if (StrUtil.isBlank(raw)) {
+            return null;
+        }
+        String u = raw.trim();
+        int idx = u.indexOf("/uploads/images/");
+        if (idx < 0) {
+            return null;
+        }
+        String path = u.substring(idx);
+        // 去掉 query/fragment
+        int q = path.indexOf('?');
+        if (q >= 0) {
+            path = path.substring(0, q);
+        }
+        int h = path.indexOf('#');
+        if (h >= 0) {
+            path = path.substring(0, h);
+        }
+        return path;
+    }
+
+    private void deleteImageFiles(ImageDO image) {
+        Path filePath = Paths.get(imageUploadConfig.getBasePath()).toAbsolutePath().resolve(image.getFilePath());
+        try {
+            Files.deleteIfExists(filePath);
+        } catch (IOException e) {
+            log.warn("删除暂存图片文件失败: {}", filePath, e);
+        }
+        Path webpPath = resolveWebpPath(filePath);
+        try {
+            Files.deleteIfExists(webpPath);
+        } catch (IOException e) {
+            log.warn("删除暂存图片WebP副本失败: {}", webpPath, e);
+        }
     }
 
     @Override

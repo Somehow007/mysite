@@ -226,13 +226,15 @@ CREATE TABLE IF NOT EXISTS `t_image` (
     `source_url` VARCHAR(500) DEFAULT NULL COMMENT '原始URL(source_type=1时)',
     `uploader_id` BIGINT NOT NULL COMMENT '上传者ID',
     `article_count` INT NOT NULL DEFAULT 0 COMMENT '引用文章数',
+    `status` TINYINT NOT NULL DEFAULT 1 COMMENT '生命周期 0:暂存(编辑器预览) 1:正式(文章已引用)',
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     `del_flag` TINYINT NOT NULL DEFAULT 0 COMMENT '删除标识 0:未删除 1:已删除',
     PRIMARY KEY (`id`),
     KEY `idx_uploader_id` (`uploader_id`),
     KEY `idx_create_time` (`create_time`),
-    KEY `idx_source_type` (`source_type`)
+    KEY `idx_source_type` (`source_type`),
+    KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='图片表';
 
 -- ==============================================

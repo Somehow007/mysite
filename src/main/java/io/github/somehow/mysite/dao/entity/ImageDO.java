@@ -29,4 +29,9 @@ public class ImageDO extends BaseDO {
     private String sourceUrl;
     private Long uploaderId;
     private Integer articleCount;
+    /** 0=暂存（编辑器预览，可被 GC） 1=正式（已被文章引用） */
+    private Integer status;
+
+    public static final int STATUS_STAGING = 0;
+    public static final int STATUS_ACTIVE = 1;
 }

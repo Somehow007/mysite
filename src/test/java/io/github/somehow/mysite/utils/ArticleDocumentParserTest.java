@@ -211,4 +211,31 @@ class ArticleDocumentParserTest {
         assertEquals("a.png", ArticleDocumentParser.baseName("attachments/a.png"));
         assertEquals("Pasted image 1.png", ArticleDocumentParser.baseName("Pasted image 1.png"));
     }
+
+    // ── extractUploadImageUrls（暂存图转正用） ──────────────────
+
+    @Test
+    void extractUploadUrls_fromMarkdownAndCover() {
+        String content = "看图 ![a](/uploads/images/2026/10/1_a.png) 和 ![](http://host/uploads/images/2026/10/2_b.png?x=1)";
+        List<String> urls = ArticleDocumentParser.extractUploadImageUrls(
+                content, "/uploads/images/2026/10/3_c.png");
+        assertEquals(3, urls.size());
+        assertTrue(urls.contains("/uploads/images/2026/10/1_a.png"));
+        assertTrue(urls.contains("/uploads/images/2026/10/2_b.png"));
+        assertTrue(urls.contains("/uploads/images/2026/10/3_c.png"));
+    }
+
+    @Test
+    void extractUploadUrls_ignoresExternal() {
+        List<String> urls = ArticleDocumentParser.extractUploadImageUrls(
+                "![x](https://cdn.nlark.com/a.png)", "https://example.com/b.png");
+        assertTrue(urls.isEmpty());
+    }
+
+    @Test
+    void extractUploadUrls_fromRawHtml() {
+        String content = "<img src=\"/uploads/images/2026/10/1_a.png\" alt=\"x\">";
+        List<String> urls = ArticleDocumentParser.extractUploadImageUrls(content);
+        assertEquals(List.of("/uploads/images/2026/10/1_a.png"), urls);
+    }
 }
