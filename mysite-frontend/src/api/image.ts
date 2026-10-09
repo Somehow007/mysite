@@ -23,6 +23,10 @@ export interface ImageItem {
   sourceType: number
   sourceUrl: string | null
   uploaderId: string
+  /** 0 暂存 / 1 正式 */
+  status?: number
+  /** 1 已被文章引用 / 0 孤儿 */
+  referenced?: number
   createTime: string
 }
 
@@ -31,6 +35,10 @@ export interface ImageListParams {
   size?: number
   keyword?: string
   sourceType?: number
+  /** 0 暂存 / 1 正式 */
+  status?: number
+  /** 0 未引用(孤儿) / 1 已引用 */
+  usageStatus?: number
 }
 
 export const MAX_IMAGE_FILE_SIZE = 5 * 1024 * 1024 // 5MB
@@ -70,4 +78,15 @@ export function getImages(params: ImageListParams = {}) {
 export function deleteImage(id: string): Promise<void> {
   const response = apiClient.delete<ApiResponse<void>>(`/v1/images/${id}`)
   return response.then(() => {})
+}
+
+/**
+ * 批量清理孤儿图（未被文章引用）。
+ * excludeFreshStaging=true 时跳过 48h 内新建的暂存图，避免误删正在写的草稿。
+ */
+export function cleanupOrphanImages(excludeFreshStaging = true): Promise<number> {
+  const response = apiClient.delete<ApiResponse<number>>('/v1/images/orphans', {
+    params: { excludeFreshStaging },
+  })
+  return response.then(res => res.data.data ?? 0)
 }

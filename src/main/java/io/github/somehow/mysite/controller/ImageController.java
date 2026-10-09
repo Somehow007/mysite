@@ -46,4 +46,11 @@ public class ImageController {
         imageService.deleteImage(id);
         return Results.success();
     }
+
+    @Operation(summary = "批量清理孤儿图（未被文章引用；默认跳过 48h 内新建的暂存图）")
+    @DeleteMapping("/v1/images/orphans")
+    public Result<Integer> cleanupOrphanImages(
+            @RequestParam(value = "excludeFreshStaging", defaultValue = "true") boolean excludeFreshStaging) {
+        return Results.success(imageService.cleanupOrphanImages(excludeFreshStaging));
+    }
 }

@@ -461,6 +461,39 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
         return removed;
     }
 
+    @Override
+    public int cleanupOrphanImages(boolean excludeFreshStaging) {
+        List<Long> orphanIds = baseMapper.selectOrphanImageIds(excludeFreshStaging);
+        if (orphanIds == null || orphanIds.isEmpty()) {
+            return 0;
+        }
+
+        List<ImageDO> images = baseMapper.selectByIds(orphanIds);
+        if (images == null || images.isEmpty()) {
+            return 0;
+        }
+
+        int removed = 0;
+        for (ImageDO image : images) {
+            try {
+                deleteImageFiles(image);
+                int rows = baseMapper.update(null, Wrappers.lambdaUpdate(ImageDO.class)
+                        .eq(ImageDO::getId, image.getId())
+                        .eq(ImageDO::getDelFlag, 0)
+                        .set(ImageDO::getDelFlag, 1));
+                if (rows > 0) {
+                    removed++;
+                }
+            } catch (Exception e) {
+                log.warn("清理孤儿图片失败: id={}, url={}", image.getId(), image.getUrl(), e);
+            }
+        }
+        if (removed > 0) {
+            log.info("批量清理孤儿图片 {} 张（excludeFreshStaging={}）", removed, excludeFreshStaging);
+        }
+        return removed;
+    }
+
     /** 每天 04:10 清理过期暂存图（编辑器里粘贴/导入后未保存进文章的孤儿图） */
     @Scheduled(cron = "0 10 4 * * *")
     public void scheduledCleanupStagingImages() {

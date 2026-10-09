@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { getImages, deleteImage, uploadImage, MAX_IMAGE_FILE_SIZE, type ImageItem } from '@/api/image'
+import { getImages, deleteImage, uploadImage, cleanupOrphanImages, MAX_IMAGE_FILE_SIZE, type ImageItem } from '@/api/image'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useHead } from '@unhead/vue'
@@ -19,8 +19,11 @@ const totalPages = ref(1)
 const total = ref(0)
 const keyword = ref('')
 const sourceType = ref<number | undefined>(undefined)
+/** 0 未引用(孤儿) / 1 已引用 / undefined 全部 */
+const usageStatus = ref<number | undefined>(undefined)
 const sortField = ref('createTime')
 const sortOrder = ref('desc')
+const cleaningOrphans = ref(false)
 
 const selectedForPreview = ref<ImageItem | null>(null)
 const uploadInputRef = ref<HTMLInputElement | null>(null)
@@ -121,6 +124,7 @@ async function fetchImages(page: number = 1) {
     }
     if (keyword.value) params.keyword = keyword.value
     if (sourceType.value !== undefined) params.sourceType = sourceType.value
+    if (usageStatus.value !== undefined) params.usageStatus = usageStatus.value
     const result = await getImages(params)
     images.value = result.list
     currentPage.value = result.pagination.page
@@ -141,6 +145,11 @@ function handleSourceTypeChange() {
   fetchImages(1)
 }
 
+function handleUsageStatusChange() {
+  selectedIds.value = new Set()
+  fetchImages(1)
+}
+
 function toggleSortOrder() {
   sortOrder.value = sortOrder.value === 'desc' ? 'asc' : 'desc'
   fetchImages(1)
@@ -149,6 +158,7 @@ function toggleSortOrder() {
 function handleReset() {
   keyword.value = ''
   sourceType.value = undefined
+  usageStatus.value = undefined
   sortField.value = 'createTime'
   sortOrder.value = 'desc'
   fetchImages(1)
@@ -165,6 +175,47 @@ const imageFilterOptions = [
   { label: '本地上传', value: 0 },
   { label: 'URL拉取', value: 1 },
 ]
+
+const usageFilterOptions = [
+  { label: '全部引用状态', value: undefined as number | undefined },
+  { label: '已引用', value: 1 },
+  { label: '孤儿图', value: 0 },
+]
+
+function usageLabel(image: ImageItem): { text: string; class: string } {
+  if (image.referenced === 1) {
+    return { text: '已引用', class: 'bg-success-subtle text-success' }
+  }
+  if (image.status === 0) {
+    return { text: '暂存', class: 'bg-warning-subtle text-warning' }
+  }
+  return { text: '孤儿', class: 'bg-danger-subtle text-danger' }
+}
+
+async function handleCleanupOrphans() {
+  const ok = await confirm({
+    title: '清理孤儿图',
+    message: '将删除所有未被文章引用的图片（含文章已删、正文中已移除的图）。48 小时内新建的暂存图会保留，避免误删正在写的草稿。确定继续？',
+    danger: true,
+    confirmText: '清理',
+  })
+  if (!ok) return
+  cleaningOrphans.value = true
+  try {
+    const n = await cleanupOrphanImages(true)
+    if (n > 0) {
+      toast.success(`已清理 ${n} 张孤儿图`)
+    } else {
+      toast.success('没有可清理的孤儿图')
+    }
+    selectedIds.value = new Set()
+    await fetchImages(1)
+  } catch (e) {
+    toast.error('清理失败：' + (e instanceof Error ? e.message : '未知错误'))
+  } finally {
+    cleaningOrphans.value = false
+  }
+}
 
 async function confirmDelete(image: ImageItem) {
   const ok = await confirm({
@@ -210,6 +261,17 @@ onMounted(() => {
           class="hidden"
           @change="handleFileUpload"
         />
+        <button
+          type="button"
+          class="btn-secondary text-sm"
+          :disabled="cleaningOrphans"
+          title="删除未被任何文章引用的图片"
+          @click="handleCleanupOrphans"
+        >
+          <Loader2 v-if="cleaningOrphans" :size="14" class="animate-spin" />
+          <Trash2 v-else :size="14" />
+          {{ cleaningOrphans ? '清理中…' : '清理孤儿图' }}
+        </button>
         <button
           @click="triggerUpload"
           class="btn-secondary text-sm"
@@ -259,6 +321,13 @@ onMounted(() => {
         @change="handleSourceTypeChange"
       >
         <option v-for="opt in imageFilterOptions" :key="String(opt.value)" :value="opt.value">{{ opt.label }}</option>
+      </select>
+      <select
+        v-model="usageStatus"
+        class="px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+        @change="handleUsageStatusChange"
+      >
+        <option v-for="opt in usageFilterOptions" :key="String(opt.value)" :value="opt.value">{{ opt.label }}</option>
       </select>
     </SearchFilterBar>
 
@@ -337,19 +406,16 @@ onMounted(() => {
             <p class="text-xs font-medium truncate text-text-secondary" :title="image.originalName">
               {{ image.originalName }}
             </p>
-            <div class="flex items-center justify-between mt-1">
-              <span class="text-[10px] text-text-muted">
+            <div class="flex items-center justify-between mt-1 gap-1">
+              <span class="text-[10px] text-text-muted truncate">
                 {{ formatFileSize(image.fileSize) }} · {{ contentTypeLabel(image.contentType) }}
               </span>
               <span
-                :class="[
-                  'px-1.5 py-0.5 text-[10px] rounded',
-                  image.sourceType === 0
-                    ? 'bg-info-subtle text-info'
-                    : 'bg-accent-subtle text-accent'
-                ]"
+                class="px-1.5 py-0.5 text-[10px] rounded flex-shrink-0"
+                :class="usageLabel(image).class"
+                :title="image.referenced === 1 ? '已被文章正文或封面引用' : (image.status === 0 ? '编辑器暂存，保存文章后转正' : '未被任何文章引用')"
               >
-                {{ image.sourceType === 0 ? '本地' : 'URL' }}
+                {{ usageLabel(image).text }}
               </span>
             </div>
           </div>

@@ -15,4 +15,10 @@ public class ImagePageQueryReqDTO extends Page {
 
     @Schema(description = "来源类型: 0-本地上传 1-URL拉取")
     private Integer sourceType;
+
+    @Schema(description = "生命周期: 0-暂存 1-正式")
+    private Integer status;
+
+    @Schema(description = "引用状态: 0-未被文章引用(孤儿) 1-已被文章引用；不传查全部")
+    private Integer usageStatus;
 }

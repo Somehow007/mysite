@@ -49,6 +49,12 @@ public class ImagePageQueryRespDTO {
     @JsonSerialize(using = ToStringSerializer.class)
     private Long uploaderId;
 
+    @Schema(description = "生命周期 0:暂存 1:正式")
+    private Integer status;
+
+    @Schema(description = "是否被文章引用 1:已引用 0:孤儿")
+    private Integer referenced;
+
     @Schema(description = "创建时间")
     private Date createTime;
 }

@@ -36,6 +36,14 @@ public interface ImageService extends IService<ImageDO> {
      */
     int cleanupExpiredStagingImages();
 
+    /**
+     * 批量清理孤儿图（未被任何文章正文/封面引用）。
+     *
+     * @param excludeFreshStaging true 时跳过 48h 内新建的暂存图，避免误删正在写的草稿
+     * @return 清理张数
+     */
+    int cleanupOrphanImages(boolean excludeFreshStaging);
+
     IPage<ImagePageQueryRespDTO> pageQueryImages(ImagePageQueryReqDTO requestParam);
 
     void deleteImage(Long id);
