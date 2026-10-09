@@ -284,24 +284,6 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <!-- 批量操作栏（悬浮胶囊） -->
-    <Transition
-      enter-active-class="transition-all duration-200 ease-out"
-      enter-from-class="opacity-0 -translate-y-1"
-      leave-active-class="transition-all duration-200 ease-in"
-      leave-to-class="opacity-0 -translate-y-1"
-    >
-      <div v-if="selectedIds.size > 0" class="flex items-center justify-center mb-4">
-        <div class="inline-flex items-center gap-3 px-4 py-2 rounded-full border border-accent/30 bg-bg-elevated shadow-md">
-          <span class="text-[13px] font-semibold text-accent">已选 {{ selectedIds.size }} 项</span>
-          <button @click="handleBatchDelete" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] rounded-full bg-danger-subtle text-danger hover:bg-danger/20 transition-colors">
-            <Trash2 :size="12" />批量删除
-          </button>
-          <button @click="selectedIds = new Set()" class="px-2 py-1 text-[12.5px] text-text-muted hover:text-text-primary transition-colors">取消</button>
-        </div>
-      </div>
-    </Transition>
-
     <SearchFilterBar
       v-model="keyword"
       placeholder="搜索文件名..."
@@ -361,14 +343,37 @@ onMounted(() => {
         <span class="text-xs text-accent font-medium tabular-nums shrink-0">{{ uploadProgress }}%</span>
       </div>
 
-      <!-- Select all -->
-      <div class="flex items-center gap-2 mb-3">
+      <!-- Select all / 批量操作：同一行右侧切换，行高固定，选中时页面不跳动 -->
+      <div class="flex items-center gap-2 mb-3 min-h-[28px]">
         <button @click="toggleSelectAll" class="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-accent transition-colors">
           <CheckSquare v-if="selectedIds.size === images.length && images.length > 0" :size="14" class="text-accent" />
           <Square v-else :size="14" />
           {{ selectedIds.size === images.length ? '取消全选' : '全选' }}
         </button>
         <span class="text-xs text-text-muted">已选 {{ selectedIds.size }} / {{ images.length }}</span>
+
+        <Transition
+          enter-active-class="transition-opacity duration-150 ease-out"
+          enter-from-class="opacity-0"
+          leave-active-class="transition-opacity duration-150 ease-in"
+          leave-to-class="opacity-0"
+        >
+          <div v-if="selectedIds.size > 0" class="ml-auto flex items-center gap-2">
+            <button
+              @click="handleBatchDelete"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md bg-danger-subtle text-danger hover:bg-danger/15 transition-colors"
+            >
+              <Trash2 :size="12" />
+              删除所选
+            </button>
+            <button
+              @click="selectedIds = new Set()"
+              class="px-2 py-1 text-xs text-text-muted hover:text-text-primary transition-colors"
+            >
+              取消
+            </button>
+          </div>
+        </Transition>
       </div>
 
       <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
