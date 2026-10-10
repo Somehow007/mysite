@@ -68,6 +68,10 @@ public class UserController {
         updateReq.setUserId(userDetails.getUserId().toString());
         updateReq.setAvatar(result.getUrl());
         userService.updateUser(updateReq);
+        // 头像已绑定用户，暂存图转正
+        if (result.getUrl() != null) {
+            imageService.promoteStagingImages(java.util.List.of(result.getUrl()));
+        }
         return Results.success(result);
     }
 
