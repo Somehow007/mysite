@@ -195,7 +195,7 @@ function usageLabel(image: ImageItem): { text: string; class: string } {
 async function handleCleanupOrphans() {
   const ok = await confirm({
     title: '清理孤儿图',
-    message: '将删除所有未被文章引用的图片（含文章已删、正文中已移除的图）。48 小时内新建的暂存图会保留，避免误删正在写的草稿。确定继续？',
+    message: '将删除所有未被文章、合集引用的图片（含文章/合集已删、正文中已移除的图）。48 小时内新建的暂存图会保留，避免误删正在写的草稿。确定继续？',
     danger: true,
     confirmText: '清理',
   })
@@ -418,7 +418,7 @@ onMounted(() => {
               <span
                 class="px-1.5 py-0.5 text-[10px] rounded flex-shrink-0"
                 :class="usageLabel(image).class"
-                :title="image.referenced === 1 ? '已被文章正文或封面引用' : (image.status === 0 ? '编辑器暂存，保存文章后转正' : '未被任何文章引用')"
+                :title="image.referenced === 1 ? '已被文章或合集引用' : (image.status === 0 ? '编辑器暂存，保存后转正' : '未被文章或合集引用')"
               >
                 {{ usageLabel(image).text }}
               </span>

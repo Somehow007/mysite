@@ -29,6 +29,8 @@ import io.github.somehow.mysite.dto.resp.collection.ArticleNavInfoRespDTO;
 import io.github.somehow.mysite.dto.resp.collection.CollectionDetailRespDTO;
 import io.github.somehow.mysite.dto.resp.collection.CollectionPageQueryRespDTO;
 import io.github.somehow.mysite.service.CollectionService;
+import io.github.somehow.mysite.service.ImageService;
+import io.github.somehow.mysite.utils.ArticleDocumentParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
@@ -50,6 +52,7 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
     private final CollectionArticleMapper collectionArticleMapper;
     private final ArticleMapper articleMapper;
     private final UserMapper userMapper;
+    private final ImageService imageService;
 
     private static final String CACHE_DETAIL = "collection_detail";
     private static final String CACHE_ARTICLES = "collection_articles";
@@ -83,6 +86,8 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
             collectionDO.setCoverImage(null);
         }
         collectionMapper.insert(collectionDO);
+        // 合集封面/描述引用的暂存图转正
+        promoteStagingImagesQuietly(requestParam.getDescription(), requestParam.getCoverImage());
         return collectionDO.getId();
     }
 
@@ -102,6 +107,17 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
         if (requestParam.getVisibility() != null) existing.setVisibility(requestParam.getVisibility());
 
         collectionMapper.updateById(existing);
+        promoteStagingImagesQuietly(requestParam.getDescription(), requestParam.getCoverImage());
+    }
+
+    /** 保存合集时把封面/描述里的暂存图片转正；失败不影响主流程 */
+    private void promoteStagingImagesQuietly(String description, String coverImage) {
+        try {
+            imageService.promoteStagingImages(
+                    ArticleDocumentParser.extractUploadImageUrls(description, coverImage));
+        } catch (Exception e) {
+            log.warn("合集暂存图片转正失败（不影响保存）: {}", e.getMessage());
+        }
     }
 
     @Override
