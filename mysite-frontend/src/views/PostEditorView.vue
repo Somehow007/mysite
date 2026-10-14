@@ -9,6 +9,7 @@ import { getCategories } from '@/api/category'
 import { getTags, createTag } from '@/api/tag'
 import { getCollections, addArticleToCollection, removeArticleFromCollection } from '@/api/collection'
 import { uploadImage, MAX_IMAGE_FILE_SIZE } from '@/api/image'
+import { fileBaseName, matchKey, replaceImagePlaceholder } from '@/utils/imagePlaceholder'
 import { useUserStore } from '@/stores/user'
 import { useToast } from '@/composables/useToast'
 import MarkdownWysiwygEditor from '@/components/editor/MarkdownWysiwygEditor.vue'
@@ -64,33 +65,7 @@ function triggerImportPicker() {
 const DOC_EXT = /\.(txt|md|markdown)$/i
 const IMG_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i
 
-function fileBaseName(path: string): string {
-  return path.split(/[\\/]/).pop() || path
-}
 
-/**
- * 把「图片待补传」占位（或残留的 Obsidian / Markdown 引用）替换为已上传图片。
- */
-function replaceImagePlaceholder(markdown: string, originalRef: string, newUrl: string): string {
-  const esc = originalRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  // 与 ArticleDocumentParser.buildPlaceholder 生成格式一一对应
-  const callout = new RegExp(
-    '\\n{0,2}> \\[!warning\\] 图片待补传\\n' +
-      '> 原引用：`' + esc + '`\\n' +
-      '> 未能自动上传。[^\\n]*\\n?',
-    'g',
-  )
-  const asImage = `\n\n![](${newUrl})\n\n`
-  let out = markdown.replace(callout, asImage)
-  if (out !== markdown) return out
-
-  const obs = new RegExp('!\\[\\[' + esc + '(?:\\|[^\\]]*)?\\]\\]', 'g')
-  out = markdown.replace(obs, `![](${newUrl})`)
-  if (out !== markdown) return out
-
-  const mdImg = new RegExp('!\\[[^\\]]*\\]\\(' + esc + '\\)', 'g')
-  return markdown.replace(mdImg, `![](${newUrl})`)
-}
 
 async function onImportFile(e: Event) {
   const input = e.target as HTMLInputElement
@@ -163,6 +138,7 @@ async function onImportFile(e: Event) {
 /**
  * 二次补传：单独选图片文件（可来自任意目录，如 Obsidian attachments/），
  * 按文件名匹配失败项，上传后替换正文占位。
+ * 仅当占位真的被替换进正文才算成功，避免「图传了、正文没变」。
  */
 function triggerRepairPicker() {
   if (repairing.value || !importNotice.value) return
@@ -177,41 +153,54 @@ async function onRepairFiles(e: Event) {
 
   repairing.value = true
   const failed = importNotice.value.failed
-  const byBase = new Map<string, ArticleImportImage>()
+  // 同名文件可能对应多个失败项（不同目录下的 image.png），用列表而不是单值
+  const byBase = new Map<string, ArticleImportImage[]>()
   for (const img of failed) {
-    byBase.set(fileBaseName(img.originalRef).toLowerCase(), img)
+    const key = matchKey(fileBaseName(img.originalRef))
+    const list = byBase.get(key) ?? []
+    list.push(img)
+    byBase.set(key, list)
   }
 
   let patched = content.value
-  const doneKeys = new Set<string>()
-  const errorByKey = new Map<string, string>()
+  const doneRefs = new Set<string>()
+  const errorByRef = new Map<string, string>()
   let ok = 0
 
   for (const file of files) {
-    const key = file.name.toLowerCase()
-    const target = byBase.get(key)
-    if (!target || doneKeys.has(key)) continue
+    const key = matchKey(file.name)
+    const candidates = byBase.get(key)
+    if (!candidates) continue
+    const target = candidates.find(c => !doneRefs.has(c.originalRef) && !errorByRef.has(c.originalRef))
+    if (!target) continue
     if (file.size > MAX_IMAGE_FILE_SIZE) {
-      errorByKey.set(key, `图片超过 ${MAX_IMAGE_FILE_SIZE / (1024 * 1024)}MB`)
+      errorByRef.set(target.originalRef, `图片超过 ${MAX_IMAGE_FILE_SIZE / (1024 * 1024)}MB`)
       continue
     }
     try {
       const uploaded = await uploadImage(file)
-      patched = replaceImagePlaceholder(patched, target.originalRef, uploaded.url)
-      doneKeys.add(key)
+      const next = replaceImagePlaceholder(patched, target.originalRef, uploaded.url)
+      if (next === patched) {
+        // 上传成功但正文占位没对上——不能算替换成功，否则会留下孤儿暂存图
+        errorByRef.set(target.originalRef, '已上传，但未能匹配到正文占位')
+        continue
+      }
+      patched = next
+      doneRefs.add(target.originalRef)
       ok++
     } catch (err) {
-      errorByKey.set(key, err instanceof Error ? err.message : '上传失败')
+      errorByRef.set(target.originalRef, err instanceof Error ? err.message : '上传失败')
     }
   }
 
-  content.value = patched
+  if (doneRefs.size > 0) {
+    content.value = patched
+  }
 
   const remaining: ArticleImportImage[] = []
   for (const img of failed) {
-    const key = fileBaseName(img.originalRef).toLowerCase()
-    if (doneKeys.has(key)) continue
-    const reason = errorByKey.get(key)
+    if (doneRefs.has(img.originalRef)) continue
+    const reason = errorByRef.get(img.originalRef)
     remaining.push(reason ? { ...img, reason } : img)
   }
 
@@ -227,7 +216,12 @@ async function onRepairFiles(e: Event) {
     if (ok > 0) {
       toast.error(`已补传 ${ok} 张，仍有 ${remaining.length} 张待处理`)
     } else {
-      toast.error('所选图片未能匹配到待补传项（请确认文件名一致）')
+      const replaceFailed = [...errorByRef.values()].some(m => m.includes('占位'))
+      toast.error(
+        replaceFailed
+          ? '图片已上传，但未能替换正文占位——请确认文件名与「原引用」一致'
+          : '所选图片未能匹配到待补传项（请确认文件名一致）',
+      )
     }
   }
 }
