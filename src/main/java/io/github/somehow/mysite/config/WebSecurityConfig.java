@@ -73,7 +73,6 @@ public class WebSecurityConfig {
                         ).permitAll()
                         .requestMatchers(
                                 "/v1/tags/**",
-                                "/v1/search/**",
                                 "/v1/site/**",
                                 // 监控端点仅放行只读健康/信息，其余（metrics 等）收归 ADMIN
                                 "/actuator/health",
