@@ -2,6 +2,7 @@ package io.github.somehow.mysite.ragent.core;
 
 import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.core.intent.IntentResult;
+// ReadingContext 与本类同包
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeBaseDO;
 import io.github.somehow.mysite.ragent.dao.mapper.KnowledgeBaseMapper;
 import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
@@ -89,8 +90,16 @@ public class PromptTemplate {
     public List<ChatMessage> buildRagPrompt(String question,
                                             List<SearchResult> context,
                                             List<ChatMessage> history) {
+        return buildRagPrompt(question, context, history, null);
+    }
+
+    public List<ChatMessage> buildRagPrompt(String question,
+                                            List<SearchResult> context,
+                                            List<ChatMessage> history,
+                                            ReadingContext reading) {
         String exampleTitle = context.isEmpty() ? "xxx" : context.get(0).docTitle();
         String systemPrompt = RAG_SYSTEM.formatted(exampleTitle, formatContext(context));
+        systemPrompt = appendReadingContext(systemPrompt, reading);
 
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(ChatMessage.system(systemPrompt));
@@ -103,8 +112,14 @@ public class PromptTemplate {
      * 构建通用聊天 Prompt（无检索结果时使用）。
      */
     public List<ChatMessage> buildGeneralPrompt(String question, List<ChatMessage> history) {
+        return buildGeneralPrompt(question, history, null);
+    }
+
+    public List<ChatMessage> buildGeneralPrompt(String question, List<ChatMessage> history,
+                                                ReadingContext reading) {
+        String systemPrompt = appendReadingContext(GENERAL_SYSTEM, reading);
         List<ChatMessage> messages = new ArrayList<>();
-        messages.add(ChatMessage.system(GENERAL_SYSTEM));
+        messages.add(ChatMessage.system(systemPrompt));
         messages.addAll(history);
         messages.add(ChatMessage.user(question));
         return messages;
@@ -143,8 +158,17 @@ public class PromptTemplate {
             List<SearchResult> context,
             List<ChatMessage> history,
             IntentResult intent) {
+        return buildIntentAwarePrompt(question, context, history, intent, null);
+    }
 
-        String systemPrompt = buildSystemPrompt(context, intent);
+    public List<ChatMessage> buildIntentAwarePrompt(
+            String question,
+            List<SearchResult> context,
+            List<ChatMessage> history,
+            IntentResult intent,
+            ReadingContext reading) {
+
+        String systemPrompt = buildSystemPrompt(context, intent, reading);
         List<ChatMessage> messages = new ArrayList<>();
         messages.add(ChatMessage.system(systemPrompt));
         messages.addAll(history);
@@ -153,9 +177,10 @@ public class PromptTemplate {
     }
 
     /**
-     * 组装 system prompt：基础 persona + 意图专属片段 + 检索上下文。
+     * 组装 system prompt：基础 persona + 意图专属片段 + 阅读上下文 + 检索上下文。
      */
-    private String buildSystemPrompt(List<SearchResult> context, IntentResult intent) {
+    private String buildSystemPrompt(List<SearchResult> context, IntentResult intent,
+                                     ReadingContext reading) {
         StringBuilder sb = new StringBuilder();
 
         // 基础 persona
@@ -176,15 +201,56 @@ public class PromptTemplate {
             sb.append(intent.getCustomPromptFragment());
         }
 
+        // 阅读上下文（文章页）：优先于检索片段解释「这篇」
+        appendReadingContextSection(sb, reading);
+
         // 检索上下文
         if (context.isEmpty()) {
-            sb.append("\n## 检索结果\n（未找到相关内容，请诚实告知用户）");
+            if (reading != null && reading.hasContent()) {
+                sb.append("\n## 检索结果\n（未额外检索到其他文章；请优先依据「用户正在阅读的文章」回答）");
+            } else {
+                sb.append("\n## 检索结果\n（未找到相关内容，请诚实告知用户）");
+            }
         } else {
             sb.append("\n## 提供的博客内容\n");
             sb.append(formatContextWithKbName(context));
         }
 
         return sb.toString();
+    }
+
+    /**
+     * 在已有 system prompt 末尾追加阅读上下文段（通用 / RAG 路径复用）。
+     */
+    private String appendReadingContext(String systemPrompt, ReadingContext reading) {
+        if (reading == null) {
+            return systemPrompt;
+        }
+        StringBuilder sb = new StringBuilder(systemPrompt);
+        appendReadingContextSection(sb, reading);
+        return sb.toString();
+    }
+
+    private void appendReadingContextSection(StringBuilder sb, ReadingContext reading) {
+        if (reading == null) {
+            return;
+        }
+        sb.append("\n## 用户正在阅读的文章\n");
+        sb.append("标题：《%s》（文章 ID: %s）\n\n".formatted(
+            reading.title().isBlank() ? "未知标题" : reading.title(),
+            reading.articleId()));
+        if (reading.hasContent()) {
+            sb.append(reading.content()).append("\n");
+        } else {
+            sb.append("（正文不可用）\n");
+        }
+        sb.append("""
+
+            ### 阅读上下文规则
+            1. 「这篇 / 本文 / 该文 / 上面这篇 / 总结一下」默认指上面这篇正在阅读的文章。
+            2. 若用户明确问其他文章（点名标题、说「另一篇 / 那篇 / 别的文章」），请依据「提供的博客内容」检索片段回答，不要冒充当前这篇。
+            3. 对比两篇时，分别标明《当前阅读》与检索来源。
+            """);
     }
 
     /**

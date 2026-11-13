@@ -65,16 +65,19 @@ export function createChatStream(
   conversationId: string | null,
   kbIds: string[],
   callbacks: ChatStreamCallbacks,
+  /** 文章页当前阅读文章 ID；非文章页传 null，后端行为与原先一致 */
+  articleId?: string | null,
 ): AbortController {
   const params = new URLSearchParams({ q: question, visitorId: getVisitorId() })
   if (conversationId != null) params.set('conversationId', conversationId)
   if (kbIds != null && kbIds.length > 0) {
     kbIds.forEach(id => params.append('kbIds', id))
   }
+  if (articleId) params.set('articleId', articleId)
 
-  // 诊断日志：确认 kbIds 已拼入 URL
+  // 诊断日志：确认 kbIds / articleId 已拼入 URL
   if (import.meta.env.DEV) {
-    console.log('[rag] streaming request:', `/v1/rag/chat/stream?${params}`, 'kbIds:', kbIds)
+    console.log('[rag] streaming request:', `/v1/rag/chat/stream?${params}`, 'kbIds:', kbIds, 'articleId:', articleId)
   }
 
   const controller = new AbortController()

@@ -29,6 +29,11 @@ export function useChat() {
   const lastError = ref<{ kind: ChatStreamErrorKind; message: string; status?: number } | null>(null)
   /** 用户选择的知识库 ID 列表（空 = 不检索） */
   const selectedKbIds = ref<string[]>([])
+  /**
+   * 当前阅读文章 ID（文章页路由注入）。
+   * 仅在 /post/:id 页面非空；离开文章页清空，避免污染全局对话。
+   */
+  const articleContextId = ref<string | null>(null)
 
   // ── 对话历史 ─────────────────────────────────────────────
   const conversations = ref<ConversationSummary[]>([])
@@ -71,7 +76,11 @@ export function useChat() {
     })
 
     status.value = 'streaming'
-    abort = createChatStream(q, conversationId.value, selectedKbIds.value, {
+    abort = createChatStream(
+      q,
+      conversationId.value,
+      selectedKbIds.value,
+      {
       onMeta: (id) => { conversationId.value = id },
 
       onSources: (sources: SourceChunk[]) => {
@@ -108,7 +117,14 @@ export function useChat() {
         }
         abort = null
       },
-    })
+      },
+      articleContextId.value,
+    )
+  }
+
+  /** 由文章页路由同步当前阅读文章；离开文章页传 null */
+  function setArticleContext(articleId: string | null) {
+    articleContextId.value = articleId
   }
 
   /** 重试：移除失败的那条 AI 消息，用原问题重发 */
@@ -195,6 +211,8 @@ export function useChat() {
     conversations,
     loadingHistory,
     selectedKbIds,
+    articleContextId,
+    setArticleContext,
     sendMessage,
     retry,
     cancelGeneration,

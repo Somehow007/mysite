@@ -41,6 +41,7 @@ class RagChatServiceTest {
     private QueryRewriter queryRewriter;
     private IntentClassifier intentClassifier;
     private KnowledgeCatalogService catalogService;
+    private ArticleReadingContextService articleReadingContextService;
     private RagChatService service;
 
     @BeforeEach
@@ -52,6 +53,8 @@ class RagChatServiceTest {
         queryRewriter = mock(QueryRewriter.class);
         intentClassifier = mock(IntentClassifier.class);
         catalogService = mock(KnowledgeCatalogService.class);
+        articleReadingContextService = mock(ArticleReadingContextService.class);
+        when(articleReadingContextService.load(any())).thenReturn(null);
 
         properties = new RagProperties();
         properties.getRetrieval().setRerankTopK(5);
@@ -73,7 +76,7 @@ class RagChatServiceTest {
 
         service = new RagChatService(retrievalEngine, conversationManager,
             promptTemplate, routingLLMService, rateLimiter, properties,
-            queryRewriter, intentClassifier, catalogService);
+            queryRewriter, intentClassifier, catalogService, articleReadingContextService);
     }
 
     @Nested

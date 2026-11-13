@@ -22,6 +22,7 @@ import io.github.somehow.mysite.ragent.llm.rerank.BaiLianRerankProvider;
 import io.github.somehow.mysite.ragent.llm.model.ChatEvent;
 import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
+import io.github.somehow.mysite.ragent.service.ArticleReadingContextService;
 import io.github.somehow.mysite.ragent.service.ChatRateLimiter;
 import io.github.somehow.mysite.ragent.service.KnowledgeDocumentService;
 import io.github.somehow.mysite.ragent.service.RagChatService;
@@ -249,12 +250,16 @@ class Phase3IntegrationTest {
         PromptTemplate promptTemplate = new PromptTemplate(ragProps);
 
         // 构建 RagChatService
+        ArticleReadingContextService readingContextService =
+            mock(ArticleReadingContextService.class);
+        when(readingContextService.load(any())).thenReturn(null);
         ragChatService = new RagChatService(
             retrievalEngine, conversationManager,
             promptTemplate, routingLLMService,
             rateLimiter, ragProps,
             queryRewriter, intentClassifier,
-            mock(io.github.somehow.mysite.ragent.service.KnowledgeCatalogService.class));
+            mock(io.github.somehow.mysite.ragent.service.KnowledgeCatalogService.class),
+            readingContextService);
     }
 
     @AfterEach

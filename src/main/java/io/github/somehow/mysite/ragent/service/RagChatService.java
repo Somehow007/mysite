@@ -4,6 +4,7 @@ import io.github.somehow.mysite.commons.enums.UserRole;
 import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.core.ConversationManager;
 import io.github.somehow.mysite.ragent.core.PromptTemplate;
+import io.github.somehow.mysite.ragent.core.ReadingContext;
 import io.github.somehow.mysite.ragent.core.RetrievalEngine;
 import io.github.somehow.mysite.ragent.core.intent.IntentClassifier;
 import io.github.somehow.mysite.ragent.core.intent.IntentResult;
@@ -59,6 +60,7 @@ public class RagChatService {
     private final QueryRewriter queryRewriter;
     private final IntentClassifier intentClassifier;
     private final KnowledgeCatalogService catalogService;
+    private final ArticleReadingContextService articleReadingContextService;
 
     public RagChatService(RetrievalEngine retrievalEngine,
                           ConversationManager conversationManager,
@@ -68,7 +70,8 @@ public class RagChatService {
                           RagProperties properties,
                           QueryRewriter queryRewriter,
                           IntentClassifier intentClassifier,
-                          KnowledgeCatalogService catalogService) {
+                          KnowledgeCatalogService catalogService,
+                          ArticleReadingContextService articleReadingContextService) {
         this.retrievalEngine = retrievalEngine;
         this.conversationManager = conversationManager;
         this.promptTemplate = promptTemplate;
@@ -78,6 +81,7 @@ public class RagChatService {
         this.queryRewriter = queryRewriter;
         this.intentClassifier = intentClassifier;
         this.catalogService = catalogService;
+        this.articleReadingContextService = articleReadingContextService;
     }
 
     /**
@@ -93,19 +97,29 @@ public class RagChatService {
     public Flux<ChatEvent> chat(String question, Long conversationId,
                                 String visitorId, String clientIp,
                                 UserRole userRole, List<Long> kbIds) {
-        return chat(question, conversationId, visitorId, clientIp, userRole, kbIds, null, null);
+        return chat(question, conversationId, visitorId, clientIp, userRole, kbIds, null, null, null);
     }
 
     public Flux<ChatEvent> chat(String question, Long conversationId,
                                 String visitorId, String clientIp,
                                 UserRole userRole, List<Long> kbIds,
                                 Long userId, String username) {
+        return chat(question, conversationId, visitorId, clientIp, userRole, kbIds, userId, username, null);
+    }
+
+    /**
+     * @param articleId 当前阅读文章 ID（文章页传入；null = 非文章页，行为与原先一致）
+     */
+    public Flux<ChatEvent> chat(String question, Long conversationId,
+                                String visitorId, String clientIp,
+                                UserRole userRole, List<Long> kbIds,
+                                Long userId, String username, Long articleId) {
         return Mono.fromCallable(() -> {
                 rateLimiter.check(clientIp, question, userRole);
                 return true;
             })
             .subscribeOn(Schedulers.boundedElastic())
-            .flatMapMany(ok -> doChat(question, conversationId, visitorId, kbIds, userRole, userId, username))
+            .flatMapMany(ok -> doChat(question, conversationId, visitorId, kbIds, userRole, userId, username, articleId))
             .onErrorResume(e -> {
                 if (e instanceof ChatRateLimiter.RateLimitExceededException) {
                     return Flux.just(ChatEvent.error(e.getMessage()));
@@ -118,9 +132,18 @@ public class RagChatService {
 
     private Flux<ChatEvent> doChat(String question, Long conversationId,
                                    String visitorId, List<Long> kbIds,
-                                   UserRole userRole, Long userId, String username) {
+                                   UserRole userRole, Long userId, String username,
+                                   Long articleId) {
         long t0 = System.currentTimeMillis();
         boolean hasKbIds = kbIds != null && !kbIds.isEmpty();
+
+        // 文章页阅读上下文：非文章页 articleId=null → reading=null，后续路径完全不变
+        ReadingContext reading = articleReadingContextService.load(articleId);
+        if (reading != null) {
+            log.info("[pipeline] reading context: articleId={}, title='{}', contentChars={}",
+                reading.articleId(), reading.title(),
+                reading.hasContent() ? reading.content().length() : 0);
+        }
 
         UsageContext.open(UsageContext.State.builder()
             .traceId(UUID.randomUUID().toString())
@@ -144,7 +167,9 @@ public class RagChatService {
         // ── Stage 2: 查询改写 ──
         long t2 = System.currentTimeMillis();
         UsageContext.setCallType("REWRITE");
-        RewriteResult rewritten = queryRewriter.rewrite(question, history);
+        RewriteResult rewritten = (reading != null)
+            ? queryRewriter.rewrite(question, history, reading)
+            : queryRewriter.rewrite(question, history);
         String primaryQuery = rewritten.subQueries().get(0);
         log.info("[pipeline] stage2: rewritten={}, subQueries={} ({}ms)",
             rewritten.rewritten(), rewritten.subQueries().size(),
@@ -153,7 +178,7 @@ public class RagChatService {
         // ── Stage 3: 意图分类（KB_META / KB_RETRIEVAL / CHAT）──
         long t3 = System.currentTimeMillis();
         UsageContext.setCallType("CLASSIFY");
-        IntentResult intent = intentClassifier.classify(primaryQuery, history, hasKbIds);
+        IntentResult intent = intentClassifier.classify(primaryQuery, history, hasKbIds || reading != null);
         log.info("[pipeline] stage3: type={}, confidence={}, reason={} ({}ms)",
             intent.getType(), String.format("%.2f", intent.getConfidence()),
             intent.getReason(), System.currentTimeMillis() - t3);
@@ -167,37 +192,39 @@ public class RagChatService {
             return streamLLMResponse(messages, convId, question, List.of());
         }
 
-        // CHAT = 闲聊，MCP = 工具调用（预留），均不检索
+        // CHAT = 闲聊，MCP = 工具调用（预留），均不检索；文章页仍带上阅读上下文
         if (!intent.isKbRetrieval()) {
             log.info("[pipeline] non-retrieval intent ({}) → skipping retrieval", intent.getType());
-            List<ChatMessage> messages = promptTemplate.buildGeneralPrompt(primaryQuery, history);
+            List<ChatMessage> messages = promptTemplate.buildGeneralPrompt(primaryQuery, history, reading);
             UsageContext.setCallType("CHAT");
             return streamLLMResponse(messages, convId, question, List.of());
         }
 
-        // 用户未选择任何 KB → 不检索，直接 LLM 回复
-        if (!hasKbIds) {
+        // 无 KB 且非文章页 → 不检索（原行为）。文章页即使未选 KB 也检索，
+        // 这样「再问其他文章」时仍能命中知识库；kbIds 空 = 全库向量检索。
+        if (!hasKbIds && reading == null) {
             log.info("[pipeline] KB_RETRIEVAL but no KBs selected by user → skipping retrieval");
-            List<ChatMessage> messages = promptTemplate.buildGeneralPrompt(primaryQuery, history);
+            List<ChatMessage> messages = promptTemplate.buildGeneralPrompt(primaryQuery, history, reading);
             UsageContext.setCallType("CHAT");
             return streamLLMResponse(messages, convId, question, List.of());
         }
 
-        // ── Stage 4: 用户指定 KB 检索 ──
+        // ── Stage 4: KB 检索（用户勾选范围；文章页未勾选 = 全库，覆盖「其他文章」）──
         long t4 = System.currentTimeMillis();
         int topK = intent.getCustomTopK() != null
             ? intent.getCustomTopK()
             : properties.getRetrieval().getRerankTopK();
 
+        List<Long> retrievalKbIds = hasKbIds ? kbIds : List.of();
         List<SearchResult> retrieved;
         if (rewritten.subQueries().size() > 1) {
             retrieved = retrievalEngine.multiRetrieve(
-                rewritten.subQueries(), kbIds, topK);
+                rewritten.subQueries(), retrievalKbIds, topK);
         } else {
-            retrieved = retrievalEngine.retrieve(primaryQuery, topK, kbIds);
+            retrieved = retrievalEngine.retrieve(primaryQuery, topK, retrievalKbIds);
         }
-        log.info("[pipeline] stage4: {} results, kbIds={}, topK={} ({}ms)",
-            retrieved.size(), kbIds, topK,
+        log.info("[pipeline] stage4: {} results, kbIds={}, topK={}, reading={} ({}ms)",
+            retrieved.size(), retrievalKbIds, topK, reading != null,
             System.currentTimeMillis() - t4);
 
         List<SourceChunkDTO> sources = retrieved.stream()
@@ -205,9 +232,9 @@ public class RagChatService {
                 r.kbId(), properties.getKbNameCache().getOrDefault(r.kbId(), "博客")))
             .toList();
 
-        // ── Stage 5: 意图感知 Prompt ──
+        // ── Stage 5: 意图感知 Prompt（含阅读上下文）──
         List<ChatMessage> messages = promptTemplate.buildIntentAwarePrompt(
-            primaryQuery, retrieved, history, intent);
+            primaryQuery, retrieved, history, intent, reading);
         log.info("[pipeline] stage5: {} messages, {} chars",
             messages.size(), messages.stream().mapToInt(m -> m.getContent().length()).sum());
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick, watch, onScopeDispose, onBeforeUnmount, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Sparkles, X, RotateCw, PanelLeftOpen, AlertTriangle, Clock, LogIn, Library } from 'lucide-vue-next'
 import { useMediaQuery } from '@vueuse/core'
 import { useChat } from '@/composables/useChat'
@@ -23,6 +23,7 @@ const SUGGESTED_QUESTIONS = [
 const hasSuggestedQuestions = computed(() => SUGGESTED_QUESTIONS.length > 0)
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const isOpen = ref(false)
 const messagesContainer = ref<HTMLElement | null>(null)
@@ -57,7 +58,28 @@ function toggleKb(kbId: string) {
 }
 
 const hasSelectedKbs = computed(() => chat.selectedKbIds.value.length > 0)
+
+// ── 文章页阅读上下文：/post/:id 注入 articleId，离开后清空 ──
+const readingArticleId = computed(() => {
+  const id = route.params.id
+  const isPost = route.path.startsWith('/post/') && id != null && id !== ''
+  return isPost ? String(id) : null
+})
+
+watch(
+  readingArticleId,
+  (id) => {
+    chat.setArticleContext(id)
+  },
+  { immediate: true },
+)
+
 const subtitleText = computed(() => {
+  const reading = readingArticleId.value
+  if (reading) {
+    if (!hasSelectedKbs.value) return '正在阅读文章 · 可问这篇或其他文章'
+    return `正在阅读文章 · 检索 ${chat.selectedKbIds.value.length} 个知识库`
+  }
   if (!hasSelectedKbs.value) return '未选择知识库，直接对话'
   if (chat.selectedKbIds.value.length === 1 && kbs.value.length > 0) {
     const kb = kbs.value.find(k => k.id === chat.selectedKbIds.value[0])

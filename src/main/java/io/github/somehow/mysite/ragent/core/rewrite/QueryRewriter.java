@@ -47,6 +47,10 @@ public class QueryRewriter {
     // ── 代词检测词 ──
     private static final List<String> PRONOUN_MARKERS = List.of("这个", "那个", "它", "上面", "前面", "刚才", "之前");
 
+    // ── 文章页指代（当前正在阅读的那篇）──
+    private static final List<String> ARTICLE_DEIXIS_MARKERS =
+        List.of("这篇", "本文", "该文", "此文", "这篇文章", "总结一下", "概括一下", "讲了什么");
+
     public QueryRewriter(@Qualifier("classificationLLM") LLMService classificationLLM,
                          ObjectMapper objectMapper) {
         this.classificationLLM = classificationLLM;
@@ -61,14 +65,22 @@ public class QueryRewriter {
      * @return RewriteResult，含 1-N 个子问题
      */
     public RewriteResult rewrite(String question, List<ChatMessage> history) {
+        return rewrite(question, history, null);
+    }
+
+    /**
+     * 带阅读上下文的查询改写（文章页）：「这篇 / 本文」指当前正在读的文章。
+     */
+    public RewriteResult rewrite(String question, List<ChatMessage> history,
+                                 io.github.somehow.mysite.ragent.core.ReadingContext reading) {
         // 快速判断：不需要改写的直接返回原文
-        if (!needsRewrite(question, history)) {
+        if (!needsRewrite(question, history, reading)) {
             return RewriteResult.unchanged(question);
         }
 
         try {
             UsageContext.setCallType("REWRITE");
-            String prompt = buildRewritePrompt(question, history);
+            String prompt = buildRewritePrompt(question, history, reading);
             String llmOutput = classificationLLM.chat(
                 ChatRequest.of("deepseek-chat", prompt));
             return parseRewriteResult(llmOutput, question);
@@ -82,8 +94,17 @@ public class QueryRewriter {
      * 快速判断是否需要触发改写（纯规则，不调 LLM，零成本）。
      */
     boolean needsRewrite(String question, List<ChatMessage> history) {
+        return needsRewrite(question, history, null);
+    }
+
+    boolean needsRewrite(String question, List<ChatMessage> history,
+                         io.github.somehow.mysite.ragent.core.ReadingContext reading) {
         if (question == null || question.isEmpty()) return false;
 
+        // 文章页指代（这篇/本文）即使无历史也要消解
+        if (reading != null && hasArticleDeixis(question)) {
+            return true;
+        }
         // 含代词 + 有历史 → 需要指代消解
         if (hasPronouns(question) && history != null && !history.isEmpty()) {
             return true;
@@ -103,6 +124,10 @@ public class QueryRewriter {
         return PRONOUN_MARKERS.stream().anyMatch(q::contains);
     }
 
+    private boolean hasArticleDeixis(String q) {
+        return ARTICLE_DEIXIS_MARKERS.stream().anyMatch(q::contains);
+    }
+
     private boolean isColloquial(String q) {
         return COLLOQUIAL_MARKERS.stream().anyMatch(q::contains);
     }
@@ -111,6 +136,11 @@ public class QueryRewriter {
      * 构造改写 Prompt。
      */
     String buildRewritePrompt(String question, List<ChatMessage> history) {
+        return buildRewritePrompt(question, history, null);
+    }
+
+    String buildRewritePrompt(String question, List<ChatMessage> history,
+                              io.github.somehow.mysite.ragent.core.ReadingContext reading) {
         StringBuilder sb = new StringBuilder();
         sb.append("""
             将用户问题改写为适合向量检索的清晰查询。如果问题包含多个子问题，拆分为独立查询。
@@ -125,6 +155,16 @@ public class QueryRewriter {
             4. 如果问题已经很清晰，subQueries 只包含一个元素（轻微优化措辞即可）
 
             """);
+
+        if (reading != null) {
+            sb.append("""
+                ## 用户正在阅读的文章
+                标题：《%s》
+                规则：问题中的「这篇 / 本文 / 该文 / 总结一下」默认指这篇文章，改写时带上该标题或主题词。
+                若问题明确指向其他文章，保留对其他文章的表述，不要改写成当前这篇。
+
+                """.formatted(reading.title().isBlank() ? "未知标题" : reading.title()));
+        }
 
         if (history != null && !history.isEmpty()) {
             sb.append("## 对话历史\n");

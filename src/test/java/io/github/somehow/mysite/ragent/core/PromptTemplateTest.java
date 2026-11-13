@@ -166,4 +166,30 @@ class PromptTemplateTest {
             assertEquals("知识库有多少篇文章？", messages.get(1).getContent());
         }
     }
+
+    @Nested
+    @DisplayName("阅读上下文（文章页）")
+    class ReadingContextPrompt {
+
+        @Test
+        @DisplayName("无阅读上下文时 system 不包含「正在阅读」")
+        void omitsReadingSectionWhenNull() {
+            List<ChatMessage> messages = template.buildGeneralPrompt("你好", List.of(), null);
+            assertFalse(messages.get(0).getContent().contains("用户正在阅读的文章"));
+        }
+
+        @Test
+        @DisplayName("有阅读上下文时应注入标题、正文与指代规则")
+        void injectsReadingSection() {
+            ReadingContext reading = ReadingContext.of(42L, "JWT 实践", "这里是正文");
+            List<ChatMessage> messages = template.buildGeneralPrompt(
+                "总结一下这篇", List.of(), reading);
+
+            String sys = messages.get(0).getContent();
+            assertTrue(sys.contains("用户正在阅读的文章"));
+            assertTrue(sys.contains("JWT 实践"));
+            assertTrue(sys.contains("这里是正文"));
+            assertTrue(sys.contains("这篇"));
+        }
+    }
 }
