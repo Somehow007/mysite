@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { Marked } from 'marked'
+import DOMPurify from 'dompurify'
 import Prism from 'prismjs'
 import katex from 'katex'
 
@@ -308,7 +309,7 @@ export function useMarkdown() {
       let result = typeof html === 'string' ? html : ''
       result = renderCallouts(result)            // Step 1: transform [!TYPE] blockquotes → callout divs
       result = renderMathInHtml(result, mathBlocks) // Step 2: render LaTeX
-      renderedHtml.value = result
+      renderedHtml.value = DOMPurify.sanitize(result) // Step 3: sanitize — 对齐 chat 管线，防存储型 XSS（R10）
       toc.value = extractToc(renderedHtml.value)
     } catch {
       renderedHtml.value = ''
