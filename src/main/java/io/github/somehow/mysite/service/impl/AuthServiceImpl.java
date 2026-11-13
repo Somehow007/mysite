@@ -1,6 +1,5 @@
 package io.github.somehow.mysite.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import io.github.somehow.mysite.commons.framework.errorcode.ErrorCode;
@@ -110,7 +109,14 @@ public class AuthServiceImpl implements AuthService {
             throw new ClientException(ErrorCode.USER_REGISTER_EMAIL_BLANK);
         }
 
-        UserDO userDO = BeanUtil.toBean(requestParam, UserDO.class);
+        // 显式赋值：不用 BeanUtil.toBean 全量拷贝——注册 DTO 日后加 role/status
+        // 字段会直接变越权面（risks.md R12）。role/status 走 UserDO 默认值。
+        UserDO userDO = new UserDO();
+        userDO.setUsername(requestParam.getUsername());
+        userDO.setRealName(requestParam.getRealName());
+        userDO.setSex(requestParam.getSex());
+        userDO.setEmail(requestParam.getEmail());
+        userDO.setPhoneNumber(requestParam.getPhoneNumber());
         userDO.setId(IdUtil.getSnowflakeNextId());
         userDO.setPassword(passwordEncoder.encode(requestParam.getPassword()));
         userDO.setDelFlag(0);
