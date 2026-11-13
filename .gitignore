@@ -50,3 +50,5 @@ docker/artalk_data/artalk.db
 .claude/
 docker/pgvector_data/
 docker/mysql_data/
+# 嵌套独立仓库（手帐前端源码，remote=Somehow007/study-journel，独立 clone 工作流）
+study-journey/
