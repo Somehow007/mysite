@@ -75,7 +75,9 @@ public class WebSecurityConfig {
                                 "/v1/tags/**",
                                 "/v1/search/**",
                                 "/v1/site/**",
-                                "/actuator/**",
+                                // 监控端点仅放行只读健康/信息，其余（metrics 等）收归 ADMIN
+                                "/actuator/health",
+                                "/actuator/info",
                                 "/doc.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
@@ -103,6 +105,10 @@ public class WebSecurityConfig {
                         // RAG 知识库管理：仅 ADMIN
                         .requestMatchers(
                                 "/v1/rag/knowledge-bases/**"
+                        ).hasRole("ADMIN")
+                        // 监控端点其余项：仅 ADMIN（health/info 已在上方 permitAll）
+                        .requestMatchers(
+                                "/actuator/**"
                         ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/v1/categories/*/children"

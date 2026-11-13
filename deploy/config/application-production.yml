@@ -62,6 +62,16 @@ jwt:
 cors:
   allowed-origins: "*"
 
+# 生产关闭 API 文档端点（knife4j.production 使 doc.html/api-docs 返回 404；
+# springdoc 开关兜底 /v3/api-docs 与 swagger-ui，开发环境不受影响）
+knife4j:
+  production: true
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
 logging:
   level:
     root: INFO
