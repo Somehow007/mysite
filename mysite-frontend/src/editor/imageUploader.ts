@@ -1,7 +1,7 @@
 import { uploadImage, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useToast } from '@/composables/useToast'
 
-const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
 /**
  * Crepe 图片上传适配器。

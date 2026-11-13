@@ -21,7 +21,7 @@ public class ImageUploadConfig {
     private DataSize maxFileSize = DataSize.ofMegabytes(5);
 
     private List<String> allowedTypes = Arrays.asList(
-            "image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"
+            "image/jpeg", "image/png", "image/gif", "image/webp"
     );
     private String urlPath = "/uploads/images/";
     private int maxUploadsPerMinute = 10;
