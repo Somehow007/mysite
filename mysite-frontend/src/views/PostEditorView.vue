@@ -27,6 +27,7 @@ useHead(() => ({
   title: `${pageTitle.value} - MySite`,
 }))
 
+const editorRef = ref<InstanceType<typeof MarkdownWysiwygEditor> | null>(null)
 const title = ref('')
 const content = ref('')
 const summary = ref('')
@@ -376,6 +377,10 @@ onUnmounted(() => {
 async function handleSave(isPublish: boolean) {
   // 防止并发保存（双击、Ctrl+S 在保存未完成时再次触发等）
   if (saving.value) return
+
+  // 编辑器有 300ms 序列化防抖：点「存草稿/发布」前先 flush，
+  // 否则正文里的图片 URL 可能还没写回 content，存成草稿后图片会变成孤儿图
+  editorRef.value?.flush()
 
   if (!title.value.trim()) {
     error.value = '请输入文章标题'
@@ -764,6 +769,7 @@ function removeCover() {
 
         <div class="h-[calc(100vh-280px)] min-h-[500px] rounded-xl border border-border overflow-hidden bg-bg-secondary card-shadow">
           <MarkdownWysiwygEditor
+            ref="editorRef"
             v-model="content"
             placeholder="开始创作，输入 / 唤起更多功能..."
             @save="handleSave(false)"

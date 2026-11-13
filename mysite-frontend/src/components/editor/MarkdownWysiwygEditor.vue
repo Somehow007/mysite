@@ -49,6 +49,19 @@ function flushEmit() {
   pendingValue = null
 }
 
+/** 保存前强制同步编辑器最新 Markdown 到父级 v-model，避免 300ms 防抖导致正文/图片 URL 丢失 */
+function flush() {
+  if (handle && pendingValue === null) {
+    const latest = handle.getMarkdown()
+    if (latest !== lastEmittedValue) {
+      pendingValue = latest
+    }
+  }
+  flushEmit()
+}
+
+defineExpose({ flush })
+
 function onEditorChange(markdown: string) {
   pendingValue = markdown
   if (debounceTimer) clearTimeout(debounceTimer)

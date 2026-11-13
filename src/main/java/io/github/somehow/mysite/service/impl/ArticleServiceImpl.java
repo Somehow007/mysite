@@ -185,8 +185,15 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         tagService.evictTagCache();
         articleCacheService.evictArticleDetail(requestParam.getId());
 
-        // 同步转正本次内容里引用的暂存图
-        promoteStagingImagesQuietly(requestParam.getContent(), requestParam.getCoverImage());
+        // 同步转正本次内容里引用的暂存图（草稿/发布一视同仁）。
+        // 请求未带 content 时回退库内正文，避免只改标题/发布状态时漏转正。
+        String effectiveContent = StrUtil.isNotBlank(requestParam.getContent())
+                ? requestParam.getContent()
+                : (updatedArticle != null ? updatedArticle.getContent() : null);
+        String effectiveCover = requestParam.getCoverImage() != null
+                ? requestParam.getCoverImage()
+                : (updatedArticle != null ? updatedArticle.getCoverImage() : null);
+        promoteStagingImagesQuietly(effectiveContent, effectiveCover);
 
         // ★ RAG 集成：发布文章更新事件，触发异步重新向量化
         if (updatedArticle != null) {

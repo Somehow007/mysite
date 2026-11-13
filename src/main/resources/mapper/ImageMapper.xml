@@ -2,7 +2,11 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="io.github.somehow.mysite.dao.mapper.ImageMapper">
 
-    <!-- 是否被未删除文章/合集/用户头像/评论头像引用 -->
+    <!--
+      是否被未删除内容引用。
+      文章侧包含草稿（published=0）：草稿正文/封面引用的图不算孤儿，
+      保存草稿后应转正并保留，避免清理任务误删。
+    -->
     <sql id="referencedExists">
         (
             EXISTS (
@@ -65,7 +69,7 @@
         ORDER BY i.create_time DESC
     </select>
 
-    <!-- 未被文章引用的图片 ID（可选排除「新建的暂存图」以免误删正在写的草稿） -->
+    <!-- 未被文章/合集/头像/评论引用的图片 ID（可选排除「新建的暂存图」以免误删正在写的草稿） -->
     <select id="selectOrphanImageIds" resultType="java.lang.Long">
         SELECT i.id
         FROM t_image i
@@ -74,6 +78,16 @@
         <if test="excludeFreshStaging">
             AND NOT (i.status = 0 AND i.create_time &gt; DATE_SUB(NOW(), INTERVAL 48 HOUR))
         </if>
+    </select>
+
+    <!-- 过期暂存图 ID：超过保留期且确实无人引用（含草稿引用；不用可能过期的 article_count） -->
+    <select id="selectExpiredStagingImageIds" resultType="java.lang.Long">
+        SELECT i.id
+        FROM t_image i
+        WHERE i.del_flag = 0
+          AND i.status = 0
+          AND i.create_time &lt; DATE_SUB(NOW(), INTERVAL 48 HOUR)
+          AND NOT <include refid="referencedExists"/>
     </select>
 
 </mapper>

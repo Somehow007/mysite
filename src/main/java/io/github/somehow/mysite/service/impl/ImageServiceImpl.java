@@ -430,13 +430,13 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
 
     @Override
     public int cleanupExpiredStagingImages() {
-        Date cutoff = new Date(System.currentTimeMillis() - STAGING_TTL_MS);
-        List<ImageDO> expired = baseMapper.selectList(Wrappers.lambdaQuery(ImageDO.class)
-                .eq(ImageDO::getStatus, ImageDO.STATUS_STAGING)
-                .eq(ImageDO::getArticleCount, 0)
-                .eq(ImageDO::getDelFlag, 0)
-                .lt(ImageDO::getCreateTime, cutoff));
-        if (expired.isEmpty()) {
+        // 按实时引用判定（含草稿文章正文/封面），不用 article_count，避免误删草稿引用的图
+        List<Long> expiredIds = baseMapper.selectExpiredStagingImageIds();
+        if (expiredIds == null || expiredIds.isEmpty()) {
+            return 0;
+        }
+        List<ImageDO> expired = baseMapper.selectByIds(expiredIds);
+        if (expired == null || expired.isEmpty()) {
             return 0;
         }
 

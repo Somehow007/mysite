@@ -90,7 +90,8 @@ class ImageStagingLifecycleTest {
     @Test
     void cleanup_deletesExpiredUnboundStaging() {
         ImageDO img = stagingImage(9L, "/uploads/images/2026/10/9_z.png");
-        when(imageMapper.selectList(any())).thenReturn(List.of(img));
+        when(imageMapper.selectExpiredStagingImageIds()).thenReturn(List.of(9L));
+        when(imageMapper.selectByIds(List.of(9L))).thenReturn(List.of(img));
         when(imageMapper.update(isNull(), any())).thenReturn(1);
 
         int n = imageService.cleanupExpiredStagingImages();
@@ -101,7 +102,7 @@ class ImageStagingLifecycleTest {
 
     @Test
     void cleanup_nothingExpired_returnsZero() {
-        when(imageMapper.selectList(any())).thenReturn(List.of());
+        when(imageMapper.selectExpiredStagingImageIds()).thenReturn(List.of());
         assertEquals(0, imageService.cleanupExpiredStagingImages());
         verify(imageMapper, never()).update(any(), any());
     }

@@ -23,6 +23,7 @@ public interface ImageService extends IService<ImageDO> {
 
     /**
      * 将正文/封面中的暂存图片转正（status 0→1）并累计引用数。
+     * 草稿保存同样转正：草稿引用的图进入系统并保留。
      * 幂等：已是正式状态的不重复计数。
      *
      * @return 本次转正张数
@@ -30,7 +31,7 @@ public interface ImageService extends IService<ImageDO> {
     int promoteStagingImages(Collection<String> imageUrls);
 
     /**
-     * 清理超过保留期且未被任何文章引用的暂存图片（删文件 + 逻辑删记录）。
+     * 清理超过保留期且未被任何内容引用的暂存图片（含草稿文章引用；删文件 + 逻辑删记录）。
      *
      * @return 清理张数
      */
