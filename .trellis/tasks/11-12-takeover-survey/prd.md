@@ -42,6 +42,18 @@ mysite 是 AI 生成的主力项目：代码层已有部分秩序（CLAUDE.md、
 4. **阶段 3（小步翻新）**：按 risks.md P0→P2 顺序，一次一个关注点。
 5. TBD 清单（risks.md 末尾 8 项）需 owner/服务器侧确认，优先 1/2（决定 R1 爆炸半径）。
 
+## 进展记录
+
+- **2026-11-12 阶段 0**：三件套产出（本目录 + docs/MAP.md）。
+- **2026-11-13 阶段 1（立约）**：用户决策 = WIP 由我分组提交 / study-journey 加 gitignore。落地 5 commits：
+  - `8779ec3` chore: gitignore 忽略 study-journey/
+  - `f77afac` fix(image): 草稿引用暂存图不误删（实时引用判定 + 编辑器 flush）
+  - `f03628a` feat(rag): 文章页阅读上下文（articleId→ReadingContext→prompt/rewrite/前端全链路）
+  - `bd5fd40` docs: 批量收录 17 份未跟踪设计文档（密钥扫描过，只占位符）
+  - `9e531d7` docs: 三件套 + AGENTS.md 生效
+  - 验证：`./mvnw compile` `test-compile` `npm run type-check` 全过。工作树已干净 = git 基线达成。
+  - 遗留：P0-R1 密钥轮换 + repo visibility（服务器/GitHub 侧，owner 执行）；两条线在飞代码均已完整（无半成品遗留）。
+
 ## Resolution（待归档时补）
 
-阶段 0 已完成，三件套餐齐；待用户评审后进入阶段 1。
+阶段 0+1 完成；阶段 2 安全网（一键验证脚本 + 关键路径 characterization tests）与 R1 密钥轮换为下一步。
