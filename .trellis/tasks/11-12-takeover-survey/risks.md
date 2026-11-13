@@ -17,7 +17,11 @@
 | R8 git 基线 | ✅ 阶段1 | |
 | R9 嵌套 repo | ✅ `8779ec3` | gitignore |
 | R10 useMarkdown XSS | ✅ `8e7dc27` | 渲染末尾 DOMPurify，对齐 chat 管线 |
-| R12 BeanUtil 注册拷贝 | ✅ `d30a03f` | 显式赋值；同条其余项（双 markdown 管线/login-test.html/死配置）仍待办 |
+| R11 匿名接口 | 🔶部分 `3306bd7` | visitorId 日志脱敏+IP 解析统一；点赞 IP 去重维持；/v1/search/** 属死配置随 fdd1012 清 |
+| R12 BeanUtil 注册拷贝 | ✅ `d30a03f` | 显式赋值；login-test.html/死配置已清（fdd1012）；双 markdown 管线仍待办 |
+| R13 运维卫生 | 🔶部分 `fdd1012` | allowMultiQueries 已关；CHANGELOG/文档漂移仍待办 |
+| CI 缺失 | ✅ `9b39146` | .github/workflows/ci.yml（后端 hermetic+前端 typecheck/build） |
+| deploy 跳测试 | ✅ `12c4fcf` | package 跑 hermetic 排除 needs-infra |
 
 ## P0 — 先堵（安全隐患，收益极高）
 
