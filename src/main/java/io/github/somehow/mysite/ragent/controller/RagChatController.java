@@ -10,6 +10,7 @@ import io.github.somehow.mysite.ragent.llm.model.ChatEvent;
 import io.github.somehow.mysite.ragent.llm.model.ChatMessage;
 import io.github.somehow.mysite.ragent.service.ChatRateLimiter;
 import io.github.somehow.mysite.ragent.service.RagChatService;
+import io.github.somehow.mysite.utils.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -77,7 +78,7 @@ public class RagChatController {
             HttpServletRequest request) {
 
         SseEmitter emitter = new SseEmitter(120_000L);  // 120 秒超时
-        String clientIp = resolveClientIp(request);
+        String clientIp = ClientIpResolver.resolve(request);
         UserRole userRole = UserContext.getRole();
         Long userId = parseUserId(UserContext.getUserId());
         String username = UserContext.getName();
@@ -198,17 +199,6 @@ public class RagChatController {
             // 客户端主动断开是正常断连，不算异常
             emitter.completeWithError(e);
         }
-    }
-
-    /**
-     * 取真实客户端 IP：Nginx 反代后 X-Forwarded-For 携带原始 IP。
-     */
-    private String resolveClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            return xff.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 
     private static Long parseUserId(String userId) {

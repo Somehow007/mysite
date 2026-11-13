@@ -8,11 +8,14 @@ import io.github.somehow.mysite.dto.req.auth.RefreshTokenReqDTO;
 import io.github.somehow.mysite.dto.req.auth.RegisterReqDTO;
 import io.github.somehow.mysite.dto.resp.auth.LoginRespDTO;
 import io.github.somehow.mysite.dto.resp.user.UserSelectRespDTO;
+import io.github.somehow.mysite.security.LoginRateLimiter;
 import io.github.somehow.mysite.security.SecurityUserDetails;
 import io.github.somehow.mysite.service.AuthService;
 import io.github.somehow.mysite.service.UserService;
+import io.github.somehow.mysite.utils.ClientIpResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,10 +28,13 @@ public class AuthController {
 
     private final AuthService authService;
     private final UserService userService;
+    private final LoginRateLimiter loginRateLimiter;
 
     @Operation(summary = "用户登录")
     @PostMapping("/v1/auth/login")
-    public Result<LoginRespDTO> login(@Valid @RequestBody LoginReqDTO requestParam) {
+    public Result<LoginRespDTO> login(@Valid @RequestBody LoginReqDTO requestParam,
+                                    HttpServletRequest request) {
+        loginRateLimiter.check(ClientIpResolver.resolve(request));
         return Results.success(authService.login(requestParam));
     }
 
