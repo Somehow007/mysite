@@ -75,6 +75,23 @@ mysite 是 AI 生成的主力项目：代码层已有部分秩序（CLAUDE.md、
   - `d30a03f` R12 注册 BeanUtil.toBean → 显式赋值
   - 每 commit 均过 `verify.sh quick`。剩余：R11（匿名接口口径需决策）、R12 余项（login-test.html/双 markdown 管线）、R13 运维卫生、CI 缺失。
 
-## Resolution（待归档时补）
+## Resolution
 
-阶段 0+1 完成；阶段 2 安全网（一键验证脚本 + 关键路径 characterization tests）与 R1 密钥轮换为下一步。
+- **日期**：2026-11-13 归档。
+- **问题**：AI 生成存量项目接管——无中立工程约定、无 CI、验证不闭环、git 39 项 in-flight、
+  公开仓库含明文密钥、多处安全面（CORS 回显/SSRF/SVG/actuator/登录无限制）。
+- **解法（四阶段 playbook，qqbot-brain 定调）**：
+  1. 摸底：MAP.md + risks.md + AGENTS.draft（只读，逐条证据）。
+  2. 立约：AGENTS.md 生效 + 6 commits 清 git 基线 + study-journey 嵌套 repo 入 gitignore。
+  3. 安全网：`scripts/verify.sh`（quick/full 分层）+ `@Tag("needs-infra")` 隔离 docker 依赖
+     + 56 例 characterization tests（auth/文章写路径/RAG SSE/手帐）；顺手修复
+     lambda cache 顺序依赖测试（`TestTableInfo`）。
+  4. 小步翻新：风险序一次一关注点 12 commits——R2 CORS 白名单、R3 actuator/文档端点、
+     R4 登录限流、R5 SSRF 逐跳、R6 去 svg、R10 文章 DOMPurify、R11 visitorId 脱敏、
+     R12 注册显式赋值/死配置、R13 allowMultiQueries、CI workflow、deploy 跑测试。
+- **关键决策**：repo 保持 public（owner）；密钥轮换延后（本地密码+端口未开），残余
+  唯一非端口项=JWT 默认值是否被生产 .env 覆盖，待服务器侧 `grep JWT_SECRET`。
+- **验证结论**：`verify.sh quick` 全绿（后端 hermetic + 前端 typecheck/build）；
+  needs-infra 全量待 docker（TBD-3）；CI 首跑待 push。
+- **后续方向**：进入日常维护态。背景项=双 markdown 管线去重、CHANGELOG/文档漂移、
+  存量 .svg 清理、生产 .env 确认；新工作按 AGENTS.md 纪律走。
