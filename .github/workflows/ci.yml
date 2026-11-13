@@ -1,0 +1,57 @@
+# CI —— 每次 push/PR 自动跑验证，绿了才敢合。
+#
+# 与本地 scripts/verify.sh quick 同口径：
+#   后端：JUnit hermetic 单测（@Tag("needs-infra") 的 docker 依赖类排除，
+#         GitHub runner 上不保证有 MySQL/PG/Redis）
+#   前端：npm ci → vue-tsc 类型检查 → vite build
+#
+# 全量测试（含 needs-infra）在本地/服务器跑 ./scripts/verify.sh full。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  backend:
+    name: backend (hermetic tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Backend tests (exclude needs-infra)
+        run: chmod +x mvnw && ./mvnw -B test -DexcludedGroups=needs-infra
+
+  frontend:
+    name: frontend (typecheck + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: mysite-frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mysite-frontend
+        run: npm ci
+
+      - name: Type check
+        working-directory: mysite-frontend
+        run: npm run type-check
+
+      - name: Build
+        working-directory: mysite-frontend
+        run: npm run build
