@@ -15,7 +15,9 @@ import io.github.somehow.mysite.dao.mapper.CollectionMapper;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
 import io.github.somehow.mysite.dto.resp.collection.ArticleNavInfoRespDTO;
 import io.github.somehow.mysite.dto.resp.collection.CollectionDetailRespDTO;
+import io.github.somehow.mysite.support.TestTableInfo;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -44,6 +46,11 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 @DisplayName("合集私有文章可见性测试")
 class CollectionServiceVisibilityTest {
+
+    @BeforeAll
+    static void initTableInfo() {
+        TestTableInfo.initAll();
+    }
 
     private static final long COLLECTION_ID = 1L;
     private static final long AUTHOR_ID = 100L;

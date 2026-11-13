@@ -9,6 +9,8 @@ import io.github.somehow.mysite.dao.mapper.ArticleMapper;
 import io.github.somehow.mysite.dao.mapper.CategoryMapper;
 import io.github.somehow.mysite.dto.req.category.*;
 import io.github.somehow.mysite.dto.resp.category.CategoryRespDTO;
+import io.github.somehow.mysite.support.TestTableInfo;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,6 +29,11 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class CategoryServiceImplTest {
+
+    @BeforeAll
+    static void initTableInfo() {
+        TestTableInfo.initAll();
+    }
 
     @Mock
     private CategoryMapper categoryMapper;

@@ -2,6 +2,7 @@ package io.github.somehow.mysite.service.impl;
 
 import io.github.somehow.mysite.dao.entity.ImageDO;
 import io.github.somehow.mysite.service.ImageService;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 真实数据源冒烟：暂存孤儿图清理 + 保存转正（需本地 MySQL，与 dev 同库）。
  */
 @SpringBootTest
+@Tag("needs-infra")
 class ImageStagingIntegrationSmokeTest {
 
     @Autowired

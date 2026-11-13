@@ -53,6 +53,18 @@ mysite 是 AI 生成的主力项目：代码层已有部分秩序（CLAUDE.md、
   - `9e531d7` docs: 三件套 + AGENTS.md 生效
   - 验证：`./mvnw compile` `test-compile` `npm run type-check` 全过。工作树已干净 = git 基线达成。
   - 遗留：P0-R1 密钥轮换 + repo visibility（服务器/GitHub 侧，owner 执行）；两条线在飞代码均已完整（无半成品遗留）。
+- **2026-11-13 owner 决策（R1）**：repo 保持 public；密钥轮换延后（理由：本地密码、公网未开 DB 端口）；commits 留本地不 push。残余：JWT 默认值是否被生产 .env 覆盖仍待顺手验证（唯一非「端口」性质的泄露项）。本次存档编辑按指示**暂不 commit**。
+- **2026-11-13 阶段 2（安全网，进行中）**：
+  - `scripts/verify.sh`：`quick`（hermetic：`-DexcludedGroups=needs-infra` + 前端 type-check）/ `full`（需 docker：compose up → 全量 test → lint(no-fix) → build）。chmod +x。
+  - 5 个 `@SpringBootTest` 打 `@Tag("needs-infra")`： MysiteApplicationTests / ImageStagingIntegrationSmokeTest / ElasticsearchConfigurationTest / ElasticsearchEnabledIntegrationTest(保留@Disabled) / ElasticsearchDisabledIntegrationTest。
+  - 新 characterization tests：AuthServiceImplTest（16 例：登录/注册/刷新/禁用/重复）+ CustomMoodServiceImplTest（11 例：user 隔离/CRUD/幂等导入/dark_colors 兜底）。
+  - 修复存量顺序依赖测试：CategoryServiceImplTest、CollectionServiceVisibilityTest 此前依赖与 @SpringBootTest 同 JVM 被顺带填充的 lambda cache；新增 `support/TestTableInfo.initAll()` 统一初始化全部 26 实体表元数据。
+  - 验证：`./scripts/verify.sh quick` 绿（415 tests + type-check）。存量洞察：无 src/test/resources → 5 个 infra 测试实际跑 dev 配置真实库（ImageStagingIntegrationSmokeTest 直写 dev 库）；full 模式需 Docker daemon（当前未运行，TBD-3 仍开）。
+- **2026-11-13 阶段 2 收尾（characterization tests 补齐）**：
+  - `ArticleServiceImplWriteTest`（18 例）：create 参数校验链/默认值(tagIds/合集/索引/缓存/暂存图/RAG事件) + update 部分更新语义/tagIds 三态(null 保留/空清空/非空替换)/归属校验(ADMIN 绕过)/更新后回查缺失降级。
+  - `RagChatControllerTest`（11 例）：SSE 事件顺序与 JSON 线格式(meta→content→done, conversationId 序列化为 string)、done/error 后 complete、XFF 取首 IP、kbIds 解析、同步异常→error 事件、会话历史两个端点。SseEmitter Handler 为包级私有接口 → 反射+动态代理注入；executor 用捕获式同步执行。
+  - **钉住的现状边界**：`kbIds=非法值` 在进 SSE 流前同步 `Long.parseLong` 抛 NumberFormatException → HTTP 500 而非 SSE error 事件（前端自产 kbIds，正常不触发，记为已知边界）。
+  - 最终验证：`./scripts/verify.sh quick` 绿（后端 hermetic 全过 + 前端 type-check）。阶段 2 完成；full 模式待 Docker daemon（TBD-3）。
 
 ## Resolution（待归档时补）
 

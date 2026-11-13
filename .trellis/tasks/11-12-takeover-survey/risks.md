@@ -14,6 +14,8 @@
 - **危险度**：极高。若生产 JWT_SECRET 未覆盖默认值，任何人可伪造 ADMIN token 全面接管站点；MySQL 密码疑似个人惯用密码（撞库风险外溢到其他账号）。
 - **修复收益**：极高。
 - **处置**：轮换全部值（DB 密码、JWT_SECRET 并重发 token、检查该密码是否复用于他处）；`application.yaml` 改 `${ENV:}` 引用；`.env.example` 全部改占位符；历史泄露已成事实（清历史改不了已 fork/克隆者，**轮换优先于洗仓库**）；考虑 repo 转 private 作纵深。
+- **⚠ owner 决策（2026-11-13）：延后处理**。理由（owner 提供）：泄露项是本地开发密码，公网未开放 MySQL 等端口，repo 保持 public 不转 private、暂不动轮换。改为**记入待办**，后续随改动顺手做。
+  - 残余注意：JWT 密钥不依赖端口——若生产 `/opt/mysite/.env` 未覆盖默认值，公开仓库里的默认值可直接伪造 ADMIN token 打活站。**唯一值得顺手做的检查**：`grep JWT_SECRET /opt/mysite/.env`（覆盖=风险归零，未覆盖=建议仅轮换此项）。
 - **验证**：`curl https://api.github.com/repos/Somehow007/mysite` 看 visibility；`git log -p application.yaml` 确认引入提交；服务器 `cat /opt/mysite/.env` 确认生产是否覆盖了 JWT_SECRET（TBD，需服务器侧确认）。
 
 ### R2. CorsFilter 回显任意 Origin + 携带凭证，且使 yaml 白名单成死配置

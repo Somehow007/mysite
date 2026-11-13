@@ -5,6 +5,7 @@ import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.UserSyncService;
 import io.github.somehow.mysite.service.impl.DatabaseArticleSearchServiceImpl;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
 @ActiveProfiles("test")
+@Tag("needs-infra")
 @TestPropertySource(properties = {
     "elasticsearch.enabled=false"
 })
