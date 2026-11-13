@@ -19,8 +19,10 @@ build_backend() {
     local mvn_cmd
     mvn_cmd=$(find_maven "$PROJECT_ROOT")
     [ "$mvn_cmd" = "$PROJECT_ROOT/mvnw" ] && chmod +x "$mvn_cmd"
-    if ! "$mvn_cmd" clean package -DskipTests; then
-        die "后端构建失败"
+    # package 会跑测试阶段：hermetic 单测全跑，needs-infra（docker 依赖）排除。
+    # 如需部署前全量验证：先起 docker 并跑 ./scripts/verify.sh full 再部署。
+    if ! "$mvn_cmd" clean package -DexcludedGroups=needs-infra; then
+        die "后端构建失败（含测试失败——如需跳过请确认原因后手动 -DskipTests）"
     fi
     local fat_jar
     fat_jar=$(find_fat_jar "$PROJECT_ROOT") || die "未找到 fat JAR 文件"
