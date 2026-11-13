@@ -253,18 +253,15 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
 
         HttpClient httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(imageUploadConfig.getUrlFetchConnectTimeout()))
-                .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
-
-        HttpRequest headRequest = HttpRequest.newBuilder()
-                .uri(uri)
-                .method("HEAD", HttpRequest.BodyPublishers.noBody())
-                .timeout(Duration.ofMillis(imageUploadConfig.getUrlFetchReadTimeout()))
+                .followRedirects(HttpClient.Redirect.NEVER)
                 .build();
 
         HttpResponse<Void> headResponse;
         try {
-            headResponse = httpClient.send(headRequest, HttpResponse.BodyHandlers.discarding());
+            headResponse = sendFollowingRedirects(httpClient, uri, "HEAD",
+                    HttpResponse.BodyHandlers.discarding());
+        } catch (ClientException e) {
+            throw e;
         } catch (Exception e) {
             throw new ClientException(ErrorCode.IMAGE_URL_UNREACHABLE);
         }
@@ -286,15 +283,12 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
             throw new ClientException(ErrorCode.IMAGE_URL_TOO_LARGE);
         }
 
-        HttpRequest getRequest = HttpRequest.newBuilder()
-                .uri(uri)
-                .GET()
-                .timeout(Duration.ofMillis(imageUploadConfig.getUrlFetchReadTimeout()))
-                .build();
-
         HttpResponse<byte[]> getResponse;
         try {
-            getResponse = httpClient.send(getRequest, HttpResponse.BodyHandlers.ofByteArray());
+            getResponse = sendFollowingRedirects(httpClient, uri, "GET",
+                    HttpResponse.BodyHandlers.ofByteArray());
+        } catch (ClientException e) {
+            throw e;
         } catch (Exception e) {
             throw new ClientException(ErrorCode.IMAGE_URL_FETCH_FAILED);
         }
@@ -714,6 +708,51 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
 
         return null;
     }
+
+    /**
+     * 手动跟随重定向发送请求：逐跳对重定向目标过 {@link #checkSsrf}。
+     *
+     * <p>此前 {@code followRedirects(NORMAL)} 自动跟随但只对初始 URI 做 SSRF 检查，
+     * 302 到内网/回环地址可绕过（risks.md R5）。改为 NEVER + 手动逐跳校验，
+     * 最多 {@value #MAX_REDIRECTS} 跳，保留正常 http→https / CDN 跳转能力。</p>
+     */
+    <T> HttpResponse<T> sendFollowingRedirects(HttpClient httpClient, URI startUri, String method,
+                                               HttpResponse.BodyHandler<T> bodyHandler)
+            throws IOException, InterruptedException {
+        URI current = startUri;
+        int hopsLeft = MAX_REDIRECTS;
+        while (true) {
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(current)
+                    .method(method, HttpRequest.BodyPublishers.noBody())
+                    .timeout(Duration.ofMillis(imageUploadConfig.getUrlFetchReadTimeout()))
+                    .build();
+
+            HttpResponse<T> response = httpClient.send(request, bodyHandler);
+            int status = response.statusCode();
+
+            if (status >= 300 && status < 400) {
+                if (hopsLeft-- <= 0) {
+                    throw new ClientException(ErrorCode.IMAGE_URL_UNREACHABLE);
+                }
+                String location = response.headers().firstValue("Location").orElse(null);
+                if (StrUtil.isBlank(location)) {
+                    throw new ClientException(ErrorCode.IMAGE_URL_UNREACHABLE);
+                }
+                URI next = current.resolve(location.trim());
+                if (!"http".equalsIgnoreCase(next.getScheme())
+                        && !"https".equalsIgnoreCase(next.getScheme())) {
+                    throw new ClientException(ErrorCode.IMAGE_URL_INVALID);
+                }
+                checkSsrf(next);
+                current = next;
+                continue;
+            }
+            return response;
+        }
+    }
+
+    private static final int MAX_REDIRECTS = 5;
 
     private void checkSsrf(URI uri) {
         String host = uri.getHost();
