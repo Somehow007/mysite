@@ -1,7 +1,23 @@
-# 风险清单（摸底版）— 按「改起来的危险度 × 修复收益」排序
+# 风险清单 — 按「改起来的危险度 × 修复收益」排序
 
-> 2026-11-12 · 只读摸底。每条：证据 → 危险度/收益 → 验证方式。TBD=未验证勿猜。
-> 排序原则（接管 playbook）：正确性/安全 > 验证缺口 > 结构卫生 > 体验。
+> 2026-11-12 · 摸底版；2026-11-13 起随阶段 3 处置更新状态。
+> 状态：✅已修(commit) / ⏸延后(owner决策) / 待办。排序原则：正确性/安全 > 验证缺口 > 结构卫生 > 体验。
+
+## 处置进度（2026-11-13）
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| R1 密钥 | ⏸ owner 延后 | repo 保持 public；残余=生产 .env 是否覆盖 JWT_SECRET |
+| R2 CORS | ✅ `658a117` | CorsFilter 消费白名单；非白名单 Origin 无 CORS 头；`*` 不带 credentials |
+| R3 actuator/swagger | ✅ `6772fa0` | health/info 放行、其余 ADMIN；prod 关 knife4j+springdoc |
+| R4 登录限流 | ✅ `55c15f3` | LoginRateLimiter：10 次/10 分/IP（Redis 固定窗口） |
+| R5 SSRF 重定向 | ✅ `cb2119b` | NEVER + 手动逐跳 checkSsrf，≤5 跳；残留 DNS-rebind TOCTOU |
+| R6 SVG 上传 | ✅ `82dc5da` | 三处白名单+前端去 svg；残留=已落盘 .svg 待 owner 清 |
+| R7 验证缺口 | 🔶部分 | verify.sh+hermetic 分层完成；无 CI、deploy 仍 -DskipTests |
+| R8 git 基线 | ✅ 阶段1 | |
+| R9 嵌套 repo | ✅ `8779ec3` | gitignore |
+| R10 useMarkdown XSS | ✅ `8e7dc27` | 渲染末尾 DOMPurify，对齐 chat 管线 |
+| R12 BeanUtil 注册拷贝 | ✅ `d30a03f` | 显式赋值；同条其余项（双 markdown 管线/login-test.html/死配置）仍待办 |
 
 ## P0 — 先堵（安全隐患，收益极高）
 

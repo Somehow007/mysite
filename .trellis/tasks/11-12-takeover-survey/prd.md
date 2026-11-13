@@ -65,6 +65,15 @@ mysite 是 AI 生成的主力项目：代码层已有部分秩序（CLAUDE.md、
   - `RagChatControllerTest`（11 例）：SSE 事件顺序与 JSON 线格式(meta→content→done, conversationId 序列化为 string)、done/error 后 complete、XFF 取首 IP、kbIds 解析、同步异常→error 事件、会话历史两个端点。SseEmitter Handler 为包级私有接口 → 反射+动态代理注入；executor 用捕获式同步执行。
   - **钉住的现状边界**：`kbIds=非法值` 在进 SSE 流前同步 `Long.parseLong` 抛 NumberFormatException → HTTP 500 而非 SSE error 事件（前端自产 kbIds，正常不触发，记为已知边界）。
   - 最终验证：`./scripts/verify.sh quick` 绿（后端 hermetic 全过 + 前端 type-check）。阶段 2 完成；full 模式待 Docker daemon（TBD-3）。
+- **2026-11-13 阶段 3（小步翻新，安全链完成）**：按 risks.md 顺序一次一关注点：
+  - `658a117` R2 CorsFilter 消费白名单（非白名单 Origin 无 CORS 头；`*` 规范合规不发 credentials）
+  - `6772fa0` R3 actuator 拆分（health/info 放行，其余 ADMIN）+ prod 关 knife4j/springdoc
+  - `55c15f3` R4 LoginRateLimiter（Redis 10/10min/IP）+ 抽 ClientIpResolver 消第三处复制
+  - `cb2119b` R5 SSRF 重定向逐跳校验（NEVER+手动跟随≤5 跳，包私有方法可 mock 测试；残留 DNS-rebind TOCTOU）
+  - `82dc5da` R6 上传白名单去 svg（残留：已落盘 .svg 待 owner 清）
+  - `8e7dc27` R10 useMarkdown 末尾 DOMPurify（无 iframe 用法，默认 profile 直用）
+  - `d30a03f` R12 注册 BeanUtil.toBean → 显式赋值
+  - 每 commit 均过 `verify.sh quick`。剩余：R11（匿名接口口径需决策）、R12 余项（login-test.html/双 markdown 管线）、R13 运维卫生、CI 缺失。
 
 ## Resolution（待归档时补）
 
