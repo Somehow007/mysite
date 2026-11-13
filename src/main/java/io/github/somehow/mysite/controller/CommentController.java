@@ -7,6 +7,7 @@ import io.github.somehow.mysite.dto.req.comment.CommentCreateReqDTO;
 import io.github.somehow.mysite.dto.resp.CommentLikeRespDTO;
 import io.github.somehow.mysite.dto.resp.CommentTreeRespDTO;
 import io.github.somehow.mysite.service.CommentService;
+import io.github.somehow.mysite.utils.ClientIpResolver;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,7 +29,7 @@ public class CommentController {
             @PathVariable Long articleId,
             HttpServletRequest request) {
         String currentUserId = UserContext.getUserId();
-        String currentIp = getClientIp(request);
+        String currentIp = ClientIpResolver.resolve(request);
         return Results.success(commentService.getArticleComments(articleId, currentUserId, currentIp));
     }
 
@@ -37,7 +38,7 @@ public class CommentController {
     public Result<Void> createComment(
             @RequestBody CommentCreateReqDTO requestParam,
             HttpServletRequest request) {
-        String ipAddress = getClientIp(request);
+        String ipAddress = ClientIpResolver.resolve(request);
         String userAgent = request.getHeader("User-Agent");
         commentService.createComment(requestParam, ipAddress, userAgent);
         return Results.success();
@@ -56,21 +57,7 @@ public class CommentController {
             @PathVariable Long id,
             HttpServletRequest request) {
         String currentUserId = UserContext.getUserId();
-        String ipAddress = getClientIp(request);
+        String ipAddress = ClientIpResolver.resolve(request);
         return Results.success(commentService.toggleLike(id, currentUserId, ipAddress));
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
-        }
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-        return ip;
     }
 }

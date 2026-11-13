@@ -89,7 +89,7 @@ public class RagChatController {
             : List.of();
 
         log.info("RAG chat request: ip={}, role={}, visitorId={}, convId={}, qLen={}, kbIds={}, articleId={}",
-            clientIp, userRole, visitorId, conversationId, question.length(), kbIds, articleId);
+            clientIp, userRole, maskVisitorId(visitorId), conversationId, question.length(), kbIds, articleId);
 
         // ── 优雅终止：存储订阅句柄，客户端断开 / 超时时取消后端 Flux ──
         final Disposable[] subscriptionHolder = new Disposable[1];
@@ -199,6 +199,16 @@ public class RagChatController {
             // 客户端主动断开是正常断连，不算异常
             emitter.completeWithError(e);
         }
+    }
+
+    /**
+     * visitorId 是匿名会话唯一凭证，日志只留前缀防泄露后被冒用拉取历史。
+     */
+    private static String maskVisitorId(String visitorId) {
+        if (visitorId == null || visitorId.isBlank()) {
+            return visitorId;
+        }
+        return visitorId.length() <= 8 ? "***" : visitorId.substring(0, 8) + "***";
     }
 
     private static Long parseUserId(String userId) {
