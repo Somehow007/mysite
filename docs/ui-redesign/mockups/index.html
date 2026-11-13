@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>mysite UI 重构 · 效果图索引</title>
+<style>
+  :root {
+    --accent: #4F46E5; --accent-hover: #4338CA; --accent-subtle: #EEF2FF;
+    --bg-primary: #F8F9FA; --bg-elevated: #FFFFFF; --border: #E5E7EB;
+    --text-primary: #111827; --text-secondary: #4B5563; --text-muted: #9CA3AF;
+  }
+  [data-theme="dark"] {
+    --accent: #818CF8; --accent-hover: #A5B4FC; --accent-subtle: rgba(129,140,248,.15);
+    --bg-primary: #0B0F19; --bg-elevated: #151A2D; --border: #262D42;
+    --text-primary: #E5E7EB; --text-secondary: #9CA3AF; --text-muted: #6B7280;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg-primary); color: var(--text-primary);
+    min-height: 100vh; transition: background .25s, color .25s;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 56px 24px 80px; }
+  header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; }
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+  .sub { color: var(--text-secondary); margin-top: 8px; font-size: 15px; line-height: 1.7; }
+  .theme-btn {
+    border: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-secondary);
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; cursor: pointer; flex-shrink: 0;
+  }
+  .theme-btn:hover { color: var(--text-primary); border-color: var(--accent); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 20px; }
+  .card {
+    display: block; background: var(--bg-elevated); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px; text-decoration: none; color: inherit;
+    transition: transform .2s, box-shadow .2s, border-color .2s;
+  }
+  .card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 12px 32px rgba(0,0,0,.08); }
+  .num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; border-radius: 10px; font-size: 14px; font-weight: 600;
+    background: var(--accent-subtle); color: var(--accent); margin-bottom: 14px;
+  }
+  .card h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .card p { font-size: 13.5px; color: var(--text-secondary); line-height: 1.7; }
+  .tags { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .tag {
+    font-size: 12px; padding: 3px 10px; border-radius: 999px;
+    background: var(--accent-subtle); color: var(--accent);
+  }
+  footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 13px; color: var(--text-muted); line-height: 1.8; }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer code { background: var(--accent-subtle); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>mysite UI 重构 · 效果图索引</h1>
+      <p class="sub">覆盖 RAG 知识库管理、RAG 智能问答、统一管理后台、公开个人主页四个板块。<br>每张图为独立 HTML（零依赖），右上角可切换亮 / 暗主题。设计说明见 <code>docs/ui-redesign/UI重构设计方案.md</code>。</p>
+    </div>
+    <button class="theme-btn" id="themeBtn">🌙 深色</button>
+  </header>
+
+  <div class="grid">
+    <a class="card" href="./01-rag-knowledge.html">
+      <span class="num">01</span>
+      <h2>RAG 知识库管理</h2>
+      <p>两级视图（库列表 → 库详情）、统计条实时状态与自动刷新提示、文档表格语义状态徽章、行展开分块预览、分块参数说明。</p>
+      <div class="tags"><span class="tag">状态实时可见</span><span class="tag">分块可预览</span><span class="tag">反馈统一</span></div>
+    </a>
+    <a class="card" href="./02-rag-chat.html">
+      <span class="num">02</span>
+      <h2>RAG 智能问答</h2>
+      <p>玻璃拟态聊天面板、可点击跳转的引用来源卡片、流式输出光标、失败重试气泡、限流提示横幅、历史会话重命名 / 删除。</p>
+      <div class="tags"><span class="tag">来源可溯源</span><span class="tag">状态可感知</span><span class="tag">失败可恢复</span></div>
+    </a>
+    <a class="card" href="./03-admin-console.html">
+      <span class="num">03</span>
+      <h2>统一管理后台（用户管理示例）</h2>
+      <p>统一页面骨架：统计卡 + 筛选栏 + DataTable + 智能分页；批量操作浮条、危险操作输入确认弹窗、Toast 反馈组、语义徽章体系。</p>
+      <div class="tags"><span class="tag">组件统一</span><span class="tag">反馈统一</span><span class="tag">危险操作有门槛</span></div>
+    </a>
+    <a class="card" href="./04-profile.html">
+      <span class="num">04</span>
+      <h2>公开个人主页 + 个人中心</h2>
+      <p>新增 /user/:username 公开主页（访客视角：资料卡、统计、文章流），下方附本人视角的个人中心设置预览（状态徽章、账号安全、登录设备）。</p>
+      <div class="tags"><span class="tag">身份对外承载</span><span class="tag">双视角分离</span><span class="tag">设置状态可见</span></div>
+    </a>
+  </div>
+
+  <footer>
+    设计 token 与线上 classic 主题对齐（accent #4F46E5 / 深色 #818CF8），状态色采用「10% 透明背景 + 实色文字」语义徽章规范，亮暗主题下均成立。<br>
+    配套文档：<code>docs/ui-redesign/UI重构设计方案.md</code>（现状诊断 · 设计系统 · 分模块方案 · 健壮性设计 · 实施路线图）
+  </footer>
+</div>
+<script>
+  const btn = document.getElementById('themeBtn');
+  btn.addEventListener('click', () => {
+    const html = document.documentElement;
+    const dark = html.getAttribute('data-theme') === 'dark';
+    html.setAttribute('data-theme', dark ? 'light' : 'dark');
+    btn.textContent = dark ? '🌙 深色' : '☀️ 浅色';
+  });
+</script>
+</body>
+</html>

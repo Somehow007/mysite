@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>林小满 (@linxiaoman) - MySite 个人主页</title>
+<style>
+  :root {
+    --accent: #4F46E5;
+    --accent-hover: #4338CA;
+    --accent-subtle: #EEF2FF;
+    --bg-primary: #F8F9FA;
+    --bg-elevated: #FFFFFF;
+    --bg-code: #F1F3F5;
+    --border: #E5E7EB;
+    --text-primary: #111827;
+    --text-secondary: #4B5563;
+    --text-muted: #9CA3AF;
+    --success: #10B981;
+    --warning: #F59E0B;
+    --danger: #EF4444;
+    --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.04), 0 1px 3px rgba(17, 24, 39, 0.06);
+    --shadow-md: 0 4px 12px rgba(17, 24, 39, 0.08);
+  }
+  [data-theme="dark"] {
+    --accent: #818CF8;
+    --accent-hover: #A5B4FC;
+    --accent-subtle: #1E2440;
+    --bg-primary: #0B0F19;
+    --bg-elevated: #151A2D;
+    --bg-code: #1E2438;
+    --border: #262D42;
+    --text-primary: #E5E7EB;
+    --text-secondary: #9CA3AF;
+    --text-muted: #6B7280;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Noto Sans SC", sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; border: none; background: none; }
+  svg { display: block; }
+
+  .container { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+
+  /* ===== 顶部导航 ===== */
+  .nav {
+    position: sticky; top: 0; z-index: 50;
+    background: color-mix(in srgb, var(--bg-elevated) 80%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-inner {
+    max-width: 1080px; margin: 0 auto; padding: 0 24px;
+    height: 60px; display: flex; align-items: center; gap: 32px;
+  }
+  .nav-logo {
+    font-size: 18px; font-weight: 700; letter-spacing: -0.02em;
+    color: var(--text-primary); display: flex; align-items: center; gap: 8px;
+  }
+  .nav-logo .logo-mark {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: linear-gradient(135deg, var(--accent), #7C3AED);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 13px; font-weight: 800;
+  }
+  .nav-links { display: flex; gap: 4px; flex: 1; }
+  .nav-links a {
+    padding: 6px 14px; border-radius: 8px; font-size: 14px;
+    color: var(--text-secondary); transition: color .15s, background .15s;
+  }
+  .nav-links a:hover { color: var(--text-primary); background: var(--bg-code); }
+  .nav-links a.active { color: var(--accent); font-weight: 600; }
+  .nav-actions { display: flex; align-items: center; gap: 10px; }
+  .icon-btn {
+    width: 36px; height: 36px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-secondary); transition: background .15s, color .15s;
+  }
+  .icon-btn:hover { background: var(--bg-code); color: var(--text-primary); }
+  .nav-avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #4F46E5, #7C3AED);
+    color: #fff; font-size: 13px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid var(--bg-elevated); box-shadow: var(--shadow-sm);
+  }
+
+  /* ===== 资料卡片区 ===== */
+  .profile-hero { padding: 48px 0 0; }
+  .profile-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 36px 40px;
+    box-shadow: var(--shadow-sm);
+    position: relative; overflow: hidden;
+  }
+  .profile-card::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--accent), #7C3AED 55%, #EC4899);
+  }
+  .profile-main { display: flex; gap: 28px; align-items: flex-start; }
+  .profile-avatar {
+    width: 96px; height: 96px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, #4F46E5, #7C3AED);
+    color: #fff; font-size: 36px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 0 4px var(--bg-elevated), 0 0 0 6px var(--accent-subtle);
+  }
+  .profile-info { flex: 1; min-width: 0; }
+  .profile-name-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .profile-name { font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  .username-badge {
+    font-size: 13px; color: var(--text-muted);
+    background: var(--bg-code); padding: 2px 10px; border-radius: 99px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .role-badge {
+    font-size: 12px; font-weight: 600; color: var(--accent);
+    background: var(--accent-subtle); padding: 3px 10px; border-radius: 99px;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .profile-bio {
+    margin-top: 10px; font-size: 15px; color: var(--text-secondary); max-width: 520px;
+  }
+  .profile-meta {
+    margin-top: 14px; display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    font-size: 13.5px; color: var(--text-muted);
+  }
+  .profile-meta span, .profile-meta a.meta-link {
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .profile-meta a.meta-link { color: var(--accent); }
+  .profile-meta a.meta-link:hover { text-decoration: underline; }
+  .profile-actions { display: flex; gap: 10px; flex-shrink: 0; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 20px; border-radius: 10px; font-size: 14px; font-weight: 600;
+    transition: background .15s, border-color .15s, color .15s, transform .1s;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  [data-theme="dark"] .btn-primary { color: #0B0F19; }
+  .btn-outline {
+    background: transparent; color: var(--text-secondary);
+    border: 1px solid var(--border);
+  }
+  .btn-outline:hover { border-color: var(--text-muted); color: var(--text-primary); }
+
+  /* ===== 数据统计行 ===== */
+  .profile-stats {
+    margin-top: 28px; padding-top: 24px;
+    border-top: 1px solid var(--border);
+    display: grid; grid-template-columns: repeat(4, 1fr);
+  }
+  .stat-item { text-align: center; position: relative; }
+  .stat-item + .stat-item::before {
+    content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 1px; height: 32px; background: var(--border);
+  }
+  .stat-num { font-size: 22px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em; }
+  .stat-label { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ===== Tab 栏 ===== */
+  .tabs {
+    margin-top: 36px;
+    border-bottom: 1px solid var(--border);
+    display: flex; gap: 8px;
+  }
+  .tab {
+    padding: 12px 18px; font-size: 15px; color: var(--text-secondary);
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    display: inline-flex; align-items: center; gap: 7px;
+    transition: color .15s, border-color .15s;
+  }
+  .tab:hover { color: var(--text-primary); }
+  .tab.active { color: var(--accent); font-weight: 600; border-bottom-color: var(--accent); }
+  .tab .lock-icon { color: var(--text-muted); }
+
+  /* ===== 文章列表 ===== */
+  .article-list { padding: 8px 0 0; }
+  .article-item {
+    display: flex; gap: 28px; align-items: stretch;
+    padding: 28px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .article-item:last-child { border-bottom: none; }
+  .article-body { flex: 1; min-width: 0; }
+  .article-title {
+    font-size: 19px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.4;
+    color: var(--text-primary);
+  }
+  .article-title:hover { color: var(--accent); }
+  .article-excerpt {
+    margin-top: 8px; font-size: 14px; color: var(--text-secondary); line-height: 1.7;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .article-meta {
+    margin-top: 14px; display: flex; align-items: center; gap: 16px;
+    font-size: 13px; color: var(--text-muted);
+  }
+  .cat-badge {
+    font-size: 12px; font-weight: 500; color: var(--accent);
+    background: var(--accent-subtle); padding: 2px 9px; border-radius: 6px;
+  }
+  .article-meta span { display: inline-flex; align-items: center; gap: 5px; }
+  .article-cover {
+    width: 200px; height: 100px; border-radius: 12px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255, 255, 255, 0.92); font-size: 15px; font-weight: 700;
+    text-align: center; padding: 0 16px; letter-spacing: 0.02em;
+    box-shadow: var(--shadow-sm);
+  }
+  .cover-1 { background: linear-gradient(135deg, #4F46E5, #7C3AED); }
+  .cover-2 { background: linear-gradient(135deg, #0891B2, #10B981); }
+  .cover-3 { background: linear-gradient(135deg, #F59E0B, #EF4444); }
+
+  /* ===== 分页 ===== */
+  .pagination {
+    padding: 32px 0 8px;
+    display: flex; justify-content: center; gap: 8px;
+  }
+  .page-btn {
+    min-width: 36px; height: 36px; padding: 0 10px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; color: var(--text-secondary);
+    transition: background .15s, color .15s;
+  }
+  .page-btn:hover { background: var(--bg-code); color: var(--text-primary); }
+  .page-btn.active { background: var(--accent); color: #fff; font-weight: 600; }
+  [data-theme="dark"] .page-btn.active { color: #0B0F19; }
+  .page-btn.disabled { color: var(--text-muted); opacity: 0.5; cursor: default; }
+  .page-btn.disabled:hover { background: transparent; color: var(--text-muted); }
+
+  /* ===== 设置预览分隔 ===== */
+  .settings-divider {
+    margin: 56px 0 32px;
+    border-top: 2px dashed var(--border);
+    position: relative;
+  }
+  .settings-divider span {
+    position: absolute; left: 50%; top: 0; transform: translate(-50%, -50%);
+    background: var(--bg-primary); padding: 6px 20px;
+    font-size: 13px; color: var(--text-muted); white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+
+  /* ===== 设置卡片 ===== */
+  .settings-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 32px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+  }
+  .settings-card-title {
+    font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 9px;
+  }
+  .settings-card-title svg { color: var(--accent); }
+  .settings-card-desc { font-size: 13px; color: var(--text-muted); margin-top: 4px; }
+  .settings-form { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 28px; }
+  .form-field { display: flex; flex-direction: column; gap: 7px; }
+  .form-field.full { grid-column: 1 / -1; }
+  .form-label { font-size: 13.5px; font-weight: 600; color: var(--text-secondary); }
+  .form-input, .form-select, .form-textarea {
+    font-family: inherit; font-size: 14px; color: var(--text-primary);
+    background: var(--bg-primary); border: 1px solid var(--border);
+    border-radius: 9px; padding: 9px 13px; width: 100%;
+    transition: border-color .15s, box-shadow .15s;
+    outline: none;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  }
+  .form-textarea { resize: vertical; min-height: 74px; line-height: 1.6; }
+  .input-with-badge { display: flex; align-items: center; gap: 10px; }
+  .input-with-badge .form-input { flex: 1; }
+  .status-badge {
+    font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 99px;
+    display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  }
+  .status-badge.success { color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }
+  .status-badge.warning { color: var(--warning); background: color-mix(in srgb, var(--warning) 12%, transparent); }
+  .link-btn { font-size: 13px; font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .link-btn:hover { text-decoration: underline; }
+
+  .avatar-field { display: flex; align-items: center; gap: 18px; }
+  .avatar-field .profile-avatar.small {
+    width: 64px; height: 64px; font-size: 24px;
+    box-shadow: 0 0 0 3px var(--bg-elevated), 0 0 0 4px var(--accent-subtle);
+  }
+  .avatar-actions { display: flex; flex-direction: column; gap: 4px; }
+  .avatar-actions .hint { font-size: 12px; color: var(--text-muted); }
+
+  .settings-footer {
+    margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: flex-end; gap: 14px;
+  }
+  .settings-footer .save-hint { font-size: 12.5px; color: var(--text-muted); }
+
+  /* 密码输入 */
+  .pwd-wrap { position: relative; }
+  .pwd-wrap .form-input { padding-right: 40px; }
+  .pwd-eye {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    color: var(--text-muted); width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center; border-radius: 6px;
+  }
+  .pwd-eye:hover { color: var(--text-primary); background: var(--bg-code); }
+
+  /* 登录设备 */
+  .device-list { margin-top: 24px; border-top: 1px solid var(--border); }
+  .device-item {
+    display: flex; align-items: center; gap: 16px;
+    padding: 16px 0; border-bottom: 1px solid var(--border);
+  }
+  .device-item:last-child { border-bottom: none; }
+  .device-icon {
+    width: 40px; height: 40px; border-radius: 10px; flex-shrink: 0;
+    background: var(--bg-code); color: var(--text-secondary);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .device-info { flex: 1; min-width: 0; }
+  .device-name { font-size: 14px; font-weight: 600; color: var(--text-primary); display: flex; align-items: center; gap: 9px; }
+  .device-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+  .text-danger-btn { font-size: 13px; font-weight: 600; color: var(--danger); }
+  .text-danger-btn:hover { text-decoration: underline; }
+
+  .settings-section-head {
+    margin: 8px 0 20px; font-size: 14px; font-weight: 600; color: var(--text-secondary);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ===== 页脚 ===== */
+  .footer {
+    margin-top: 64px; border-top: 1px solid var(--border);
+    padding: 28px 0; text-align: center;
+    font-size: 13px; color: var(--text-muted);
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .empty-hint {
+    padding: 64px 0; text-align: center; color: var(--text-muted); font-size: 14px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== 顶部导航 ===== -->
+<header class="nav">
+  <div class="nav-inner">
+    <a href="#" class="nav-logo"><span class="logo-mark">M</span>MySite</a>
+    <nav class="nav-links">
+      <a href="#">首页</a>
+      <a href="#">归档</a>
+      <a href="#">合集</a>
+      <a href="#">关于</a>
+    </nav>
+    <div class="nav-actions">
+      <button class="icon-btn" aria-label="搜索">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </button>
+      <button class="icon-btn" id="themeToggle" aria-label="切换主题">
+        <svg id="iconSun" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <svg id="iconMoon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <div class="nav-avatar">林</div>
+    </div>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- ===== 资料卡片区 ===== -->
+  <section class="profile-hero">
+    <div class="profile-card">
+      <div class="profile-main">
+        <div class="profile-avatar">林</div>
+        <div class="profile-info">
+          <div class="profile-name-row">
+            <h1 class="profile-name">林小满</h1>
+            <span class="username-badge">@linxiaoman</span>
+            <span class="role-badge">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+              创作者
+            </span>
+          </div>
+          <p class="profile-bio">全栈开发者，关注搜索与推荐系统</p>
+          <div class="profile-meta">
+            <span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+              2023 年 6 月加入
+            </span>
+            <span>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              杭州
+            </span>
+            <a class="meta-link" href="#">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              github.com/linxm
+            </a>
+          </div>
+        </div>
+        <div class="profile-actions">
+          <button class="btn btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5v14"/></svg>
+            关注
+          </button>
+          <button class="btn btn-outline">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 18 9-18 9 4-9-4-9Z"/><path d="M7 12h14"/></svg>
+            私信
+          </button>
+        </div>
+      </div>
+      <div class="profile-stats">
+        <div class="stat-item"><div class="stat-num">42</div><div class="stat-label">文章</div></div>
+        <div class="stat-item"><div class="stat-num">5</div><div class="stat-label">合集</div></div>
+        <div class="stat-item"><div class="stat-num">1.2k</div><div class="stat-label">获赞</div></div>
+        <div class="stat-item"><div class="stat-num">368</div><div class="stat-label">被收藏</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Tab 栏 ===== -->
+  <div class="tabs" id="profileTabs">
+    <button class="tab active" data-tab="articles">文章 42</button>
+    <button class="tab" data-tab="collections">合集 5</button>
+    <button class="tab" data-tab="favorites">
+      收藏
+      <svg class="lock-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    </button>
+    <button class="tab" data-tab="about">关于</button>
+  </div>
+
+  <!-- 文章面板 -->
+  <div class="tab-panel active" id="panel-articles">
+    <div class="article-list">
+      <article class="article-item">
+        <div class="article-body">
+          <a href="#"><h2 class="article-title">Elasticsearch 可插拔架构在 Spring Boot 中的落地实践</h2></a>
+          <p class="article-excerpt">从单体应用接入搜索引擎的痛点出发，介绍如何通过抽象搜索层、条件装配与降级策略，让 ES 在项目中做到可插拔、可回退，附带完整的配置示例与压测数据。</p>
+          <div class="article-meta">
+            <span class="cat-badge">后端</span>
+            <span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              3.4k
+            </span>
+            <span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
+              286
+            </span>
+            <span>2026-07-18</span>
+          </div>
+        </div>
+        <div class="article-cover cover-1">Elasticsearch<br>可插拔架构</div>
+      </article>
+
+      <article class="article-item">
+        <div class="article-body">
+          <a href="#"><h2 class="article-title">Vue 3 组合式 API 下的状态管理：从 Pinia 到轻量 composable</h2></a>
+          <p class="article-excerpt">并不是所有项目都需要全量引入状态库。这篇文章对比了 Pinia store 与纯 composable 两种方案在中型博客项目中的取舍，并给出一套渐进式的拆分策略。</p>
+          <div class="article-meta">
+            <span class="cat-badge">前端</span>
+            <span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              2.1k
+            </span>
+            <span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
+              174
+            </span>
+            <span>2026-06-30</span>
+          </div>
+        </div>
+        <div class="article-cover cover-2">Vue 3<br>状态管理</div>
+      </article>
+
+      <article class="article-item">
+        <div class="article-body">
+          <a href="#"><h2 class="article-title">给个人博客加一层推荐系统：基于行为日志的召回与排序</h2></a>
+          <p class="article-excerpt">小流量站点同样可以做推荐。记录点击与停留时长，用简单的协同过滤加时间衰减做召回，再按标签权重重排序，成本几乎为零，效果超出预期。</p>
+          <div class="article-meta">
+            <span class="cat-badge">算法实践</span>
+            <span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              1.8k
+            </span>
+            <span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10v12M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/></svg>
+              152
+            </span>
+            <span>2026-06-12</span>
+          </div>
+        </div>
+        <div class="article-cover cover-3">博客<br>推荐系统</div>
+      </article>
+    </div>
+
+    <!-- 分页 -->
+    <nav class="pagination" aria-label="分页">
+      <button class="page-btn disabled" aria-label="上一页">‹</button>
+      <button class="page-btn active">1</button>
+      <button class="page-btn">2</button>
+      <button class="page-btn">3</button>
+      <button class="page-btn" aria-label="下一页">›</button>
+    </nav>
+  </div>
+
+  <div class="tab-panel" id="panel-collections">
+    <div class="empty-hint">合集列表视图（设计评审演示，此处省略）</div>
+  </div>
+  <div class="tab-panel" id="panel-favorites">
+    <div class="empty-hint">收藏夹仅本人可见（设计评审演示，此处省略）</div>
+  </div>
+  <div class="tab-panel" id="panel-about">
+    <div class="empty-hint">关于页视图（设计评审演示，此处省略）</div>
+  </div>
+
+  <!-- ===== 本人视角分隔 ===== -->
+  <div class="settings-divider">
+    <span>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+      以下为本人视角 · 个人中心设置预览
+    </span>
+  </div>
+
+  <!-- ===== 个人资料设置卡片 ===== -->
+  <section class="settings-card">
+    <h3 class="settings-card-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      个人资料
+    </h3>
+    <p class="settings-card-desc">这些信息将展示在你的公开个人主页上。</p>
+
+    <div class="settings-form">
+      <div class="form-field full">
+        <label class="form-label">头像</label>
+        <div class="avatar-field">
+          <div class="profile-avatar small">林</div>
+          <div class="avatar-actions">
+            <button class="btn btn-outline" style="padding:7px 14px;font-size:13px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></svg>
+              更换头像
+            </button>
+            <span class="hint">支持 JPG / PNG，不超过 2MB</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-field">
+        <label class="form-label" for="f-nickname">昵称</label>
+        <input class="form-input" id="f-nickname" type="text" value="林小满">
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="f-realname">真实姓名</label>
+        <input class="form-input" id="f-realname" type="text" value="林满" placeholder="仅本人可见">
+      </div>
+
+      <div class="form-field">
+        <label class="form-label" for="f-email">邮箱</label>
+        <div class="input-with-badge">
+          <input class="form-input" id="f-email" type="email" value="linxiaoman@example.com">
+          <span class="status-badge success">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            已验证
+          </span>
+        </div>
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="f-phone">手机号</label>
+        <div class="input-with-badge">
+          <input class="form-input" id="f-phone" type="tel" placeholder="未绑定手机号">
+          <span class="status-badge warning">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></svg>
+            未绑定
+          </span>
+          <button class="link-btn">去绑定</button>
+        </div>
+      </div>
+
+      <div class="form-field">
+        <label class="form-label" for="f-gender">性别</label>
+        <select class="form-select" id="f-gender">
+          <option>保密</option>
+          <option selected>女</option>
+          <option>男</option>
+        </select>
+      </div>
+
+      <div class="form-field full">
+        <label class="form-label" for="f-bio">个人简介</label>
+        <textarea class="form-textarea" id="f-bio" rows="3" maxlength="120">全栈开发者，关注搜索与推荐系统</textarea>
+      </div>
+    </div>
+
+    <div class="settings-footer">
+      <span class="save-hint">上次保存于 10 分钟前</span>
+      <button class="btn btn-primary">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+        保存修改
+      </button>
+    </div>
+  </section>
+
+  <!-- ===== 账号安全设置卡片 ===== -->
+  <section class="settings-card">
+    <h3 class="settings-card-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg>
+      账号安全
+    </h3>
+    <p class="settings-card-desc">定期更新密码并检查登录设备，保障账号安全。</p>
+
+    <h4 class="settings-section-head" style="margin-top:24px;">修改密码</h4>
+    <div class="settings-form" style="margin-top:14px;">
+      <div class="form-field full">
+        <label class="form-label" for="pwd-old">当前密码</label>
+        <div class="pwd-wrap">
+          <input class="form-input" id="pwd-old" type="password" value="••••••••••">
+          <button class="pwd-eye" aria-label="显示密码">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="pwd-new">新密码</label>
+        <div class="pwd-wrap">
+          <input class="form-input" id="pwd-new" type="password" placeholder="8-32 位，含字母与数字">
+          <button class="pwd-eye" aria-label="显示密码">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="form-field">
+        <label class="form-label" for="pwd-confirm">确认新密码</label>
+        <div class="pwd-wrap">
+          <input class="form-input" id="pwd-confirm" type="password" placeholder="再次输入新密码">
+          <button class="pwd-eye" aria-label="显示密码">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:18px;">
+      <button class="btn btn-outline">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+        更新密码
+      </button>
+    </div>
+
+    <h4 class="settings-section-head" style="margin-top:28px;">登录设备</h4>
+    <div class="device-list">
+      <div class="device-item">
+        <div class="device-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="12" x="3" y="4" rx="2"/><path d="M2 20h20"/></svg>
+        </div>
+        <div class="device-info">
+          <div class="device-name">
+            MacBook Pro · Chrome
+            <span class="status-badge success">当前设备</span>
+          </div>
+          <div class="device-sub">浙江 杭州 · 最近活跃：刚刚</div>
+        </div>
+      </div>
+      <div class="device-item">
+        <div class="device-icon">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="20" x="5" y="2" rx="2"/><path d="M12 18h.01"/></svg>
+        </div>
+        <div class="device-info">
+          <div class="device-name">iPhone 15 · Safari</div>
+          <div class="device-sub">浙江 杭州 · 最近活跃：3 天前</div>
+        </div>
+        <button class="text-danger-btn">下线</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ===== 页脚 ===== -->
+<footer class="footer">
+  <div class="container">© 2026 MySite · 林小满的个人博客 · 保留所有权利</div>
+</footer>
+
+<script>
+  // 主题切换
+  (function () {
+    var toggle = document.getElementById('themeToggle');
+    var sun = document.getElementById('iconSun');
+    var moon = document.getElementById('iconMoon');
+    toggle.addEventListener('click', function () {
+      var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      if (dark) {
+        document.documentElement.removeAttribute('data-theme');
+        sun.style.display = 'block';
+        moon.style.display = 'none';
+      } else {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        sun.style.display = 'none';
+        moon.style.display = 'block';
+      }
+    });
+  })();
+
+  // Tab 切换
+  (function () {
+    var tabs = document.querySelectorAll('#profileTabs .tab');
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        tabs.forEach(function (t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        document.querySelectorAll('.tab-panel').forEach(function (p) { p.classList.remove('active'); });
+        document.getElementById('panel-' + tab.dataset.tab).classList.add('active');
+      });
+    });
+  })();
+
+  // 密码可见性切换
+  (function () {
+    document.querySelectorAll('.pwd-eye').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var input = btn.parentElement.querySelector('input');
+        input.type = input.type === 'password' ? 'text' : 'password';
+      });
+    });
+  })();
+</script>
+
+</body>
+</html>

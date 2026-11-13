@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能问答面板 · UI 重构效果图</title>
+<style>
+  /* ============ 设计 Token ============ */
+  :root {
+    --accent: #4F46E5;
+    --accent-hover: #4338CA;
+    --accent-subtle: #EEF2FF;
+    --bg-primary: #F8F9FA;
+    --bg-elevated: #FFFFFF;
+    --border: #E5E7EB;
+    --text-primary: #111827;
+    --text-secondary: #4B5563;
+    --text-muted: #9CA3AF;
+    --success: #10B981;
+    --warning: #F59E0B;
+    --danger: #EF4444;
+
+    --glass-bg: rgba(255, 255, 255, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.65);
+    --panel-shadow: 0 24px 64px -12px rgba(17, 24, 39, 0.22), 0 8px 24px -8px rgba(79, 70, 229, 0.12);
+    --bubble-ai-shadow: 0 1px 2px rgba(17, 24, 39, 0.05);
+    --backdrop-dim: rgba(17, 24, 39, 0.18);
+    --code-bg: #F1F3F7;
+    --code-block-bg: #111827;
+    --code-block-text: #E5E7EB;
+    --danger-bg: rgba(239, 68, 68, 0.07);
+    --danger-border: rgba(239, 68, 68, 0.35);
+    --warning-bg: rgba(245, 158, 11, 0.10);
+    --warning-border: rgba(245, 158, 11, 0.35);
+    --placeholder-block: #E9ECEF;
+    --placeholder-block-2: #F0F2F5;
+  }
+
+  [data-theme="dark"] {
+    --accent: #818CF8;
+    --accent-hover: #A5B4FC;
+    --accent-subtle: rgba(129, 140, 248, 0.14);
+    --bg-primary: #0B0F19;
+    --bg-elevated: #151A2D;
+    --border: #262D42;
+    --text-primary: #E5E7EB;
+    --text-secondary: #9CA3AF;
+    --text-muted: #6B7280;
+
+    --glass-bg: rgba(21, 26, 45, 0.78);
+    --glass-border: rgba(255, 255, 255, 0.08);
+    --panel-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.6), 0 8px 24px -8px rgba(129, 140, 248, 0.10);
+    --bubble-ai-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+    --backdrop-dim: rgba(0, 0, 0, 0.35);
+    --code-bg: #1C2338;
+    --code-block-bg: #0B0F19;
+    --code-block-text: #D1D5DB;
+    --danger-bg: rgba(239, 68, 68, 0.10);
+    --danger-border: rgba(239, 68, 68, 0.40);
+    --warning-bg: rgba(245, 158, 11, 0.12);
+    --warning-border: rgba(245, 158, 11, 0.40);
+    --placeholder-block: #1A2033;
+    --placeholder-block-2: #161C2E;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: -apple-system, "PingFang SC", "Noto Sans SC", sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    overflow: hidden;
+    transition: background 0.3s ease, color 0.3s ease;
+  }
+
+  svg { display: block; }
+
+  /* ============ 背景：虚化的博客文章列表页 ============ */
+  .blog-page {
+    position: fixed;
+    inset: 0;
+    padding: 0 56px;
+    overflow: hidden;
+  }
+
+  /* 装饰性渐变光斑，衬托玻璃拟态 */
+  .blog-page::before,
+  .blog-page::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(90px);
+    pointer-events: none;
+  }
+  .blog-page::before {
+    width: 560px; height: 560px;
+    right: -80px; bottom: -120px;
+    background: radial-gradient(circle, rgba(79, 70, 229, 0.16), transparent 70%);
+  }
+  .blog-page::after {
+    width: 420px; height: 420px;
+    left: -120px; top: -100px;
+    background: radial-gradient(circle, rgba(16, 185, 129, 0.10), transparent 70%);
+  }
+
+  .blog-nav {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    height: 64px;
+    border-bottom: 1px solid var(--border);
+    margin: 0 -56px;
+    padding: 0 56px;
+  }
+  .ph { border-radius: 6px; background: var(--placeholder-block); }
+  .blog-nav .logo { width: 96px; height: 20px; border-radius: 8px; }
+  .blog-nav .nav-item { width: 56px; height: 12px; }
+  .blog-nav .nav-avatar { width: 32px; height: 32px; border-radius: 50%; margin-left: auto; }
+
+  .blog-main { max-width: 760px; margin: 40px auto 0; }
+  .blog-hero { width: 220px; height: 30px; border-radius: 10px; margin-bottom: 10px; }
+  .blog-hero-sub { width: 320px; height: 14px; margin-bottom: 36px; background: var(--placeholder-block-2); }
+
+  .post-card {
+    display: flex;
+    gap: 20px;
+    padding: 22px;
+    margin-bottom: 20px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+  }
+  .post-card .cover { width: 132px; height: 96px; border-radius: 10px; flex-shrink: 0; }
+  .post-card .meta { flex: 1; display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+  .post-card .t { height: 16px; width: 62%; }
+  .post-card .l { height: 11px; background: var(--placeholder-block-2); }
+  .post-card .l.w90 { width: 90%; }
+  .post-card .l.w75 { width: 75%; }
+  .post-card .l.w40 { width: 40%; }
+
+  /* ============ 聊天面板（玻璃拟态） ============ */
+  .chat-panel {
+    position: fixed;
+    right: 40px;
+    bottom: 40px;
+    width: 520px;
+    height: 680px;
+    display: flex;
+    flex-direction: column;
+    border-radius: 16px;
+    overflow: hidden;
+    background: var(--glass-bg);
+    -webkit-backdrop-filter: blur(20px) saturate(1.8);
+    backdrop-filter: blur(20px) saturate(1.8);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--panel-shadow);
+  }
+
+  /* ---- 头部 ---- */
+  .panel-header {
+    height: 60px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .icon-btn {
+    width: 34px;
+    height: 34px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .icon-btn:hover { background: var(--accent-subtle); color: var(--accent); }
+  .icon-btn.is-active { background: var(--accent-subtle); color: var(--accent); }
+
+  .header-title { flex: 1; min-width: 0; }
+  .header-title h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.01em; }
+  .header-title p { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; gap: 5px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+
+  /* 主题切换图标显隐 */
+  .icon-moon { display: none; }
+  [data-theme="dark"] .icon-moon { display: block; }
+  [data-theme="dark"] .icon-sun { display: none; }
+
+  /* ---- 消息区 ---- */
+  .panel-body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .messages {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .msg { display: flex; gap: 10px; max-width: 100%; }
+  .msg.user { justify-content: flex-end; }
+
+  .avatar {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent-subtle);
+    color: var(--accent);
+    margin-top: 2px;
+  }
+
+  .bubble {
+    padding: 10px 14px;
+    font-size: 13.5px;
+    line-height: 1.65;
+    max-width: 82%;
+    word-break: break-word;
+  }
+
+  .msg.user .bubble {
+    background: var(--accent);
+    color: #FFFFFF;
+    border-radius: 14px 14px 4px 14px;
+    box-shadow: 0 4px 12px -4px rgba(79, 70, 229, 0.45);
+  }
+
+  .msg.ai .bubble {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px 14px 14px 14px;
+    box-shadow: var(--bubble-ai-shadow);
+    color: var(--text-primary);
+  }
+
+  .bubble p + p { margin-top: 8px; }
+  .bubble strong { font-weight: 600; }
+
+  .bubble code.inline {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    padding: 1.5px 5px;
+    border-radius: 5px;
+    background: var(--code-bg);
+    color: var(--accent);
+  }
+
+  /* 引用角标 */
+  .cite {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 17px;
+    height: 15px;
+    padding: 0 3px;
+    margin: 0 2px;
+    border-radius: 4px;
+    background: var(--accent-subtle);
+    color: var(--accent);
+    font-size: 10px;
+    font-weight: 600;
+    vertical-align: 2px;
+    cursor: pointer;
+  }
+
+  /* 代码块 */
+  .code-block {
+    margin-top: 10px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: var(--code-block-bg);
+  }
+  .code-block .code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.45);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .code-block pre {
+    padding: 12px 14px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--code-block-text);
+    overflow-x: auto;
+  }
+  .code-block .c-key { color: #93C5FD; }
+  .code-block .c-str { color: #6EE7B7; }
+  .code-block .c-com { color: rgba(255, 255, 255, 0.35); }
+
+  /* 引用来源 */
+  .sources { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); }
+  .sources-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+
+  .source-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 11px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .source-card + .source-card { margin-top: 8px; }
+  .source-card:hover,
+  .source-card.is-hover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 12px -4px rgba(79, 70, 229, 0.25);
+    transform: translateY(-1px);
+  }
+
+  .source-badge {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: var(--accent-subtle);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .source-info { flex: 1; min-width: 0; }
+  .source-title {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .source-rel { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  .rel-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .rel-dot.high { background: var(--success); }
+  .rel-dot.mid { background: var(--warning); }
+  .source-link { flex-shrink: 0; color: var(--text-muted); }
+  .source-card:hover .source-link,
+  .source-card.is-hover .source-link { color: var(--accent); }
+
+  /* 流式输出 */
+  .cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1.05em;
+    margin-left: 2px;
+    vertical-align: -2px;
+    background: var(--accent);
+    animation: blink 0.9s steps(2, start) infinite;
+  }
+  @keyframes blink { to { visibility: hidden; } }
+
+  .stream-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .stream-status:hover { color: var(--danger); }
+  .pulse-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.8); }
+  }
+
+  /* 失败态 */
+  .msg.ai .bubble.is-error {
+    background: var(--danger-bg);
+    border: 1px solid var(--danger-border);
+    box-shadow: none;
+  }
+  .error-row { display: flex; align-items: center; gap: 8px; color: var(--danger); font-size: 13px; font-weight: 500; }
+  .error-actions { margin-top: 10px; display: flex; justify-content: flex-start; }
+  .retry-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 13px;
+    border-radius: 8px;
+    border: 1px solid var(--danger-border);
+    background: transparent;
+    color: var(--danger);
+    font-size: 12px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .retry-btn:hover { background: var(--danger-bg); }
+
+  /* 限流横幅 */
+  .rate-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 9px;
+    padding: 10px 13px;
+    border-radius: 10px;
+    border: 1px solid var(--warning-border);
+    background: var(--warning-bg);
+    color: var(--warning);
+    font-size: 12.5px;
+    line-height: 1.55;
+  }
+  .rate-banner svg { flex-shrink: 0; margin-top: 1px; }
+  .rate-banner strong { font-weight: 600; }
+
+  /* ---- 历史会话侧栏（覆盖层，展开状态） ---- */
+  .history-layer {
+    position: absolute;
+    left: 0; right: 0; top: 0; bottom: 0;
+    display: flex;
+    z-index: 20;
+    animation: fadeIn 0.18s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  .history-panel {
+    width: 236px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-elevated);
+    border-right: 1px solid var(--border);
+    box-shadow: 8px 0 24px -12px rgba(17, 24, 39, 0.18);
+    animation: slideIn 0.22s ease;
+  }
+  @keyframes slideIn { from { transform: translateX(-24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+  .history-backdrop {
+    flex: 1;
+    background: var(--backdrop-dim);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+  }
+
+  .history-head {
+    padding: 14px 14px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .history-head h2 { font-size: 13px; font-weight: 600; }
+  .history-head span { font-size: 11px; color: var(--text-muted); }
+
+  .new-chat-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 0 12px 12px;
+    padding: 8px 0;
+    border: 1px dashed var(--border);
+    border-radius: 9px;
+    background: transparent;
+    color: var(--accent);
+    font-size: 12.5px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+  }
+  .new-chat-btn:hover { background: var(--accent-subtle); border-color: var(--accent); }
+
+  .session-list { flex: 1; overflow-y: auto; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 2px; }
+
+  .session-item {
+    position: relative;
+    padding: 9px 10px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .session-item:hover, .session-item.is-hover { background: var(--accent-subtle); }
+  .session-item.is-active { background: var(--accent-subtle); }
+  .session-item.is-active::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 9px; bottom: 9px;
+    width: 3px;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+  .session-title {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-right: 0;
+  }
+  .session-item.is-hover .session-title { padding-right: 46px; }
+  .session-time { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+  .session-actions {
+    position: absolute;
+    right: 8px; top: 50%;
+    transform: translateY(-50%);
+    display: none;
+    gap: 2px;
+  }
+  .session-item.is-hover .session-actions { display: flex; }
+  .session-actions .icon-btn { width: 26px; height: 26px; border-radius: 7px; }
+  .session-actions .icon-btn.danger:hover { color: var(--danger); background: var(--danger-bg); }
+
+  /* ---- 输入区 ---- */
+  .panel-footer {
+    flex-shrink: 0;
+    padding: 12px 14px 10px;
+    border-top: 1px solid var(--border);
+  }
+
+  .input-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 5px 5px 5px 16px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--bg-elevated);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .input-row:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+  }
+  .input-row input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 13.5px;
+    font-family: inherit;
+    color: var(--text-primary);
+    height: 32px;
+  }
+  .input-row input::placeholder { color: var(--text-muted); }
+
+  .send-btn {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--accent);
+    color: #FFFFFF;
+    cursor: pointer;
+    box-shadow: 0 4px 10px -3px rgba(79, 70, 229, 0.5);
+    transition: background 0.15s ease, transform 0.15s ease;
+  }
+  .send-btn:hover { background: var(--accent-hover); transform: scale(1.05); }
+
+  .footer-hint {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+</style>
+</head>
+<body>
+
+  <!-- ============ 背景：博客文章列表页（占位模拟） ============ -->
+  <div class="blog-page" aria-hidden="true">
+    <nav class="blog-nav">
+      <div class="ph logo"></div>
+      <div class="ph nav-item"></div>
+      <div class="ph nav-item"></div>
+      <div class="ph nav-item"></div>
+      <div class="ph nav-avatar"></div>
+    </nav>
+    <main class="blog-main">
+      <div class="ph blog-hero"></div>
+      <div class="ph blog-hero-sub"></div>
+
+      <article class="post-card">
+        <div class="ph cover"></div>
+        <div class="meta">
+          <div class="ph t"></div>
+          <div class="ph l w90"></div>
+          <div class="ph l w75"></div>
+          <div class="ph l w40"></div>
+        </div>
+      </article>
+      <article class="post-card">
+        <div class="ph cover"></div>
+        <div class="meta">
+          <div class="ph t" style="width:48%"></div>
+          <div class="ph l w90"></div>
+          <div class="ph l w75"></div>
+          <div class="ph l w40" style="width:30%"></div>
+        </div>
+      </article>
+      <article class="post-card">
+        <div class="ph cover"></div>
+        <div class="meta">
+          <div class="ph t" style="width:70%"></div>
+          <div class="ph l w90"></div>
+          <div class="ph l w75"></div>
+          <div class="ph l w40" style="width:36%"></div>
+        </div>
+      </article>
+      <article class="post-card">
+        <div class="ph cover"></div>
+        <div class="meta">
+          <div class="ph t" style="width:55%"></div>
+          <div class="ph l w90"></div>
+          <div class="ph l w75"></div>
+          <div class="ph l w40"></div>
+        </div>
+      </article>
+    </main>
+  </div>
+
+  <!-- ============ 聊天面板 ============ -->
+  <section class="chat-panel" aria-label="智能问答面板">
+
+    <!-- 头部 -->
+    <header class="panel-header">
+      <button class="icon-btn is-active" title="历史会话" aria-label="历史会话">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+      </button>
+      <div class="header-title">
+        <h1>智能问答</h1>
+        <p><span class="status-dot"></span>基于站内知识库</p>
+      </div>
+      <button class="icon-btn" id="themeToggle" title="切换主题" aria-label="切换主题">
+        <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+        <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+      </button>
+      <button class="icon-btn" title="新建会话" aria-label="新建会话">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/></svg>
+      </button>
+      <button class="icon-btn" title="关闭" aria-label="关闭">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </header>
+
+    <div class="panel-body">
+      <!-- 消息区 -->
+      <div class="messages">
+
+        <!-- 1. 用户提问 -->
+        <div class="msg user">
+          <div class="bubble">这个站点的搜索是怎么实现的？</div>
+        </div>
+
+        <!-- 2. AI 回答（含 Markdown / 代码块 / 引用来源） -->
+        <div class="msg ai">
+          <div class="avatar" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+          </div>
+          <div class="bubble">
+            <p>这个站点的搜索基于<strong>可插拔的搜索架构</strong>实现：文章发布或更新后会同步写入 <code class="inline">Elasticsearch</code> 索引<span class="cite">1</span>；查询时先走分词检索，再叠加向量召回做混合排序，兼顾关键词精确匹配与语义相关度<span class="cite">2</span>。</p>
+            <p>部署上通过 <code class="inline">docker-compose</code> 一键启动 ES 与后端服务，核心配置如下：</p>
+            <div class="code-block">
+              <div class="code-head"><span>application.yml</span><span>yaml</span></div>
+              <pre><span class="c-key">search:</span>
+  <span class="c-key">engine:</span> <span class="c-str">elasticsearch</span>  <span class="c-com"># 可切换 mysql / none</span>
+  <span class="c-key">elasticsearch:</span>
+    <span class="c-key">uris:</span> <span class="c-str">http://localhost:9200</span>
+    <span class="c-key">index:</span> <span class="c-str">mysite_articles</span></pre>
+            </div>
+            <div class="sources">
+              <div class="sources-label">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                引用来源
+              </div>
+              <div class="source-card is-hover">
+                <span class="source-badge">1</span>
+                <div class="source-info">
+                  <div class="source-title">《Elasticsearch 可插拔架构实现总结》</div>
+                  <div class="source-rel"><span class="rel-dot high"></span>相关度 92%</div>
+                </div>
+                <svg class="source-link" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+              </div>
+              <div class="source-card">
+                <span class="source-badge">2</span>
+                <div class="source-info">
+                  <div class="source-title">《RAG 问答功能部署指南》</div>
+                  <div class="source-rel"><span class="rel-dot mid"></span>相关度 87%</div>
+                </div>
+                <svg class="source-link" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. 用户追问 -->
+        <div class="msg user">
+          <div class="bubble">那向量检索用的什么模型？</div>
+        </div>
+
+        <!-- 4. AI 流式输出中 -->
+        <div class="msg ai">
+          <div class="avatar" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+          </div>
+          <div class="bubble">
+            <p>向量检索使用的是 <strong>bge-small-zh-v1.5</strong> 中文嵌入模型：文章入库时先按 512 token 切分片段并计算向量，存入 ES 的 <code class="inline">dense_vector</code> 字段；提问时把问题同样编码为向量，通过余弦相似度召回 Top-K 片段交给大模型生成回答<span class="cursor"></span></p>
+            <div class="stream-status">
+              <span class="pulse-dot"></span>
+              正在生成… 点击停止
+            </div>
+          </div>
+        </div>
+
+        <!-- 5. 失败态消息 -->
+        <div class="msg ai">
+          <div class="avatar" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+          </div>
+          <div class="bubble is-error">
+            <div class="error-row">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+              网络连接中断，生成失败
+            </div>
+            <div class="error-actions">
+              <button class="retry-btn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                重试
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6. 限流提示横幅 -->
+        <div class="rate-banner" role="alert">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+          <div><strong>提问过于频繁</strong>，请 12 分钟后再试（每小时限 20 次）</div>
+        </div>
+
+      </div>
+
+      <!-- 历史会话侧栏（展开覆盖状态） -->
+      <div class="history-layer">
+        <aside class="history-panel" aria-label="历史会话">
+          <div class="history-head">
+            <h2>历史会话</h2>
+            <span>共 5 条</span>
+          </div>
+          <button class="new-chat-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+            新对话
+          </button>
+          <div class="session-list">
+            <div class="session-item is-active">
+              <div class="session-title">搜索功能的实现原理</div>
+              <div class="session-time">当前会话</div>
+            </div>
+            <div class="session-item is-hover">
+              <div class="session-title">如何部署 Elasticsearch</div>
+              <div class="session-time">2小时前</div>
+              <div class="session-actions">
+                <button class="icon-btn" title="重命名" aria-label="重命名">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                </button>
+                <button class="icon-btn danger" title="删除" aria-label="删除">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+              </div>
+            </div>
+            <div class="session-item">
+              <div class="session-title">RAG 知识库如何更新文章</div>
+              <div class="session-time">昨天 21:14</div>
+            </div>
+            <div class="session-item">
+              <div class="session-title">评论系统接入 Artalk 的步骤</div>
+              <div class="session-time">3天前</div>
+            </div>
+            <div class="session-item">
+              <div class="session-title">图片上传失败怎么排查</div>
+              <div class="session-time">上周</div>
+            </div>
+          </div>
+        </aside>
+        <div class="history-backdrop"></div>
+      </div>
+    </div>
+
+    <!-- 输入区 -->
+    <footer class="panel-footer">
+      <div class="input-row">
+        <input type="text" placeholder="输入你的问题…" aria-label="输入你的问题">
+        <button class="send-btn" title="发送" aria-label="发送">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+        </button>
+      </div>
+      <div class="footer-hint">
+        <span class="status-dot"></span>
+        已登录 · 剩余 15 次/小时
+      </div>
+    </footer>
+
+  </section>
+
+  <script>
+    // 主题切换
+    document.getElementById('themeToggle').addEventListener('click', function () {
+      var root = document.documentElement;
+      root.setAttribute('data-theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+    });
+  </script>
+</body>
+</html>
