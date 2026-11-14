@@ -1,6 +1,6 @@
 # AGENTS.md — MySite 工程约定（v1）
 
-> 2026-11-12 由 `.trellis/tasks/11-12-takeover-survey/AGENTS.draft.md` 经评审提升生效。
+> 2026-11-12 由 `.trellis/tasks/archive/2026-11/11-12-takeover-survey/AGENTS.draft.md` 经评审提升生效。
 > 本文件只放最小约定集；新增纪律先跑通验证再沉淀进来。
 
 ## 0. 先读哪
@@ -11,22 +11,18 @@
 
 ## 1. 验证命令（动代码前必须能跑）
 
+一键入口 `./scripts/verify.sh`：
+
 ```bash
-# 基础设施（MySQL/Redis/PG 起齐，后端测试依赖真实库）
-cd docker && docker compose up -d
-
-# 后端
-./mvnw compile          # 编译必须过
-./mvnw test             # 已知不闭环：5 个 @SpringBootTest 需 docker 全量起；补齐 hermetic 测试进行中
-
-# 前端（mysite-frontend/）
-npm run type-check      # vue-tsc，必须过
-npm run lint            # oxlint+eslint（注意：默认 --fix 会改文件，提交前跑）
-npm run build           # 构建必须过
+./scripts/verify.sh        # quick：后端 hermetic 测试 + 前端 type-check，不依赖 docker
+./scripts/verify.sh full   # full：需 docker 起齐 MySQL/Redis/PG，全量测试 + 前端 type-check/lint/build
 ```
 
-无 CI。部署构建 `./deploy/deploy.sh` 内部 `-DskipTests`——**部署前必须本地先过 `./mvnw test`**。
-前端当前无单测框架；playwright 已装未用，新测试落地前先用 `type-check + lint + build` 当网。
+- 依赖真实基础设施的测试必须打 `@Tag("needs-infra")`（现有 5 个 `@SpringBootTest`），否则 quick 会被拖成依赖 docker。
+- 手动单跑：后端 `./mvnw compile` / `./mvnw test -DexcludedGroups=needs-infra`；前端（`mysite-frontend/`）`npm run type-check` / `npm run lint`（oxlint+eslint，默认 --fix）/ `npm run build`。
+- CI：`.github/workflows/ci.yml` 随 push/PR(main) 跑 quick 同口径（后端 hermetic + 前端 typecheck/build）；needs-infra 全量只在本地/服务器 `verify.sh full`。
+- 部署 `./deploy/deploy.sh` 内部跑 hermetic 测试（`clean package -DexcludedGroups=needs-infra`），不再 `-DskipTests`。
+- 前端当前无单测框架；playwright 已装未用，新测试落地前先用 `type-check + lint + build` 当网。
 
 ## 2. 改动纪律（先讨论再动手的情形）
 
@@ -42,7 +38,7 @@ npm run build           # 构建必须过
 
 ## 3. 硬约束（沿用既有约定，违者必返工）
 
-- **密钥零入库**：任何 secret 只走 `${ENV:}` / 本地 `.env`（已 gitignore）。`.env.example` 只写占位符。提交前 `git diff --cached | grep -iE 'key|secret|password'` 自查。（历史已泄露项见 `.trellis/tasks/11-12-takeover-survey/risks.md` R1）
+- **密钥零入库**：任何 secret 只走 `${ENV:}` / 本地 `.env`（已 gitignore）。`.env.example` 只写占位符。提交前 `git diff --cached | grep -iE 'key|secret|password'` 自查。（历史已泄露项见 `.trellis/tasks/archive/2026-11/11-12-takeover-survey/risks.md` R1）
 - Snowflake `Long` ID：DTO 一律 `@JsonSerialize(ToStringSerializer)`，前端类型一律 `string`。
 - 响应统一 `Result`/`Results`，错误走 `GlobalExceptionHandler`，不裸抛、不吞（catch 必须落日志或转业务码；RAG「失败静默」仅限已列明的降级点）。
 - 角色只认 `ADMIN/CREATOR/USER`；`/api/journal/**` 仅 ADMIN 且按 `user_id` 隔离。
