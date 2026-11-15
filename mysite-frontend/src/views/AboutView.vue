@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useSiteStore } from '@/stores/site'
+import ArticleContent from '@/components/article/ArticleContent.vue'
 
 useHead(() => ({
   title: '关于',
@@ -10,24 +12,99 @@ useHead(() => ({
 }))
 
 const siteStore = useSiteStore()
+
+const authorInitial = computed(() => siteStore.site.author?.charAt(0) || '·')
+// 长文走 site.aboutContent（markdown）；未配置时整块不渲染，作者卡已含短简介
+const aboutMarkdown = computed(() => siteStore.site.aboutContent?.trim() ?? '')
+const hasCardFooter = computed(() =>
+  !!(siteStore.site.github || siteStore.site.rss || siteStore.site.techStack),
+)
 </script>
 
 <template>
-  <div>
-    <section class="mb-10 pb-8 border-b border-border">
-      <h1 class="text-3xl sm:text-4xl font-bold text-text-primary tracking-tight">
+  <div class="mx-auto w-full max-w-[720px]">
+    <section class="border-b-[3px] border-b-border-strong border-double pb-6 pt-2 text-center">
+      <p class="text-xs uppercase tracking-[0.14em] text-text-muted">
+        About
+      </p>
+      <h1 class="mt-2 font-serif text-[40px] font-black leading-[1.1] tracking-tight text-text-primary lg:text-[56px]">
         关于
       </h1>
-    </section>
-
-    <div class="prose-custom max-w-none">
-      <p class="text-lg text-text-secondary leading-relaxed mb-6">
+      <p
+        v-if="siteStore.site.description"
+        class="mx-auto mt-3 max-w-xl font-serif text-[15px] leading-relaxed text-text-secondary lg:text-[17px]"
+      >
         {{ siteStore.site.description }}
       </p>
-      <div class="space-y-4 text-text-secondary">
-        <p>这是一个基于 Vue 3 + Spring Boot 构建的个人博客系统。</p>
-        <p>在这里，我记录技术思考、学习笔记和生活感悟。</p>
+    </section>
+
+    <section
+      class="paper-card paper-card--strong paper-hard-shadow mt-8 rounded-xl border border-border bg-bg-elevated p-6 sm:p-8"
+    >
+      <div class="flex flex-col gap-5 sm:flex-row sm:items-center">
+        <img
+          v-if="siteStore.site.avatar"
+          :src="siteStore.site.avatar"
+          :alt="siteStore.site.author"
+          class="h-16 w-16 shrink-0 rounded-full object-cover"
+        />
+        <div
+          v-else
+          class="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-accent-subtle to-accent font-serif text-2xl font-bold text-accent"
+          aria-hidden="true"
+        >
+          {{ authorInitial }}
+        </div>
+        <div class="min-w-0 flex-1">
+          <h2 class="font-serif text-2xl font-bold text-text-primary">
+            {{ siteStore.site.author }}
+          </h2>
+          <p
+            v-if="siteStore.site.authorTagline"
+            class="mt-1 text-sm text-text-muted"
+          >
+            {{ siteStore.site.authorTagline }}
+          </p>
+          <p
+            v-if="siteStore.site.authorBio"
+            class="mt-3 text-sm leading-relaxed text-text-secondary"
+          >
+            {{ siteStore.site.authorBio }}
+          </p>
+        </div>
       </div>
+
+      <div
+        v-if="hasCardFooter"
+        class="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border pt-4 text-[13px]"
+      >
+        <a
+          v-if="siteStore.site.github"
+          :href="siteStore.site.github"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-accent transition-opacity hover:opacity-80"
+        >
+          GitHub
+        </a>
+        <a
+          v-if="siteStore.site.rss"
+          :href="siteStore.site.rss"
+          class="text-accent transition-opacity hover:opacity-80"
+        >
+          RSS
+        </a>
+        <span
+          v-if="siteStore.site.techStack"
+          class="text-text-muted"
+        >
+          技术栈 · {{ siteStore.site.techStack }}
+        </span>
+      </div>
+    </section>
+
+    <div v-if="aboutMarkdown" class="mt-10">
+      <ArticleContent :content="aboutMarkdown" />
     </div>
   </div>
 </template>

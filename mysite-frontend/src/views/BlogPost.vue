@@ -9,7 +9,7 @@ import { calculateReadingTime } from '@/utils/date'
 import { useScrollProgress } from '@/composables/useScrollProgress'
 import { useFavorite } from '@/composables/useFavorite'
 import { useChatLauncher } from '@/composables/useChatLauncher'
-import { takePendingAsk, hasAuthSession } from '@/composables/usePendingAsk'
+import { takePendingAsk, takePendingQuote, hasAuthSession } from '@/composables/usePendingAsk'
 import { useSiteStore } from '@/stores/site'
 import ArticleContent from '@/components/article/ArticleContent.vue'
 import ArticleToc from '@/components/article/ArticleToc.vue'
@@ -23,6 +23,7 @@ import type { RelatedItem } from '@/components/article/PostRelated.vue'
 import CommentSection from '@/components/comment/CommentSection.vue'
 import ArticleNav from '@/components/collection/ArticleNav.vue'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
+import NotFoundPanel from '@/components/common/NotFoundPanel.vue'
 import type { Article, ArticleNavInfo } from '@/types'
 import type { TocItem } from '@/composables/useMarkdown'
 
@@ -35,7 +36,8 @@ const siteStore = useSiteStore()
 
 const article = ref<Article | null>(null)
 const loading = ref(false)
-const error = ref(false)
+// 区分「文章不存在/无权查看」（A030100，含私有文章对陌生人）与其他加载错误，前者走 404 面板
+const errorKind = ref<'notfound' | 'error' | null>(null)
 const tocItems = ref<TocItem[]>([])
 const navInfo = ref<ArticleNavInfo | null>(null)
 const relatedItems = ref<RelatedItem[]>([])
@@ -60,7 +62,9 @@ const showArticleNav = computed(() => {
 })
 
 useHead(() => ({
-  title: article.value ? article.value.title : '加载中...',
+  title: article.value
+    ? article.value.title
+    : errorKind.value === 'notfound' ? '页面不存在' : '加载中...',
   meta: article.value
     ? [
         { name: 'description', content: article.value.summary || '' },
@@ -131,8 +135,15 @@ async function loadRelated() {
 
 async function fetchArticle(id: string) {
   loading.value = true
-  error.value = false
+  errorKind.value = null
   relatedItems.value = []
+  // snowflake ID 必为数字；非数字路径（如 /post/abc）直接按不存在处理，省一次必失败的请求
+  if (!/^\d+$/.test(id)) {
+    loading.value = false
+    errorKind.value = 'notfound'
+    article.value = null
+    return
+  }
   try {
     const [articleData, navData] = await Promise.all([
       getArticleById(id),
@@ -144,8 +155,8 @@ async function fetchArticle(id: string) {
       setFavoriteStatus(id, article.value.isFavorited)
     }
     void loadRelated()
-  } catch {
-    error.value = true
+  } catch (e) {
+    errorKind.value = (e as { code?: string })?.code === 'A030100' ? 'notfound' : 'error'
     article.value = null
   } finally {
     loading.value = false
@@ -163,10 +174,13 @@ onMounted(() => {
   if (route.params.id) {
     fetchArticle(route.params.id as string)
   }
-  // 未登录提问回跳恢复：暂存的问题在登录后自动打开面板并发送
+  // 未登录提问/选区引用回跳恢复：暂存内容在登录后自动恢复（一次性语义）
   const pending = takePendingAsk(route.fullPath)
+  const pendingQuote = takePendingQuote(route.fullPath)
   if (pending && hasAuthSession()) {
     launcher.open({ question: pending, send: true })
+  } else if (pendingQuote && hasAuthSession()) {
+    launcher.open({ quote: pendingQuote })
   }
 })
 
@@ -213,7 +227,9 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div v-else-if="error" class="py-16 text-center">
+    <NotFoundPanel v-else-if="errorKind === 'notfound'" />
+
+    <div v-else-if="errorKind === 'error'" class="py-16 text-center">
       <p class="text-text-muted mb-4">文章加载失败</p>
       <button
         @click="router.push('/')"

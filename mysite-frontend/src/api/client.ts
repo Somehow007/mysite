@@ -31,7 +31,9 @@ apiClient.interceptors.response.use(
   (response: AxiosResponse<ApiResponse<unknown>>) => {
     const data = response.data
     if (data && data.code !== '0') {
-      const err = new Error(data.message || '请求失败')
+      // 附加业务错误码（如 A030100=文章不存在），供调用方区分错误类型；纯增量，不影响现有只读 message 的消费方
+      const err = new Error(data.message || '请求失败') as Error & { code?: string }
+      err.code = data.code
       return Promise.reject(err)
     }
     return response

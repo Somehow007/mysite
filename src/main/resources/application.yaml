@@ -85,6 +85,8 @@ site:
   author: ${SITE_AUTHOR:Admin}
   author-bio: ${SITE_AUTHOR_BIO:}
   author-tagline: ${SITE_AUTHOR_TAGLINE:}
+  about-content: ${SITE_ABOUT_CONTENT:}
+  tech-stack: ${SITE_TECH_STACK:}
   avatar: ${SITE_AVATAR:}
   url: ${SITE_URL:}
   github: ${SITE_GITHUB:}

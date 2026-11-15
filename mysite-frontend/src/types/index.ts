@@ -161,6 +161,10 @@ export interface SiteConfig {
   author: string
   authorBio?: string
   authorTagline?: string
+  /** About 页长文（markdown），渲染进 .prose */
+  aboutContent?: string
+  /** 技术栈一句话（如「Vue 3 · Spring Boot · MySQL」） */
+  techStack?: string
   avatar?: string
   url: string
   github?: string

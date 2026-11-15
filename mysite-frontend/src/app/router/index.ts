@@ -81,6 +81,12 @@ const router = createRouter({
           name: 'register',
           component: () => import('@/views/RegisterView.vue'),
         },
+        {
+          // 兜底 404：必须放在 children 末尾；静态路由优先级更高，不影响已有路径
+          path: ':pathMatch(.*)*',
+          name: 'not-found',
+          component: () => import('@/views/NotFoundView.vue'),
+        },
       ],
     },
     {

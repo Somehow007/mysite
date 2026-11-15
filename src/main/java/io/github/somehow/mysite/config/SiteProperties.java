@@ -26,6 +26,10 @@ public class SiteProperties {
     private String author = "Admin";
     private String authorBio = "";
     private String authorTagline = "";
+    /** About 页长文（markdown）；env 只能放单行，多行内容走 yaml {@code site.about-content} 覆盖 */
+    private String aboutContent = "";
+    /** 站点技术栈一句话（如「Vue 3 · Spring Boot · MySQL」），About 页作者卡展示 */
+    private String techStack = "";
     private String avatar = "";
     private String url = "";
     private String github = "";
