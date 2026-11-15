@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useChatMarkdown } from '@/composables/useChatMarkdown'
-import { toRef } from 'vue'
+import { ref, toRef, watch, onMounted, nextTick } from 'vue'
 
 const props = defineProps<{
   content: string
@@ -11,12 +11,56 @@ const contentRef = toRef(props, 'content')
 const streamingRef = toRef(props, 'streaming')
 
 const { renderedHtml } = useChatMarkdown(contentRef, streamingRef)
+
+// ── [n] 引用角标（T11）────────────────────────────────────────
+// useChatMarkdown 不做引用转换，这里在 v-html 落地后做 DOM 后处理：
+// 把正文文本节点里的 [n] 包成 <sup class="chat-cite">（accent 角标，chat.css）。
+// 跳过 pre/code/a/.katex/.chat-math/.chat-cite，避免误伤代码与已有角标。
+const bodyRef = ref<HTMLElement | null>(null)
+
+function decorateCitations() {
+  const root = bodyRef.value
+  if (!root) return
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      const el = node.parentElement
+      if (!el || el.closest('pre, code, a, .katex, .chat-math, .chat-cite')) {
+        return NodeFilter.FILTER_REJECT
+      }
+      return /\[\d{1,2}\]/.test(node.nodeValue ?? '')
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT
+    },
+  })
+  const targets: Text[] = []
+  while (walker.nextNode()) targets.push(walker.currentNode as Text)
+  for (const node of targets) {
+    const frag = document.createDocumentFragment()
+    for (const part of (node.nodeValue ?? '').split(/(\[\d{1,2}\])/)) {
+      const m = /^\[(\d{1,2})\]$/.exec(part)
+      if (m) {
+        const sup = document.createElement('sup')
+        sup.className = 'chat-cite'
+        sup.textContent = `[${m[1]}]`
+        frag.appendChild(sup)
+      } else if (part) {
+        frag.appendChild(document.createTextNode(part))
+      }
+    }
+    node.parentNode?.replaceChild(frag, node)
+  }
+}
+
+// renderedHtml 每次更新（流式 rAF 节流 / 完成后全量）都会重建 v-html，
+// 角标随之重涂；immediate 之外 onMounted 兜底首帧。
+watch(renderedHtml, () => nextTick(decorateCitations))
+onMounted(decorateCitations)
 </script>
 
 <template>
   <div class="chat-markdown-body">
     <!-- 渲染完成的 HTML -->
-    <div v-if="renderedHtml" class="markdown-body" v-html="renderedHtml" />
+    <div v-if="renderedHtml" ref="bodyRef" class="markdown-body" v-html="renderedHtml" />
 
     <!-- 流式中、暂无渲染内容时的加载动画（包含空字符串与仅空白字符场景） -->
     <div v-else-if="streaming" class="flex items-center gap-1.5 py-2">

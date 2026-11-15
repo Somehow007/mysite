@@ -24,4 +24,7 @@ public class SourceChunkDTO {
     private Long kbId;
     /** 所属知识库名称（Phase 6 新增，如 "技术博客"、"读书笔记"） */
     private String kbName;
+    /** 来源文章 ID（仅 ARTICLE 文档有值；前端出处卡跳转 /post/:id 用，T11 新增） */
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long articleId;
 }

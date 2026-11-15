@@ -110,20 +110,20 @@ defineExpose({ setInput, focus })
       </button>
     </div>
 
-    <!-- 输入行：999px 胶囊 -->
+    <!-- 输入行：999px 胶囊（paper 下方角墨线框，见 chat.css .chat-input-box） -->
     <div
-      class="flex items-end gap-2 px-3 py-1.5 rounded-full border border-border bg-bg-secondary transition-all duration-200"
+      class="chat-input-box flex items-end gap-2 px-3 py-1.5 rounded-full border border-border bg-bg-secondary transition-all duration-200"
       :class="overLimit ? '!border-danger' : 'focus-within:border-accent focus-within:shadow-[0_0_0_3px_rgba(79,70,229,0.14)]'"
     >
       <!-- 移动端字号 16px（text-base）：iOS 对 < 16px 的输入框聚焦时会自动缩放页面；
-           桌面端恢复 14px。enterkeyhint 让软键盘回车键显示"发送" -->
+           桌面端恢复 14px。enterkeyhint 让软键盘回车键显示"发送"；衬线正文（T11） -->
       <textarea
         ref="textareaRef"
         v-model="input"
         :maxlength="MAX_LENGTH + 50"
         rows="1"
         enterkeyhint="send"
-        class="flex-1 resize-none bg-transparent text-base sm:text-sm text-text-primary placeholder:text-text-muted/60 outline-none max-h-[120px] py-1.5"
+        class="flex-1 resize-none bg-transparent font-serif text-base sm:text-sm text-text-primary placeholder:text-text-muted/60 outline-none max-h-[120px] py-1.5"
         :class="overLimit ? 'text-danger' : ''"
         placeholder="输入你的问题..."
         :disabled="streaming"
@@ -131,11 +131,11 @@ defineExpose({ setInput, focus })
         @input="autoResize"
       />
       <button
-        class="shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200"
+        class="chat-input-send shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200"
         :class="streaming
           ? 'bg-danger text-white hover:opacity-90'
           : canSend
-            ? 'bg-accent text-white shadow-[0_4px_12px_-4px_rgba(79,70,229,0.45)] hover:scale-105 hover:shadow-[0_6px_16px_-4px_rgba(79,70,229,0.55)]'
+            ? 'bg-text-primary text-bg-primary hover:scale-105'
             : 'bg-bg-code text-text-muted cursor-not-allowed'"
         :disabled="!canSend && !streaming"
         :aria-label="streaming ? '停止生成' : '发送消息'"

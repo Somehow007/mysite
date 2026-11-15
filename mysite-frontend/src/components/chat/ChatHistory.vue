@@ -113,7 +113,7 @@ function handleKeydown(e: KeyboardEvent, convId: string) {
     <!-- New conversation button -->
     <div class="px-3 pt-3 pb-2 shrink-0">
       <button
-        class="w-full flex items-center gap-2 px-3 py-2 rounded-lg
+        class="chat-history-new w-full flex items-center gap-2 px-3 py-2 rounded-lg
                border border-dashed border-border text-text-secondary
                hover:border-accent hover:text-accent hover:bg-accent-subtle
                transition-colors text-sm font-medium"
@@ -151,7 +151,7 @@ function handleKeydown(e: KeyboardEvent, convId: string) {
           class="w-full text-left"
         >
           <button
-            class="w-full text-left px-3 py-2.5 rounded-lg mb-0.5
+            class="chat-history-item w-full text-left px-3 py-2.5 rounded-lg mb-0.5
                    transition-colors relative"
             :class="conv.id === currentId
               ? 'bg-accent-subtle text-accent'

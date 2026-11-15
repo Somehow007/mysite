@@ -1,0 +1,161 @@
+/* 聊天面板样式（UI 重构 T11）
+ * 对照 .trellis/tasks/11-15-ui-concepts/final/post.html?sheet=ask 与 final/paper.css。
+ * 新版式对所有主题生效（token 驱动）；纸本专属装饰（方角/墨线/硬阴影/衬线正文）
+ * 统一限 html[data-theme^="paper"] 作用域。
+ *
+ * 层级注意：paper 覆盖必须写在 @layer 外（unlayered 优先于 Tailwind utilities 层），
+ * 否则 rounded、border 等工具类会压过纸本规则（与 themes/*.css 同理）。 */
+
+@layer components {
+  /* ── AI 回答：衬线正文（代码/公式保持等宽）── */
+  .chat-markdown-body {
+    font-family: var(--font-serif);
+  }
+  .chat-markdown-body .markdown-body code {
+    font-family: var(--font-mono);
+  }
+
+  /* ── [n] 引用角标：accent 小号上标（ChatStreamWriter DOM 后处理生成）── */
+  .chat-cite {
+    color: var(--accent);
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 0.72em;
+    vertical-align: super;
+    padding: 0 1px;
+  }
+
+  /* ── 用户消息：bg-secondary 墨块（替代 accent 气泡）── */
+  .chat-bubble-user {
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+  }
+
+  /* ── AI 消息：无卡片底，裸排正文；失败态由模板挂 danger 框类 ── */
+  .chat-bubble-ai {
+    min-width: 0;
+  }
+
+  /* ── 出处卡：两行引用卡 [n] 标题 / kbName · NN% ── */
+  .chat-source-card {
+    display: block;
+    border: 1px solid var(--border);
+    background: var(--bg-primary);
+    padding: 10px 12px;
+    border-radius: var(--radius-md);
+    transition: border-color 150ms ease;
+  }
+  .chat-source-card--link {
+    cursor: pointer;
+  }
+  .chat-source-card--link:hover {
+    border-color: var(--accent);
+  }
+  .chat-source-title {
+    display: block;
+    font-family: var(--font-serif);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.45;
+    color: var(--text-primary);
+  }
+  .chat-source-num {
+    color: var(--accent);
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 12px;
+    margin-right: 6px;
+  }
+  .chat-source-meta {
+    display: block;
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+}
+
+/* ── 纸本作用域（unlayered，压过 Tailwind utilities）────────── */
+
+html[data-theme^="paper"] .chat-panel {
+  border-color: var(--border-strong);
+  border-radius: 0;
+  box-shadow: var(--shadow-hard);
+  background: var(--bg-elevated);
+}
+/* 移动端 sheet：概念稿为纸面底（bg-primary），输入框在其上凸出 */
+@media (max-width: 639px) {
+  html[data-theme^="paper"] .chat-panel {
+    background: var(--bg-primary);
+  }
+}
+
+html[data-theme^="paper"] .chat-fab {
+  border-radius: 0;
+  box-shadow: var(--shadow-hard);
+}
+
+html[data-theme^="paper"] .chat-avatar {
+  border-radius: 0;
+}
+
+html[data-theme^="paper"] .chat-bubble-user {
+  border-color: transparent;
+  border-radius: 0;
+}
+
+html[data-theme^="paper"] .chat-bubble-ai--failed {
+  border-radius: 0;
+}
+
+html[data-theme^="paper"] .chat-source-card {
+  border-radius: 0;
+}
+
+html[data-theme^="paper"] .chat-input-box {
+  border-color: var(--border-strong);
+  border-radius: 0;
+  background: var(--bg-primary);
+}
+html[data-theme^="paper"] .chat-input-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+html[data-theme^="paper"] .chat-input-send {
+  border-radius: 0;
+}
+
+html[data-theme^="paper"] .chat-kb-pill {
+  border-radius: 0;
+}
+
+/* 空态示例问题：虚线 chip（对齐概念稿 .chip） */
+html[data-theme^="paper"] .chat-empty-chip {
+  border-radius: 0;
+  background: transparent;
+  border: 1px dashed var(--border);
+  color: var(--text-secondary);
+}
+html[data-theme^="paper"] .chat-empty-chip:hover {
+  border-color: var(--accent);
+  border-style: solid;
+  color: var(--accent);
+}
+
+/* 匿名提示 / 限流 / 错误条：方角 */
+html[data-theme^="paper"] .chat-note {
+  border-radius: 0;
+}
+
+/* 历史抽屉：右侧墨线 + 列表项方角 */
+html[data-theme^="paper"] .chat-history-drawer {
+  border-right-color: var(--border-strong);
+}
+html[data-theme^="paper"] .chat-history-new,
+html[data-theme^="paper"] .chat-history-item {
+  border-radius: 0;
+}
+html[data-theme^="paper"] .chat-history-item .rounded-r-sm {
+  border-radius: 0;
+}

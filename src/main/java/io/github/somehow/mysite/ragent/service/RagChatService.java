@@ -11,6 +11,8 @@ import io.github.somehow.mysite.ragent.core.intent.IntentResult;
 import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter;
 import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter.RewriteResult;
 import io.github.somehow.mysite.ragent.dao.entity.ConversationDO;
+import io.github.somehow.mysite.ragent.dao.entity.KnowledgeDocumentDO;
+import io.github.somehow.mysite.ragent.dao.mapper.KnowledgeDocumentMapper;
 import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
 import io.github.somehow.mysite.ragent.llm.RoutingLLMService;
 import io.github.somehow.mysite.ragent.llm.model.ChatEvent;
@@ -24,7 +26,10 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -61,6 +66,7 @@ public class RagChatService {
     private final IntentClassifier intentClassifier;
     private final KnowledgeCatalogService catalogService;
     private final ArticleReadingContextService articleReadingContextService;
+    private final KnowledgeDocumentMapper knowledgeDocumentMapper;
 
     public RagChatService(RetrievalEngine retrievalEngine,
                           ConversationManager conversationManager,
@@ -71,7 +77,8 @@ public class RagChatService {
                           QueryRewriter queryRewriter,
                           IntentClassifier intentClassifier,
                           KnowledgeCatalogService catalogService,
-                          ArticleReadingContextService articleReadingContextService) {
+                          ArticleReadingContextService articleReadingContextService,
+                          KnowledgeDocumentMapper knowledgeDocumentMapper) {
         this.retrievalEngine = retrievalEngine;
         this.conversationManager = conversationManager;
         this.promptTemplate = promptTemplate;
@@ -82,6 +89,7 @@ public class RagChatService {
         this.intentClassifier = intentClassifier;
         this.catalogService = catalogService;
         this.articleReadingContextService = articleReadingContextService;
+        this.knowledgeDocumentMapper = knowledgeDocumentMapper;
     }
 
     /**
@@ -227,9 +235,11 @@ public class RagChatService {
             retrieved.size(), retrievalKbIds, topK, reading != null,
             System.currentTimeMillis() - t4);
 
+        Map<Long, Long> articleIds = resolveSourceArticleIds(retrieved);
         List<SourceChunkDTO> sources = retrieved.stream()
             .map(r -> new SourceChunkDTO(r.docTitle(), r.content(), r.score(),
-                r.kbId(), properties.getKbNameCache().getOrDefault(r.kbId(), "博客")))
+                r.kbId(), properties.getKbNameCache().getOrDefault(r.kbId(), "博客"),
+                articleIds.get(r.docId())))
             .toList();
 
         // ── Stage 5: 意图感知 Prompt（含阅读上下文）──
@@ -244,6 +254,40 @@ public class RagChatService {
         } catch (RuntimeException e) {
             UsageContext.close();
             throw e;
+        }
+    }
+
+    // ── 出处卡 articleId 解析（T11：前端出处卡跳 /post/:id）──
+
+    /**
+     * 检索结果 docId → 文章 ID。仅 ARTICLE 文档的 source_ref 是文章 ID；
+     * UPLOAD 文档与解析失败的条目不进 map（前端自然降级为不可点卡片）。
+     * 解析失败不阻塞问答：出处链接是装饰性能力，降级为空 map。
+     */
+    private Map<Long, Long> resolveSourceArticleIds(List<SearchResult> results) {
+        List<Long> docIds = results.stream()
+            .map(SearchResult::docId)
+            .filter(Objects::nonNull)
+            .distinct()
+            .toList();
+        if (docIds.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            Map<Long, Long> map = new HashMap<>();
+            for (KnowledgeDocumentDO doc : knowledgeDocumentMapper.selectBatchIds(docIds)) {
+                if (!"ARTICLE".equals(doc.getSourceType())) {
+                    continue;
+                }
+                Long articleId = KnowledgeCatalogService.parseLong(doc.getSourceRef());
+                if (articleId != null) {
+                    map.put(doc.getId(), articleId);
+                }
+            }
+            return map;
+        } catch (RuntimeException e) {
+            log.warn("[sources] resolve articleId failed, sources will be unlinkable: {}", e.getMessage());
+            return Map.of();
         }
     }
 

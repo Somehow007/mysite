@@ -18,21 +18,21 @@ const emit = defineEmits<{
     class="flex mb-4 gap-2.5"
     :class="message.role === 'user' ? 'justify-end' : 'justify-start'"
   >
-    <!-- AI 机器人头像 -->
+    <!-- AI 头像 -->
     <div
       v-if="message.role === 'assistant'"
-      class="w-[30px] h-[30px] rounded-[9px] bg-accent-subtle text-accent flex items-center justify-center shrink-0 mt-0.5"
+      class="chat-avatar w-[30px] h-[30px] rounded-[9px] bg-accent-subtle text-accent flex items-center justify-center shrink-0 mt-0.5"
     >
       <Bot :size="17" />
     </div>
 
-    <!-- AI 气泡 -->
+    <!-- AI 回答：无卡片底，衬线正文裸排（chat.css）；失败态保留 danger 提示框 -->
     <div
       v-if="message.role === 'assistant'"
-      class="max-w-[82%]"
+      class="max-w-[82%] chat-bubble-ai"
       :class="message.failed
-        ? 'bg-danger-subtle border border-danger/35 rounded-[4px_14px_14px_14px] px-3.5 py-2.5'
-        : 'bg-bg-elevated border border-border rounded-[4px_14px_14px_14px] px-3.5 py-2.5 shadow-[0_1px_2px_rgba(17,24,39,0.05)]'"
+        ? 'chat-bubble-ai--failed bg-danger-subtle border border-danger/35 rounded-[4px_14px_14px_14px] px-3.5 py-2.5'
+        : ''"
     >
       <!-- 失败态 -->
       <template v-if="message.failed">
@@ -70,10 +70,10 @@ const emit = defineEmits<{
       />
     </div>
 
-    <!-- 用户气泡 -->
+    <!-- 用户消息：bg-secondary 墨块（chat-bubble-user，chat.css 定色） -->
     <div
       v-if="message.role === 'user'"
-      class="max-w-[82%] bg-accent text-white rounded-[14px_14px_4px_14px] px-3.5 py-2.5 text-sm leading-relaxed shadow-[0_4px_12px_-4px_rgba(79,70,229,0.45)]"
+      class="max-w-[82%] chat-bubble-user rounded-[14px_14px_4px_14px] px-3.5 py-2.5 text-sm leading-relaxed"
     >
       {{ message.content }}
     </div>

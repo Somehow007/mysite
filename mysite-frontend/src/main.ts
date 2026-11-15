@@ -4,6 +4,7 @@ import '@/styles/transitions.css'
 import '@/styles/typography.css'
 import '@/styles/code.css'
 import '@/styles/post.css'
+import '@/styles/chat.css'
 import 'katex/dist/katex.min.css'
 
 import { createApp } from 'vue'

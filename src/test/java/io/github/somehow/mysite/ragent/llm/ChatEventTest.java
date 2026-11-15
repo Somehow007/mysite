@@ -42,8 +42,8 @@ class ChatEventTest {
         @DisplayName("sources → type=sources, sources=非空列表")
         void sourcesEventShouldHaveCorrectFields() {
             List<SourceChunkDTO> sources = List.of(
-                new SourceChunkDTO("文章A", "内容片段", 0.95f, null, null),
-                new SourceChunkDTO("文章B", "另一片段", 0.82f, null, null)
+                new SourceChunkDTO("文章A", "内容片段", 0.95f, null, null, null),
+                new SourceChunkDTO("文章B", "另一片段", 0.82f, null, null, null)
             );
 
             ChatEvent event = ChatEvent.sources(sources);

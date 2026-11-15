@@ -364,7 +364,7 @@ onScopeDispose(() => {
   <button
     v-if="!isOpen && !hideFab"
     :style="{ bottom: fabBottom }"
-    class="fixed right-6 z-40 w-14 h-14
+    class="chat-fab fixed right-6 z-40 w-14 h-14
            rounded-full bg-accent text-white
            shadow-lg hover:shadow-xl hover:-translate-y-0.5
            flex items-center justify-center
@@ -433,7 +433,7 @@ onScopeDispose(() => {
 
           <!-- 标题区 -->
           <div class="flex-1 min-w-0">
-            <h1 class="text-[15px] font-semibold text-text-primary leading-tight">AI 助手</h1>
+            <h1 class="font-serif text-[15px] font-semibold text-text-primary leading-tight">AI 助手</h1>
             <p class="text-[11.5px] text-text-muted mt-0.5 flex items-center gap-1.5">
               <span
                 class="w-1.5 h-1.5 rounded-full shrink-0"
@@ -475,7 +475,7 @@ onScopeDispose(() => {
             v-for="kb in kbs"
             :key="kb.id"
             @click="toggleKb(kb.id)"
-            class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200"
+            class="chat-kb-pill shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-all duration-200"
             :class="chat.selectedKbIds.value.includes(kb.id)
               ? 'bg-accent text-text-inverse shadow-sm'
               : 'bg-bg-code text-text-muted hover:bg-accent-subtle hover:text-accent'"
@@ -499,7 +499,7 @@ onScopeDispose(() => {
             <!-- Anonymous user tip -->
             <div
               v-if="!userStore.isLoggedIn"
-              class="mb-4 px-3 py-2 rounded-lg bg-info-subtle border border-info/20 text-xs text-info flex items-center gap-2"
+              class="chat-note mb-4 px-3 py-2 rounded-lg bg-info-subtle border border-info/20 text-xs text-info flex items-center gap-2"
             >
               <AlertTriangle :size="14" class="shrink-0" />
               <span class="flex-1">登录后可保存对话历史，享受更多额度</span>
@@ -511,7 +511,7 @@ onScopeDispose(() => {
             <!-- Rate limit banner -->
             <div
               v-if="rateLimitSeconds > 0"
-              class="mb-4 px-3 py-2 rounded-lg bg-warning-subtle border border-warning/20 text-xs text-warning flex items-center gap-2"
+              class="chat-note mb-4 px-3 py-2 rounded-lg bg-warning-subtle border border-warning/20 text-xs text-warning flex items-center gap-2"
             >
               <Clock :size="14" class="shrink-0" />
               <span>提问过于频繁，请 {{ rateLimitSeconds }} 秒后重试</span>
@@ -536,7 +536,7 @@ onScopeDispose(() => {
                 <button
                   v-for="q in SUGGESTED_QUESTIONS"
                   :key="q"
-                  class="bg-accent-subtle text-accent rounded-full px-3 py-1.5
+                  class="chat-empty-chip bg-accent-subtle text-accent rounded-full px-3 py-1.5
                          text-xs hover:opacity-80 transition-opacity"
                   @click="handleSend(q)"
                 >
@@ -569,7 +569,7 @@ onScopeDispose(() => {
               class="flex items-center justify-center my-2"
             >
               <div
-                class="flex items-center gap-2 text-xs px-3 py-2 rounded-lg w-full"
+                class="chat-note flex items-center gap-2 text-xs px-3 py-2 rounded-lg w-full"
                 :class="chat.lastError.value.kind === 'network'
                   ? 'bg-warning-subtle text-warning'
                   : 'bg-danger-subtle text-danger'"
@@ -613,7 +613,7 @@ onScopeDispose(() => {
         <Transition name="slide-left">
           <div
             v-if="showHistory"
-            class="absolute inset-y-0 left-0 z-30 w-[min(236px,80vw)] bg-bg-elevated border-r border-border flex flex-col shadow-lg"
+            class="chat-history-drawer absolute inset-y-0 left-0 z-30 w-[min(236px,80vw)] bg-bg-elevated border-r border-border flex flex-col shadow-lg"
           >
             <div class="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
               <span class="text-xs font-semibold text-text-secondary">历史对话 · {{ chat.conversations.value.length }} 条</span>

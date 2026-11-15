@@ -259,7 +259,8 @@ class Phase3IntegrationTest {
             rateLimiter, ragProps,
             queryRewriter, intentClassifier,
             mock(io.github.somehow.mysite.ragent.service.KnowledgeCatalogService.class),
-            readingContextService);
+            readingContextService,
+            mock(io.github.somehow.mysite.ragent.dao.mapper.KnowledgeDocumentMapper.class));
     }
 
     @AfterEach

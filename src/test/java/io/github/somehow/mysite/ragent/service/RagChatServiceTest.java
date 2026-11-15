@@ -9,6 +9,8 @@ import io.github.somehow.mysite.ragent.core.intent.IntentResult;
 import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter;
 import io.github.somehow.mysite.ragent.core.rewrite.QueryRewriter.RewriteResult;
 import io.github.somehow.mysite.ragent.dao.entity.ConversationDO;
+import io.github.somehow.mysite.ragent.dao.entity.KnowledgeDocumentDO;
+import io.github.somehow.mysite.ragent.dao.mapper.KnowledgeDocumentMapper;
 import io.github.somehow.mysite.ragent.dto.SourceChunkDTO;
 import io.github.somehow.mysite.ragent.llm.RoutingLLMService;
 import io.github.somehow.mysite.ragent.llm.model.ChatEvent;
@@ -42,6 +44,7 @@ class RagChatServiceTest {
     private IntentClassifier intentClassifier;
     private KnowledgeCatalogService catalogService;
     private ArticleReadingContextService articleReadingContextService;
+    private KnowledgeDocumentMapper knowledgeDocumentMapper;
     private RagChatService service;
 
     @BeforeEach
@@ -54,6 +57,7 @@ class RagChatServiceTest {
         intentClassifier = mock(IntentClassifier.class);
         catalogService = mock(KnowledgeCatalogService.class);
         articleReadingContextService = mock(ArticleReadingContextService.class);
+        knowledgeDocumentMapper = mock(KnowledgeDocumentMapper.class);
         when(articleReadingContextService.load(any())).thenReturn(null);
 
         properties = new RagProperties();
@@ -76,7 +80,8 @@ class RagChatServiceTest {
 
         service = new RagChatService(retrievalEngine, conversationManager,
             promptTemplate, routingLLMService, rateLimiter, properties,
-            queryRewriter, intentClassifier, catalogService, articleReadingContextService);
+            queryRewriter, intentClassifier, catalogService, articleReadingContextService,
+            knowledgeDocumentMapper);
     }
 
     @Nested
@@ -161,6 +166,46 @@ class RagChatServiceTest {
                     && "文章A".equals(e.sources().get(0).getTitle())
                     && 0.9f == e.sources().get(0).getScore())
                 .expectNextCount(2)  // content + done
+                .verifyComplete();
+        }
+
+        @Test
+        @DisplayName("ARTICLE 文档的 source_ref 应解析为 sources.articleId（T11 出处卡跳转）")
+        void sourcesShouldCarryArticleIdForArticleDocs() {
+            ConversationDO conv = new ConversationDO();
+            conv.setId(1L);
+
+            List<SearchResult> results = List.of(
+                new SearchResult(1L, 100L, "文章A", "内容片段", 0.9f, 1L),
+                new SearchResult(2L, 200L, "上传文档", "另一片段", 0.8f, 1L)
+            );
+
+            KnowledgeDocumentDO articleDoc = new KnowledgeDocumentDO();
+            articleDoc.setId(100L);
+            articleDoc.setSourceType("ARTICLE");
+            articleDoc.setSourceRef("555");
+            KnowledgeDocumentDO uploadDoc = new KnowledgeDocumentDO();
+            uploadDoc.setId(200L);
+            uploadDoc.setSourceType("UPLOAD");
+            uploadDoc.setSourceRef("file.pdf");
+
+            when(conversationManager.getOrCreateConversation(any(), any(), any())).thenReturn(conv);
+            when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
+            when(retrievalEngine.retrieve(anyString(), anyInt(), any())).thenReturn(results);
+            when(knowledgeDocumentMapper.selectBatchIds(anyCollection()))
+                .thenReturn(List.of(articleDoc, uploadDoc));
+            when(routingLLMService.chatStream(any())).thenReturn(Flux.just("答案"));
+
+            Flux<ChatEvent> events = service.chat("q", 1L, "v", "127.0.0.1", UserRole.USER, List.of(1L));
+
+            StepVerifier.create(events)
+                .expectNextMatches(e -> "meta".equals(e.type()))
+                .expectNextMatches(e -> "sources".equals(e.type())
+                    && e.sources() != null
+                    && e.sources().size() == 2
+                    && Long.valueOf(555L).equals(e.sources().get(0).getArticleId())
+                    && e.sources().get(1).getArticleId() == null)
+                .expectNextCount(2)
                 .verifyComplete();
         }
     }
