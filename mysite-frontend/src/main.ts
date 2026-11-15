@@ -7,7 +7,8 @@ import 'katex/dist/katex.min.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import { createUnhead, VueHeadMixin, headSymbol } from '@unhead/vue'
+import { createHead } from '@unhead/vue/client'
+import { VueHeadMixin, headSymbol } from '@unhead/vue'
 import { gsap } from 'gsap'
 import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import App from './app/App.vue'
@@ -24,7 +25,9 @@ gsap.defaults({
 })
 
 const app = createApp(App)
-const unhead = createUnhead()
+// 必须用 client 版 createHead：createUnhead 只是核心管理器，不带 DOM 渲染插件，
+// 否则 useHead 解析正常但 title/meta 永远不会写进 document（dirty 常驻 true）
+const unhead = createHead()
 
 app.use(createPinia())
 app.use(router)

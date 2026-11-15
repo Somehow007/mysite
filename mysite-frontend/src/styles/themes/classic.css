@@ -22,8 +22,10 @@
   --accent-subtle: #EEF2FF;
   --border: #E5E7EB;
   --border-subtle: #F3F4F6;
+  --border-strong: #E5E7EB;
   --shadow-color: rgba(0, 0, 0, 0.04);
   --shadow-color-md: rgba(0, 0, 0, 0.08);
+  --shadow-hard: 0 1px 3px var(--shadow-color), 0 1px 2px var(--shadow-color);
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(255, 255, 255, 0.40);
   --glass-blur: 20px;
@@ -73,8 +75,10 @@
   --accent-subtle: rgba(99, 102, 241, 0.12);
   --border: #2D3548;
   --border-subtle: #1E2438;
+  --border-strong: #2D3548;
   --shadow-color: rgba(0, 0, 0, 0.2);
   --shadow-color-md: rgba(0, 0, 0, 0.35);
+  --shadow-hard: 0 1px 3px var(--shadow-color), 0 1px 2px var(--shadow-color);
   --glass-bg: rgba(21, 26, 45, 0.72);
   --glass-border: rgba(255, 255, 255, 0.10);
   --glass-blur: 25px;

@@ -10,6 +10,8 @@ export type ThemeId =
   | 'warm-sunset'
   | 'liquid-glass'
   | 'liquid-glass-dark'
+  | 'paper-light'
+  | 'paper-dark'
 
 export interface ThemeMeta {
   id: ThemeId
@@ -90,6 +92,24 @@ export const THEME_REGISTRY: ThemeMeta[] = [
     hasDarkVariant: true,
     lightVariant: 'liquid-glass',
     preview: { bg: '#000000', accent: '#0A84FF' },
+  },
+  {
+    id: 'paper-light',
+    name: '纸本·昼',
+    group: 'paper',
+    icon: 'book-open',
+    hasDarkVariant: true,
+    darkVariant: 'paper-dark',
+    preview: { bg: '#F6F1E7', accent: '#B4441F' },
+  },
+  {
+    id: 'paper-dark',
+    name: '纸本·夜',
+    group: 'paper',
+    icon: 'book-open',
+    hasDarkVariant: true,
+    lightVariant: 'paper-light',
+    preview: { bg: '#16130F', accent: '#E0794F' },
   },
 ]
 

@@ -10,7 +10,7 @@ import type { Tag } from '@/types'
 import type { Column } from '@/components/ui/DataTable.vue'
 
 useHead(() => ({
-  title: '标签管理 - MySite',
+  title: '标签管理',
 }))
 
 const tags = ref<Tag[]>([])

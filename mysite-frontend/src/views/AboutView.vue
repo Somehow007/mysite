@@ -3,7 +3,7 @@ import { useHead } from '@unhead/vue'
 import { useSiteStore } from '@/stores/site'
 
 useHead(() => ({
-  title: '关于 - MySite',
+  title: '关于',
   meta: [
     { name: 'description', content: '关于本站' },
   ],

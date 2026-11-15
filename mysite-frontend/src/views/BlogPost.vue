@@ -35,7 +35,7 @@ const readingTime = computed(() =>
 )
 
 useHead(() => ({
-  title: article.value ? `${article.value.title} - MySite` : '加载中...',
+  title: article.value ? article.value.title : '加载中...',
   meta: article.value
     ? [
         { name: 'description', content: article.value.summary || '' },

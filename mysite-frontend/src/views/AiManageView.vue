@@ -17,7 +17,7 @@ import {
 import AiProviderCard from '@/components/dashboard/AiProviderCard.vue'
 import type { Column } from '@/components/ui/DataTable.vue'
 
-useHead(() => ({ title: 'AI 管理 - MySite' }))
+useHead(() => ({ title: 'AI 管理' }))
 
 type Tab = 'logs' | 'dashboard' | 'providers'
 const tab = ref<Tab>('logs')

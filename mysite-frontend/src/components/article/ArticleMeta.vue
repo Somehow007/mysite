@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Calendar, Eye, Clock, Tag, Heart, Lock, User } from 'lucide-vue-next'
 import { formatDate, calculateReadingTime } from '@/utils/date'
+import { formatViewCount } from '@/utils/format'
 import type { ArticleListItem } from '@/types'
 
 const props = defineProps<{
@@ -25,7 +26,7 @@ const readingTime = computed(() =>
     </span>
     <span v-if="article.viewCount > 0" class="inline-flex items-center gap-1">
       <Eye :size="12" />
-      <span>{{ article.viewCount }}</span>
+      <span>{{ formatViewCount(article.viewCount) }}</span>
     </span>
     <span v-if="showFavorite && article.favoriteCount > 0" class="inline-flex items-center gap-1" :class="article.isFavorited ? 'text-danger' : ''">
       <Heart :size="12" :fill="article.isFavorited ? 'currentColor' : 'none'" :stroke-width="article.isFavorited ? 0 : 2" />

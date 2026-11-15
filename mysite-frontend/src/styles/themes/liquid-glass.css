@@ -22,8 +22,10 @@
   --accent-subtle: rgba(0, 122, 255, 0.10);
   --border: rgba(0, 0, 0, 0.08);
   --border-subtle: rgba(0, 0, 0, 0.04);
+  --border-strong: rgba(0, 0, 0, 0.08);
   --shadow-color: rgba(0, 0, 0, 0.04);
   --shadow-color-md: rgba(0, 0, 0, 0.08);
+  --shadow-hard: 0 1px 3px var(--shadow-color), 0 1px 2px var(--shadow-color);
   --glass-bg: rgba(255, 255, 255, 0.65);
   --glass-border: rgba(255, 255, 255, 0.35);
   --glass-blur: 20px;
@@ -73,8 +75,10 @@
   --accent-subtle: rgba(10, 132, 255, 0.15);
   --border: rgba(255, 255, 255, 0.10);
   --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-strong: rgba(255, 255, 255, 0.10);
   --shadow-color: rgba(0, 0, 0, 0.3);
   --shadow-color-md: rgba(0, 0, 0, 0.5);
+  --shadow-hard: 0 1px 3px var(--shadow-color), 0 1px 2px var(--shadow-color);
   --glass-bg: rgba(30, 30, 30, 0.60);
   --glass-border: rgba(255, 255, 255, 0.12);
   --glass-blur: 25px;

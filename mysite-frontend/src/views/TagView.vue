@@ -14,7 +14,7 @@ const loading = ref(false)
 const tagSlug = ref('')
 
 useHead(() => ({
-  title: tagSlug.value ? `${tagSlug.value} - MySite` : '标签 - MySite',
+  title: tagSlug.value || '标签',
 }))
 
 async function fetchArticles(slug: string, page = 1) {

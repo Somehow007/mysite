@@ -5,6 +5,8 @@ import { useHead } from '@unhead/vue'
 import { ArrowLeft, BookOpen, Calendar, Eye, Clock, Lock } from 'lucide-vue-next'
 import { getCollectionById } from '@/api/collection'
 import { formatDate, calculateReadingTime } from '@/utils/date'
+import { formatViewCount } from '@/utils/format'
+import { Pagination } from '@/components/ui'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
 import SkeletonCard from '@/components/common/SkeletonCard.vue'
 import type { CollectionDetail } from '@/types'
@@ -18,7 +20,7 @@ const currentPage = ref(1)
 const pageSize = 10
 
 useHead(() => ({
-  title: collection.value ? `${collection.value.title} - MySite` : '合集 - MySite',
+  title: collection.value ? collection.value.title : '合集',
   meta: collection.value
     ? [
         { name: 'description', content: collection.value.description || '' },
@@ -151,7 +153,7 @@ onMounted(() => {
                 <div class="flex items-center gap-3 text-xs text-text-muted">
                   <span class="inline-flex items-center gap-1">
                     <Eye :size="12" />
-                    {{ article.viewCount }}
+                    {{ formatViewCount(article.viewCount) }}
                   </span>
                   <span class="inline-flex items-center gap-1">
                     <Clock :size="12" />
@@ -170,25 +172,13 @@ onMounted(() => {
         <p class="text-text-muted">该合集暂无文章</p>
       </div>
 
-      <div v-if="collection.articleCount > pageSize" class="flex items-center justify-center gap-2 mt-8">
-        <button
-          :disabled="currentPage <= 1"
-          @click="handlePageChange(currentPage - 1)"
-          class="px-3 py-1.5 rounded-lg text-sm border border-border text-text-muted hover:bg-accent-subtle hover:text-accent hover:border-accent/30 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          上一页
-        </button>
-        <span class="text-sm text-text-muted">
-          {{ currentPage }} / {{ Math.ceil(collection.articleCount / pageSize) }}
-        </span>
-        <button
-          :disabled="currentPage >= Math.ceil(collection.articleCount / pageSize)"
-          @click="handlePageChange(currentPage + 1)"
-          class="px-3 py-1.5 rounded-lg text-sm border border-border text-text-muted hover:bg-accent-subtle hover:text-accent hover:border-accent/30 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          下一页
-        </button>
-      </div>
+      <Pagination
+        :current="currentPage"
+        :total="collection.articleCount"
+        :page-size="pageSize"
+        class="mt-8"
+        @update:current="handlePageChange"
+      />
     </template>
   </div>
 </template>

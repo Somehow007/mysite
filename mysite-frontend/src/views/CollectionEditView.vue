@@ -16,7 +16,7 @@ const toast = useToast()
 const isEdit = computed(() => !!route.params.id && route.params.id !== 'new')
 const pageTitle = computed(() => isEdit.value ? '编辑合集' : '新建合集')
 
-useHead(() => ({ title: `${pageTitle.value} - MySite` }))
+useHead(() => ({ title: pageTitle.value }))
 
 const title = ref('')
 const description = ref('')

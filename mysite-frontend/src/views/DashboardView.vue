@@ -18,7 +18,7 @@ import type { ArticleListItem, Pagination as PaginationType, Category, Collectio
 import type { Column } from '@/components/ui/DataTable.vue'
 
 useHead(() => ({
-  title: '文章管理 - MySite',
+  title: '文章管理',
 }))
 
 const router = useRouter()

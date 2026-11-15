@@ -24,7 +24,7 @@ const isEdit = computed(() => !!route.params.id)
 const pageTitle = computed(() => isEdit.value ? '编辑文章' : '写文章')
 
 useHead(() => ({
-  title: `${pageTitle.value} - MySite`,
+  title: pageTitle.value,
 }))
 
 const editorRef = ref<InstanceType<typeof MarkdownWysiwygEditor> | null>(null)

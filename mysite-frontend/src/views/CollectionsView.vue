@@ -5,6 +5,8 @@ import { useRouter } from 'vue-router'
 import { BookOpen, Library, Eye, Loader2, Search, ArrowLeft } from 'lucide-vue-next'
 import { getCollections } from '@/api/collection'
 import { formatDate } from '@/utils/date'
+import { formatViewCount } from '@/utils/format'
+import { Pagination as PaginationBar } from '@/components/ui'
 import { useScrollReveal } from '@/composables/useScrollReveal'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
 import SkeletonCard from '@/components/common/SkeletonCard.vue'
@@ -12,7 +14,7 @@ import type { Collection, Pagination } from '@/types'
 
 const router = useRouter()
 
-useHead(() => ({ title: '合集 - MySite' }))
+useHead(() => ({ title: '合集' }))
 
 const collections = ref<Collection[]>([])
 const pagination = ref<Pagination | null>(null)
@@ -45,13 +47,6 @@ function handleSearch() {
 function handlePageChange(page: number) {
   fetchCollections(page)
   window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function formatViewCount(count?: number): string {
-  if (!count || count <= 0) return '0'
-  if (count >= 10000) return (count / 10000).toFixed(1) + '万'
-  if (count >= 1000) return (count / 1000).toFixed(1) + 'k'
-  return String(count)
 }
 
 // Enable scroll-reveal animations
@@ -157,22 +152,13 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="pagination && pagination.totalPages > 1" class="flex items-center justify-center gap-2 mt-8">
-      <button
-        :disabled="currentPage <= 1"
-        @click="handlePageChange(currentPage - 1)"
-        class="px-3 py-1.5 rounded-lg text-sm border border-border text-text-muted hover:bg-accent-subtle hover:text-accent hover:border-accent/30 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        上一页
-      </button>
-      <span class="text-sm text-text-muted">{{ currentPage }} / {{ pagination.totalPages }}</span>
-      <button
-        :disabled="currentPage >= pagination.totalPages"
-        @click="handlePageChange(currentPage + 1)"
-        class="px-3 py-1.5 rounded-lg text-sm border border-border text-text-muted hover:bg-accent-subtle hover:text-accent hover:border-accent/30 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-      >
-        下一页
-      </button>
-    </div>
+    <PaginationBar
+      v-if="pagination"
+      :current="currentPage"
+      :total="pagination.total"
+      :page-size="pagination.size || 10"
+      class="mt-8"
+      @update:current="handlePageChange"
+    />
   </div>
 </template>

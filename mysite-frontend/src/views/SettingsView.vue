@@ -10,7 +10,7 @@ import type { ChangePasswordRequest } from '@/types'
 import { uploadAvatar } from '@/api/user'
 
 useHead(() => ({
-  title: '个人设置 - MySite',
+  title: '个人设置',
 }))
 
 const userStore = useUserStore()

@@ -1,0 +1,148 @@
+/* 纸本主题（paper-light / paper-dark）
+ * 取值以 .trellis/tasks/11-15-ui-concepts/final/paper.css 为准。
+ * 变量结构对齐 classic.css；代码块为暖棕深色底，日/夜主题共用（post.html .code）。 */
+
+[data-theme="paper-light"] {
+  --success: #10B981;
+  --success-subtle: rgb(16 185 129 / 0.12);
+  --warning: #F59E0B;
+  --warning-subtle: rgb(245 158 11 / 0.12);
+  --danger: #EF4444;
+  --danger-subtle: rgb(239 68 68 / 0.12);
+  --info: #3B82F6;
+  --info-subtle: rgb(59 130 246 / 0.12);
+
+  --bg-primary: #F6F1E7;
+  --bg-secondary: #EFE7D8;
+  --bg-elevated: #FBF8F2;
+  --bg-code: #EBE3D3;
+  --bg-accent: #F0D9CC;
+  --text-primary: #1D1A16;
+  --text-secondary: #4F483E;
+  --text-muted: #7D7466;
+  --text-inverse: #FFFFFF;
+  --accent: #B4441F;
+  --accent-hover: #963414;
+  --accent-subtle: #F0D9CC;
+  --border: #D9CFBD;
+  --border-subtle: #E7DECD;
+  --border-strong: #1D1A16;
+  --shadow-color: rgba(0, 0, 0, 0.05);
+  --shadow-color-md: rgba(0, 0, 0, 0.10);
+  --shadow-hard: 6px 6px 0 var(--border-strong);
+  --glass-bg: rgba(251, 248, 242, 0.88);
+  --glass-border: rgba(29, 26, 22, 0.12);
+  --glass-blur: 12px;
+  --glass-saturate: 1.3;
+  --glass-shadow: 4px 4px 0 var(--border-strong);
+  --grain: radial-gradient(rgba(0, 0, 0, 0.028) 1px, transparent 1px);
+
+  --code-bg: #1C1915;
+  --code-header-bg: #1C1915;
+  --code-border: #3A332A;
+  --code-line-highlight: rgba(233, 196, 106, 0.07);
+  --code-line-number: #6E6555;
+  --code-token-keyword: #E0794F;
+  --code-token-string: #B5C98A;
+  --code-token-function: #E9C46A;
+  --code-token-number: #F0A35E;
+  --code-token-comment: #7D7466;
+  --code-token-operator: #F0A35E;
+  --code-token-variable: #D97B66;
+  --code-token-type: #B48EAD;
+  --code-token-property: #8FB8A8;
+  --code-token-tag: #7FA3C4;
+  --code-token-attr: #A9C183;
+  --code-token-punctuation: #A89A86;
+  --code-token-plain: #E9DFCF;
+}
+
+[data-theme="paper-dark"] {
+  --success: #34D399;
+  --success-subtle: rgb(52 211 153 / 0.18);
+  --warning: #FBBF24;
+  --warning-subtle: rgb(251 191 36 / 0.18);
+  --danger: #F87171;
+  --danger-subtle: rgb(248 113 113 / 0.18);
+  --info: #60A5FA;
+  --info-subtle: rgb(96 165 250 / 0.18);
+
+  --bg-primary: #16130F;
+  --bg-secondary: #1F1B16;
+  --bg-elevated: #221E18;
+  --bg-code: #100E0B;
+  --bg-accent: #3A2419;
+  --text-primary: #ECE4D6;
+  --text-secondary: #C2B8A7;
+  --text-muted: #8D8475;
+  --text-inverse: #16130F;
+  --accent: #E0794F;
+  --accent-hover: #F08D63;
+  --accent-subtle: #3A2419;
+  --border: #3A332A;
+  --border-subtle: #2E2820;
+  --border-strong: #ECE4D6;
+  --shadow-color: rgba(0, 0, 0, 0.2);
+  --shadow-color-md: rgba(0, 0, 0, 0.35);
+  --shadow-hard: 6px 6px 0 #000;
+  --glass-bg: rgba(34, 30, 24, 0.88);
+  --glass-border: rgba(236, 228, 214, 0.10);
+  --glass-blur: 12px;
+  --glass-saturate: 1.2;
+  --glass-shadow: 4px 4px 0 #000;
+  --grain: radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+
+  --code-bg: #1C1915;
+  --code-header-bg: #1C1915;
+  --code-border: #3A332A;
+  --code-line-highlight: rgba(233, 196, 106, 0.07);
+  --code-line-number: #6E6555;
+  --code-token-keyword: #E0794F;
+  --code-token-string: #B5C98A;
+  --code-token-function: #E9C46A;
+  --code-token-number: #F0A35E;
+  --code-token-comment: #7D7466;
+  --code-token-operator: #F0A35E;
+  --code-token-variable: #D97B66;
+  --code-token-type: #B48EAD;
+  --code-token-property: #8FB8A8;
+  --code-token-tag: #7FA3C4;
+  --code-token-attr: #A9C183;
+  --code-token-punctuation: #A89A86;
+  --code-token-plain: #E9DFCF;
+}
+
+/* ── 纸本作用域样式：仅在 paper 主题生效，其他主题不受影响 ── */
+
+[data-theme^="paper"] body {
+  background-image: var(--grain);
+  background-size: 3px 3px;
+}
+
+/* 方角纸卡：配合 Tailwind 的 rounded-* 使用，paper 下覆盖为直角 */
+[data-theme^="paper"] .paper-card {
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 0;
+}
+
+[data-theme^="paper"] .paper-card--strong {
+  border-color: var(--border-strong);
+}
+
+[data-theme^="paper"] .paper-hard-shadow {
+  box-shadow: var(--shadow-hard);
+}
+
+/* 代码块是深色底：paper-light 的 --text-muted 是为纸面设计的，在深色块上对比度不足，
+   头部标签/复制按钮改用概念稿的暖灰；hover 同理换成代码高亮色，避免浅色 accent-subtle 底 */
+[data-theme="paper-light"] .code-block-header,
+[data-theme="paper-light"] .code-block-copy {
+  color: #8D8475;
+}
+
+[data-theme^="paper"] .code-block-copy:hover {
+  color: var(--code-token-function);
+  background-color: rgba(233, 196, 106, 0.12);
+  border-color: var(--code-border);
+}

@@ -7,10 +7,12 @@ import {
   LayoutDashboard, Home, NotebookPen,
 } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
+import { useSiteStore } from '@/stores/site'
 import { usePermission } from '@/composables/usePermission'
 
 const route = useRoute()
 const userStore = useUserStore()
+const siteStore = useSiteStore()
 const { isAdmin, isCreator } = usePermission()
 
 const isCollapsed = ref(false)
@@ -78,6 +80,9 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-56')
 const profileUrl = computed(() =>
   userStore.user?.username ? `/user/${userStore.user.username}` : '/dashboard/settings'
 )
+const siteAdminLabel = computed(() =>
+  siteStore.site.title ? `${siteStore.site.title} Admin` : 'Admin'
+)
 </script>
 
 <template>
@@ -104,7 +109,7 @@ const profileUrl = computed(() =>
         </div>
         <div v-if="!isCollapsed">
           <p class="text-[15px] font-semibold tracking-wide leading-tight">控制台</p>
-          <p class="text-[11px] text-text-muted leading-tight">MySite Admin</p>
+          <p class="text-[11px] text-text-muted leading-tight">{{ siteAdminLabel }}</p>
         </div>
       </RouterLink>
     </div>

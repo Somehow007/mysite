@@ -76,6 +76,21 @@ jwt:
 cors:
   allowed-origins: http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:3000
 
+# 站点信息：/v1/site/config 原样下发给前端。真实值走环境变量（本地 .env / 生产 /opt/mysite/.env），
+# 不配时用 ${VAR:默认} 兜底；navigation 默认值在 SiteProperties 类里，部署侧可用 site.navigation 整体覆盖
+site:
+  title: ${SITE_TITLE:MySite}
+  subtitle: ${SITE_SUBTITLE:}
+  description: ${SITE_DESCRIPTION:一个极简的个人博客}
+  author: ${SITE_AUTHOR:Admin}
+  author-bio: ${SITE_AUTHOR_BIO:}
+  author-tagline: ${SITE_AUTHOR_TAGLINE:}
+  avatar: ${SITE_AVATAR:}
+  url: ${SITE_URL:}
+  github: ${SITE_GITHUB:}
+  rss: ${SITE_RSS:}
+  comment-enabled: ${SITE_COMMENT_ENABLED:true}
+
 elasticsearch:
   enabled: false
   uris:

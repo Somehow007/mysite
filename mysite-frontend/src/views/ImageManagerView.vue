@@ -7,7 +7,7 @@ import { useHead } from '@unhead/vue'
 import { Image as ImageIcon, Trash2, Loader2, ExternalLink, Upload, X, ZoomIn, CheckSquare, Square } from 'lucide-vue-next'
 import { PageHeader, SearchFilterBar, Pagination } from '@/components/ui'
 
-useHead({ title: '图片管理 - MySite' })
+useHead({ title: '图片管理' })
 
 const toast = useToast()
 const { confirm } = useConfirm()

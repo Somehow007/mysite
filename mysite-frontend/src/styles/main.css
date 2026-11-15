@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+@import "./fonts.css";
 @import "./themes/tokens.css";
 @import "./themes/classic.css";
 @import "./themes/aurora.css";
@@ -7,6 +8,7 @@
 @import "./themes/ocean-breeze.css";
 @import "./themes/warm-sunset.css";
 @import "./themes/liquid-glass.css";
+@import "./themes/paper.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -29,9 +31,11 @@
   --color-accent-subtle: var(--accent-subtle);
   --color-border: var(--border);
   --color-border-subtle: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
 
   --shadow-color: var(--shadow-color);
   --shadow-color-md: var(--shadow-color-md);
+  --shadow-hard: var(--shadow-hard);
 
   --color-glass-bg: var(--glass-bg);
   --color-glass-border: var(--glass-border);

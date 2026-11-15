@@ -22,8 +22,10 @@
   --accent-subtle: rgba(192, 106, 48, 0.11);
   --border: #F0D8C8;
   --border-subtle: #F8E8D8;
+  --border-strong: #F0D8C8;
   --shadow-color: rgba(232, 138, 90, 0.06);
   --shadow-color-md: rgba(232, 138, 90, 0.12);
+  --shadow-hard: 0 1px 3px var(--shadow-color), 0 1px 2px var(--shadow-color);
   --glass-bg: rgba(255, 255, 255, 0.70);
   --glass-border: rgba(192, 106, 48, 0.15);
   --glass-blur: 20px;

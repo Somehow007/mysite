@@ -20,7 +20,7 @@ const keyword = ref('')
 const collections = ref<Collection[]>([])
 
 useHead(() => ({
-  title: keyword.value ? `搜索: ${keyword.value} - MySite` : '搜索 - MySite',
+  title: keyword.value ? `搜索: ${keyword.value}` : '搜索',
 }))
 
 async function doSearch(q: string, page = 1) {

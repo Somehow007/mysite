@@ -16,6 +16,7 @@ import { getPaginated } from '@/api/client'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { formatDate } from '@/utils/date'
+import { formatViewCount } from '@/utils/format'
 import type { UserProfile, Collection } from '@/types'
 import type { ArticleListItem } from '@/types'
 
@@ -72,8 +73,8 @@ const ROLE_BADGE: Record<string, string> = {
 
 useHead(() => ({
   title: profile.value
-    ? `${profile.value.realName || profile.value.username} - MySite`
-    : `${username.value} - MySite`,
+    ? profile.value.realName || profile.value.username
+    : username.value,
 }))
 
 async function fetchProfile() {
@@ -343,7 +344,7 @@ onMounted(() => {
               <p v-if="a.summary" class="mt-2 text-sm leading-relaxed text-text-secondary line-clamp-2">{{ a.summary }}</p>
               <div class="mt-3.5 flex items-center gap-4 text-[13px] text-text-muted">
                 <span v-if="a.categoryName" class="inline-flex items-center rounded-md bg-accent-subtle px-2 py-0.5 text-xs font-medium text-accent">{{ a.categoryName }}</span>
-                <span class="inline-flex items-center gap-1"><Eye :size="14" /> {{ a.viewCount }}</span>
+                <span class="inline-flex items-center gap-1"><Eye :size="14" /> {{ formatViewCount(a.viewCount) }}</span>
                 <span class="inline-flex items-center gap-1"><Heart :size="14" /> {{ a.favoriteCount }}</span>
                 <span>{{ a.createTime ? new Date(a.createTime).toLocaleDateString('zh-CN') : '' }}</span>
               </div>
@@ -414,7 +415,7 @@ onMounted(() => {
               <p v-if="a.summary" class="mt-2 text-sm leading-relaxed text-text-secondary line-clamp-2">{{ a.summary }}</p>
               <div class="mt-3.5 flex items-center gap-4 text-[13px] text-text-muted">
                 <span v-if="a.categoryName" class="inline-flex items-center rounded-md bg-accent-subtle px-2 py-0.5 text-xs font-medium text-accent">{{ a.categoryName }}</span>
-                <span class="inline-flex items-center gap-1"><Eye :size="14" /> {{ a.viewCount }}</span>
+                <span class="inline-flex items-center gap-1"><Eye :size="14" /> {{ formatViewCount(a.viewCount) }}</span>
                 <span class="inline-flex items-center gap-1"><Heart :size="14" /> {{ a.favoriteCount }}</span>
                 <span>{{ a.createTime ? new Date(a.createTime).toLocaleDateString('zh-CN') : '' }}</span>
               </div>

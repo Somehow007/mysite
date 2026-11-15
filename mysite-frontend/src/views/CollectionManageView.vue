@@ -15,7 +15,7 @@ const toast = useToast()
 const { confirm } = useConfirm()
 const userStore = useUserStore()
 
-useHead(() => ({ title: '合集管理 - MySite' }))
+useHead(() => ({ title: '合集管理' }))
 
 const collections = ref<Collection[]>([])
 const pagination = ref<PaginationMeta | null>(null)

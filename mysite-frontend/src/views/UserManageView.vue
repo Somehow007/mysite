@@ -14,7 +14,7 @@ const { error: toastError, success } = useToast()
 const { confirm } = useConfirm()
 
 useHead(() => ({
-  title: '用户管理 - MySite',
+  title: '用户管理',
 }))
 
 const users = ref<AdminUser[]>([])

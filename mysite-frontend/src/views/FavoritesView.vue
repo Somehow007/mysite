@@ -18,7 +18,7 @@ const searchKeyword = ref('')
 const searchInput = ref('')
 
 useHead(() => ({
-  title: '我的收藏 - MySite',
+  title: '我的收藏',
   meta: [
     { name: 'description', content: '我收藏的文章列表' },
   ],

@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { BookOpen, Library, Eye, Lock } from 'lucide-vue-next'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
+import { formatViewCount } from '@/utils/format'
 import { gsap } from 'gsap'
 import type { Collection } from '@/types'
 
@@ -10,13 +11,6 @@ defineProps<{
 }>()
 
 const cardRef = ref<HTMLElement | null>(null)
-
-function formatViewCount(count?: number): string {
-  if (!count || count <= 0) return '0'
-  if (count >= 10000) return (count / 10000).toFixed(1) + '万'
-  if (count >= 1000) return (count / 1000).toFixed(1) + 'k'
-  return String(count)
-}
 
 function onMouseEnter() {
   gsap.to(cardRef.value, {

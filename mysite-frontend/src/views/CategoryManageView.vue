@@ -22,7 +22,7 @@ const { success, error: toastError } = useToast()
 const { confirm } = useConfirm()
 
 useHead(() => ({
-  title: '分类管理 - MySite',
+  title: '分类管理',
 }))
 
 const categories = ref<Category[]>([])

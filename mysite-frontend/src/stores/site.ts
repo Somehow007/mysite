@@ -5,9 +5,9 @@ import { get } from '@/api/client'
 
 export const useSiteStore = defineStore('site', () => {
   const site = ref<SiteConfig>({
-    title: 'MySite',
-    description: '一个极简的个人博客',
-    author: 'Admin',
+    title: '',
+    description: '',
+    author: '',
     url: '',
     commentEnabled: true,
     navigation: [

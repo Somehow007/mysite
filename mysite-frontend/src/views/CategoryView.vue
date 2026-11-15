@@ -14,7 +14,7 @@ const loading = ref(false)
 const categoryName = ref('')
 
 useHead(() => ({
-  title: categoryName.value ? `${categoryName.value} - MySite` : '分类 - MySite',
+  title: categoryName.value || '分类',
 }))
 
 async function fetchArticles(slug: string, page = 1) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ArticleCard from './ArticleCard.vue'
-import ArticlePagination from './ArticlePagination.vue'
+import { Pagination as PaginationBar } from '@/components/ui'
 import SkeletonCard from '@/components/common/SkeletonCard.vue'
 import type { ArticleListItem, Pagination } from '@/types'
 
@@ -43,11 +43,12 @@ defineEmits<{
       </div>
     </div>
 
-    <ArticlePagination
+    <PaginationBar
       v-if="pagination && !loading"
       :current="pagination.page"
-      :total="pagination.totalPages"
-      @change="$emit('page-change', $event)"
+      :total="pagination.total"
+      :page-size="pagination.size"
+      @update:current="$emit('page-change', $event)"
     />
   </div>
 </template>

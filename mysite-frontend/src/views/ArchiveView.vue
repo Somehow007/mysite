@@ -6,7 +6,7 @@ import { Calendar } from 'lucide-vue-next'
 import type { ArchiveItem, ArchiveArticle } from '@/types'
 
 useHead(() => ({
-  title: '归档 - MySite',
+  title: '归档',
   meta: [
     { name: 'description', content: '所有文章按时间归档' },
   ],

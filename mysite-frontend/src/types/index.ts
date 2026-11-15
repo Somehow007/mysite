@@ -155,9 +155,15 @@ export interface AuthTokens {
 
 export interface SiteConfig {
   title: string
+  subtitle?: string
   description: string
   author: string
+  authorBio?: string
+  authorTagline?: string
+  avatar?: string
   url: string
+  github?: string
+  rss?: string
   commentEnabled?: boolean
   navigation: NavigationItem[]
 }

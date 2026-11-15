@@ -23,7 +23,7 @@ import { getAiProviders } from '@/api/aiAdmin'
 
 const PAGE = 20
 
-useHead(() => ({ title: '知识库管理 - MySite' }))
+useHead(() => ({ title: '知识库管理' }))
 
 const toast = useToast()
 const { confirm } = useConfirm()

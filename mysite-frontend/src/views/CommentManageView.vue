@@ -9,7 +9,7 @@ import { PageHeader, SearchFilterBar, Badge, Pagination, EmptyState } from '@/co
 import type { CommentAdmin, Pagination as PaginationType } from '@/types'
 
 useHead(() => ({
-  title: '评论管理 - MySite',
+  title: '评论管理',
 }))
 
 const toast = useToast()
