@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Palette, Sun, Moon, Check } from 'lucide-vue-next'
+import { Palette, Sun, Moon, Check, SunMoon } from 'lucide-vue-next'
 import { useTheme, THEME_REGISTRY, type ThemeId } from '@/composables/useTheme'
 import { Dropdown } from '@/components/ui'
 
-const { currentTheme, setTheme, toggleDarkMode, getThemeMeta } = useTheme()
+const { currentTheme, isSystemFollow, setTheme, followSystem, toggleDarkMode, getThemeMeta } = useTheme()
 
 const uniqueThemes = THEME_REGISTRY.filter(t => !t.id.includes('-dark') || t.group === 'glass')
 
@@ -17,6 +17,11 @@ function isThemeActive(theme: (typeof THEME_REGISTRY)[number]): boolean {
 
 function handleSelect(id: ThemeId, close: () => void) {
   setTheme(id)
+  close()
+}
+
+function handleFollowSystem(close: () => void) {
+  followSystem()
   close()
 }
 
@@ -43,6 +48,22 @@ function handleToggleDark() {
         </div>
 
         <div class="px-2 py-1">
+          <button
+            @click="handleFollowSystem(close)"
+            role="menuitem"
+            :aria-current="isSystemFollow ? 'true' : undefined"
+            class="flex items-center gap-2.5 w-full px-2 py-2 text-sm transition-colors duration-150 rounded-md"
+            :class="isSystemFollow
+              ? 'text-accent bg-accent-subtle'
+              : 'text-text-secondary hover:bg-accent-subtle hover:text-accent'"
+          >
+            <SunMoon :size="15" />
+            <span>跟随系统</span>
+            <span v-if="isSystemFollow" class="ml-auto flex items-center gap-1.5">
+              <span class="text-xs text-text-muted">{{ getThemeMeta(currentTheme)?.name }}</span>
+              <Check :size="12" class="text-accent" />
+            </span>
+          </button>
           <button
             @click="handleToggleDark()"
             role="menuitem"

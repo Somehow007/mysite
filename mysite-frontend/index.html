@@ -15,7 +15,7 @@
   </head>
   <body>
     <script>
-      ;(function(){var t=localStorage.getItem('mysite_theme_v2')||'classic-light';document.documentElement.setAttribute('data-theme',t);var d=t.includes('dark')||t==='aurora';document.documentElement.classList.toggle('dark',d);document.documentElement.style.colorScheme=d?'dark':'light'})()
+      ;(function(){var t=localStorage.getItem('mysite_theme_v2');var d=t?t.includes('dark')||t==='aurora':matchMedia('(prefers-color-scheme: dark)').matches;var theme=t||(d?'paper-dark':'paper-light');document.documentElement.setAttribute('data-theme',theme);document.documentElement.classList.toggle('dark',d);document.documentElement.style.colorScheme=d?'dark':'light'})()
     </script>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
