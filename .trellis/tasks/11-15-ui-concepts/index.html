@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"/><title>MySite UI 概念稿</title>
+<style>
+body{font-family:-apple-system,"PingFang SC",sans-serif;background:#f4f4f2;color:#111;margin:0;padding:48px}
+h1{font-size:28px;margin:0 0 6px}h2{font-size:18px;margin:40px 0 14px}p.s{color:#666;margin:0 0 24px}
+.g{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+a.c{display:block;background:#fff;border:1px solid #e5e5e2;border-radius:14px;overflow:hidden;color:inherit;text-decoration:none;transition:.2s}
+a.c:hover{transform:translateY(-3px);box-shadow:0 16px 40px -20px rgba(0,0,0,.3)}
+iframe{width:1440px;height:1000px;border:0;transform:scale(.25);transform-origin:0 0;pointer-events:none}
+.f{width:100%;height:250px;overflow:hidden;border-bottom:1px solid #eee}
+.t{padding:16px 18px}.t b{font-size:16px}.t div{font-size:13px;color:#666;margin-top:6px;line-height:1.6}
+.final a.c{border:2px solid #b4441f}
+</style></head><body>
+<h1>MySite UI 概念稿</h1><p class="s">已定方向：<b>A 纸本为底 + C 的提问交互</b>。实现任务见 <a href="prd.md">prd.md</a>。</p>
+<h2>定稿</h2>
+<div class="g final">
+<a class="c" href="final/home.html"><div class="f"><iframe src="final/home.html"></iframe></div><div class="t"><b>首页</b><div>刊头 + 置顶头条/最受欢迎 + 提问区（示例问题、带出处的示例回答）+ 最近更新/合集/作者卡。</div></div></a>
+<a class="c" href="final/post.html"><div class="f"><iframe src="final/post.html"></iframe></div><div class="t"><b>文章详情</b><div>面包屑替代 router.back、封面头图、合集进度、§ 编号标题、选中文字“问 AI”、右栏目录 + 问这篇、文末合集导航/继续读。</div></div></a>
+<a class="c" href="final/mobile.html"><div class="f"><iframe src="final/mobile.html"></iframe></div><div class="t"><b>移动端</b><div>4 台手机：首页、详情、问这篇 sheet、目录 sheet（夜间）。</div></div></a>
+</div>
+<h2>初版三方向（存档）</h2>
+<div class="g">
+<a class="c" href="a-editorial.html"><div class="f"><iframe src="a-editorial.html"></iframe></div><div class="t"><b>A · 纸本 Editorial</b><div>采用为底。</div></div></a>
+<a class="c" href="b-terminal.html"><div class="f"><iframe src="b-terminal.html"></iframe></div><div class="t"><b>B · 工程师笔记本</b><div>未采用：暗色等宽不利长文阅读，移动端难做。</div></div></a>
+<a class="c" href="c-ask-first.html"><div class="f"><iframe src="c-ask-first.html"></iframe></div><div class="t"><b>C · 对话即入口</b><div>借用提问框 + 出处卡交互，降为首页第二屏。</div></div></a>
+</div></body></html>

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>概念 C · 对话即入口 Ask-first</title>
+<style>
+  :root{
+    --bg:#fbfbfa; --card:#fff; --fg:#111418; --fg-2:#4a5160; --fg-3:#8a909c; --line:#ececea;
+    --brand:#4f46e5; --brand-2:#8b5cf6; --mint:#10b981; --tint:#f3f2ff;
+    --sans:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    --mono:"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);line-height:1.6}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 32px}
+  header.bar{position:sticky;top:0;z-index:5;backdrop-filter:blur(14px);background:rgba(251,251,250,.75);border-bottom:1px solid var(--line)}
+  header.bar .wrap{display:flex;align-items:center;height:60px;gap:28px}
+  .logo{display:flex;align-items:center;gap:10px;font-weight:700}
+  .logo i{width:26px;height:26px;border-radius:8px;background:conic-gradient(from 200deg,var(--brand),var(--brand-2),var(--mint),var(--brand))}
+  header nav{display:flex;gap:22px;font-size:14px;color:var(--fg-2)}
+  header .r{margin-left:auto;display:flex;gap:10px;align-items:center;font-size:14px}
+  .btn{padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:#fff}
+  .btn.p{background:var(--fg);color:#fff;border-color:var(--fg)}
+  /* hero */
+  .hero{position:relative;text-align:center;padding:84px 0 56px;overflow:hidden}
+  .hero::before{content:"";position:absolute;left:50%;top:-140px;width:900px;height:520px;transform:translateX(-50%);
+    background:radial-gradient(closest-side,rgba(139,92,246,.18),transparent),radial-gradient(closest-side at 70% 60%,rgba(16,185,129,.14),transparent);filter:blur(10px);z-index:-1}
+  .avatar{width:64px;height:64px;border-radius:50%;margin:0 auto 18px;background:linear-gradient(135deg,#c7d2fe,#ddd6fe);display:grid;place-items:center;font-size:26px;box-shadow:0 0 0 6px #fff,0 8px 30px rgba(79,70,229,.25)}
+  .hero h1{font-size:46px;letter-spacing:-.02em;line-height:1.15;font-weight:800}
+  .hero h1 span{background:linear-gradient(90deg,var(--brand),var(--brand-2));-webkit-background-clip:text;color:transparent}
+  .hero p.sub{color:var(--fg-2);font-size:17px;margin:14px auto 0;max-width:560px}
+  .ask{max-width:720px;margin:34px auto 0;background:#fff;border:1px solid var(--line);border-radius:20px;padding:8px 8px 8px 20px;
+    box-shadow:0 1px 0 rgba(0,0,0,.02),0 20px 50px -20px rgba(79,70,229,.35);display:flex;align-items:center;gap:10px;text-align:left}
+  .ask input{flex:1;border:0;outline:none;font:inherit;font-size:17px;padding:14px 0;background:transparent}
+  .ask .kb{font-size:12px;color:var(--brand);background:var(--tint);border-radius:999px;padding:4px 10px;white-space:nowrap}
+  .ask button{width:46px;height:46px;border-radius:14px;border:0;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;font-size:18px;cursor:pointer}
+  .chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:16px}
+  .chip{font-size:13px;color:var(--fg-2);border:1px solid var(--line);background:#fff;padding:6px 12px;border-radius:999px;cursor:pointer;transition:.15s}
+  .chip:hover{border-color:var(--brand);color:var(--brand)}
+  .note{font-size:12px;color:var(--fg-3);margin-top:12px}
+  /* answer preview */
+  .answer{max-width:720px;margin:26px auto 0;text-align:left;background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 20px}
+  .answer .q{font-size:13px;color:var(--fg-3)}
+  .answer .a{margin-top:8px;font-size:15px;color:var(--fg)}
+  .answer .a sup{color:var(--brand);font-weight:700}
+  .refs{display:flex;gap:10px;margin-top:14px}
+  .ref{flex:1;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;background:var(--bg)}
+  .ref b{display:block;font-size:13px;color:var(--fg)} .ref span{color:var(--fg-3)}
+  /* sections */
+  .sh{display:flex;justify-content:space-between;align-items:end;margin:64px 0 18px}
+  .sh h2{font-size:22px;letter-spacing:-.01em}
+  .sh a{font-size:13px;color:var(--fg-3)}
+  .feat{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;transition:.2s;display:flex;flex-direction:column}
+  .card:hover{transform:translateY(-3px);box-shadow:0 18px 40px -22px rgba(17,20,24,.35)}
+  .thumb{aspect-ratio:16/10;position:relative}
+  .card.big .thumb{aspect-ratio:16/11}
+  .th1{background:linear-gradient(135deg,#312e81,#6d28d9 55%,#10b981)}
+  .th2{background:linear-gradient(135deg,#fde68a,#fca5a5)}
+  .th3{background:linear-gradient(135deg,#a7f3d0,#93c5fd)}
+  .thumb em{position:absolute;left:14px;top:14px;font-style:normal;font-size:11px;font-weight:600;background:rgba(255,255,255,.9);padding:3px 9px;border-radius:999px}
+  .thumb code{position:absolute;left:16px;bottom:14px;font-family:var(--mono);font-size:12px;color:rgba(255,255,255,.85)}
+  .card .body{padding:16px 18px 18px}
+  .card h3{font-size:17px;line-height:1.4}
+  .card.big h3{font-size:21px}
+  .card p{font-size:13.5px;color:var(--fg-2);margin-top:6px}
+  .card .m{font-size:12px;color:var(--fg-3);margin-top:12px;display:flex;gap:12px}
+  .two{display:grid;grid-template-columns:1.6fr 1fr;gap:28px}
+  .row{display:flex;gap:16px;padding:16px 0;border-bottom:1px solid var(--line)}
+  .row .d{font-size:12px;color:var(--fg-3);width:64px;flex-shrink:0;padding-top:2px}
+  .row h4{font-size:16px} .row p{font-size:13px;color:var(--fg-2)}
+  .ser{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:14px}
+  .ser h5{font-size:15px}
+  .ser .prog{display:flex;gap:4px;margin-top:12px}
+  .ser .prog i{flex:1;height:6px;border-radius:3px;background:var(--line)} .ser .prog i.on{background:var(--brand)}
+  .ser span{font-size:12px;color:var(--fg-3)}
+  footer{margin-top:72px;padding:28px 0 48px;border-top:1px solid var(--line);font-size:13px;color:var(--fg-3);display:flex;justify-content:space-between}
+  .label{position:fixed;right:16px;bottom:16px;background:var(--brand);color:#fff;font-size:12px;padding:8px 12px;border-radius:999px}
+</style>
+</head>
+<body>
+<header class="bar"><div class="wrap">
+  <a class="logo" href="#"><i></i>某某的知识库</a>
+  <nav><a href="#">文章</a><a href="#">合集</a><a href="#">标签</a><a href="#">关于</a></nav>
+  <div class="r"><a href="#" style="color:var(--fg-3)">⌘K 搜索</a><a class="btn" href="#">RSS</a><a class="btn p" href="#">登录</a></div>
+</div></header>
+
+<div class="wrap">
+  <section class="hero">
+    <div class="avatar">🌿</div>
+    <h1>别翻目录了，<br/><span>直接问我写过什么。</span></h1>
+    <p class="sub">62 篇关于 Java 后端、RAG 与工程实践的文章，全部可被检索、引用、追问。</p>
+    <div class="ask">
+      <input placeholder="例如：JWT 双 token 刷新应该放在哪一层？" />
+      <span class="kb">📚 全部文章 ▾</span>
+      <button>↑</button>
+    </div>
+    <div class="chips">
+      <span class="chip">LLM 熔断怎么做的？</span><span class="chip">pgvector 和 ES 怎么选</span><span class="chip">Snowflake ID 前端为什么用 string</span><span class="chip">最近在学什么</span>
+    </div>
+    <div class="note">回答附原文出处 · 登录后每小时 10 次</div>
+
+    <div class="answer">
+      <div class="q">示例 · 你是怎么处理 LLM 熔断的？</div>
+      <div class="a">连续 2 次失败后打开熔断，首次成功即重置冷却<sup>[1]</sup>。路由只在首个 token 之前切换 provider，避免一条回答混入两个模型的输出<sup>[2]</sup>。</div>
+      <div class="refs">
+        <a class="ref" href="#"><b>[1] 把博客变成可以被提问的知识库</b><span>§4 多模型路由 · 12 分钟</span></a>
+        <a class="ref" href="#"><b>[2] WebFlux 取消信号一路到 LLM</b><span>§2 首 token 边界 · 11 分钟</span></a>
+      </div>
+    </div>
+  </section>
+
+  <div class="sh"><h2>精选</h2><a href="#">全部文章 →</a></div>
+  <section class="feat">
+    <a class="card big" href="#"><div class="thumb th1"><em>置顶 · RAG</em><code>embedding &lt;=&gt; $1</code></div><div class="body"><h3>把博客变成可以被提问的知识库：pgvector + 意图路由</h3><p>分块、召回、重排、熔断——一次完整落地的复盘。</p><div class="m"><span>11 月 12 日</span><span>12 分钟</span><span>2.3k</span></div></div></a>
+    <a class="card" href="#"><div class="thumb th2"><em>后端</em></div><div class="body"><h3>JWT 双 Token 的刷新边界</h3><p>放在网关、过滤器还是业务层？</p><div class="m"><span>10 月 30 日</span><span>8 分钟</span></div></div></a>
+    <a class="card" href="#"><div class="thumb th3"><em>工程实践</em></div><div class="body"><h3>给个人项目写一份 AGENTS.md</h3><p>当 AI 成为主要协作者之后。</p><div class="m"><span>11 月 03 日</span><span>9 分钟</span></div></div></a>
+  </section>
+
+  <section class="two">
+    <div>
+      <div class="sh"><h2>最近更新</h2><a href="#">按分类筛选 ▾</a></div>
+      <a class="row" href="#"><div class="d">11-08</div><div><h4>MyBatis-Plus 逻辑删除与唯一索引的冲突</h4><p>del_flag 让唯一约束失效的老问题。</p></div></a>
+      <a class="row" href="#"><div class="d">10-27</div><div><h4>Rerank 不可用时，向量分数截断够不够用</h4><p>降级路径的量化评估。</p></div></a>
+      <a class="row" href="#"><div class="d">10-19</div><div><h4>Spring WebFlux 里取消信号如何一路传到 LLM</h4><p>SseEmitter → Disposable → WebClient。</p></div></a>
+      <a class="row" href="#"><div class="d">10-11</div><div><h4>Redis 按 cache name 配 TTL 的策略模式</h4><p>一个小抽象省掉一堆 @Cacheable 参数。</p></div></a>
+    </div>
+    <div>
+      <div class="sh"><h2>合集</h2><a href="#">全部 →</a></div>
+      <div class="ser"><h5>从零搭一个 RAG 系统</h5><span>7 / 9 篇 · 连载中</span><div class="prog"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i></div></div>
+      <div class="ser"><h5>Spring Security 拆解</h5><span>6 / 6 篇 · 已完结</span><div class="prog"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i></div></div>
+    </div>
+  </section>
+
+  <footer><span>© 2026 某某</span><span>GitHub · RSS · 关于本站</span></footer>
+</div>
+<div class="label">概念 C · 对话即入口</div>
+</body>
+</html>

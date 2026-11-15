@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>定稿 · 移动端</title>
+<style>
+body{margin:0;background:#e9e3d7;font-family:-apple-system,"PingFang SC",sans-serif;color:#1d1a16;padding:36px 40px 60px}
+h1{font-family:"Songti SC",Georgia,serif;font-size:26px;margin:0 0 4px}p.s{color:#7d7466;margin:0 0 28px;font-size:14px}
+.row{display:flex;flex-wrap:wrap;gap:36px}
+.ph{width:390px}
+.ph .f{width:390px;height:844px;border:10px solid #1d1a16;border-radius:46px;overflow:hidden;background:#000;box-shadow:0 30px 60px -30px rgba(0,0,0,.5)}
+.ph iframe{width:100%;height:100%;border:0;display:block}
+.ph b{display:block;margin-top:14px;font-size:14px}.ph span{font-size:12.5px;color:#7d7466;line-height:1.6;display:block;margin-top:2px}
+</style></head><body>
+<h1>移动端 · 390 × 844</h1><p class="s">每台都是真实页面在 iframe 里的响应式渲染，能滚动、能点（底部工具条、目录/提问 sheet）。</p>
+<div class="row">
+<div class="ph"><div class="f"><iframe src="home.html"></iframe></div><b>① 首页</b><span>刊头缩小，分类横滑；头条封面全宽；提问框输入框占满一行，示例问题可点。</span></div>
+<div class="ph"><div class="f"><iframe src="post.html"></iframe></div><b>② 文章详情</b><span>封面出血；底部工具条：目录 / 问这篇 / 收藏，替代现在的 MobileTocDrawer 浮钮 + ChatWidget FAB。</span></div>
+<div class="ph"><div class="f"><iframe src="post.html?sheet=ask&scroll=900"></iframe></div><b>③ 问这篇（底部 sheet）</b><span>复用 ChatWidget 的 articleId 上下文，回答下方是出处卡片，可以继续追问。</span></div>
+<div class="ph"><div class="f"><iframe src="post.html?sheet=toc&scroll=1400&theme=dark"></iframe></div><b>④ 目录 sheet · 夜间</b><span>纸本夜间：暖黑底、米色字、橙色强调，与日间同一套 token。</span></div>
+</div></body></html>

@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>定稿 · 首页 — 纸本</title>
+<link rel="stylesheet" href="paper.css" />
+<style>
+  .mast{text-align:center;padding:46px 0 24px;border-bottom:3px double var(--border-strong)}
+  .mast .date{font-size:12px;letter-spacing:.14em;color:var(--text-muted);text-transform:uppercase}
+  .mast h1{font-family:var(--font-serif);font-size:76px;font-weight:900;letter-spacing:-.02em;line-height:1.05;margin:10px 0 0}
+  .mast h1 em{font-style:normal;color:var(--accent)}
+  .mast p{text-wrap:balance;margin-top:10px;font-family:var(--font-serif);font-size:17px;color:var(--text-secondary)}
+  .cats{display:flex;justify-content:center;gap:28px;padding:12px 0;border-bottom:1px solid var(--border);font-size:14px;color:var(--text-secondary);overflow-x:auto;scrollbar-width:none}
+  .cats a{white-space:nowrap}.cats a.on{color:var(--text-primary);font-weight:600}
+  .cats a i{font-style:normal;font-size:11px;color:var(--text-muted);margin-left:3px}
+
+  .lead{display:grid;grid-template-columns:1.55fr 1fr;gap:48px;padding:44px 0;border-bottom:1px solid var(--border)}
+  .lead h2{font-family:var(--font-serif);font-size:42px;line-height:1.2;margin:12px 0 16px;font-weight:800}
+  .lead h2 a:hover{color:var(--accent)}
+  .dek{font-family:var(--font-serif);font-size:18px;color:var(--text-secondary);line-height:1.8}
+  .cover{display:block;margin-top:24px;aspect-ratio:16/8;border:1px solid var(--border-strong);position:relative;overflow:hidden;
+    background:linear-gradient(135deg,#2b2620 0%,#3d342a 60%,#b4441f 170%)}
+  .cover svg{position:absolute;inset:0;width:100%;height:100%}
+  .byline{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:16px;font-size:13px;color:var(--text-muted)}
+  .byline b{color:var(--text-primary)}
+  .side h3{font-size:12px;letter-spacing:.16em;text-transform:uppercase;border-bottom:2px solid var(--border-strong);padding-bottom:8px}
+  .side ol{list-style:none;counter-reset:n}
+  .side li{counter-increment:n}
+  .side li a{display:grid;grid-template-columns:44px 1fr;padding:15px 0;border-bottom:1px solid var(--border)}
+  .side li a::before{content:counter(n,decimal-leading-zero);font-family:var(--font-serif);font-size:26px;color:var(--accent);line-height:1}
+  .side li h4{font-family:var(--font-serif);font-size:17px;line-height:1.45;font-weight:600}
+  .side li a:hover h4{color:var(--accent)}
+  .side li span{font-size:12px;color:var(--text-muted)}
+
+  .ask-sec{padding:44px 0 8px}
+  .ask-sec .head{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-bottom:16px}
+  .ask-sec h3{font-family:var(--font-serif);font-size:28px;font-weight:800}
+  .ask-sec h3 span{color:var(--accent)}
+  .ask-sec .chips{padding:0 18px 14px}
+  .ask-demo{border-top:1px dashed var(--border);padding:16px 18px 18px;display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .ask-demo .q{font-size:12px;color:var(--text-muted);margin-bottom:6px}
+  .note{font-size:12px;color:var(--text-muted)}
+
+  .sh{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid var(--border-strong);padding-bottom:8px;margin-top:56px}
+  .sh h3{font-size:12px;letter-spacing:.16em;text-transform:uppercase}
+  .sh a{font-size:13px;color:var(--text-muted)}
+  .main{display:grid;grid-template-columns:1fr 300px;gap:56px}
+  .post{display:grid;grid-template-columns:1fr 168px;gap:24px;padding:24px 0;border-bottom:1px solid var(--border)}
+  .post:hover h4{color:var(--accent)}
+  .post h4{font-family:var(--font-serif);font-size:22px;line-height:1.4;font-weight:700;margin:6px 0 6px;transition:color .15s}
+  .post p{font-size:14px;color:var(--text-secondary)}
+  .post .meta{font-size:12px;color:var(--text-muted);margin-top:10px}
+  .thumb{aspect-ratio:4/3;border:1px solid var(--border)}
+  .t1{background:linear-gradient(135deg,#d8c7a8,#a58f6a)}.t2{background:linear-gradient(135deg,#3d342a,#7a5a3d)}
+  .pager{display:flex;align-items:center;justify-content:space-between;padding:22px 0;font-size:14px}
+  .pager .pages{display:flex;gap:4px}
+  .pager .pages a{min-width:32px;height:32px;display:grid;place-items:center;border:1px solid transparent;color:var(--text-secondary)}
+  .pager .pages a.on{border-color:var(--border-strong);color:var(--text-primary);font-weight:700}
+  .pager > a{font-weight:600}
+
+  .series .s{display:flex;gap:14px;padding:18px 0;border-bottom:1px solid var(--border)}
+  .series .num{font-family:var(--font-serif);font-size:34px;color:var(--accent);line-height:1;width:32px}
+  .series h5{font-family:var(--font-serif);font-size:17px}
+  .series span{font-size:12px;color:var(--text-muted)}
+  .bar{height:3px;background:var(--border);margin-top:8px}.bar i{display:block;height:100%;background:var(--accent)}
+  .about{margin-top:28px;border:1px solid var(--border);padding:18px;background:var(--bg-elevated)}
+  .about .av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#d8c7a8,#b4441f);float:left;margin-right:12px}
+  .about b{font-family:var(--font-serif);font-size:16px}
+  .about p{font-size:13px;color:var(--text-secondary);clear:both;padding-top:10px}
+  .about .links{display:flex;gap:12px;font-size:12px;margin-top:10px;color:var(--accent)}
+
+  @media (max-width:900px){
+    .mast{padding:28px 0 16px}
+    .mast h1{font-size:44px}
+    .mast p{font-size:15px}
+    .cats{justify-content:flex-start;gap:20px;padding:10px 20px;margin:0 -20px}
+    .lead{grid-template-columns:1fr;gap:28px;padding:28px 0}
+    .lead h2{font-size:28px}
+    .dek{font-size:16px}
+    .cover{aspect-ratio:16/10;margin-top:18px}
+    .ask-sec h3{font-size:22px}
+    .ask-sec .head .note{display:none}
+    .ask-row{flex-wrap:wrap;padding:8px 8px 8px 14px}
+    .ask-row input{flex-basis:100%;font-size:16px}
+    .ask-row .scope{margin-right:auto}
+    .ask-demo{grid-template-columns:1fr}
+    .main{grid-template-columns:1fr;gap:0}
+    .post{grid-template-columns:1fr 96px;gap:14px;padding:18px 0}
+    .post h4{font-size:18px}
+    .post p{display:none}
+    .pager .pages a:not(.on):not(.keep){display:none}
+  }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="wrap">
+  <a class="logo" href="home.html">某某<em>·</em>手记</a>
+  <nav class="topnav"><a class="on" href="#">首页</a><a href="#">归档</a><a href="#">合集</a><a href="#">关于</a></nav>
+  <div class="r">
+    <div class="search-hint">⌕ 搜索或提问<kbd>⌘K</kbd></div>
+    <button class="icon-btn" onclick="toggleTheme()" title="切换明暗">◐</button>
+    <a class="btn" href="#">登录</a>
+    <button class="icon-btn menu-btn">☰</button>
+  </div>
+</div></header>
+
+<div class="wrap">
+  <section class="mast">
+    <div class="date">2026 年 11 月 15 日 · 第 62 篇</div>
+    <h1>某某<em>·</em>手记</h1>
+    <p>一个 Java 工程师关于后端、检索增强与长期学习的写作</p>
+  </section>
+  <nav class="cats">
+    <a class="on" href="#">全部</a><a href="#">后端<i>21</i></a><a href="#">RAG / LLM<i>14</i></a><a href="#">前端<i>9</i></a><a href="#">工程实践<i>8</i></a><a href="#">随笔<i>10</i></a>
+  </nav>
+
+  <section class="lead">
+    <article>
+      <div class="kicker">置顶 · RAG / LLM</div>
+      <h2><a href="post.html">把博客变成可以被提问的知识库：一次 pgvector + 意图路由的实践</a></h2>
+      <p class="dek">从 Markdown 感知分块到熔断式多模型路由，我把这几个月踩过的坑写成一份可复用的清单——以及为什么最后决定“意图只判断模式，不替用户选择知识库”。</p>
+      <a class="cover" href="post.html">
+        <svg viewBox="0 0 800 400" preserveAspectRatio="none">
+          <g stroke="#e9dfcf" stroke-opacity=".18" fill="none"><path d="M0 300 Q200 120 400 220 T800 140"/><path d="M0 330 Q220 160 420 250 T800 180"/><path d="M0 360 Q240 200 440 280 T800 220"/></g>
+          <g fill="#f0d9cc"><circle cx="120" cy="210" r="3"/><circle cx="260" cy="170" r="4"/><circle cx="400" cy="220" r="6" fill="#e0794f"/><circle cx="560" cy="160" r="3"/><circle cx="690" cy="150" r="4"/></g>
+          <text x="40" y="80" fill="#e9dfcf" font-family="Menlo" font-size="14" opacity=".7">SELECT … ORDER BY embedding &lt;=&gt; $1 LIMIT 8;</text>
+        </svg>
+      </a>
+      <div class="byline"><b>某某</b><span>11 月 12 日</span><span>12 分钟阅读</span><span>2.3k 阅读</span></div>
+    </article>
+    <aside class="side">
+      <h3>最受欢迎</h3>
+      <ol>
+        <li><a href="#"><div><h4>JWT 双 Token 的刷新边界，到底该放在哪</h4><span>后端 · 8 分钟</span></div></a></li>
+        <li><a href="#"><div><h4>Spring WebFlux 里取消信号如何一路传到 LLM</h4><span>RAG · 11 分钟</span></div></a></li>
+        <li><a href="#"><div><h4>Redis 按 cache name 配 TTL 的策略模式</h4><span>工程实践 · 6 分钟</span></div></a></li>
+        <li><a href="#"><div><h4>Snowflake ID 与 JavaScript 的 2^53 陷阱</h4><span>前端 · 5 分钟</span></div></a></li>
+      </ol>
+    </aside>
+  </section>
+
+  <section class="ask-sec">
+    <div class="head"><h3>不想翻目录？<span>直接问。</span></h3><span class="note">回答只基于站内文章，并标出原文出处</span></div>
+    <div class="ask">
+      <div class="ask-row">
+        <input placeholder="例如：作者是怎么处理 LLM 熔断的？" />
+        <span class="scope">全部文章 ▾</span>
+        <button class="send">提问 ↵</button>
+      </div>
+      <div class="chips"><button class="chip">LLM 熔断怎么做的</button><button class="chip">pgvector 和 ES 怎么选</button><button class="chip">为什么前端 ID 用 string</button><button class="chip">最近在学什么</button></div>
+      <div class="ask-demo">
+        <div><div class="q">示例 · 你是怎么处理 LLM 熔断的？</div>
+          <div class="answer">连续 2 次失败后打开熔断，首次成功即重置冷却<sup>[1]</sup>。路由只在首个 token 之前切换 provider，避免一条回答混入两个模型的输出<sup>[2]</sup>。</div></div>
+        <div class="refs">
+          <a class="ref" href="post.html"><b>[1] 把博客变成可以被提问的知识库</b>§4 多模型路由</a>
+          <a class="ref" href="#"><b>[2] WebFlux 取消信号一路到 LLM</b>§2 首 token 边界</a>
+        </div>
+      </div>
+    </div>
+    <p class="note" style="margin-top:14px">登录后使用 · 每小时 10 次</p>
+  </section>
+
+  <div class="main">
+    <section>
+      <div class="sh"><h3>最近更新</h3><a href="#">最新 ▾</a></div>
+      <a class="post" href="post.html"><div><div class="kicker">后端</div><h4>MyBatis-Plus 逻辑删除与唯一索引的冲突怎么解</h4><p>del_flag 让唯一约束失效的老问题，三种方案对比与我最终的选择。</p><div class="meta">11 月 08 日 · 7 分钟 · 1.1k 阅读</div></div><div class="thumb t1"></div></a>
+      <a class="post" href="post.html"><div><div class="kicker">工程实践</div><h4>给个人项目写一份 AGENTS.md 是什么体验</h4><p>当 AI 成为主要协作者，约定比代码更早需要被写下来。</p><div class="meta">11 月 03 日 · 9 分钟 · 860 阅读</div></div></a>
+      <a class="post" href="post.html"><div><div class="kicker">RAG / LLM</div><h4>Rerank 不可用时，向量分数截断够不够用</h4><p>一次降级路径的量化评估，附 50 条问题的人工打分。</p><div class="meta">10 月 27 日 · 10 分钟 · 742 阅读</div></div><div class="thumb t2"></div></a>
+      <a class="post" href="post.html"><div><div class="kicker">RAG / LLM</div><h4>Spring WebFlux 里取消信号如何一路传到 LLM</h4><p>SseEmitter → Disposable → WebClient，一条取消链的完整追踪。</p><div class="meta">10 月 19 日 · 11 分钟 · 1.9k 阅读</div></div></a>
+      <div class="pager"><a href="#" class="muted">← 上一页</a><div class="pages"><a class="on keep">1</a><a>2</a><a>3</a><a>…</a><a class="keep">7</a></div><a href="#">下一页 →</a></div>
+    </section>
+    <aside>
+      <div class="sh"><h3>连载合集</h3><a href="#">全部 →</a></div>
+      <div class="series">
+        <a class="s" href="#"><div class="num">I</div><div style="flex:1"><h5>从零搭一个 RAG 系统</h5><span>7 / 9 篇 · 连载中</span><div class="bar"><i style="width:78%"></i></div></div></a>
+        <a class="s" href="#"><div class="num">II</div><div style="flex:1"><h5>Spring Security 拆解</h5><span>6 / 6 篇 · 已完结</span><div class="bar"><i style="width:100%"></i></div></div></a>
+        <a class="s" href="#"><div class="num">III</div><div style="flex:1"><h5>MySQL 那些坑</h5><span>3 篇 · 连载中</span><div class="bar"><i style="width:30%"></i></div></div></a>
+      </div>
+      <div class="about"><div class="av"></div><b>某某</b><br/><span class="muted" style="font-size:12px">Java 后端 · 在杭州</span>
+        <p>写代码，也写下写代码时想明白的事。这个站本身就是我的练手场：Spring Boot + Vue + pgvector。</p>
+        <div class="links"><a href="#">GitHub</a><a href="#">RSS</a><a href="#">关于我 →</a></div></div>
+    </aside>
+  </div>
+</div>
+
+<footer class="site"><div class="wrap"><span>© 2026 某某 · 用 Spring Boot 与 Vue 手工排版</span><nav><a href="#">归档</a><a href="#">RSS</a><a href="#">GitHub</a><a href="#">关于</a></nav></div></footer>
+<div class="concept-label">定稿 · 首页<button onclick="toggleTheme()">切换夜间</button></div>
+<script>
+  function toggleTheme(){const h=document.documentElement;h.dataset.theme=h.dataset.theme==='dark'?'':'dark'}
+  if(new URLSearchParams(location.search).get('theme')==='dark')document.documentElement.dataset.theme='dark'
+</script>
+</body>
+</html>

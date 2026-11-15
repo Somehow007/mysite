@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>概念 B · 工程师笔记本 Notebook</title>
+<style>
+  :root{
+    --bg:#0e1013; --panel:#14171c; --panel-2:#1a1e24; --line:#252a32; --line-2:#323843;
+    --fg:#e6e8eb; --fg-2:#a3a9b3; --fg-3:#6b727d;
+    --green:#7ee787; --amber:#f2cc60; --blue:#79c0ff; --pink:#ff7ab2;
+    --mono:"JetBrains Mono","SF Mono",Menlo,Consolas,monospace;
+    --sans:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px;line-height:1.65}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:48px 48px;opacity:.25;mask-image:radial-gradient(ellipse at 30% 0%,#000 0%,transparent 70%)}
+  a{color:inherit;text-decoration:none}
+  .mono{font-family:var(--mono)}
+  .app{position:relative;display:grid;grid-template-columns:240px 1fr 300px;min-height:100vh}
+  /* left */
+  .nav{border-right:1px solid var(--line);padding:22px 18px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:24px}
+  .brand{font-family:var(--mono);font-size:15px}
+  .brand b{color:var(--green)} .brand span{color:var(--fg-3)}
+  .cursor{display:inline-block;width:8px;height:15px;background:var(--green);vertical-align:-2px;animation:b 1s steps(1) infinite}
+  @keyframes b{50%{opacity:0}}
+  .nav h6{font-family:var(--mono);font-size:11px;color:var(--fg-3);letter-spacing:.08em;margin-bottom:8px;font-weight:400}
+  .nav ul{list-style:none}
+  .nav li a{display:flex;justify-content:space-between;padding:6px 10px;border-radius:6px;color:var(--fg-2);font-family:var(--mono);font-size:13px}
+  .nav li a:hover{background:var(--panel-2);color:var(--fg)}
+  .nav li a.on{background:var(--panel-2);color:var(--fg);box-shadow:inset 2px 0 0 var(--green)}
+  .nav li a i{font-style:normal;color:var(--fg-3)}
+  .nav .foot{margin-top:auto;font-family:var(--mono);font-size:11px;color:var(--fg-3)}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);margin-right:6px}
+  /* main */
+  main{padding:28px 40px 60px;max-width:860px}
+  .cmd{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line-2);border-radius:10px;padding:12px 14px;font-family:var(--mono);color:var(--fg-3)}
+  .cmd b{color:var(--green);font-weight:400}
+  .cmd input{flex:1;background:transparent;border:0;outline:none;color:var(--fg);font:inherit}
+  .cmd kbd{font-size:11px;border:1px solid var(--line-2);border-radius:4px;padding:1px 6px}
+  .hero{padding:44px 0 34px}
+  .hero .path{font-family:var(--mono);color:var(--fg-3);font-size:12px}
+  .hero h1{font-size:40px;line-height:1.2;margin:10px 0 14px;font-weight:700;letter-spacing:-.01em}
+  .hero h1 .hl{background:linear-gradient(90deg,var(--green),var(--blue));-webkit-background-clip:text;color:transparent}
+  .hero p{color:var(--fg-2);max-width:600px;font-size:15px}
+  .stats{display:flex;gap:28px;margin-top:22px;font-family:var(--mono);font-size:12px;color:var(--fg-3)}
+  .stats b{display:block;color:var(--fg);font-size:20px;font-weight:500}
+  /* heat */
+  .heat{margin:8px 0 34px;padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+  .heat header{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--fg-3);margin-bottom:10px}
+  .grid{display:grid;grid-template-columns:repeat(52,1fr);gap:3px}
+  .grid i{aspect-ratio:1;border-radius:2px;background:var(--panel-2)}
+  .grid i.l1{background:#1d3b25}.grid i.l2{background:#2e6b3c}.grid i.l3{background:#4fb062}.grid i.l4{background:var(--green)}
+  /* posts */
+  .sect{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:12px;color:var(--fg-3);margin-bottom:6px}
+  .sect h2{font-size:13px;color:var(--fg);font-weight:500}
+  .post{display:grid;grid-template-columns:92px 1fr auto;gap:18px;padding:18px 0;border-top:1px solid var(--line);align-items:start}
+  .post:hover h3{color:var(--green)}
+  .post time{font-family:var(--mono);font-size:12px;color:var(--fg-3);padding-top:3px}
+  .post h3{font-size:17px;font-weight:600;transition:.15s}
+  .post p{color:var(--fg-2);font-size:13.5px;margin-top:4px}
+  .tags{display:flex;gap:6px;margin-top:8px}
+  .t{font-family:var(--mono);font-size:11px;padding:1px 8px;border-radius:99px;border:1px solid var(--line-2);color:var(--fg-2)}
+  .t.g{color:var(--green);border-color:#2e6b3c}.t.b{color:var(--blue);border-color:#284a6b}.t.a{color:var(--amber);border-color:#6b5a28}
+  .post .rt{font-family:var(--mono);font-size:11px;color:var(--fg-3);text-align:right}
+  .pin{color:var(--amber)}
+  /* right */
+  .rail{border-left:1px solid var(--line);padding:24px 20px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px}
+  .card h4{font-family:var(--mono);font-size:11px;color:var(--fg-3);font-weight:400;margin-bottom:10px;display:flex;justify-content:space-between}
+  .chat{flex:1;display:flex;flex-direction:column}
+  .msg{font-size:13px;padding:8px 10px;border-radius:8px;margin-bottom:8px}
+  .msg.u{background:var(--panel-2);align-self:flex-end;max-width:85%}
+  .msg.a{color:var(--fg-2)}
+  .msg.a code{font-family:var(--mono);color:var(--pink);font-size:12px}
+  .src{display:block;font-family:var(--mono);font-size:11px;color:var(--blue);margin-top:6px}
+  .chat .in{margin-top:auto;display:flex;gap:6px;border:1px solid var(--line-2);border-radius:8px;padding:8px 10px;font-family:var(--mono);font-size:12px;color:var(--fg-3)}
+  .series li{list-style:none;display:flex;justify-content:space-between;font-size:13px;padding:5px 0;color:var(--fg-2)}
+  .series li b{font-family:var(--mono);font-weight:400;color:var(--fg-3);font-size:11px}
+  .label{position:fixed;right:16px;bottom:16px;background:var(--green);color:#000;font-family:var(--mono);font-size:12px;padding:6px 10px;border-radius:6px}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="nav">
+    <div class="brand"><b>~/</b>somehow<span>.dev</span> <i class="cursor"></i></div>
+    <div><h6>// 导航</h6><ul>
+      <li><a class="on" href="#">index <i>⌘1</i></a></li>
+      <li><a href="#">posts <i>62</i></a></li>
+      <li><a href="#">series <i>4</i></a></li>
+      <li><a href="#">ask.ai <i>⌘K</i></a></li>
+      <li><a href="#">about</a></li>
+    </ul></div>
+    <div><h6>// 分类</h6><ul>
+      <li><a href="#">backend/ <i>21</i></a></li>
+      <li><a href="#">rag-llm/ <i>14</i></a></li>
+      <li><a href="#">frontend/ <i>9</i></a></li>
+      <li><a href="#">devops/ <i>8</i></a></li>
+      <li><a href="#">notes/ <i>10</i></a></li>
+    </ul></div>
+    <div class="foot"><span class="dot"></span>build 2026.11.15 · ok<br/>rss · github · login</div>
+  </aside>
+
+  <main>
+    <div class="cmd"><b>❯</b><input placeholder="搜索文章，或输入 ? 直接问 AI" /><kbd>⌘K</kbd></div>
+    <section class="hero">
+      <div class="path">$ cat ./README.md</div>
+      <h1>写 <span class="hl">后端、RAG</span> 和<br/>把东西做完的过程。</h1>
+      <p>Java 工程师。这里是我的公开笔记本：系统设计的推演、踩坑的复盘，以及一个能回答“我写过什么”的 AI 助手。</p>
+      <div class="stats"><div><b>62</b>articles</div><div><b>4</b>series</div><div><b>183k</b>words</div><div><b>214</b>days streak</div></div>
+    </section>
+
+    <div class="heat">
+      <header><span>// 写作 & 学习热力（来自手帐，仅展示频次）</span><span>less ▢▣■ more</span></header>
+      <div class="grid" id="g"></div>
+    </div>
+
+    <div class="sect"><h2>## latest</h2><span>sort: date ▾</span></div>
+    <a class="post" href="#"><time>11-12<br/><span class="pin">★ pinned</span></time><div><h3>把博客变成可以被提问的知识库：pgvector + 意图路由</h3><p>Markdown 感知分块、熔断式多模型路由，以及“意图不替用户选知识库”的取舍。</p><div class="tags"><span class="t g">rag</span><span class="t b">pgvector</span><span class="t">spring</span></div></div><div class="rt">12 min<br/>2.3k views</div></a>
+    <a class="post" href="#"><time>11-08</time><div><h3>MyBatis-Plus 逻辑删除与唯一索引的冲突</h3><p>del_flag 让唯一约束失效的老问题，三种方案对比。</p><div class="tags"><span class="t a">mysql</span><span class="t">mybatis</span></div></div><div class="rt">7 min<br/>1.1k views</div></a>
+    <a class="post" href="#"><time>11-03</time><div><h3>给个人项目写一份 AGENTS.md 是什么体验</h3><p>当 AI 成为主要协作者，约定比代码更早需要被写下来。</p><div class="tags"><span class="t">workflow</span><span class="t g">ai</span></div></div><div class="rt">9 min<br/>860 views</div></a>
+    <a class="post" href="#"><time>10-27</time><div><h3>Rerank 不可用时，向量分数截断够不够用</h3><p>一次降级路径的量化评估，附 50 条问题的人工打分。</p><div class="tags"><span class="t g">rag</span><span class="t">eval</span></div></div><div class="rt">10 min<br/>742 views</div></a>
+    <a class="post" href="#"><time>10-19</time><div><h3>Spring WebFlux 里取消信号如何一路传到 LLM</h3><p>SseEmitter → Disposable → WebClient，一条取消链的完整追踪。</p><div class="tags"><span class="t b">webflux</span><span class="t">sse</span></div></div><div class="rt">11 min<br/>1.9k views</div></a>
+  </main>
+
+  <aside class="rail">
+    <div class="card chat">
+      <h4><span>// ask.ai</span><span><span class="dot"></span>online</span></h4>
+      <div class="msg u">你是怎么处理 LLM 熔断的？</div>
+      <div class="msg a">连续 <code>2</code> 次失败即打开熔断，首个成功请求重置冷却；路由只在首 token 前切换 provider，避免混合回答。
+        <a class="src" href="#">↳ [1] pgvector + 意图路由 §4</a><a class="src" href="#">↳ [2] WebFlux 取消信号 §2</a></div>
+      <div class="in">❯ 问点什么…<span style="margin-left:auto">↵</span></div>
+    </div>
+    <div class="card series"><h4><span>// series</span><span>4</span></h4><ul>
+      <li>从零搭一个 RAG 系统 <b>7/9</b></li><li>Spring Security 拆解 <b>6/6</b></li><li>MySQL 那些坑 <b>3/?</b></li></ul></div>
+  </aside>
+</div>
+<div class="label">概念 B · 工程师笔记本</div>
+<script>
+  const g=document.getElementById('g');let s=7;
+  for(let i=0;i<364;i++){s=(s*9301+49297)%233280;const r=s/233280;const el=document.createElement('i');
+    el.className=r>.93?'l4':r>.8?'l3':r>.6?'l2':r>.4?'l1':'';g.appendChild(el)}
+</script>
+</body>
+</html>
