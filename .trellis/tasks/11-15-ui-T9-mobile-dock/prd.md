@@ -69,6 +69,20 @@
 - 走查中发现并修复 1 处自身 bug：dock 收藏计数原地不变——`article.favoriteCount`
   被父级原地 +1/-1（对象引用不变），PostDock 补字段级 watcher 后与刊头同步。
 
+## 走查记录（2026-11-15，t9-walkthrough.mjs 27/27）
+
+- **发现并修复 1 个存量 bug（本次移植带入）**：`drawerAllExpanded` 用
+  `Object.keys(collapsedIds).length === 0` 判定，但逐节点 toggle 展开时会留下
+  `id:false` 残留键 → 「全部收起」按钮在先点过单组后失效（点了反而全展开）。
+  改按值判断 `!Object.values(...).some(Boolean)`。旧右栏抽屉同款逻辑，一并修复。
+- 复核通过项：body.has-post-dock 生命周期（进/出/返回重挂载）、sheet 内滚动
+  （176 标题长文）、折叠/全展收往返、sheet 开着时 dock 被遮挡不可点、tablet 800
+  BackToTop 隐藏 + dock 问这篇开桌面 520×680 面板（非 sheet）、匿名问这篇开面板
+  见登录提示不跳页、短文章 sheet 最小形态、dock 反色实测（paper-dark 浅底/
+  classic 深底）+ sheet 随主题实时换色、横屏矮视口、pageerror=0。
+- 数据说明：当前 9 篇文章均 ≥2 标题，无零标题样本；目录按钮 disabled 分支
+  （`items.length===0`）为一行逻辑，代码复核确认。
+
 ## 备注 / 后续
 
 - dev server 的 vue-devtools 浮层会盖住 dock 中部拦截 Playwright 指针事件

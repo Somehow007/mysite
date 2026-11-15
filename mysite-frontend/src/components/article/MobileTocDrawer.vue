@@ -54,7 +54,8 @@ function toggleDrawerNode(id: string) {
 }
 
 const drawerAllExpanded = computed(() => {
-  return Object.keys(drawerCollapsedIds.value).length === 0
+  // 逐节点 toggle 会留下 false 残留键，必须按值判断而非键数量
+  return !Object.values(drawerCollapsedIds.value).some(Boolean)
 })
 
 const drawerHasCollapsible = computed(() => {
