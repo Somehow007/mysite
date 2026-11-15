@@ -6,6 +6,7 @@ import { useMediaQuery } from '@vueuse/core'
 import { useChat } from '@/composables/useChat'
 import { useFabStack } from '@/composables/useFabStack'
 import { useVisualViewport } from '@/composables/useVisualViewport'
+import { useChatLauncher, type ChatLaunchOptions } from '@/composables/useChatLauncher'
 import { getVisitorId, getKnowledgeBases } from '@/api/rag'
 import { useUserStore } from '@/stores/user'
 import type { KnowledgeBase } from '@/types'
@@ -25,12 +26,16 @@ const hasSuggestedQuestions = computed(() => SUGGESTED_QUESTIONS.length > 0)
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-const isOpen = ref(false)
+const launcher = useChatLauncher()
+// 开合状态是模块级单例：页面提问入口经 launcher.open() 打开本面板
+const isOpen = launcher.isOpen
 const messagesContainer = ref<HTMLElement | null>(null)
 const inputComponentRef = ref<InstanceType<typeof ChatInput> | null>(null)
 
 const chat = useChat()
 const isUserScrolledUp = ref(false)
+/** launcher 注入的一次性引用，渲染为输入框上方引用条（发送时拼入问题后清空） */
+const pendingQuote = ref<string | null>(null)
 
 // ── 移动端适配：断点 + 可视视口高度 ──────────────────────────
 // isMobile 对齐 Tailwind sm 断点（640px）：< 640px 走底部 sheet 形态
@@ -138,19 +143,13 @@ onBeforeUnmount(() => {
   if (rateLimitTimer) clearInterval(rateLimitTimer)
 })
 
-// 面板打开时加载历史对话列表 + KB 列表
-watch(isOpen, (open) => {
-  if (open) {
-    chat.loadConversations(getVisitorId())
-    loadKbs()
-    showHistory.value = false
-  }
-})
-
 // ── FAB 动态堆叠 ─────────────────────────────────────────────
 const { bottomStyle: fabBottom, setVisible: setFabVisible } = useFabStack('chat-widget')
-// 面板打开时 FAB 隐藏，其他 FAB 自动下移
-watch(isOpen, (open) => setFabVisible(!open))
+// FAB 隐藏规则（已拍板）：首页（含 /page/N）与文章页有专属提问入口，不渲染 FAB；
+// 面板仍可由 launcher.open() 打开。immediate 保证挂载时（如首屏即首页）占位正确。
+const hideFab = computed(() =>
+  route.name === 'home' || route.name === 'home-page' || route.name === 'post')
+watch([isOpen, hideFab], ([open, hide]) => setFabVisible(!open && !hide), { immediate: true })
 
 // ── 智能滚动 ────────────────────────────────────────────────
 
@@ -221,9 +220,14 @@ watch(isOpen, (open) => {
   }
 })
 
-function open() {
-  isOpen.value = true
-  closingByDrag = false // 重置下滑关闭标记（面板重建后需允许再次拖拽）
+// 面板打开时的统一副作用：加载历史/KB、复位拖拽关闭标记、桌面聚焦、滚底。
+// FAB 点击与 launcher.open() 都只改 isOpen，副作用收口在这里（原 open() 内逻辑并入）。
+watch(isOpen, (open) => {
+  if (!open) return
+  closingByDrag = false // 面板重建后需允许再次拖拽
+  chat.loadConversations(getVisitorId())
+  loadKbs()
+  showHistory.value = false
   nextTick(() => {
     // 移动端不自动聚焦输入框 —— 打开面板瞬间弹软键盘会直接盖住半个面板，
     // 用户点输入框时才弹键盘；桌面端保留自动聚焦
@@ -233,10 +237,54 @@ function open() {
     }
     scrollToBottom()
   })
+})
+
+function open() {
+  launcher.open()
 }
 
 function close() {
-  isOpen.value = false
+  launcher.close()
+}
+
+// ── launcher 启动参数：预填问题 / 引用 / 立即发送 / KB 范围 ──────
+// pending 在面板已打开时再次 open() 也能生效；ChatWidget 未挂载时由 immediate 兜底。
+watch(
+  () => launcher.pending.value,
+  (opts) => {
+    if (!opts || !isOpen.value) return
+    launcher.consumePending()
+    void applyLaunchOptions(opts)
+  },
+  { immediate: true },
+)
+
+async function applyLaunchOptions(opts: ChatLaunchOptions) {
+  if (opts.kbIds?.length) {
+    chat.selectedKbIds.value = [...opts.kbIds]
+  }
+  if (opts.quote) pendingQuote.value = opts.quote
+  if (opts.send) {
+    const q = opts.question?.trim()
+    if (q) handleSend(q)
+    return
+  }
+  // 预填 / 仅引用：等面板渲染出 ChatInput 后写入；移动端不聚焦（避免弹键盘）
+  await nextTick()
+  if (opts.question) inputComponentRef.value?.setInput(opts.question)
+  if (!isMobile.value) inputComponentRef.value?.focus()
+}
+
+/** 发送前把引用条拼成 markdown 引用块；发送后清空引用 */
+function handleSend(text: string) {
+  const quote = pendingQuote.value
+  pendingQuote.value = null
+  if (!quote) {
+    chat.sendMessage(text)
+    return
+  }
+  const quoted = quote.split('\n').map(line => `> ${line}`).join('\n')
+  chat.sendMessage(`${quoted}\n\n${text}`)
 }
 
 // 键盘弹起/收起 → 面板高度（--vvh 驱动）变化后，把最新消息滚回视野
@@ -311,9 +359,9 @@ onScopeDispose(() => {
 </script>
 
 <template>
-  <!-- FAB 按钮 -->
+  <!-- FAB 按钮：首页/文章页有专属提问入口，不渲染（面板仍可由 launcher 打开） -->
   <button
-    v-if="!isOpen"
+    v-if="!isOpen && !hideFab"
     :style="{ bottom: fabBottom }"
     class="fixed right-6 z-40 w-14 h-14
            rounded-full bg-accent text-white
@@ -489,7 +537,7 @@ onScopeDispose(() => {
                   :key="q"
                   class="bg-accent-subtle text-accent rounded-full px-3 py-1.5
                          text-xs hover:opacity-80 transition-opacity"
-                  @click="chat.sendMessage(q)"
+                  @click="handleSend(q)"
                 >
                   {{ q }}
                 </button>
@@ -545,8 +593,10 @@ onScopeDispose(() => {
         <ChatInput
           ref="inputComponentRef"
           :streaming="chat.isStreaming.value"
-          @send="chat.sendMessage"
+          :quote="pendingQuote"
+          @send="handleSend"
           @cancel="chat.cancelGeneration()"
+          @clear-quote="pendingQuote = null"
         />
 
         <!-- 历史对话抽屉：面板内最上层（z-20/30），覆盖 header 到输入框的完整高度。

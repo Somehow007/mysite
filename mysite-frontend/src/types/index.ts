@@ -166,6 +166,22 @@ export interface SiteConfig {
   rss?: string
   commentEnabled?: boolean
   navigation: NavigationItem[]
+  /** 首页「直接问」示例问题 chips；缺省时前端用本地兜底 */
+  askExamples?: string[]
+  /** 首页「直接问」示例问答；未配置或 answer 为空时不渲染示例块 */
+  askDemo?: SiteAskDemo | null
+}
+
+export interface SiteAskDemo {
+  question?: string
+  answer?: string
+  sources?: SiteAskDemoSource[]
+}
+
+export interface SiteAskDemoSource {
+  title: string
+  section?: string
+  articleId?: string
 }
 
 export interface NavigationItem {

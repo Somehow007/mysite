@@ -13,6 +13,7 @@ import ArticleList from '@/components/article/ArticleList.vue'
 import HomeMasthead from '@/components/home/HomeMasthead.vue'
 import CategoryStrip from '@/components/home/CategoryStrip.vue'
 import HomeLead from '@/components/home/HomeLead.vue'
+import HomeAskPanel from '@/components/home/HomeAskPanel.vue'
 import HomeSidebar from '@/components/home/HomeSidebar.vue'
 import type { ArticleListItem, Pagination, Category, Collection } from '@/types'
 
@@ -219,7 +220,7 @@ onMounted(() => {
       :popular="popularArticles"
     />
 
-    <!-- T7：提问区 HomeAskPanel 插槽 -->
+    <HomeAskPanel v-if="isFirstPage" />
 
     <div class="mt-12 lg:mt-14 lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-14">
       <section class="min-w-0">

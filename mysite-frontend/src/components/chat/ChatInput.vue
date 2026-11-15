@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
-import { ArrowUp, Square } from 'lucide-vue-next'
+import { ArrowUp, Square, X } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { usePermission } from '@/composables/usePermission'
 
 const props = defineProps<{
   streaming: boolean
+  /** 输入框上方的引用条（launcher.open({ quote }) 注入），发送时由父级拼进问题 */
+  quote?: string | null
 }>()
 
 const emit = defineEmits<{
   send: [question: string]
   cancel: []
+  'clear-quote': []
 }>()
 
 const MAX_LENGTH = 500
@@ -67,12 +70,46 @@ function autoResize() {
     el.style.height = Math.min(el.scrollHeight, 120) + 'px'
   }
 }
+
+/** 供 ChatWidget 通过 launcher 预填问题；光标落到末尾（不自动聚焦，移动端避免弹键盘） */
+function setInput(text: string) {
+  input.value = text
+  nextTick(() => {
+    autoResize()
+    const el = textareaRef.value
+    if (el) el.setSelectionRange(text.length, text.length)
+  })
+}
+
+function focus() {
+  textareaRef.value?.focus()
+}
+
+defineExpose({ setInput, focus })
 </script>
 
 <template>
   <!-- 底部留白取 max(常规间距, safe-area)：iPhone home indicator 机型不被遮挡
        （main.css 的 body safe-area padding 对 fixed 弹层无效，需在此单独处理） -->
   <div class="border-t border-border px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shrink-0">
+    <!-- 引用条：launcher.open({ quote }) 注入，发送时父级拼成「> 引用\n\n问题」 -->
+    <div
+      v-if="quote"
+      class="mb-2 flex items-start gap-2 border-l-2 border-accent bg-bg-secondary px-2.5 py-1.5"
+    >
+      <span class="min-w-0 flex-1 whitespace-pre-line text-xs leading-relaxed text-text-secondary line-clamp-2">
+        {{ quote }}
+      </span>
+      <button
+        type="button"
+        class="shrink-0 text-text-muted transition-colors hover:text-text-primary"
+        aria-label="删除引用"
+        @click="emit('clear-quote')"
+      >
+        <X :size="13" />
+      </button>
+    </div>
+
     <!-- 输入行：999px 胶囊 -->
     <div
       class="flex items-end gap-2 px-3 py-1.5 rounded-full border border-border bg-bg-secondary transition-all duration-200"

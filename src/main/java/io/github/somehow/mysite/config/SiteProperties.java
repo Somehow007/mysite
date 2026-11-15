@@ -36,6 +36,19 @@ public class SiteProperties {
             navItem("归档", "/archive"),
             navItem("关于", "/about"));
 
+    /** 首页「直接问」示例问题 chips；yaml 可用 {@code site.ask-examples} 整体覆盖 */
+    private List<String> askExamples = List.of(
+            "LLM 熔断怎么做的",
+            "pgvector 和 ES 怎么选",
+            "为什么前端 ID 用 string",
+            "最近在学什么");
+
+    /**
+     * 首页「直接问」示例问答 + 出处卡；默认 null，前端不渲染示例块。
+     * 用 {@code site.ask-demo} 配置启用，{@code answer} 置空同样视为关闭。
+     */
+    private AskDemo askDemo;
+
     private static NavItem navItem(String label, String path) {
         NavItem item = new NavItem();
         item.setLabel(label);
@@ -47,5 +60,21 @@ public class SiteProperties {
     public static class NavItem {
         private String label;
         private String path;
+    }
+
+    @Data
+    public static class AskDemo {
+        private String question;
+        private String answer;
+        private List<AskSource> sources = List.of();
+    }
+
+    @Data
+    public static class AskSource {
+        private String title;
+        /** 标题后的补充说明（如「§4 多模型路由」），可空 */
+        private String section;
+        /** 文章 ID；有值前端渲染 /post/:id 链接，无值渲染静态卡 */
+        private String articleId;
     }
 }

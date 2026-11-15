@@ -50,9 +50,13 @@ class SiteConfigControllerTest {
         for (String key : List.of(
                 "title", "subtitle", "description", "author",
                 "authorBio", "authorTagline", "avatar", "url",
-                "github", "rss", "commentEnabled", "navigation")) {
+                "github", "rss", "commentEnabled", "navigation",
+                "askExamples", "askDemo")) {
             assertTrue(json.containsKey(key), "missing key: " + key);
         }
+        // askExamples 有类内默认 4 条；askDemo 默认 null（前端不渲染示例块）
+        assertEquals(4, ((List<?>) json.get("askExamples")).size());
+        assertNull(json.get("askDemo"));
         assertEquals("Test Site", json.get("title"));
         assertEquals("副标题", json.get("subtitle"));
         assertEquals(" bio ", json.get("authorBio"));
@@ -86,5 +90,32 @@ class SiteConfigControllerTest {
         assertEquals(2, bound.getNavigation().size());
         assertEquals("首页", bound.getNavigation().get(0).getLabel());
         assertEquals("/archive", bound.getNavigation().get(1).getPath());
+    }
+
+    @Test
+    void bindsAskExamplesAndAskDemo() {
+        // site.ask-examples / site.ask-demo.* 经 yaml 或 additional-location 覆盖的绑定路径
+        Map<String, Object> source = new HashMap<>();
+        source.put("site.ask-examples[0]", "自定义问题一");
+        source.put("site.ask-examples[1]", "自定义问题二");
+        source.put("site.ask-demo.question", "示例问题？");
+        source.put("site.ask-demo.answer", "示例回答[1]");
+        source.put("site.ask-demo.sources[0].title", "示例文章");
+        source.put("site.ask-demo.sources[0].section", "§1 开头");
+        source.put("site.ask-demo.sources[0].article-id", "123");
+
+        SiteProperties bound = new Binder(
+                new MapConfigurationPropertySource(source))
+                .bind("site", SiteProperties.class)
+                .get();
+
+        assertEquals(List.of("自定义问题一", "自定义问题二"), bound.getAskExamples());
+        assertNotNull(bound.getAskDemo());
+        assertEquals("示例问题？", bound.getAskDemo().getQuestion());
+        assertEquals("示例回答[1]", bound.getAskDemo().getAnswer());
+        assertEquals(1, bound.getAskDemo().getSources().size());
+        assertEquals("示例文章", bound.getAskDemo().getSources().get(0).getTitle());
+        assertEquals("§1 开头", bound.getAskDemo().getSources().get(0).getSection());
+        assertEquals("123", bound.getAskDemo().getSources().get(0).getArticleId());
     }
 }
