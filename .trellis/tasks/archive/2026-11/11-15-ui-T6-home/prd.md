@@ -1,7 +1,7 @@
 # UI 重构 T6：首页重排
 
 > 对照稿：`.trellis/tasks/11-15-ui-concepts/final/home.html`、`mobile.html` ①。
-> 任务定义见 `../11-15-ui-concepts/prd.md` T6 节。本文件记开工结论与验收结果。
+> 任务定义见 `.trellis/tasks/11-15-ui-concepts/prd.md` T6 节。本文件记开工结论与验收结果。
 
 ## 开工结论（实现前核对）
 
