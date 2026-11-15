@@ -88,9 +88,10 @@ function protectMath(markdown: string): { processed: string; mathBlocks: Map<str
     return key
   })
 
-  // Step 6: Restore code blocks and inline code (their $ signs are now safe)
+  // Step 6: Restore code blocks and inline code（其 $ 号现已安全）。
+  // inline code 必须连反引号一起恢复，否则 `code` 退化为纯文本（与 useChatMarkdown 同款修复，T11）
   processed = processed.replace(/\x00FENCED\x00(\d+)\x00/g, (_m, i: string) => fencedBlocks[parseInt(i)] ?? '')
-  processed = processed.replace(/\x00CODE\x00(\d+)\x00/g, (_m, i: string) => inlineCodes[parseInt(i)] ?? '')
+  processed = processed.replace(/\x00CODE\x00(\d+)\x00/g, (_m, i: string) => `\`${inlineCodes[parseInt(i)] ?? ''}\``)
 
   // Step 7: Restore escaped dollar signs as literal $
   processed = processed.replace(/\x00ESCDOLLAR\x00\d+\x00/g, '$')
