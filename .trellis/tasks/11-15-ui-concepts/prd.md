@@ -206,7 +206,7 @@
 
 - **DB**：`docker/init/migrations/<date>-article-top.sql`：`ALTER TABLE t_article ADD COLUMN is_top TINYINT NOT NULL DEFAULT 0 COMMENT '置顶'` + `top_time DATETIME NULL`（用于多篇置顶时排序），同步更新 `schema.sql`。
 - **后端**：`ArticleDO` / 列表和详情 DTO 加 `isTop`；列表查询支持 `isTop` 过滤；后台“设为置顶 / 取消”接口（仅 ADMIN / 作者本人）；Redis 里文章列表的缓存要失效。
-- **前端**：Dashboard 文章表加置顶开关；`HomeLead` 优先取置顶（多篇取 `top_time` 最新那篇），没有置顶就回落到最新一篇。
+- **前端**：Dashboard 文章表加置顶开关；`HomeLead` 优先取置顶（多篇取 `top_time` 最新那篇），没有置顶就回落到最新一篇；kicker 同步把 T6 的「最新」占位换成「置顶」。
 - **评审要点**：缓存失效范围、置顶是否影响分页 total。
 
 ### T15 匿名聊天死代码清理（需先评审，§2.2）
@@ -214,6 +214,15 @@
 - **背景**：后端 `ChatRateLimiter` 对 role == null 直接拒绝，前端还在展示游客额度、匿名提示和 visitorId 流程（见 `11-15-ui-audit`）。
 - **改动**：前端删掉游客额度 / 匿名提示条，未登录统一显示“登录后使用”；`visitorId` 参数后端仍接受的话，前端可以保留传参，但不要再暴露在 UI 上（是否删管道在评审时定）；同步更新 CLAUDE.md 的 “Anonymous chat” 一节和 `.cursor/rules/ragent.mdc`。
 - **评审要点**：是否保留未来恢复游客额度的开关；会话历史的 visitorId 归属。
+
+### T17 合集连载状态与进度（需先评审，§2.4）
+
+- **背景**：T6 侧栏只做了「罗马数字 + N 篇」，概念稿还有「连载中 / 已完结 / 完成度」；`t_collection` 现只有 `article_count`，DTO 无 planned/finished（T6 偏差①收口）。
+- **DB**：`docker/init/migrations/<date>-collection-status.sql`：`ALTER TABLE t_collection ADD COLUMN planned_count INT NULL COMMENT '计划总篇数' ADD COLUMN status TINYINT NOT NULL DEFAULT 0 COMMENT '0连载中 1已完结'`，同步 `schema.sql`。
+- **后端**：`CollectionDO` + 列表/详情 DTO 加 `plannedCount`、`status`；管理端合集编辑接口接受两字段（仅 ADMIN / 作者本人）。
+- **前端**：管理端合集表单加「计划篇数 / 状态」；`HomeSidebar` 合集条目 `N 篇` → `N / planned 篇` + 进度条，status=完结时显示「已完结」；`/collections` 合集卡同步。
+- **评审要点**：`planned_count` 为 NULL 的展示形态（只显篇数还是估算进度）；`articleCount > planned` 的处理；status=已完结 与 planned_count 非空的约束关系。
+- 只依赖 T6 已落地的 HomeSidebar，与其他任务无交叠，可在 T14/T15 评审时一并过 schema。
 
 ### T16 性能 / 体验走查（收尾）
 
