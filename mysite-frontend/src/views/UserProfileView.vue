@@ -211,7 +211,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="max-w-[1080px] mx-auto px-4 py-8">
+  <div class="max-w-[1180px] mx-auto px-4 py-8">
     <!-- Loading -->
     <div v-if="loading" class="flex items-center justify-center py-20">
       <Loader2 :size="24" class="animate-spin text-text-muted" />

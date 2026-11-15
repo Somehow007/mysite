@@ -43,7 +43,7 @@ function onLeave(el: Element, done: () => void) {
 <template>
   <div class="min-h-screen flex flex-col">
     <AppHeader />
-    <main class="flex-1 w-full max-w-[1080px] mx-auto px-4 sm:px-6 py-8 sm:py-12">
+    <main class="flex-1 w-full max-w-[1180px] mx-auto px-4 sm:px-6 py-8 sm:py-12">
       <RouterView v-slot="{ Component }">
         <Transition
           mode="out-in"

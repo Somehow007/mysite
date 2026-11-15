@@ -164,6 +164,32 @@
 }
 
 @layer components {
+  /* 顶栏/工具条通用 icon 按钮（T4）：34px、透明底、hover 出描边 */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.125rem;
+    height: 2.125rem;
+    flex-shrink: 0;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 200ms var(--ease-smooth), border-color 200ms var(--ease-smooth), background-color 200ms var(--ease-smooth);
+  }
+
+  .icon-btn:hover {
+    border-color: var(--border);
+    color: var(--text-primary);
+  }
+
+  .icon-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+
   .input-base {
     width: 100%;
     padding: 0.5rem 0.75rem;

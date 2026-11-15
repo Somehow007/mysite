@@ -134,6 +134,11 @@
   box-shadow: var(--shadow-hard);
 }
 
+/* 纸本方角：与 rounded-* 同用，paper 下覆盖为直角（顶栏搜索提示框/登录按钮等） */
+[data-theme^="paper"] .paper-flat {
+  border-radius: 0;
+}
+
 /* 代码块是深色底：paper-light 的 --text-muted 是为纸面设计的，在深色块上对比度不足，
    头部标签/复制按钮改用概念稿的暖灰；hover 同理换成代码高亮色，避免浅色 accent-subtle 底 */
 [data-theme="paper-light"] .code-block-header,

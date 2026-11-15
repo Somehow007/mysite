@@ -29,11 +29,11 @@ function handleToggleDark() {
   <Dropdown trigger="click" placement="bottom-end" :spacing="6">
     <template #trigger>
       <button
-        class="p-2 rounded-lg text-text-muted hover:text-accent hover:bg-accent-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 transition-all duration-200"
+        class="icon-btn"
         :aria-label="`当前主题: ${getThemeMeta(currentTheme)?.name}，点击切换`"
         aria-haspopup="true"
       >
-        <Palette :size="18" />
+        <Palette :size="17" />
       </button>
     </template>
     <template #default="{ close }">

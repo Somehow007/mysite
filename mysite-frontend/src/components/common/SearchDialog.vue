@@ -1,19 +1,26 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { Search, X, CornerDownLeft } from 'lucide-vue-next'
 import { useSearch } from '@/composables/useSearch'
 import { useRouter } from 'vue-router'
 
+// 纯弹层组件：触发入口（顶栏提示框 / 移动菜单 / ⌘K）统一走 useSearch().open()
 const { query, results, loading, isOpen, open, close, search } = useSearch()
 const router = useRouter()
 const inputRef = ref<HTMLInputElement | null>(null)
 
-function openAndFocus() {
-  open()
-  nextTick(() => {
-    if (inputRef.value) inputRef.value.focus()
-  })
-}
+let openerEl: HTMLElement | null = null
+
+watch(isOpen, (val) => {
+  if (val) {
+    openerEl = document.activeElement as HTMLElement | null
+    nextTick(() => inputRef.value?.focus())
+  } else {
+    // 关闭时把焦点还给触发入口（移动菜单入口关闭菜单后已卸载，跳过）
+    if (openerEl?.isConnected) openerEl.focus()
+    openerEl = null
+  }
+})
 
 function handleKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -21,7 +28,7 @@ function handleKeydown(e: KeyboardEvent) {
     if (isOpen.value) {
       close()
     } else {
-      openAndFocus()
+      open()
     }
   }
   if (e.key === 'Escape' && isOpen.value) {
@@ -48,14 +55,6 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <button
-    @click="openAndFocus"
-    class="p-2 rounded-lg text-text-muted hover:text-accent hover:bg-accent-subtle transition-all duration-200"
-    aria-label="搜索"
-  >
-    <Search :size="18" />
-  </button>
-
   <teleport to="body">
     <transition name="fade">
       <div
