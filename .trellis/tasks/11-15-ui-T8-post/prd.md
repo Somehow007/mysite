@@ -85,6 +85,36 @@
 - 移动端文章页暂无「问这篇」入口——概念稿由 T9 dock 承接，T8 仅桌面右栏 AskArticleCard。
 - 收藏 snav 进度点数=可见已发布篇数；私有/未发布文章不计入（与 prev/next 口径一致）。
 
+**走查记录（2026-11-15 第二轮，DOM 级复核 + 交互实测）**
+
+新增 `scripts/t8-walkthrough.mjs`：**38/38 PASS**
+
+- A 滚动联动：TOC active 切换、已读 % / 剩余分钟实时更新、顶部 2px 进度条、TOC 点击滚动到位。
+- B 分享/收藏/snav：分享复制链接+toast；匿名收藏→/login?redirect=本篇；snav 下一篇
+  翻页后滚动回顶（router scrollBehavior top:0）+ 徽标「第 N/M 篇」随文章刷新。
+- C 登录态收藏：刊头/文末两个 FavoriteButton 计数同步（props 回写 + result.favoriteCount
+  双通道收敛一致）；移动目录 FAB→抽屉打开→点项滚动→抽屉自关。
+- D 剩余 5 主题（aurora/rose-garden/ocean-breeze/warm-sunset/liquid-glass）横向溢出=0、
+  console 0 error。
+- E 降级：短文章无 TOC 时提问卡仍渲染；无封面文章不渲染 .post-cover。
+
+代码级复核结论：
+
+- `--border-strong` 由 tokens.css 全局兜底（aurora 未定义也安全回落 --border）。
+- `.prose` serif 为存量基线，paper 覆盖层只做尺寸/装饰；非 paper 主题不受影响。
+- `.prose` 仅 ArticleContent 消费（仅 BlogPost 使用），无跨页面外溢。
+- 封面出血 -16/-24px 精确抵消 main px-4/sm:px-6；post→post 复用组件时
+  router scrollBehavior 已回顶，fetchArticle 重新加载。
+- usePendingAsk 跨页一次性语义：path 不匹配即丢弃，防止文章暂存被首页误消费
+  （文章上下文只在 /post/:id 注入，设计正确）。
+- FavoriteButton 双实例计数：toggle 方先拿 result.favoriteCount（权威值），
+  另一实例经 props 回写收敛，单用户场景一致。
+
+走查发现并修复：
+
+1. `.post-kicker` 原 `v-if=article.categoryName`，未分类文章缺 kicker chip 而面包屑
+   显示「未分类」→ 统一回退为 `categoryName || '未分类'`。
+
 **后续**
 
 - T9（移动 dock/抽屉）落地后文章页移动提问入口补齐；T11 聊天面板换肤。

@@ -52,7 +52,7 @@ const authorInitial = computed(() => props.article.authorName?.charAt(0) || '·'
 
     <header class="post-head">
       <div class="post-kicker-row">
-        <span v-if="article.categoryName" class="post-kicker">{{ article.categoryName }}</span>
+        <span class="post-kicker">{{ article.categoryName || '未分类' }}</span>
         <RouterLink
           v-if="series"
           :to="`/collection/${series.collectionId}`"
