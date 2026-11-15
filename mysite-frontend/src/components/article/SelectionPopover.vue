@@ -104,11 +104,14 @@ function update() {
   const ph = el?.offsetHeight || 40
   let left = rect.left + rect.width / 2 - pw / 2
   left = Math.max(VIEW_PAD, Math.min(left, window.innerWidth - pw - VIEW_PAD))
+  // 上边界须让出 sticky header：贴 header 下缘的选区若把 popover 放上方会被 z-50 遮住
+  const headerBottom = document.querySelector('header.sticky')?.getBoundingClientRect().bottom ?? 0
+  const topClear = Math.max(VIEW_PAD, headerBottom)
   // 优先选区上方；顶部空间不足翻到下方；再不够则钳进视口
   let top = rect.top - ph - GAP
-  if (top < VIEW_PAD) top = rect.bottom + GAP
+  if (top < topClear) top = rect.bottom + GAP
   if (top + ph > window.innerHeight - VIEW_PAD) {
-    top = Math.max(VIEW_PAD, window.innerHeight - ph - VIEW_PAD)
+    top = Math.max(topClear, window.innerHeight - ph - VIEW_PAD)
   }
   pos.value = { top, left }
   selectedText.value = sel.text

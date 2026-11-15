@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import { Send, Loader2, AlertCircle, RefreshCw, LogIn } from 'lucide-vue-next'
 import { getArticleComments, createComment, toggleCommentLike, deleteComment } from '@/api/comment'
 import { useUserStore } from '@/stores/user'
@@ -131,13 +131,21 @@ function canDelete(comment: Comment): boolean {
 
 // ── 选区「引用」预填（T10）────────────────────────────────
 // quote 渲染为 markdown 引用块；已有草稿时引用块置顶拼接
+let quoteFocusTimer = 0
+let quoteRestoreTimer = 0
 function applyQuote(quote: string, behavior: ScrollBehavior = 'smooth') {
   const block = quote.split('\n').map(line => `> ${line}`).join('\n')
   newContent.value = newContent.value.trim()
     ? `${block}\n\n${newContent.value}`
     : `${block}\n\n`
   nextTick(() => {
-    rootEl.value?.scrollIntoView({ behavior, block: 'start' })
+    const ta = rootEl.value?.querySelector('textarea')
+    // 目标是评论框本身：block:'center' 在「评论区贴近页底、滚动余量不足」
+    // 的页面上仍能让输入框落进视口（block:'start' 会被 max-scroll 截停）。
+    ta?.scrollIntoView({ behavior, block: 'center' })
+    // smooth 滚动长距离落地慢、且懒加载图片可能推移目标位置：
+    // 延迟 focus 让浏览器自带的 focus-scroll 做最终校正，同时落光标。
+    quoteFocusTimer = window.setTimeout(() => ta?.focus(), behavior === 'smooth' ? 650 : 50)
   })
 }
 
@@ -154,9 +162,14 @@ watch(() => props.articleId, (id) => {
   const q = takeCommentQuote(id)
   if (q && hasAuthSession()) {
     // 延迟跳转：等 router scrollBehavior 归位后再滚到评论框
-    setTimeout(() => applyQuote(q, 'auto'), 500)
+    quoteRestoreTimer = window.setTimeout(() => applyQuote(q, 'auto'), 500)
   }
 }, { immediate: true })
+
+onBeforeUnmount(() => {
+  clearTimeout(quoteFocusTimer)
+  clearTimeout(quoteRestoreTimer)
+})
 </script>
 
 <template>
