@@ -14,3 +14,7 @@
 - 2026-11-14 | 漂移修复：11-12-takeover-survey 移入 archive/2026-11/（归档最后一步）；AGENTS.md §1 重写为 verify.sh quick/full + needs-infra×5 + ci.yml + deploy 跑 hermetic 现状；AGENTS/MAP/CHANGES 任务路径指针同步归档位 | → `AGENTS.md` §1 + 本 commit
 - 2026-11-14 | 服务器 Phase1 实测：2G 机已超订——swap 用 ~910M（mysite JVM/mysqld 换出最多），MySQL 容器顶格 300MiB cap 97.8%，available 仅 ~432Mi；无 OOM、负载近零；决策点=A cap/调优、B zram、C Xmx、D 迁出另项目 | → `.trellis/tasks/11-14-server-phase1-resource-check/prd.md`
 - 2026-11-14 | 服务器 Phase1 处置落地：zram 983MiB(prio100,zstd) 上线 + MySQL performance_schema=OFF（compose 同步 repo/服务器，重建容器）；mysqld 97.8%→73% cap，swap 989→685Mi，available 432→574Mi；Xmx/patrolinspect 未动 | → `.trellis/tasks/11-14-server-phase1-resource-check/prd.md` Resolution
+- 2026-11-15 | UI 调研+运行时实测（Playwright 25 截图+DOM/样式提取）：站点能跑但匿名聊天 UI 与后端限流矛盾、文章页不显示封面、零 webfont、无 404/返回兜底、三套分页并存；docker Hub 不通走 daocloud，本地 brew PG 顶替 pgvector | → `.trellis/tasks/11-15-ui-audit/prd.md`
+- 2026-11-15 | 手帐剥离立项：study-journey 建立独立 AGENTS/.trellis；v6 考研向 UI 概念稿 + ADR(Hono+SQLite) + 数据模型 v3 + 剥离 S0–S5 + 路线图；mysite 零改动，未来 S4 清理消费点已列 15 项 | → `.trellis/tasks/archive/2026-11/11-15-journal-separation-design/prd.md` → `study-journey/docs/separation-plan.md`
+2026-11-15 | UI 重构定稿纸本方向（A+C 提问），出首页/详情/移动端稿 + 15 个实现任务 | → .trellis/tasks/11-15-ui-concepts/prd.md
+- 2026-11-15 | study-journey 仓库移出 mysite 工作目录，改为平级兄弟仓库 ../study-journey（手帐独立化第一步）；mysite 侧仅更新 MAP/journal.mdc/AGENTS 路径描述，零代码改动 | → `docs/MAP.md` + 手帐仓库 `.trellis/CHANGES.md`

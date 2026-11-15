@@ -6,7 +6,7 @@ alwaysApply: false
 
 # 学习手帐
 
-本仓库目前 **只有后端**（前端在独立仓库 `study-journey/`）。前缀 `/api/journal`（不是 `/v1`），`WebSecurityConfig` 中 `hasRole("ADMIN")`。
+本仓库目前 **只有后端**（前端+后续后端在平级独立仓库 `../study-journey`）。前缀 `/api/journal`（不是 `/v1`），`WebSecurityConfig` 中 `hasRole("ADMIN")`。
 
 `user_id` 只从 `UserContext` 解析，请求体/路径里不要接收 userId。数据按用户隔离。
 

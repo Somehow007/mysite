@@ -8,7 +8,7 @@
 
 个人博客 + RAG AI 问答 + 学习手帐三合一的 **Spring Boot 单体后端**（8081），
 配 **Vue 3 主站前端**（`mysite-frontend/`，dev 5173 代理 `/v1`→8081），
-以及**独立仓库**的手帐前端 `study-journey/`（部署到 `/journal/`）。
+以及**独立仓库**的手帐 `../study-journey`（平级，前端+剥离中后端，部署到 `/journal/`）。
 持久层：MySQL（博客+手帐）/ PostgreSQL+pgvector（RAG）/ Redis（缓存+限流）/ Elasticsearch（可选搜索）。
 
 ## 1. 仓库布局
@@ -20,7 +20,7 @@
 | `src/main/resources/mapper/` | 8 个 MyBatis XML，全部 `#{}` 参数化（无 `${}` 拼接） | `ls mapper/`、`grep '\${'` 无命中 |
 | `src/test/java/` | 40 个测试类；**无 src/test/resources** → 测试复用 application.yaml 连真实本地库 | `find src/test -name '*.java'` |
 | `mysite-frontend/` | 主站 Vue3+TS+Vite+Pinia，127 个 src 文件、25 个 view | `find mysite-frontend/src` |
-| `study-journey/` | ⚠ 独立 git 仓库嵌套在工作目录（remote=Somehow007/study-journel.git），手帐前端源码，未被父仓库 ignore | `study-journey/.git`、`git -C study-journey remote -v`、`git check-ignore` 否 |
+| `../study-journey`（平级兄弟仓库，2026-11-15 起不再嵌套） | 独立 git 仓库（remote=Somehow007/study-journel.git），手帐完整仓库（前端+剥离中后端+规范），规范以其自身 `AGENTS.md` 为准 | `git -C ../study-journey remote -v` |
 | `docker/` | docker-compose（MySQL8.4/Redis7/PG17+pgvector，ES/ollama 未启用或注释）+ init SQL | `docker/docker-compose.yml`、`docker/init/` |
 | `docker/init/` | schema.sql(19 表) + journal-schema.sql(7 表) + ragent-schema.sql(9 表) + data.sql(种子) + migrations/ | `grep -c 'CREATE TABLE'` 实测 |
 | `deploy/` | 构建打包 + 生产配置 + nginx + 运维脚本 | `deploy/deploy.sh`、`server-deploy.sh`、`config/application-production.yml`、`nginx/mysite.conf` |
