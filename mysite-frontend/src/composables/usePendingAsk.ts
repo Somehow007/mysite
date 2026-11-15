@@ -39,6 +39,40 @@ export function takePendingAsk(path?: string): string | null {
   }
 }
 
+// ── 选区「问 AI 这段」的匿名暂存（T10）────────────────────────
+// 与 pendingAsk 同语义：匿名选中正文点「问 AI」先跳登录，
+// 回跳文章页后 BlogPost 取出并以 launcher.open({ quote }) 恢复引用条。
+
+const PENDING_QUOTE_KEY = 'mysite_pending_quote'
+
+interface PendingQuotePayload {
+  quote: string
+  path?: string
+}
+
+export function stashPendingQuote(quote: string, path: string) {
+  sessionStorage.setItem(
+    PENDING_QUOTE_KEY,
+    JSON.stringify({ quote, path } satisfies PendingQuotePayload),
+  )
+}
+
+/** 取出并清除暂存引用（无论是否命中都清除，保证一次性） */
+export function takePendingQuote(path?: string): string | null {
+  const raw = sessionStorage.getItem(PENDING_QUOTE_KEY)
+  if (!raw) return null
+  sessionStorage.removeItem(PENDING_QUOTE_KEY)
+  try {
+    const pending = JSON.parse(raw) as PendingQuotePayload
+    const q = pending.quote?.trim()
+    if (!q) return null
+    if (pending.path && path && pending.path !== path) return null
+    return q
+  } catch {
+    return null
+  }
+}
+
 /** 是否具备可发消息的登录态（userStore 可能还在初始化，token 兜底） */
 export function hasAuthSession(): boolean {
   const userStore = useUserStore()

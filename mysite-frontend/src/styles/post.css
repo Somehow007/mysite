@@ -450,4 +450,58 @@
     box-shadow: var(--shadow-hard);
     border: 1px solid var(--border-strong);
   }
+
+  /* ── 选区操作条（T10）：fixed 定位 left/top 由 SelectionPopover 给出，
+     常驻 DOM 用 visibility 控显隐（保证可测量做 clamp）；全 token 无写死色 ── */
+  .sel-pop {
+    position: fixed;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+    box-shadow: 0 10px 28px var(--shadow-color-md);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    line-height: 1;
+    white-space: nowrap;
+    visibility: hidden;
+    pointer-events: none;
+    user-select: none;
+  }
+  .sel-pop.is-visible {
+    visibility: visible;
+    pointer-events: auto;
+  }
+  .sel-pop-btn {
+    padding: 7px 11px;
+    border: 0;
+    border-radius: calc(var(--radius-md) - 2px);
+    background: transparent;
+    color: var(--text-secondary);
+    font-family: inherit;
+    font-size: inherit;
+    cursor: pointer;
+    transition: color 150ms ease, background-color 150ms ease;
+  }
+  .sel-pop-btn:hover {
+    color: var(--accent);
+    background: var(--accent-subtle);
+  }
+  .sel-pop-btn--primary {
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  /* ── 纸本专属：选区条方角 + 硬阴影（T10）── */
+  [data-theme^="paper"] .sel-pop {
+    border-radius: 0;
+    box-shadow: var(--shadow-hard);
+  }
+  [data-theme^="paper"] .sel-pop-btn {
+    border-radius: 0;
+  }
 }

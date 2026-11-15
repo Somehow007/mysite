@@ -2,6 +2,7 @@
 import { ref, watch, nextTick } from 'vue'
 import { useMarkdown } from '@/composables/useMarkdown'
 import { useImageOptimizer } from '@/composables/useImageOptimizer'
+import SelectionPopover from '@/components/article/SelectionPopover.vue'
 import type { TocItem } from '@/composables/useMarkdown'
 
 const props = defineProps<{
@@ -85,6 +86,8 @@ watch(
   async (newContent) => {
     if (newContent) {
       await render(newContent)
+      // 换文时清掉旧选区：v-html 重建 DOM 会让选区失效，popover 需感知此变化
+      window.getSelection()?.removeAllRanges()
       emit('toc-ready', toc.value)
       await nextTick()
       if (contentRef.value) {
@@ -114,4 +117,5 @@ watch(
     class="prose"
     v-html="renderedHtml"
   />
+  <SelectionPopover :container="contentRef" />
 </template>

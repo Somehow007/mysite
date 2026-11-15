@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { Send, Loader2, AlertCircle, RefreshCw, LogIn } from 'lucide-vue-next'
 import { getArticleComments, createComment, toggleCommentLike, deleteComment } from '@/api/comment'
 import { useUserStore } from '@/stores/user'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
+import { useCommentDraft, takeCommentQuote } from '@/composables/useCommentDraft'
+import { hasAuthSession } from '@/composables/usePendingAsk'
 import { getGravatarUrl } from '@/utils/gravatar'
 import { useRouter } from 'vue-router'
 import CommentItem from '@/components/comment/CommentItem.vue'
@@ -24,6 +26,8 @@ const loading = ref(false)
 const error = ref(false)
 const submitting = ref(false)
 const newContent = ref('')
+const rootEl = ref<HTMLElement | null>(null)
+const { draft } = useCommentDraft()
 
 const isLoggedIn = computed(() => userStore.isLoggedIn)
 const currentUser = computed(() => userStore.user)
@@ -125,17 +129,38 @@ function canDelete(comment: Comment): boolean {
   return false
 }
 
-watch(() => props.articleId, () => {
-  fetchComments()
+// ── 选区「引用」预填（T10）────────────────────────────────
+// quote 渲染为 markdown 引用块；已有草稿时引用块置顶拼接
+function applyQuote(quote: string, behavior: ScrollBehavior = 'smooth') {
+  const block = quote.split('\n').map(line => `> ${line}`).join('\n')
+  newContent.value = newContent.value.trim()
+    ? `${block}\n\n${newContent.value}`
+    : `${block}\n\n`
+  nextTick(() => {
+    rootEl.value?.scrollIntoView({ behavior, block: 'start' })
+  })
+}
+
+// 登录态原地引用：SelectionPopover 写入 draft，articleId 匹配才消费
+watch(draft, (d) => {
+  if (!d || d.articleId !== props.articleId) return
+  draft.value = null
+  applyQuote(d.quote)
 })
 
-onMounted(() => {
+// 匿名引用回跳恢复 + 文章切换时重取评论；immediate 覆盖首次挂载
+watch(() => props.articleId, (id) => {
   fetchComments()
-})
+  const q = takeCommentQuote(id)
+  if (q && hasAuthSession()) {
+    // 延迟跳转：等 router scrollBehavior 归位后再滚到评论框
+    setTimeout(() => applyQuote(q, 'auto'), 500)
+  }
+}, { immediate: true })
 </script>
 
 <template>
-  <div class="mt-12">
+  <div ref="rootEl" class="mt-12 scroll-mt-24">
     <h2 class="post-section-title">评论 · {{ commentCount }}</h2>
 
     <!-- 顶级评论输入区 - 已登录 -->
