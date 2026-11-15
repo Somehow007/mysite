@@ -2,19 +2,27 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { ArrowLeft, Calendar, Eye, Clock, Tag, Lock, User } from 'lucide-vue-next'
-import { getArticleById } from '@/api/article'
+import { Lock } from 'lucide-vue-next'
+import { getArticleById, getArticles } from '@/api/article'
 import { getArticleNavigation } from '@/api/collection'
-import { formatDate, calculateReadingTime } from '@/utils/date'
+import { calculateReadingTime } from '@/utils/date'
 import { useScrollProgress } from '@/composables/useScrollProgress'
 import { useFavorite } from '@/composables/useFavorite'
+import { useChatLauncher } from '@/composables/useChatLauncher'
+import { takePendingAsk, hasAuthSession } from '@/composables/usePendingAsk'
 import { useSiteStore } from '@/stores/site'
 import ArticleContent from '@/components/article/ArticleContent.vue'
 import ArticleToc from '@/components/article/ArticleToc.vue'
 import MobileTocDrawer from '@/components/article/MobileTocDrawer.vue'
+import PostHeader from '@/components/article/PostHeader.vue'
 import FavoriteButton from '@/components/article/FavoriteButton.vue'
+import ShareButton from '@/components/article/ShareButton.vue'
+import AskArticleCard from '@/components/article/AskArticleCard.vue'
+import PostRelated from '@/components/article/PostRelated.vue'
+import type { RelatedItem } from '@/components/article/PostRelated.vue'
 import CommentSection from '@/components/comment/CommentSection.vue'
 import ArticleNav from '@/components/collection/ArticleNav.vue'
+import OptimizedImage from '@/components/common/OptimizedImage.vue'
 import type { Article, ArticleNavInfo } from '@/types'
 import type { TocItem } from '@/composables/useMarkdown'
 
@@ -22,6 +30,7 @@ const route = useRoute()
 const router = useRouter()
 const { progress } = useScrollProgress()
 const { setFavoriteStatus } = useFavorite()
+const launcher = useChatLauncher()
 const siteStore = useSiteStore()
 
 const article = ref<Article | null>(null)
@@ -29,10 +38,26 @@ const loading = ref(false)
 const error = ref(false)
 const tocItems = ref<TocItem[]>([])
 const navInfo = ref<ArticleNavInfo | null>(null)
+const relatedItems = ref<RelatedItem[]>([])
 
 const readingTime = computed(() =>
   article.value?.readingTime || calculateReadingTime(article.value?.content || article.value?.summary || ''),
 )
+
+const readPct = computed(() => Math.round(progress.value * 100))
+const remainingMinutes = computed(() =>
+  Math.max(1, Math.ceil(readingTime.value * (1 - progress.value))),
+)
+
+// 合集文章或有 prev/next 时才渲染连续阅读条，避免空壳
+const showArticleNav = computed(() => {
+  const nav = navInfo.value
+  return !!nav && (
+    nav.prev != null ||
+    nav.next != null ||
+    (nav.inCollection && !!nav.collectionTitle)
+  )
+})
 
 useHead(() => ({
   title: article.value ? article.value.title : '加载中...',
@@ -43,6 +68,10 @@ useHead(() => ({
         { property: 'og:description', content: article.value.summary || '' },
         { property: 'og:type', content: 'article' },
         ...(article.value.coverImage ? [{ property: 'og:image', content: article.value.coverImage }] : []),
+        ...(article.value.createTime
+          ? [{ property: 'article:published_time', content: article.value.createTime }]
+          : []),
+        { property: 'article:modified_time', content: article.value.updateTime },
       ]
     : [],
 }))
@@ -59,12 +88,51 @@ function handleFavoriteToggle(favorited: boolean) {
 }
 
 function handleLoginRequired() {
-  router.push('/login')
+  router.push({ name: 'login', query: { redirect: route.fullPath } })
+}
+
+// 「继续读」：合集内优先取本篇之后的文章（循环），不足 3 篇用最新文章补齐
+async function loadRelated() {
+  const current = article.value
+  if (!current) return
+  const items: RelatedItem[] = []
+  const seen = new Set<string>([current.id])
+  const nav = navInfo.value
+
+  const siblings = nav?.collectionArticles ?? []
+  if (nav?.inCollection && siblings.length > 1) {
+    const idx = siblings.findIndex(a => a.id === current.id)
+    const ordered = idx >= 0
+      ? [...siblings.slice(idx + 1), ...siblings.slice(0, idx)]
+      : siblings
+    for (const s of ordered) {
+      if (items.length >= 3) break
+      if (seen.has(s.id)) continue
+      seen.add(s.id)
+      items.push({ id: s.id, title: s.title, kicker: nav.collectionTitle || '合集' })
+    }
+  }
+
+  if (items.length < 3) {
+    try {
+      const res = await getArticles({ size: 8 })
+      for (const a of res.list) {
+        if (items.length >= 3) break
+        if (seen.has(a.id)) continue
+        seen.add(a.id)
+        items.push({ id: a.id, title: a.title, kicker: a.categoryName || '文章' })
+      }
+    } catch {
+      // 「继续读」是增强项，失败静默
+    }
+  }
+  relatedItems.value = items
 }
 
 async function fetchArticle(id: string) {
   loading.value = true
   error.value = false
+  relatedItems.value = []
   try {
     const [articleData, navData] = await Promise.all([
       getArticleById(id),
@@ -75,6 +143,7 @@ async function fetchArticle(id: string) {
     if (article.value && article.value.isFavorited !== undefined) {
       setFavoriteStatus(id, article.value.isFavorited)
     }
+    void loadRelated()
   } catch {
     error.value = true
     article.value = null
@@ -94,6 +163,11 @@ onMounted(() => {
   if (route.params.id) {
     fetchArticle(route.params.id as string)
   }
+  // 未登录提问回跳恢复：暂存的问题在登录后自动打开面板并发送
+  const pending = takePendingAsk(route.fullPath)
+  if (pending && hasAuthSession()) {
+    launcher.open({ question: pending, send: true })
+  }
 })
 </script>
 
@@ -105,19 +179,29 @@ onMounted(() => {
       :style="{ width: `${progress * 100}%` }"
     />
 
-    <div v-if="loading" class="animate-pulse space-y-6">
-      <div class="skeleton h-8 w-3/4 rounded" />
-      <div class="flex gap-4">
-        <div class="skeleton h-4 w-24 rounded" />
-        <div class="skeleton h-4 w-20 rounded" />
-        <div class="skeleton h-4 w-16 rounded" />
+    <div v-if="loading" class="animate-pulse">
+      <div class="max-w-[820px] space-y-4">
+        <div class="skeleton h-3 w-32 rounded" />
+        <div class="skeleton h-12 w-4/5 rounded" />
+        <div class="skeleton h-5 w-full rounded" />
+        <div class="skeleton h-5 w-3/5 rounded" />
+        <div class="mt-7 flex items-center gap-3.5">
+          <div class="skeleton h-9 w-9 rounded-full" />
+          <div class="space-y-2">
+            <div class="skeleton h-3.5 w-32 rounded" />
+            <div class="skeleton h-3 w-52 rounded" />
+          </div>
+        </div>
       </div>
-      <div class="skeleton h-4 w-full rounded" />
-      <div class="skeleton h-4 w-5/6 rounded" />
-      <div class="skeleton h-4 w-4/5 rounded" />
-      <div class="skeleton h-64 w-full rounded-lg" />
-      <div class="skeleton h-4 w-full rounded" />
-      <div class="skeleton h-4 w-3/4 rounded" />
+      <div class="skeleton mt-6 aspect-[16/10] w-full lg:mt-9 lg:aspect-[21/9]" />
+      <div class="mt-10 max-w-[700px] space-y-4">
+        <div class="skeleton h-4 w-full rounded" />
+        <div class="skeleton h-4 w-5/6 rounded" />
+        <div class="skeleton h-4 w-4/5 rounded" />
+        <div class="skeleton h-40 w-full rounded-lg" />
+        <div class="skeleton h-4 w-full rounded" />
+        <div class="skeleton h-4 w-3/4 rounded" />
+      </div>
     </div>
 
     <div v-else-if="error" class="py-16 text-center">
@@ -131,97 +215,63 @@ onMounted(() => {
     </div>
 
     <template v-else-if="article">
-      <div class="flex gap-12 items-start">
-        <article class="flex-1 min-w-0 max-w-[720px] mx-auto">
-          <header class="mb-10">
-            <button
-              @click="router.back()"
-              class="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-accent transition-colors duration-200 mb-6 group"
-            >
-              <ArrowLeft :size="14" class="group-hover:-translate-x-0.5 transition-transform duration-200" />
-              返回
-            </button>
+      <PostHeader
+        :article="article"
+        :nav-info="navInfo"
+        :reading-time="readingTime"
+        @toggle="handleFavoriteToggle"
+        @login-required="handleLoginRequired"
+      />
 
-            <div class="flex items-start justify-between gap-4 mb-4">
-              <h1 class="text-3xl sm:text-4xl font-bold text-text-primary leading-tight tracking-tight">
-                {{ article.title }}
-              </h1>
-              <FavoriteButton
-                :article-id="article.id"
-                :initial-favorited="article.isFavorited"
-                :favorite-count="article.favoriteCount"
-                size="lg"
-                show-count
-                @toggle="handleFavoriteToggle"
-                @login-required="handleLoginRequired"
-              />
-            </div>
+      <figure v-if="article.coverImage" class="post-cover">
+        <OptimizedImage
+          :src="article.coverImage"
+          :alt="article.title"
+          fetch-priority="high"
+          :lazy="false"
+          class="h-full w-full"
+        />
+      </figure>
 
-            <div class="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-text-muted">
-              <span v-if="article.authorName" class="inline-flex items-center gap-1.5">
-                <User :size="14" />
-                <RouterLink
-                  :to="`/user/${article.authorName}`"
-                  class="hover:text-accent transition-colors font-medium text-text-secondary"
-                >
-                  {{ article.authorName }}
-                </RouterLink>
-              </span>
-              <span class="inline-flex items-center gap-1.5">
-                <Calendar :size="14" />
-                <time :datetime="article.updateTime">{{ formatDate(article.updateTime) }}</time>
-              </span>
-              <span v-if="article.viewCount > 0" class="inline-flex items-center gap-1.5">
-                <Eye :size="14" />
-                <span>{{ article.viewCount }} 阅读</span>
-              </span>
-              <span class="inline-flex items-center gap-1.5">
-                <Clock :size="14" />
-                <span>{{ readingTime }} 分钟</span>
-              </span>
-              <RouterLink
-                v-if="article.categorySlug"
-                :to="`/category/${article.categorySlug}`"
-                class="inline-flex items-center gap-1.5 hover:text-accent transition-colors duration-200"
-              >
-                <Tag :size="14" />
-                <span>{{ article.categoryName }}</span>
-              </RouterLink>
-            </div>
-
-            <div v-if="article.tags && article.tags.length > 0" class="flex flex-wrap gap-2 mt-3">
-              <RouterLink
-                v-for="tag in article.tags"
-                :key="tag.id"
-                :to="`/tag/${tag.slug}`"
-                class="text-xs px-2.5 py-1 rounded-full border border-border text-text-muted hover:text-accent hover:border-accent hover:bg-accent-subtle transition-all duration-200"
-              >
-                #{{ tag.name }}
-              </RouterLink>
-            </div>
-          </header>
-
-          <div v-if="article.visibility === 1" class="mb-6 p-3 rounded-lg bg-accent-subtle border border-accent/30 text-accent text-sm flex items-center gap-2">
+      <div class="post-layout">
+        <article class="min-w-0">
+          <div v-if="article.visibility === 1" class="post-private-note">
             <Lock :size="14" />
             <span>这篇文章仅自己可见</span>
           </div>
 
           <ArticleContent :content="article.content" @toc-ready="handleTocReady" />
 
-          <div class="mt-10 pt-6 border-t border-border flex items-center justify-center gap-3">
-            <span class="text-sm text-text-muted">觉得有用？收藏起来吧</span>
-            <FavoriteButton
-              :article-id="article.id"
-              :initial-favorited="article.isFavorited"
-              :favorite-count="article.favoriteCount"
-              size="md"
-              show-count
-              @toggle="handleFavoriteToggle"
-              @login-required="handleLoginRequired"
-            />
+          <div class="post-end">
+            <RouterLink
+              v-for="tag in article.tags ?? []"
+              :key="tag.id"
+              :to="`/tag/${tag.slug}`"
+              class="post-tag"
+            >
+              #{{ tag.name }}
+            </RouterLink>
+            <div class="post-end-acts">
+              <FavoriteButton
+                :article-id="article.id"
+                :initial-favorited="article.isFavorited"
+                :favorite-count="article.favoriteCount"
+                variant="bar"
+                show-count
+                @toggle="handleFavoriteToggle"
+                @login-required="handleLoginRequired"
+              />
+              <ShareButton :title="article.title" />
+            </div>
           </div>
 
-          <ArticleNav v-if="navInfo" :nav-info="navInfo" />
+          <ArticleNav
+            v-if="showArticleNav && navInfo"
+            :nav-info="navInfo"
+            :article-id="article.id"
+          />
+
+          <PostRelated :items="relatedItems" />
 
           <CommentSection
             v-if="siteStore.site.commentEnabled !== false"
@@ -229,8 +279,14 @@ onMounted(() => {
           />
         </article>
 
-        <aside class="hidden lg:flex flex-col w-56 shrink-0 sticky top-20 h-[calc(100vh-6rem)]">
-          <ArticleToc :items="tocItems" />
+        <aside class="post-rail">
+          <div class="post-toc-wrap">
+            <ArticleToc :items="tocItems" />
+            <div v-if="tocItems.length" class="post-rail-pct">
+              已读 {{ readPct }}% · 剩约 {{ remainingMinutes }} 分钟
+            </div>
+          </div>
+          <AskArticleCard />
         </aside>
       </div>
 

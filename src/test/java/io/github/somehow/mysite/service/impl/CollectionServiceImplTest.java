@@ -430,4 +430,47 @@ class CollectionServiceImplTest {
         assertTrue(navInfo.getInCollection());
         assertNull(navInfo.getPrev());
     }
+
+    @Test
+    void getArticleNavigation_inCollection_shouldReturnVisibleCollectionArticles() {
+        CollectionArticleDO ca = createCollectionArticleDO(1L, COLLECTION_ID, ARTICLE_ID_2, 1);
+        when(collectionArticleMapper.selectOne(any())).thenReturn(ca);
+
+        CollectionDO collection = createCollectionDO(COLLECTION_ID, AUTHOR_ID);
+        when(collectionMapper.selectOne(any())).thenReturn(collection);
+
+        // 5 篇关系：a1/a2/a3 公开已发布，a4 他人私有，a5 草稿
+        Long privateOtherId = 444444L;
+        Long draftId = 555555L;
+        List<CollectionArticleDO> allArticles = Arrays.asList(
+                createCollectionArticleDO(10L, COLLECTION_ID, ARTICLE_ID_1, 0),
+                createCollectionArticleDO(20L, COLLECTION_ID, ARTICLE_ID_2, 1),
+                createCollectionArticleDO(30L, COLLECTION_ID, ARTICLE_ID_3, 2),
+                createCollectionArticleDO(40L, COLLECTION_ID, privateOtherId, 3),
+                createCollectionArticleDO(50L, COLLECTION_ID, draftId, 4)
+        );
+        when(collectionArticleMapper.selectList(any())).thenReturn(allArticles);
+
+        ArticleDO a1 = createArticleDO(ARTICLE_ID_1, 1);
+        ArticleDO a2 = createArticleDO(ARTICLE_ID_2, 1);
+        ArticleDO a3 = createArticleDO(ARTICLE_ID_3, 1);
+        ArticleDO a4 = createArticleDO(privateOtherId, 1);
+        a4.setVisibility(1);
+        a4.setAuthorId(999999L); // 非当前访问者（AUTHOR_ID）
+        ArticleDO a5 = createArticleDO(draftId, 0);
+        when(articleMapper.selectList(any())).thenReturn(Arrays.asList(a1, a2, a3, a4, a5));
+        // prev/next 的 selectOne 序列
+        when(articleMapper.selectOne(any())).thenReturn(a1, a3);
+
+        ArticleNavInfoRespDTO navInfo = collectionService.getArticleNavigation(ARTICLE_ID_2);
+
+        assertTrue(navInfo.getInCollection());
+        // 只含可见已发布文章，按 sort_order 有序
+        assertNotNull(navInfo.getCollectionArticles());
+        assertEquals(3, navInfo.getCollectionArticles().size());
+        assertEquals(ARTICLE_ID_1.toString(), navInfo.getCollectionArticles().get(0).getId());
+        assertEquals(ARTICLE_ID_2.toString(), navInfo.getCollectionArticles().get(1).getId());
+        assertEquals(ARTICLE_ID_3.toString(), navInfo.getCollectionArticles().get(2).getId());
+        assertEquals("测试文章" + ARTICLE_ID_2, navInfo.getCollectionArticles().get(1).getTitle());
+    }
 }

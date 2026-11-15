@@ -69,6 +69,17 @@ function enhanceCodeBlocks(container: HTMLElement) {
   }
 }
 
+// 宽表格包一层横向滚动容器，避免撑破文章列造成页面级横向滚动
+function enhanceTables(container: HTMLElement) {
+  for (const table of container.querySelectorAll('table')) {
+    if (table.parentElement?.classList.contains('table-wrap')) continue
+    const wrap = document.createElement('div')
+    wrap.className = 'table-wrap'
+    table.parentNode?.insertBefore(wrap, table)
+    wrap.appendChild(table)
+  }
+}
+
 watch(
   () => props.content,
   async (newContent) => {
@@ -79,6 +90,7 @@ watch(
       if (contentRef.value) {
         processContainer(contentRef.value)
         enhanceCodeBlocks(contentRef.value)
+        enhanceTables(contentRef.value)
       }
     }
   },

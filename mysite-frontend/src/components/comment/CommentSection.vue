@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { MessageSquare, Send, Loader2, AlertCircle, RefreshCw, LogIn } from 'lucide-vue-next'
+import { Send, Loader2, AlertCircle, RefreshCw, LogIn } from 'lucide-vue-next'
 import { getArticleComments, createComment, toggleCommentLike, deleteComment } from '@/api/comment'
 import { useUserStore } from '@/stores/user'
 import { useToast } from '@/composables/useToast'
@@ -135,15 +135,11 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mt-12 pt-8 border-t border-border">
-    <div class="flex items-center gap-2 mb-6">
-      <MessageSquare :size="20" class="text-accent" />
-      <h3 class="text-lg font-semibold text-text-primary">评论</h3>
-      <span class="text-sm text-text-muted">({{ commentCount }})</span>
-    </div>
+  <div class="mt-12">
+    <h2 class="post-section-title">评论 · {{ commentCount }}</h2>
 
     <!-- 顶级评论输入区 - 已登录 -->
-    <div v-if="isLoggedIn" class="mb-8 p-4 rounded-lg bg-bg-code border border-border">
+    <div v-if="isLoggedIn" class="mb-8 mt-4 p-4 rounded-lg paper-flat bg-bg-elevated border border-border">
       <div class="flex items-center gap-3 mb-3">
         <img
           :src="currentUser?.avatar || getGravatarUrl(currentUser?.email)"
@@ -157,14 +153,14 @@ onMounted(() => {
         v-model="newContent"
         rows="3"
         placeholder="写下你的评论..."
-        class="w-full px-3 py-2 text-sm rounded-md border border-border bg-bg-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
+        class="w-full px-3 py-2 text-sm rounded-md paper-flat border border-border bg-bg-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors resize-none"
       />
 
       <div class="flex justify-end mt-3">
         <button
           @click="handleSubmit"
           :disabled="submitting || !newContent.trim()"
-          class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md bg-accent text-white hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-md paper-flat bg-accent text-white hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           <Loader2 v-if="submitting" :size="14" class="animate-spin" />
           <Send v-else :size="14" />
@@ -174,7 +170,7 @@ onMounted(() => {
     </div>
 
     <!-- 评论输入区 - 未登录 -->
-    <div v-else class="mb-8 p-4 rounded-lg bg-bg-code border border-border text-center">
+    <div v-else class="mb-8 mt-4 p-4 rounded-lg paper-flat bg-bg-elevated border border-border text-center">
       <p class="text-sm text-text-muted mb-3">登录后即可参与评论</p>
       <button
         @click="router.push('/login')"

@@ -30,6 +30,7 @@ public class ArticleSelectRespDTO {
     private Integer readingTime;
     private Integer visibility;
     private Boolean isFavorited;
+    private Date createTime;
     private Date updateTime;
     private List<TagInfo> tags;
 

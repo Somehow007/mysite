@@ -71,7 +71,7 @@ async function submitReply() {
       <img
         :src="getAvatarUrl(comment)"
         :alt="comment.nickname"
-        class="w-9 h-9 rounded-full flex-shrink-0 bg-bg-code"
+        class="w-9 h-9 rounded-full flex-shrink-0 bg-bg-code border border-border"
         loading="lazy"
       />
 

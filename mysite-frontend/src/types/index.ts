@@ -78,6 +78,7 @@ export interface Article {
   isFavorited?: boolean
   visibility?: number
   tags: Tag[] | null
+  createTime?: string
   updateTime: string
   collectionId?: string | null
   collectionTitle?: string | null
@@ -299,6 +300,8 @@ export interface ArticleNavInfo {
   inCollection: boolean
   collectionId: string | null
   collectionTitle: string | null
+  /** 合集内当前访问者可见的已发布文章（按 sort_order 有序）；非合集文章为 null */
+  collectionArticles?: { id: string; title: string }[] | null
 }
 
 export interface CollectionListItem extends Collection {}

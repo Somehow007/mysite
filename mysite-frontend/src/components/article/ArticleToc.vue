@@ -314,7 +314,7 @@ onUnmounted(() => {
     @wheel="handleWheel"
   >
     <div class="flex items-center justify-between mb-3 px-1 shrink-0">
-      <h4 class="text-xs font-semibold uppercase tracking-wider text-text-muted">
+      <h4 class="text-xs font-bold uppercase tracking-[0.16em] text-text-muted border-b-2 border-border-strong pb-1.5">
         目录
       </h4>
       <button
@@ -339,7 +339,7 @@ onUnmounted(() => {
             class="group/toc flex items-center w-full text-left py-1.5 pl-3 transition-all duration-200 border-l-2 -ml-px text-[13px] leading-snug"
             :class="[
               activeId === node.id
-                ? 'border-accent text-accent font-medium bg-accent-subtle/50'
+                ? 'border-accent text-text-primary font-semibold'
                 : 'border-transparent text-text-muted hover:text-text-secondary hover:border-border',
             ]"
             :aria-current="activeId === node.id ? 'true' : undefined"
@@ -370,7 +370,7 @@ onUnmounted(() => {
                     class="group/toc flex items-center w-full text-left py-1.5 pl-3 transition-all duration-200 border-l-2 -ml-px text-[13px] leading-snug"
                     :class="[
                       activeId === child.id
-                        ? 'border-accent text-accent font-medium bg-accent-subtle/50'
+                        ? 'border-accent text-text-primary font-semibold'
                         : 'border-transparent text-text-muted hover:text-text-secondary hover:border-border',
                     ]"
                     :aria-current="activeId === child.id ? 'true' : undefined"
@@ -405,7 +405,7 @@ onUnmounted(() => {
                             class="group/toc flex items-center w-full text-left py-1.5 pl-3 transition-all duration-200 border-l-2 -ml-px text-[13px] leading-snug"
                             :class="[
                               activeId === grandchild.id
-                                ? 'border-accent text-accent font-medium bg-accent-subtle/50'
+                                ? 'border-accent text-text-primary font-semibold'
                                 : 'border-transparent text-text-muted hover:text-text-secondary hover:border-border',
                             ]"
                             :aria-current="
@@ -447,7 +447,7 @@ onUnmounted(() => {
                                   class="block w-full text-left py-1.5 pl-3 transition-all duration-200 border-l-2 -ml-px text-[13px] leading-snug"
                                   :class="[
                                     activeId === gg.id
-                                      ? 'border-accent text-accent font-medium bg-accent-subtle/50'
+                                      ? 'border-accent text-text-primary font-semibold'
                                       : 'border-transparent text-text-muted hover:text-text-secondary hover:border-border',
                                   ]"
                                   :aria-current="

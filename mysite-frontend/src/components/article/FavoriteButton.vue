@@ -5,13 +5,17 @@ import { useFavorite } from '@/composables/useFavorite'
 import { useToast } from '@/composables/useToast'
 import { useUserStore } from '@/stores/user'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   articleId: string
   initialFavorited?: boolean
   favoriteCount?: number
   size?: 'sm' | 'md' | 'lg'
   showCount?: boolean
-}>()
+  /** icon=圆形图标钮（列表用）；bar=带「收藏」文字的条形钮（文章页刊头/文末用） */
+  variant?: 'icon' | 'bar'
+}>(), {
+  variant: 'icon',
+})
 
 const emit = defineEmits<{
   'toggle': [favorited: boolean]
@@ -88,6 +92,33 @@ async function handleToggle() {
 
 <template>
   <button
+    v-if="variant === 'bar'"
+    @click="handleToggle"
+    class="fav-bar"
+    :class="{ 'is-faved': favorited }"
+    :disabled="pending"
+    :aria-label="favorited ? '取消收藏' : '收藏文章'"
+  >
+    <span class="relative" :class="{ 'animate-favorite-bounce': animating }">
+      <Loader2 v-if="pending" :size="14" class="animate-spin" />
+      <Heart
+        v-else
+        :size="14"
+        :fill="favorited ? 'currentColor' : 'none'"
+        :stroke-width="favorited ? 0 : 2"
+        class="transition-all duration-200"
+      />
+    </span>
+    <span class="fav-label">收藏</span>
+    <span
+      v-if="showCount && favoriteCount !== undefined"
+      class="tabular-nums"
+    >
+      {{ displayCount }}
+    </span>
+  </button>
+  <button
+    v-else
     @click="handleToggle"
     class="inline-flex items-center gap-1.5 rounded-full transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
     :class="[

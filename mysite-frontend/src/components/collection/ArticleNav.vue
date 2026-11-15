@@ -1,54 +1,70 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, BookOpen } from 'lucide-vue-next'
+import { computed } from 'vue'
 import type { ArticleNavInfo } from '@/types'
 
-defineProps<{
+const props = defineProps<{
   navInfo: ArticleNavInfo
+  /** 当前文章 id：用于在 collectionArticles 中定位「第 N / M 篇」与进度点 */
+  articleId?: string
 }>()
+
+const series = computed(() => {
+  const nav = props.navInfo
+  if (!nav.inCollection || !nav.collectionTitle) return null
+  const list = nav.collectionArticles ?? []
+  const idx = props.articleId ? list.findIndex(a => a.id === props.articleId) : -1
+  return {
+    title: nav.collectionTitle,
+    collectionId: nav.collectionId,
+    total: list.length || null,
+    index: idx >= 0 ? idx + 1 : null,
+  }
+})
+
+function dotClass(i: number): string {
+  const index = series.value?.index
+  if (!index) return ''
+  if (i + 1 === index) return 'is-cur'
+  if (i + 1 < index) return 'is-read'
+  return ''
+}
 </script>
 
 <template>
-  <nav class="border-t border-border pt-6 mt-10" aria-label="文章导航">
-    <div v-if="navInfo.inCollection && navInfo.collectionTitle" class="mb-4 text-center">
+  <nav class="post-snav" aria-label="文章导航">
+    <div v-if="series" class="post-snav-header">
       <RouterLink
-        :to="`/collection/${navInfo.collectionId}`"
-        class="inline-flex items-center gap-1.5 text-sm text-accent hover:underline"
+        v-if="series.collectionId"
+        :to="`/collection/${series.collectionId}`"
+        class="min-w-0 hover:text-accent transition-colors"
       >
-        <BookOpen :size="14" />
-        {{ navInfo.collectionTitle }}
+        <b class="truncate">{{ series.title }}</b>
       </RouterLink>
+      <b v-else class="truncate">{{ series.title }}</b>
+      <span v-if="series.index && series.total">第 {{ series.index }} / {{ series.total }} 篇</span>
     </div>
 
-    <div class="flex items-stretch gap-4">
+    <div v-if="series?.total" class="post-snav-dots" aria-hidden="true">
+      <i v-for="n in series.total" :key="n" :class="dotClass(n - 1)" />
+    </div>
+
+    <div v-if="navInfo.prev || navInfo.next" class="post-snav-pn">
       <RouterLink
         v-if="navInfo.prev"
         :to="`/post/${navInfo.prev.id}`"
-        class="flex-1 group flex items-center gap-3 p-4 rounded-lg border border-border hover:border-accent/30 hover:bg-accent-subtle/50 transition-all duration-200"
+        class="group"
       >
-        <ChevronLeft :size="18" class="text-text-muted group-hover:text-accent transition-colors shrink-0" />
-        <div class="min-w-0">
-          <span class="text-xs text-text-muted block mb-0.5">上一篇</span>
-          <span class="text-sm font-medium text-text-primary group-hover:text-accent transition-colors line-clamp-1">
-            {{ navInfo.prev.title }}
-          </span>
-        </div>
+        <small>← 上一篇</small>
+        <b class="transition-colors group-hover:text-accent">{{ navInfo.prev.title }}</b>
       </RouterLink>
-      <div v-else class="flex-1" />
-
       <RouterLink
         v-if="navInfo.next"
         :to="`/post/${navInfo.next.id}`"
-        class="flex-1 group flex items-center justify-end gap-3 p-4 rounded-lg border border-border hover:border-accent/30 hover:bg-accent-subtle/50 transition-all duration-200 text-right"
+        class="pn-next group"
       >
-        <div class="min-w-0">
-          <span class="text-xs text-text-muted block mb-0.5">下一篇</span>
-          <span class="text-sm font-medium text-text-primary group-hover:text-accent transition-colors line-clamp-1">
-            {{ navInfo.next.title }}
-          </span>
-        </div>
-        <ChevronRight :size="18" class="text-text-muted group-hover:text-accent transition-colors shrink-0" />
+        <small>下一篇 →</small>
+        <b class="transition-colors group-hover:text-accent">{{ navInfo.next.title }}</b>
       </RouterLink>
-      <div v-else class="flex-1" />
     </div>
   </nav>
 </template>

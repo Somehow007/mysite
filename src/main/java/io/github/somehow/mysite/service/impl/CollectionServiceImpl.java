@@ -465,6 +465,37 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
                 }
             }
 
+            // 合集可见文章列表：供前端「第 N / M 篇」徽标与进度点。
+            // 口径与 prev/next 一致——已发布 + 当前访问者可见（私有文章仅作者/管理员可见）。
+            List<Long> memberIds = allArticles.stream()
+                    .map(CollectionArticleDO::getArticleId)
+                    .collect(Collectors.toList());
+            Map<Long, ArticleDO> memberMap = articleMapper.selectList(Wrappers.<ArticleDO>lambdaQuery()
+                            .select(ArticleDO::getId, ArticleDO::getTitle, ArticleDO::getPublished,
+                                    ArticleDO::getVisibility, ArticleDO::getAuthorId)
+                            .in(ArticleDO::getId, memberIds)
+                            .eq(ArticleDO::getDelFlag, 0))
+                    .stream()
+                    .collect(Collectors.toMap(ArticleDO::getId, a -> a));
+            boolean admin = UserContext.isAdmin();
+            String viewerId = UserContext.getUserId();
+            List<ArticleNavInfoRespDTO.NavArticle> visibleMembers = new ArrayList<>();
+            for (CollectionArticleDO member : allArticles) {
+                ArticleDO memberArticle = memberMap.get(member.getArticleId());
+                if (memberArticle == null || !Integer.valueOf(1).equals(memberArticle.getPublished())) {
+                    continue;
+                }
+                if (!admin && Integer.valueOf(1).equals(memberArticle.getVisibility())
+                        && (viewerId == null || !viewerId.equals(String.valueOf(memberArticle.getAuthorId())))) {
+                    continue;
+                }
+                ArticleNavInfoRespDTO.NavArticle navArticle = new ArticleNavInfoRespDTO.NavArticle();
+                navArticle.setId(member.getArticleId().toString());
+                navArticle.setTitle(memberArticle.getTitle());
+                visibleMembers.add(navArticle);
+            }
+            navInfo.setCollectionArticles(visibleMembers);
+
             if (currentIndex > 0) {
                 Long prevArticleId = allArticles.get(currentIndex - 1).getArticleId();
                 ArticleDO prevArticle = articleMapper.selectOne(applyVisibilityFilter(

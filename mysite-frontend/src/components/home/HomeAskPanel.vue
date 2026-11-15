@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
 import { useChatLauncher } from '@/composables/useChatLauncher'
+import { stashPendingAsk, takePendingAsk, hasAuthSession } from '@/composables/usePendingAsk'
 import { getKnowledgeBases } from '@/api/rag'
-import { getItem } from '@/utils/storage'
 
 // 与后端 rag.rate-limit.* 及 ChatInput 文案一致的硬编码口径（限流配置无下发通道）
 const FALLBACK_EXAMPLES = [
@@ -16,8 +16,8 @@ const FALLBACK_EXAMPLES = [
 ]
 
 const MAX_QUESTION_LENGTH = 500
-const PENDING_ASK_KEY = 'mysite_pending_ask'
 
+const route = useRoute()
 const router = useRouter()
 const siteStore = useSiteStore()
 const userStore = useUserStore()
@@ -85,8 +85,8 @@ function submit(raw?: string) {
   if (!q || q.length > MAX_QUESTION_LENGTH || !aiAvailable.value) return
   if (!userStore.isLoggedIn) {
     // 未登录：暂存问题，回跳首页后由 resumePendingAsk 自动打开面板并发送
-    sessionStorage.setItem(PENDING_ASK_KEY, JSON.stringify({ question: q }))
-    router.push({ name: 'login', query: { redirect: '/' } })
+    stashPendingAsk(q, route.fullPath)
+    router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
   launcher.open({ question: q, send: true, kbIds: enabledKbIds.value })
@@ -107,18 +107,9 @@ function handleEnter(e: KeyboardEvent) {
 // 登录回跳恢复：stash 只在「未登录点提问」时写入；token 在即可放行
 // （userStore.user 可能还在 init 拉取中，SSE 请求自行带 token）
 function resumePendingAsk() {
-  const raw = sessionStorage.getItem(PENDING_ASK_KEY)
-  if (!raw) return
-  sessionStorage.removeItem(PENDING_ASK_KEY)
-  try {
-    const pending = JSON.parse(raw) as { question?: string }
-    const q = pending.question?.trim()
-    const hasSession = userStore.isLoggedIn || !!getItem<string>('access_token')
-    if (q && hasSession && aiAvailable.value) {
-      launcher.open({ question: q, send: true, kbIds: enabledKbIds.value })
-    }
-  } catch {
-    // 坏数据忽略
+  const q = takePendingAsk(route.fullPath)
+  if (q && hasAuthSession() && aiAvailable.value) {
+    launcher.open({ question: q, send: true, kbIds: enabledKbIds.value })
   }
 }
 

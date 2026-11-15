@@ -234,6 +234,16 @@
     font-size: 0.9em;
   }
 
+  /* 宽表格横向滚动容器（ArticleContent.enhanceTables 包裹） */
+  .prose .table-wrap {
+    margin: 1.5em 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .prose .table-wrap > table {
+    margin: 0;
+  }
+
   .prose th,
   .prose td {
     padding: 0.5rem 0.75rem;
@@ -291,4 +301,120 @@
     padding-top: 1em;
     border-top: 1px solid var(--border);
   }
+}
+
+/* ── 纸本文章正文（仅 paper 主题）：衬线大字号、首字下沉、章节序号与顶线 ──
+ * 对照 .trellis/tasks/11-15-ui-concepts/final/post.html .prose */
+@layer components {
+  [data-theme^="paper"] .prose {
+    font-size: 1.125rem;
+    line-height: 1.95;
+    color: var(--text-primary);
+    counter-reset: post-section;
+  }
+  @media (max-width: 639px) {
+    [data-theme^="paper"] .prose {
+      font-size: 1.0625rem;
+      line-height: 1.9;
+    }
+  }
+
+  [data-theme^="paper"] .prose h1,
+  [data-theme^="paper"] .prose h2,
+  [data-theme^="paper"] .prose h3,
+  [data-theme^="paper"] .prose h4,
+  [data-theme^="paper"] .prose h5,
+  [data-theme^="paper"] .prose h6 {
+    font-family: var(--font-serif);
+  }
+
+  [data-theme^="paper"] .prose h2 {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1.35;
+    margin-top: 2.2em;
+    padding-top: 0.4em;
+    padding-bottom: 0;
+    border-bottom: none;
+    border-top: 1px solid var(--border);
+    counter-increment: post-section;
+  }
+  [data-theme^="paper"] .prose h2::before {
+    content: "§ " counter(post-section, decimal-leading-zero);
+    display: block;
+    margin-bottom: 4px;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+  }
+  [data-theme^="paper"] .prose h3 {
+    font-size: 1.3125rem;
+    font-weight: 700;
+    margin-top: 1.8em;
+  }
+  [data-theme^="paper"] .prose h4 { font-size: 1.125rem; }
+  @media (max-width: 639px) {
+    [data-theme^="paper"] .prose h2 { font-size: 1.4375rem; }
+    [data-theme^="paper"] .prose h3 { font-size: 1.1875rem; }
+  }
+
+  /* 首字下沉：仅正文第一个自然段 */
+  [data-theme^="paper"] .prose > p:first-of-type::first-letter {
+    float: left;
+    padding: 6px 10px 0 0;
+    font-size: 3.6em;
+    font-weight: 900;
+    line-height: 0.9;
+    color: var(--accent);
+  }
+
+  [data-theme^="paper"] .prose a {
+    color: var(--accent);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+
+  [data-theme^="paper"] .prose code {
+    padding: 1px 5px;
+    border-radius: 0;
+  }
+  [data-theme^="paper"] .prose pre { border-radius: 0; }
+  [data-theme^="paper"] .code-block-wrapper { border-radius: 0; }
+  [data-theme^="paper"] .code-block-wrapper:has(pre.code-block:first-child) pre.code-block {
+    border-radius: 0;
+  }
+
+  [data-theme^="paper"] .prose blockquote {
+    padding: 2px 0 2px 20px;
+    border-left: 3px solid var(--accent);
+    font-size: 1.25rem;
+    color: var(--text-secondary);
+  }
+
+  [data-theme^="paper"] .prose ul { padding-left: 1.3em; }
+  [data-theme^="paper"] .prose li::marker { color: var(--accent); }
+
+  [data-theme^="paper"] .prose img { border-radius: 0; }
+  [data-theme^="paper"] .prose .img-wrapper {
+    border: 1px solid var(--border);
+    border-radius: 0;
+  }
+
+  /* 便签卡：方角纸卡，类型色收敛到标题文字 */
+  [data-theme^="paper"] .prose .callout {
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--bg-elevated);
+  }
+  [data-theme^="paper"] .prose .callout-header { padding: 10px 18px 0; }
+  [data-theme^="paper"] .prose .callout-title-text {
+    color: var(--callout-color, var(--accent));
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+  }
+  [data-theme^="paper"] .prose .callout-body { padding: 0 18px 14px; }
 }
