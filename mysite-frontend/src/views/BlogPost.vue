@@ -64,7 +64,9 @@ const showArticleNav = computed(() => {
 useHead(() => ({
   title: article.value
     ? article.value.title
-    : errorKind.value === 'notfound' ? '页面不存在' : '加载中...',
+    : errorKind.value === 'notfound'
+      ? '页面不存在'
+      : errorKind.value === 'error' ? '加载失败' : '加载中...',
   meta: article.value
     ? [
         { name: 'description', content: article.value.summary || '' },

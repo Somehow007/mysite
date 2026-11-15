@@ -16,8 +16,9 @@ const siteStore = useSiteStore()
 const authorInitial = computed(() => siteStore.site.author?.charAt(0) || '·')
 // 长文走 site.aboutContent（markdown）；未配置时整块不渲染，作者卡已含短简介
 const aboutMarkdown = computed(() => siteStore.site.aboutContent?.trim() ?? '')
+const techStack = computed(() => siteStore.site.techStack?.trim() ?? '')
 const hasCardFooter = computed(() =>
-  !!(siteStore.site.github || siteStore.site.rss || siteStore.site.techStack),
+  !!(siteStore.site.github || siteStore.site.rss || techStack.value),
 )
 </script>
 
@@ -95,10 +96,10 @@ const hasCardFooter = computed(() =>
           RSS
         </a>
         <span
-          v-if="siteStore.site.techStack"
+          v-if="techStack"
           class="text-text-muted"
         >
-          技术栈 · {{ siteStore.site.techStack }}
+          技术栈 · {{ techStack }}
         </span>
       </div>
     </section>

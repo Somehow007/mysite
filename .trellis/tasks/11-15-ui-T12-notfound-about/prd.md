@@ -44,3 +44,15 @@
 - **配置**：`site.about-content` / `site.tech-stack` 两个可选字段（SiteProperties + yaml `${SITE_*:}` + .env.example 占位），前端 SiteConfig 同步可选字段。
 - **并行提示**：工作树存在另一会话的 T10 在途改动（`usePendingAsk.ts`、`useCommentDraft.ts`、`11-16-ui-T10-selection/`），提交时已隔离未卷入。
 - **遗留**：SPA 无法返回真实 HTTP 404 状态（仅 noindex meta）；`/dashboard/不存在路径` 会落到前台 404（可接受）。
+
+## 走查记录（t12-walkthrough.mjs，42/42）
+
+- **路由回归**：home/archive/about/post/collections/login 均不被 catch-all 吞掉；post 有效→无效→后退 状态往返正确。
+- **边界**：`/post/`（空 id）、`/nope?x=1`、多级路径、`/post/<id>/extra`、`/post/0` → 404；`/about//` 双斜杠 dev 下 404（生产 nginx merge_slashes 归一，记录为可接受偏差）。
+- **焦点链**：搜索按钮 → dialog 打开焦点进输入框 → Esc 焦点归还触发按钮；⌘K 在 404 页可用；Tab 可达两个操作按钮。
+- **导航**：最受欢迎列表项点击进真实文章；FAB 在 404 页保留且面板可打开（符合拍板「其他前台页保留」）。
+- **About**：mock 注入验证 avatar img/§序号规则/callout/code/外链全渲染；bio+tagline+links+techStack 全空时卡内仅作者名、footer 行整体隐藏；仅 techStack 时 footer 行渲染。
+- **useMarkdown 修复回归**：真实文章 inline `<code>`>0、fenced `<pre>`>0、`code` 内无 `<em>/<strong>` 污染（修复顺带堵住 code 内 markdown 符号二次解析）。
+- **降级/深色/移动**：`/dashboard/xyz` 未登录跳登录（guard 先于 404）；移动 notfound 无 post-dock、body 无 has-post-dock；paper-dark 404 墨色 `rgb(236,228,214)`/底 `rgb(22,19,15)`。
+- **走查顺手修（自身）**：BlogPost error 态标题补「加载失败」；About techStack 渲染前 trim（配置值带空白不再漏出「技术栈 · 」空行）。
+- 0 真实 bug，3 项断言修正（`/about//` 预期、::before counter 无解析值、页脚作者名干扰计数）。
