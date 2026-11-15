@@ -6,6 +6,17 @@ export function formatDate(dateStr: string): string {
   return `${year}-${month}-${day}`
 }
 
+/** 中文日期：withYear=false → "11 月 15 日"；true → "2026 年 11 月 15 日" */
+export function formatChineseDate(dateStr: string | Date, withYear = false): string {
+  const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr
+  if (Number.isNaN(date.getTime())) return ''
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  return withYear
+    ? `${date.getFullYear()} 年 ${month} 月 ${day} 日`
+    : `${month} 月 ${day} 日`
+}
+
 export function formatDateTime(dateStr: string | null | undefined): string {
   if (!dateStr) return '—'
   const date = new Date(dateStr)

@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ChevronDown } from 'lucide-vue-next'
 import { getArticles } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { getCollections } from '@/api/collection'
-import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
 import { useFavorite } from '@/composables/useFavorite'
 import { useScrollReveal } from '@/composables/useScrollReveal'
-import { ArrowUpDown, ArrowUp, ArrowDown, Tag, X, Loader2, BookOpen, ChevronRight } from 'lucide-vue-next'
+import { Dropdown } from '@/components/ui'
 import ArticleList from '@/components/article/ArticleList.vue'
-import CollectionCard from '@/components/collection/CollectionCard.vue'
+import HomeMasthead from '@/components/home/HomeMasthead.vue'
+import CategoryStrip from '@/components/home/CategoryStrip.vue'
+import HomeLead from '@/components/home/HomeLead.vue'
+import HomeSidebar from '@/components/home/HomeSidebar.vue'
 import type { ArticleListItem, Pagination, Category, Collection } from '@/types'
 
 type SortField = 'createTime' | 'viewCount'
@@ -18,32 +21,50 @@ type SortOrder = 'desc' | 'asc'
 
 const route = useRoute()
 const router = useRouter()
-const siteStore = useSiteStore()
 const userStore = useUserStore()
 const { setFavoriteStatus, setFavoriteCount } = useFavorite()
 
 const articles = ref<ArticleListItem[]>([])
 const pagination = ref<Pagination | null>(null)
 const loading = ref(false)
+// 实际已加载的页码：/page/N 上选分类会 fetchArticles(1) 但 URL 不变，以它为准
+const loadedPage = ref(route.params.page ? Number(route.params.page) : 1)
 const categories = ref<Category[]>([])
 const categoriesLoading = ref(false)
 const collections = ref<Collection[]>([])
-const collectionsLoading = ref(false)
+const leadArticle = ref<ArticleListItem | null>(null)
+const popularArticles = ref<ArticleListItem[]>([])
 
 const sortField = ref<SortField>('createTime')
 const sortOrder = ref<SortOrder>('desc')
 const selectedCategorySlug = ref<string | null>(null)
 
-const sortOptions: { field: SortField; order: SortOrder; label: string; icon: typeof ArrowUpDown }[] = [
-  { field: 'createTime', order: 'desc', label: '最新', icon: ArrowDown },
-  { field: 'createTime', order: 'asc', label: '最早', icon: ArrowUp },
-  { field: 'viewCount', order: 'desc', label: '浏览最多', icon: ArrowDown },
-  { field: 'viewCount', order: 'asc', label: '浏览最少', icon: ArrowUp },
+const sortOptions: { field: SortField; order: SortOrder; label: string }[] = [
+  { field: 'createTime', order: 'desc', label: '最新' },
+  { field: 'createTime', order: 'asc', label: '最早' },
+  { field: 'viewCount', order: 'desc', label: '浏览最多' },
+  { field: 'viewCount', order: 'asc', label: '浏览最少' },
 ]
 
-const selectedCategoryName = computed(() => {
-  if (!selectedCategorySlug.value) return null
-  return categories.value.find(c => c.slug === selectedCategorySlug.value)?.name ?? null
+const currentSortLabel = computed(
+  () => sortOptions.find(o => o.field === sortField.value && o.order === sortOrder.value)?.label ?? '最新'
+)
+
+const sectionTitle = computed(() => {
+  if (sortField.value === 'createTime') {
+    return sortOrder.value === 'desc' ? '最近更新' : '最早发布'
+  }
+  return sortOrder.value === 'desc' ? '最多阅读' : '最少阅读'
+})
+
+const isFirstPage = computed(() => loadedPage.value === 1)
+const showMasthead = computed(() => isFirstPage.value && !selectedCategorySlug.value)
+
+// 头条与列表去重：头条固定取「最新一篇」（T14 置顶前），与下方排序无关
+const displayArticles = computed(() => {
+  if (!isFirstPage.value || !leadArticle.value) return articles.value
+  const leadId = leadArticle.value.id
+  return articles.value.filter(a => a.id !== leadId)
 })
 
 function isSortActive(field: SortField, order: SortOrder) {
@@ -61,13 +82,14 @@ function selectCategory(slug: string | null) {
   fetchArticles(1)
 }
 
-function clearCategory() {
-  selectedCategorySlug.value = null
-  fetchArticles(1)
-}
-
 async function fetchArticles(page = 1) {
   loading.value = true
+  loadedPage.value = page
+  if (page === 1) {
+    fetchLead()
+  } else {
+    leadArticle.value = null
+  }
   try {
     const params: { page: number; size: number; categorySlug?: string; sortField?: string; sortOrder?: string } = { page, size: 10 }
     if (selectedCategorySlug.value) {
@@ -90,6 +112,30 @@ async function fetchArticles(page = 1) {
   }
 }
 
+async function fetchLead() {
+  try {
+    const res = await getArticles({
+      page: 1,
+      size: 1,
+      sortField: 'createTime',
+      sortOrder: 'desc',
+      categorySlug: selectedCategorySlug.value || undefined,
+    })
+    leadArticle.value = res.list[0] ?? null
+  } catch {
+    leadArticle.value = null
+  }
+}
+
+async function fetchPopular() {
+  try {
+    const res = await getArticles({ page: 1, size: 4, sortField: 'viewCount', sortOrder: 'desc' })
+    popularArticles.value = res.list
+  } catch {
+    popularArticles.value = []
+  }
+}
+
 async function fetchCategories() {
   categoriesLoading.value = true
   try {
@@ -102,20 +148,23 @@ async function fetchCategories() {
 }
 
 async function fetchCollections() {
-  collectionsLoading.value = true
   try {
-    // 按文章总浏览量降序取前 3 个合集
-    const res = await getCollections({ page: 1, size: 3, sortBy: 'viewCount' })
+    const res = await getCollections({ page: 1, size: 5, sortBy: 'viewCount' })
     collections.value = res.list
   } catch {
     collections.value = []
-  } finally {
-    collectionsLoading.value = false
   }
 }
 
 function handlePageChange(page: number) {
-  router.push(page === 1 ? '/' : `/page/${page}`)
+  const target = page === 1 ? '/' : `/page/${page}`
+  // 同路径 push 不触发 route watch（如 /page/2 上选分类后点回第 2 页），直接拉取
+  if (route.path === target) {
+    fetchArticles(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    return
+  }
+  router.push(target)
 }
 
 function handleFavoriteToggle(articleId: string, favorited: boolean) {
@@ -148,125 +197,78 @@ onMounted(() => {
   fetchArticles(page)
   fetchCategories()
   fetchCollections()
+  fetchPopular()
 })
 </script>
 
 <template>
   <div>
-    <section class="mb-12 pb-10 border-b border-border">
-      <h1 class="text-4xl font-bold text-text-primary mb-3 tracking-tight">
-        {{ siteStore.site.title }}
-      </h1>
-      <p class="text-lg text-text-muted leading-relaxed max-w-xl">
-        {{ siteStore.site.description }}
-      </p>
-    </section>
+    <HomeMasthead v-if="showMasthead" :total="pagination?.total ?? 0" />
 
-    <section class="mb-8 space-y-4">
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-medium text-text-muted mr-1 flex items-center gap-1">
-          <ArrowUpDown :size="12" />
-          排序
-        </span>
-        <button
-          v-for="opt in sortOptions"
-          :key="`${opt.field}-${opt.order}`"
-          @click="setSort(opt.field, opt.order)"
-          class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200"
-          :class="isSortActive(opt.field, opt.order)
-            ? 'bg-accent text-text-inverse shadow-sm'
-            : 'bg-bg-code text-text-muted hover:text-accent hover:bg-accent-subtle'"
-        >
-          <component :is="opt.icon" :size="10" />
-          {{ opt.label }}
-        </button>
-      </div>
-
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="text-xs font-medium text-text-muted mr-1 flex items-center gap-1">
-          <Tag :size="12" />
-          分类
-        </span>
-        <Loader2 v-if="categoriesLoading" :size="14" class="animate-spin text-text-muted" />
-        <template v-else>
-          <button
-            @click="selectCategory(null)"
-            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200"
-            :class="!selectedCategorySlug
-              ? 'bg-accent text-text-inverse shadow-sm'
-              : 'bg-bg-code text-text-muted hover:text-accent hover:bg-accent-subtle'"
-          >
-            全部
-          </button>
-          <button
-            v-for="cat in categories"
-            :key="cat.slug"
-            @click="selectCategory(cat.slug)"
-            class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all duration-200"
-            :class="selectedCategorySlug === cat.slug
-              ? 'bg-accent text-text-inverse shadow-sm'
-              : 'bg-bg-code text-text-muted hover:text-accent hover:bg-accent-subtle'"
-          >
-            {{ cat.name }}
-            <span v-if="cat.articleCount" class="opacity-60">{{ cat.articleCount }}</span>
-          </button>
-        </template>
-      </div>
-
-      <div
-        v-if="selectedCategoryName"
-        class="flex items-center gap-2 text-xs text-text-muted"
-      >
-        <span>当前筛选：</span>
-        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-accent-subtle text-accent font-medium">
-          {{ selectedCategoryName }}
-        </span>
-        <button
-          @click="clearCategory"
-          class="inline-flex items-center justify-center w-4 h-4 rounded-full hover:bg-border transition-colors"
-        >
-          <X :size="10" />
-        </button>
-      </div>
-    </section>
-
-    <!-- 合集展示 -->
-    <section v-if="collections.length > 0 || collectionsLoading" class="mb-10">
-      <div class="flex items-center justify-between mb-4">
-        <div class="flex items-center gap-2">
-          <BookOpen :size="18" class="text-accent" />
-          <h2 class="text-lg font-semibold text-text-primary">合集</h2>
-        </div>
-        <RouterLink
-          to="/collections"
-          class="inline-flex items-center gap-0.5 text-xs font-medium text-text-muted hover:text-accent transition-colors duration-200"
-        >
-          查看全部
-          <ChevronRight :size="12" />
-        </RouterLink>
-      </div>
-      <div v-if="collectionsLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div v-for="i in 3" :key="i" class="h-48 rounded-xl border border-border bg-bg-secondary animate-pulse" />
-      </div>
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div
-          v-for="collection in collections"
-          :key="collection.id"
-          data-reveal
-        >
-          <CollectionCard :collection="collection" />
-        </div>
-      </div>
-    </section>
-
-    <ArticleList
-      :articles="articles"
-      :pagination="pagination"
-      :loading="loading"
-      :skeleton-count="5"
-      :show-favorite="userStore.isLoggedIn"
-      @page-change="handlePageChange"
-      @favorite-toggle="handleFavoriteToggle"
+    <CategoryStrip
+      :categories="categories"
+      :selected-slug="selectedCategorySlug"
+      :total-count="selectedCategorySlug ? null : (pagination?.total ?? null)"
+      :loading="categoriesLoading"
+      @select="selectCategory"
     />
+
+    <HomeLead
+      v-if="isFirstPage && leadArticle"
+      :lead="leadArticle"
+      :popular="popularArticles"
+    />
+
+    <!-- T7：提问区 HomeAskPanel 插槽 -->
+
+    <div class="mt-12 lg:mt-14 lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:gap-14">
+      <section class="min-w-0">
+        <div class="flex items-baseline justify-between gap-4 border-b-2 border-b-border-strong pb-2">
+          <h2 class="text-[12px] font-semibold uppercase tracking-[0.16em] text-text-secondary">
+            {{ sectionTitle }}
+          </h2>
+          <Dropdown trigger="click" placement="bottom-end" :spacing="6">
+            <template #trigger="{ open }">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 text-[13px] font-medium text-text-muted transition-colors hover:text-text-primary"
+                :aria-expanded="open"
+              >
+                {{ currentSortLabel }}
+                <ChevronDown :size="13" class="transition-transform duration-200" :class="open && 'rotate-180'" />
+              </button>
+            </template>
+            <template #default="{ close }">
+              <div class="paper-card w-36 rounded-xl border border-border bg-bg-elevated py-1.5">
+                <button
+                  v-for="opt in sortOptions"
+                  :key="`${opt.field}-${opt.order}`"
+                  type="button"
+                  class="flex w-full items-center px-3.5 py-2 text-left text-sm transition-colors duration-150"
+                  :class="isSortActive(opt.field, opt.order)
+                    ? 'font-semibold text-accent'
+                    : 'text-text-secondary hover:bg-bg-code hover:text-text-primary'"
+                  @click="setSort(opt.field, opt.order); close()"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
+            </template>
+          </Dropdown>
+        </div>
+
+        <ArticleList
+          :articles="displayArticles"
+          :pagination="pagination"
+          :loading="loading"
+          :skeleton-count="5"
+          :show-favorite="userStore.isLoggedIn"
+          @page-change="handlePageChange"
+          @favorite-toggle="handleFavoriteToggle"
+        />
+      </section>
+
+      <HomeSidebar :collections="collections" />
+    </div>
   </div>
 </template>
