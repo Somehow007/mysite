@@ -81,6 +81,21 @@
   另确认本仓 cascade 层序为 theme<base<utilities<components（components 反超
   utilities），paper 覆盖仍按惯例写 unlayered 保险。
 
+### 走查记录（t11-walkthrough.mjs，26/26 PASS）
+
+DOM 级复核，覆盖主验证之外的边角：角标边界（code 内/3 位数字不误转）、
+取消截断标记、失败重试链路、来源折叠开关、空态 chip 直发、关闭重开保留消息、
+/post 无 FAB / /archive 有 FAB、paper-dark 色值、用户长串不溢出、
+移动 sheet 贴底/纸面底/顶部留缝。
+
+**走查发现并修复 1 个存量 bug**（非 T11 回归）：
+`useChatMarkdown.protectMath` 恢复 inline code 占位符时只回内容不回反引号
+（`\x00CODE` → `arr[1]` 而非 `` `arr[1]` ``），导致聊天中所有行内代码
+**一直渲染为纯文本**且反引号被吞。已在 Step 6-7 恢复处补回反引号；
+消费点仅 ChatStreamWriter 一处（已 grep 确认），修复后 `[n]` 角标对 code
+内的括号也正确跳过。修复后 t11-verify 49/49、t11-walkthrough 26/26、
+type-check 绿。
+
 ## Resolution
 
 完成。聊天面板完成纸本换肤且六旧主题行为不变：用户消息改 `bg-secondary` 墨块、

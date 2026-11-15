@@ -106,7 +106,8 @@ function protectMath(markdown: string): { processed: string; mathBlocks: Map<str
 
   // Step 6-7: 恢复代码块与 inline code（它们的 $ 现在安全了）
   processed = processed.replace(/\x00FENCED\x00(\d+)\x00/g, (_m, i: string) => fencedBlocks[parseInt(i)] ?? '')
-  processed = processed.replace(/\x00CODE\x00(\d+)\x00/g, (_m, i: string) => inlineCodes[parseInt(i)] ?? '')
+  // 注意：inline code 必须连反引号一起恢复，否则 `code` 退化为纯文本
+  processed = processed.replace(/\x00CODE\x00(\d+)\x00/g, (_m, i: string) => `\`${inlineCodes[parseInt(i)] ?? ''}\``)
   processed = processed.replace(/\x00ESCDOLLAR\x00\d+\x00/g, '$')
 
   return { processed, mathBlocks }
