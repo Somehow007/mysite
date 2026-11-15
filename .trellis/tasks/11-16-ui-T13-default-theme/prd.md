@@ -96,3 +96,29 @@
   如需让 paper/classic 用户也能进面板，属顶栏方案变更，另立任务评审。
 - 存量访客的 `classic-light`（含 useStorage 历史自动回写）保持原样，
   见「开工结论」；站长清一次 localStorage 即见新默认。
+- **存量遗留（非本任务范围）**：`localStorage` 访问本身被禁时，
+  `api/rag.ts`/`utils/storage.ts`/`usePendingAsk` 等仍有未防护读写
+  （走查实测残留 2 个 pageerror），主题已由本次修复不受影响；
+  全局 storage 容错值得单独立项。
+
+## 走查记录（2026-11-16，t13-walkthrough.mjs 53/53）
+
+- **发现并修复 2 个边界问题**：
+  1. `localStorage` 访问抛错（隐私模式/禁用场景）时首屏内联脚本整体
+     中断 → `data-theme` 不设置、页面掉到 `:root` 默认样（实测
+     `rgb(248,249,250)` 且 theme=undefined）。修：getItem 包 try/catch，
+     失败回落系统解析（与 Vue 侧 useStorage 的 getSSRHandler 容错一致）。
+  2. 空串脏值 `mysite_theme_v2=''`：inline script falsy 判定走系统
+     解析 paper-light，Vue 侧 `??` 不判空串 → `data-theme=''`，
+     **首屏闪变**。修：computed 改 `||` 与首屏脚本 falsy 语义对齐。
+- **清理 1 处死代码**：「跟随系统」行的激活态装饰（aria-current/
+  解析主题名/Check）经实测永不渲染——面板只在无 variant 主题下出现，
+  而跟随系统态必解析为 paper-*（有 variant）→ AppHeader 恒走明暗钮。
+  行本身保留为「回到跟随系统」动作项，`isSystemFollow` 一并移除。
+- 复核通过项：DCL/接管后零跳变（亮暗+classic-dark 存储）、10 套主题
+  dark/colorScheme 全组合一致、跨标签页 storage 事件双向同步、
+  theme-transitioning 清理、Esc/点外关闭、跟随系统→明暗钮→面板
+  显隐切换正确、/ /about /login /collections /404/文章页/不存在文章/
+  390 暗色 全部 paper 主题 + 溢出=0 + pageerror=0。
+- INFO 记录（不判负）：非法值 'bogus-theme' 透传不校验（存量行为）；
+  跟随系统态点明暗钮会落到具体 paper 变体退出跟随（设计语义）。

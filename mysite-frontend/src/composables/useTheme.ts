@@ -120,10 +120,11 @@ const preferredDark = usePreferredDark()
 const isDark = ref(false)
 
 // 生效主题：手动选择 > 跟随系统解析。对外契约不变（只读 .value）。
+// 用 || 而非 ??：空串等 falsy 脏值与 index.html 首屏脚本的 falsy 判定保持一致，
+// 否则 '' 会让 data-theme 被清成空、首屏从 paper 闪变成无主题。
 const currentTheme = computed<ThemeId>(() =>
-  storedTheme.value ?? (preferredDark.value ? 'paper-dark' : 'paper-light')
+  storedTheme.value || (preferredDark.value ? 'paper-dark' : 'paper-light')
 )
-const isSystemFollow = computed(() => storedTheme.value == null)
 
 function isThemeDark(id: ThemeId): boolean {
   return id.includes('dark') || id === 'aurora'
@@ -181,7 +182,6 @@ export function useTheme() {
 
   return {
     currentTheme,
-    isSystemFollow,
     isDark,
     themeRegistry: THEME_REGISTRY,
     setTheme,

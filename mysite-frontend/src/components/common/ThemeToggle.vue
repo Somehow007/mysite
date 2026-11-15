@@ -3,7 +3,7 @@ import { Palette, Sun, Moon, Check, SunMoon } from 'lucide-vue-next'
 import { useTheme, THEME_REGISTRY, type ThemeId } from '@/composables/useTheme'
 import { Dropdown } from '@/components/ui'
 
-const { currentTheme, isSystemFollow, setTheme, followSystem, toggleDarkMode, getThemeMeta } = useTheme()
+const { currentTheme, setTheme, followSystem, toggleDarkMode, getThemeMeta } = useTheme()
 
 const uniqueThemes = THEME_REGISTRY.filter(t => !t.id.includes('-dark') || t.group === 'glass')
 
@@ -48,21 +48,15 @@ function handleToggleDark() {
         </div>
 
         <div class="px-2 py-1">
+          <!-- 面板只在无 variant 主题下渲染（AppHeader 混合方案），此时必为手动选择态，
+               故本行恒为普通动作项：点击清存储回到跟随系统 -->
           <button
             @click="handleFollowSystem(close)"
             role="menuitem"
-            :aria-current="isSystemFollow ? 'true' : undefined"
-            class="flex items-center gap-2.5 w-full px-2 py-2 text-sm transition-colors duration-150 rounded-md"
-            :class="isSystemFollow
-              ? 'text-accent bg-accent-subtle'
-              : 'text-text-secondary hover:bg-accent-subtle hover:text-accent'"
+            class="flex items-center gap-2.5 w-full px-2 py-2 text-sm text-text-secondary hover:bg-accent-subtle hover:text-accent transition-colors duration-150 rounded-md"
           >
-            <SunMoon :size="15" />
+            <SunMoon :size="15" class="text-accent" />
             <span>跟随系统</span>
-            <span v-if="isSystemFollow" class="ml-auto flex items-center gap-1.5">
-              <span class="text-xs text-text-muted">{{ getThemeMeta(currentTheme)?.name }}</span>
-              <Check :size="12" class="text-accent" />
-            </span>
           </button>
           <button
             @click="handleToggleDark()"

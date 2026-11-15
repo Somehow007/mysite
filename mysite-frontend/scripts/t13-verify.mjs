@@ -41,7 +41,7 @@ const overflowOf = page => page.evaluate(() => document.documentElement.scrollWi
 console.log('== A. 无存储 → 跟随系统 ==')
 {
   // A1 亮色系统 → paper-light
-  const { ctx, page, errors } = await newPage({ colorScheme: 'light' })
+  const { ctx, page } = await newPage({ colorScheme: 'light' })
   await page.goto(base + '/', { waitUntil: 'domcontentloaded' })
   await page.waitForTimeout(400)
   ok('亮系统首屏 data-theme=paper-light', (await themeOf(page)) === 'paper-light', await themeOf(page))
