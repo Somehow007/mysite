@@ -23,6 +23,8 @@ export interface ChatLaunchOptions {
 
 const isOpen = ref(false)
 const pending = ref<ChatLaunchOptions | null>(null)
+/** 文章页当前阅读文章标题，由 BlogPost 注入；移动端 sheet 标题展示用 */
+const readingTitle = ref<string | null>(null)
 
 export function useChatLauncher() {
   function open(opts?: ChatLaunchOptions) {
@@ -41,5 +43,10 @@ export function useChatLauncher() {
     return opts
   }
 
-  return { isOpen, pending, open, close, consumePending }
+  /** BlogPost 同步当前阅读文章标题（null = 不在文章页/无标题） */
+  function setReadingTitle(title: string | null) {
+    readingTitle.value = title
+  }
+
+  return { isOpen, pending, readingTitle, open, close, consumePending, setReadingTitle }
 }

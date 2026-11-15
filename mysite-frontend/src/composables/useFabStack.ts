@@ -1,16 +1,15 @@
 // composables/useFabStack.ts
 // 浮动操作按钮（FAB）动态堆叠管理器。
 //
-// 问题：站点有多个 fixed 定位的 FAB（ChatWidget、BackToTop、MobileTocDrawer），
-// 硬编码 bottom 值在不同屏幕尺寸下互相重叠。尤其 Tablet 区间（640-1023px）
-// 同时存在 ChatWidget 和 MobileTocDrawer 时重叠严重。
+// 问题：站点有多个 fixed 定位的 FAB（ChatWidget、BackToTop），
+// 硬编码 bottom 值在不同屏幕尺寸下互相重叠。
 //
 // 方案（Material Design 3 FAB stacking pattern）：
 //   所有 FAB 注册到本 composable，按声明顺序从屏幕底部向上堆叠。
 //   每个 FAB 的 bottom 偏移 = baseMargin + Σ(下方可见 FAB 的高度 + gap)。
 //   任何 FAB 显示/隐藏时，所有上方的 FAB 自动重新计算位置。
 
-import { ref, computed, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 
 // ── 配置 ──────────────────────────────────────────────────────
 
@@ -30,7 +29,6 @@ interface FabSlot {
 const SLOTS: FabSlot[] = [
   { id: 'back-to-top',  height: 48 },  // p-3 + icon 18px = 24 + 18 + 24 ≈ 48
   { id: 'chat-widget',  height: 56 },  // w-14 h-14
-  { id: 'mobile-toc',   height: 48 },  // w-12 h-12
 ]
 
 // ── 全局可见性状态（按 fabId 索引）───────────────────────────

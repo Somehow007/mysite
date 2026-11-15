@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
 import { Lock } from 'lucide-vue-next'
@@ -13,7 +13,7 @@ import { takePendingAsk, hasAuthSession } from '@/composables/usePendingAsk'
 import { useSiteStore } from '@/stores/site'
 import ArticleContent from '@/components/article/ArticleContent.vue'
 import ArticleToc from '@/components/article/ArticleToc.vue'
-import MobileTocDrawer from '@/components/article/MobileTocDrawer.vue'
+import PostDock from '@/components/article/PostDock.vue'
 import PostHeader from '@/components/article/PostHeader.vue'
 import FavoriteButton from '@/components/article/FavoriteButton.vue'
 import ShareButton from '@/components/article/ShareButton.vue'
@@ -169,6 +169,15 @@ onMounted(() => {
     launcher.open({ question: pending, send: true })
   }
 })
+
+// 移动端聊天 sheet 标题「正在阅读：{title}」的数据源（useChatLauncher.readingTitle）
+watch(() => article.value?.title, (title) => {
+  launcher.setReadingTitle(title ?? null)
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  launcher.setReadingTitle(null)
+})
 </script>
 
 <template>
@@ -290,7 +299,13 @@ onMounted(() => {
         </aside>
       </div>
 
-      <MobileTocDrawer :items="tocItems" />
+      <PostDock
+        :items="tocItems"
+        :read-pct="readPct"
+        :article="article"
+        @toggle="handleFavoriteToggle"
+        @login-required="handleLoginRequired"
+      />
     </template>
   </div>
 </template>

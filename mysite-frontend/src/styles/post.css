@@ -351,6 +351,69 @@
     color: var(--accent);
   }
 
+  /* ── 移动端底部工具栏（T9，对照概念稿 .dock）──
+     <lg 显示，与 ≥lg 的右栏（目录/问这篇/收藏在刊头与文末）互补；
+     墨块反色条（text-primary 底 / bg-primary 字）全主题生效。 */
+  .post-dock {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    z-index: 35;
+    display: flex;
+    background: var(--text-primary);
+    color: var(--bg-primary);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  }
+  @media (min-width: 1024px) {
+    .post-dock { display: none; }
+  }
+  .post-dock-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+    padding: 10px 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font-size: 14px;
+    line-height: 1.3;
+    cursor: pointer;
+  }
+  .post-dock-btn + .post-dock-btn {
+    border-left: 1px solid color-mix(in srgb, currentColor 18%, transparent);
+  }
+  .post-dock-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+  .post-dock-sub {
+    font-size: 10px;
+    opacity: 0.6;
+  }
+  .post-dock-ask {
+    flex: 1.4;
+    background: var(--accent);
+    color: #fff;
+  }
+  .post-dock-fav {
+    display: inline-flex;
+    align-items: center;
+    height: 18px;
+  }
+  .post-dock-btn.is-faved {
+    color: var(--danger);
+  }
+
+  /* dock 占位留白：把文末/评论区/页脚推出 dock 覆盖区（body 类由 PostDock 维护） */
+  @media (max-width: 1023px) {
+    body.has-post-dock {
+      padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    }
+  }
+
   /* ── 私有文章提示 ── */
   .post-private-note {
     display: flex;
@@ -380,5 +443,11 @@
   }
   [data-theme^="paper"] .post-cover {
     border-radius: 0;
+  }
+
+  /* ── 纸本专属：dock 墨块硬阴影（T9）── */
+  [data-theme^="paper"] .post-dock {
+    box-shadow: var(--shadow-hard);
+    border: 1px solid var(--border-strong);
   }
 }

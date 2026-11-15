@@ -1,15 +1,23 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { useMediaQuery } from '@vueuse/core'
 import { ArrowUp } from 'lucide-vue-next'
 import { useFabStack } from '@/composables/useFabStack'
 
 const { bottomStyle, setVisible } = useFabStack('back-to-top')
 
-const visible = ref(false)
+const route = useRoute()
+// 文章页 <lg 由 PostDock 接管底部区域（T9），BackToTop 让位
+const isNarrow = useMediaQuery('(max-width: 1023px)')
+const dockActive = computed(() => isNarrow.value && route.name === 'post')
+
+const scrolled = ref(false)
+const visible = computed(() => scrolled.value && !dockActive.value)
 watch(visible, setVisible, { immediate: true })
 
 function handleScroll() {
-  visible.value = window.scrollY > 300
+  scrolled.value = window.scrollY > 300
 }
 
 function scrollToTop() {

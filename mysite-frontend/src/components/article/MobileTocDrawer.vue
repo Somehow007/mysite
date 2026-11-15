@@ -1,23 +1,23 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import { List, X, ChevronsDownUp, ChevronsUpDown } from 'lucide-vue-next'
+import { X, ChevronsDownUp, ChevronsUpDown } from 'lucide-vue-next'
 import type { TocItem } from '@/composables/useMarkdown'
 import { useToc } from '@/composables/useToc'
-import { useFabStack } from '@/composables/useFabStack'
 import TocTree from './TocTree.vue'
 
+// 受控底部 sheet（T9）：由 PostDock 以 v-model:open 控制，不再自带 FAB。
 const props = defineProps<{
   items: TocItem[]
+  open: boolean
+  /** 页面级已读进度（0-100），显示在头部右侧 */
+  readPct: number
 }>()
 
-const isOpen = ref(false)
+const emit = defineEmits<{
+  'update:open': [value: boolean]
+}>()
 
-const { bottomStyle: fabBottom, setVisible } = useFabStack('mobile-toc')
-// FAB 可见性：有目录项 且 抽屉未打开
-const fabVisible = computed(() => props.items.length > 0 && !isOpen.value)
-watch(fabVisible, setVisible, { immediate: true })
-
-const tocListRef = ref<HTMLElement | null>(null)
+const sheetRef = ref<HTMLElement | null>(null)
 
 const {
   activeId,
@@ -26,7 +26,7 @@ const {
   navigateTo: tocNavigate,
 } = useToc(() => props.items)
 
-// ---- Local tree for drawer (always starts all-expanded) ----
+// ---- Local tree for sheet (always starts all-expanded) ----
 const drawerTree = ref<typeof tocTree.value>([])
 const drawerCollapsedIds = ref<Record<string, boolean>>({})
 
@@ -97,13 +97,8 @@ function unlockBodyScroll() {
 }
 
 // ---- Open/close ----
-function open() {
-  rebuildDrawerTree()
-  isOpen.value = true
-}
-
 function close() {
-  isOpen.value = false
+  emit('update:open', false)
 }
 
 function navigateTo(id: string) {
@@ -114,21 +109,55 @@ function navigateTo(id: string) {
 }
 
 function handleKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && isOpen.value) {
+  if (e.key === 'Escape' && props.open) {
     close()
   }
 }
 
-// ---- Progress info ----
-const activeIndex = computed(() => {
-  const idx = props.items.findIndex(i => i.id === activeId.value)
-  return idx >= 0 ? idx + 1 : 0
-})
+// ---- 下滑关闭（grab + 头部拖拽区）----
+let dragStartY = 0
+let dragDy = 0
+let closingByDrag = false
 
-const progressPercent = computed(() => {
-  if (props.items.length === 0) return 0
-  return Math.round((activeIndex.value / props.items.length) * 100)
-})
+function onDragStart(e: TouchEvent) {
+  if (closingByDrag) return
+  const touch = e.touches[0]
+  if (!touch) return
+  dragStartY = touch.clientY
+  dragDy = 0
+  if (sheetRef.value) sheetRef.value.style.transition = 'none'
+}
+
+function onDragMove(e: TouchEvent) {
+  if (closingByDrag) return
+  const touch = e.touches[0]
+  if (!touch) return
+  dragDy = Math.max(0, touch.clientY - dragStartY) // 只响应下拉
+  if (sheetRef.value && dragDy > 0) {
+    sheetRef.value.style.transform = `translateY(${dragDy}px)`
+  }
+}
+
+function onDragEnd() {
+  const sheet = sheetRef.value
+  if (!sheet || closingByDrag) return
+  if (dragDy > 100) {
+    // 下拉超过阈值：手动滑出屏幕后再卸载，避免与 leave 过渡的 transform 冲突
+    closingByDrag = true
+    sheet.style.transition = 'transform 200ms ease-in'
+    sheet.style.transform = 'translateY(100%)'
+    window.setTimeout(() => close(), 200)
+  } else {
+    if (dragDy > 0) {
+      sheet.style.transition = 'transform 150ms ease-out'
+    }
+    sheet.style.transform = ''
+    window.setTimeout(() => {
+      if (sheetRef.value) sheetRef.value.style.transition = ''
+    }, 200)
+  }
+  dragDy = 0
+}
 
 // ---- Lifecycle ----
 onMounted(() => {
@@ -137,171 +166,219 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
-  if (isOpen.value) unlockBodyScroll()
+  if (props.open) unlockBodyScroll()
 })
 
-watch(isOpen, (open) => {
+watch(() => props.open, (open) => {
   if (open) {
-    lockBodyScroll()
+    closingByDrag = false
     rebuildDrawerTree()
+    lockBodyScroll()
   } else {
     unlockBodyScroll()
   }
 })
 
 watch(tocTree, () => {
-  if (isOpen.value) rebuildDrawerTree()
+  if (props.open) rebuildDrawerTree()
 })
 </script>
 
 <template>
-  <!-- Floating Action Button -->
-  <Transition name="fab">
-    <button
-      v-if="items.length > 0 && !isOpen"
-      @click="open"
-      :style="{ bottom: fabBottom }"
-      class="fixed right-8 z-30 lg:hidden flex items-center justify-center w-12 h-12 rounded-full glass glass-sm shadow-lg border border-border/50 text-text-secondary hover:text-accent hover:border-accent/30 active:scale-90 transition-all duration-200"
-      aria-label="打开文章目录"
-      title="目录"
-    >
-      <List :size="18" />
-    </button>
-  </Transition>
-
-  <!-- Drawer overlay + content -->
   <Teleport to="body">
-    <Transition
-      name="drawer"
-      @after-leave="unlockBodyScroll"
-    >
+    <!-- 遮罩 -->
+    <Transition name="toc-fade">
       <div
-        v-if="isOpen"
-        class="fixed inset-0 z-40 lg:hidden"
+        v-if="open"
+        class="toc-sheet-mask"
+        @click="close"
+        @touchmove.stop.prevent
+      />
+    </Transition>
+
+    <!-- 底部 sheet -->
+    <Transition name="toc-sheet">
+      <div
+        v-if="open"
+        ref="sheetRef"
+        class="toc-sheet"
         role="dialog"
         aria-modal="true"
         aria-label="文章目录"
       >
-        <!-- Backdrop -->
+        <!-- 拖拽区：抓手 + 头部（下滑关闭；touch-action: none 独占手势） -->
         <div
-          class="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
-          @click="close"
-        />
-
-        <!-- Drawer panel -->
-        <div class="absolute top-0 right-0 bottom-0 w-[min(280px,80vw)] flex flex-col bg-bg-secondary border-l border-border shadow-2xl">
-          <!-- Header -->
-          <div class="shrink-0 px-4 pt-[max(4rem,env(safe-area-inset-top))] pb-3 border-b border-border">
-            <div class="flex items-center justify-between mb-2.5">
-              <h3 class="text-sm font-semibold text-text-primary">目录</h3>
-              <div class="flex items-center gap-1">
-                <button
-                  v-if="drawerHasCollapsible"
-                  @click="toggleDrawerAll"
-                  class="p-1.5 rounded-lg text-text-muted hover:text-accent hover:bg-bg-primary transition-colors duration-150"
-                  :title="drawerAllExpanded ? '收起全部' : '展开全部'"
-                >
-                  <ChevronsDownUp v-if="drawerAllExpanded" :size="14" />
-                  <ChevronsUpDown v-else :size="14" />
-                </button>
-                <button
-                  @click="close"
-                  class="p-1.5 -mr-1 rounded-lg text-text-muted hover:text-text-secondary hover:bg-bg-primary transition-colors duration-150"
-                  aria-label="关闭目录"
-                >
-                  <X :size="16" />
-                </button>
-              </div>
+          class="toc-sheet-dragzone"
+          @touchstart.passive="onDragStart"
+          @touchmove.passive="onDragMove"
+          @touchend="onDragEnd"
+          @touchcancel="onDragEnd"
+        >
+          <div class="toc-sheet-grab" />
+          <header class="toc-sheet-header">
+            <b>目录</b>
+            <div class="toc-sheet-header-acts">
+              <button
+                v-if="drawerHasCollapsible"
+                @click="toggleDrawerAll"
+                class="toc-sheet-icon"
+                :title="drawerAllExpanded ? '收起全部' : '展开全部'"
+                :aria-label="drawerAllExpanded ? '收起全部' : '展开全部'"
+              >
+                <ChevronsDownUp v-if="drawerAllExpanded" :size="15" />
+                <ChevronsUpDown v-else :size="15" />
+              </button>
+              <span class="toc-sheet-pct">已读 {{ readPct }}%</span>
+              <button
+                @click="close"
+                class="toc-sheet-icon"
+                aria-label="关闭目录"
+              >
+                <X :size="16" />
+              </button>
             </div>
-
-            <!-- Progress indicator -->
-            <div class="flex items-center gap-3">
-              <div class="flex-1 h-1 rounded-full bg-border/50 overflow-hidden">
-                <div
-                  class="h-full rounded-full bg-accent transition-all duration-300 ease-out"
-                  :style="{ width: `${progressPercent}%` }"
-                />
-              </div>
-              <span class="text-[11px] text-text-muted tabular-nums whitespace-nowrap">
-                {{ activeIndex }}/{{ items.length }}
-              </span>
-            </div>
-          </div>
-
-          <!-- TOC List -->
-          <ul
-            ref="tocListRef"
-            class="flex-1 overflow-y-auto overscroll-contain py-2 px-1 border-l-0 text-sm"
-            role="list"
-          >
-            <TocTree
-              :nodes="drawerTree"
-              :active-id="activeId"
-              :min-level="minLevel"
-              :is-group-expanded="isDrawerGroupExpanded"
-              :stagger-delay="false"
-              text-muted-class="text-text-secondary"
-              @navigate="navigateTo"
-              @toggle="toggleDrawerNode"
-            />
-          </ul>
+          </header>
         </div>
+
+        <!-- TOC List -->
+        <ul class="toc-sheet-body" role="list">
+          <TocTree
+            :nodes="drawerTree"
+            :active-id="activeId"
+            :min-level="minLevel"
+            :is-group-expanded="isDrawerGroupExpanded"
+            :stagger-delay="false"
+            text-muted-class="text-text-secondary"
+            @navigate="navigateTo"
+            @toggle="toggleDrawerNode"
+          />
+        </ul>
       </div>
     </Transition>
   </Teleport>
 </template>
 
 <style scoped>
-/* FAB enter/leave */
-.fab-enter-active,
-.fab-leave-active {
-  transition:
-    opacity 200ms ease,
-    transform 200ms ease;
-}
-.fab-enter-from,
-.fab-leave-to {
-  opacity: 0;
-  transform: scale(0.8) translateY(8px);
+/* 遮罩：与聊天 sheet 同层（z-40），dock（z-35）被盖住 */
+.toc-sheet-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.35);
 }
 
-/* Drawer transition */
-.drawer-enter-active {
-  transition: opacity 250ms ease;
+/* 底部 sheet：概念稿 .sheet —— 纸面底 + 顶部墨线 + 抓手 */
+.toc-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  max-height: 78vh;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-strong);
 }
-.drawer-enter-active > div:last-child {
-  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+
+.toc-sheet-dragzone {
+  flex-shrink: 0;
+  touch-action: none;
+  user-select: none;
 }
-.drawer-leave-active {
+
+.toc-sheet-grab {
+  width: 40px;
+  height: 4px;
+  margin: 8px auto 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.toc-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 18px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.toc-sheet-header b {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.toc-sheet-header-acts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toc-sheet-pct {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.toc-sheet-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  transition: color 150ms ease;
+}
+
+.toc-sheet-icon:hover {
+  color: var(--accent);
+}
+
+.toc-sheet-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px 10px max(10px, env(safe-area-inset-bottom));
+  font-size: 15px;
+}
+
+/* 遮罩淡入/淡出 */
+.toc-fade-enter-active,
+.toc-fade-leave-active {
   transition: opacity 200ms ease;
 }
-.drawer-leave-active > div:last-child {
-  transition: transform 200ms ease-in;
+.toc-fade-enter-from,
+.toc-fade-leave-to {
+  opacity: 0;
 }
 
-.drawer-enter-from {
-  opacity: 0;
+/* sheet 滑入/滑出 */
+.toc-sheet-enter-active {
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
 }
-.drawer-enter-from > div:last-child {
-  transform: translateX(100%);
+.toc-sheet-leave-active {
+  transition: transform 200ms ease-in;
 }
-.drawer-leave-to {
-  opacity: 0;
-}
-.drawer-leave-to > div:last-child {
-  transform: translateX(100%);
+.toc-sheet-enter-from,
+.toc-sheet-leave-to {
+  transform: translateY(100%);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fab-enter-active,
-  .fab-leave-active,
-  .drawer-enter-active,
-  .drawer-leave-active {
+  .toc-fade-enter-active,
+  .toc-fade-leave-active,
+  .toc-sheet-enter-active,
+  .toc-sheet-leave-active {
     transition-duration: 1ms !important;
   }
-  .drawer-enter-active > div:last-child,
-  .drawer-leave-active > div:last-child {
-    transition-duration: 1ms !important;
-  }
+}
+
+/* 纸本专属：方角 + 墨线（scoped unlayered，与 chat.css 同理压过 utilities） */
+html[data-theme^="paper"] .toc-sheet-icon {
+  border-radius: 0;
 }
 </style>

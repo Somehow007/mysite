@@ -20,8 +20,8 @@ const SUGGESTED_QUESTIONS = [
   '最近发布了哪些文章？',
   'Spring Security 怎么配置 JWT？',
 ]
-
-const hasSuggestedQuestions = computed(() => SUGGESTED_QUESTIONS.length > 0)
+// 文章页移动 sheet 的空态示例（与 AskArticleCard 同组文案）
+const POST_SUGGESTED_QUESTIONS = ['总结成 3 点', '这篇的核心结论是什么', '适合什么读者看']
 
 const router = useRouter()
 const route = useRoute()
@@ -79,7 +79,18 @@ watch(
   { immediate: true },
 )
 
+// 移动端 + 文章页：sheet 形态显示「✦ 问这篇文章 / 正在阅读：标题」
+const isPostContext = computed(() => isMobile.value && readingArticleId.value != null)
+
+const suggestedQuestions = computed(() =>
+  isPostContext.value ? POST_SUGGESTED_QUESTIONS : SUGGESTED_QUESTIONS,
+)
+const hasSuggestedQuestions = computed(() => suggestedQuestions.value.length > 0)
+
 const subtitleText = computed(() => {
+  if (isPostContext.value) {
+    return `正在阅读：${launcher.readingTitle.value || '本文'}`
+  }
   const reading = readingArticleId.value
   if (reading) {
     if (!hasSelectedKbs.value) return '正在阅读文章 · 可问这篇或其他文章'
@@ -433,13 +444,16 @@ onScopeDispose(() => {
 
           <!-- 标题区 -->
           <div class="flex-1 min-w-0">
-            <h1 class="font-serif text-[15px] font-semibold text-text-primary leading-tight">AI 助手</h1>
+            <h1 class="font-serif text-[15px] font-semibold text-text-primary leading-tight">
+              {{ isPostContext ? '✦ 问这篇文章' : 'AI 助手' }}
+            </h1>
             <p class="text-[11.5px] text-text-muted mt-0.5 flex items-center gap-1.5">
               <span
+                v-if="!isPostContext"
                 class="w-1.5 h-1.5 rounded-full shrink-0"
                 :class="hasSelectedKbs ? 'bg-accent' : 'bg-text-muted'"
               />
-              {{ subtitleText }}
+              <span class="truncate">{{ subtitleText }}</span>
             </p>
           </div>
 
@@ -534,7 +548,7 @@ onScopeDispose(() => {
                 class="flex flex-wrap justify-center gap-2 max-w-[280px]"
               >
                 <button
-                  v-for="q in SUGGESTED_QUESTIONS"
+                  v-for="q in suggestedQuestions"
                   :key="q"
                   class="chat-empty-chip bg-accent-subtle text-accent rounded-full px-3 py-1.5
                          text-xs hover:opacity-80 transition-opacity"
