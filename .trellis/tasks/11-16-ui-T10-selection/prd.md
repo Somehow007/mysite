@@ -108,3 +108,16 @@
 - t10-debug.mjs、t10-shot.mjs 为调试脚本，已删（截图脚本一并清理）。
 - lint 基线 16 errors 为历史存量（CHANGES 多处记录「lint 16 基线」），非本任务引入。
 - HEAD 在 T12 提交后短暂缺 usePendingAsk 导出（type-check 会挂），本次 commit 修复；后续如有并行任务注意 usePendingAsk.ts 归属 T10。
+
+## 走查记录（2026-11-16）
+
+`scripts/t10-walkthrough.mjs` DOM 级复核 **45/45**（W1 定位边界 / W2 贴边+resize / W3 键盘路径 / W4 选区形态 / W5 动作细节 / W6 生命周期回归 / W7 主题热切换 / W8 时序竞态），修复后 t10-verify 复跑 55/55 无回归。
+
+**真实 bug ×2，均已修复：**
+
+1. **sticky header 遮挡**：选区首行贴近 header 下缘时 popover 放上方会被 `header.sticky z-50` 遮住（popover z-40，实测 popTop=44 < headerBottom=59）。`update()` 顶部净空改为 `max(VIEW_PAD, header.sticky.getBoundingClientRect().bottom)`，不足即翻转下方/钳制。
+2. **评论框滚动不到位 + 无焦点**：`scrollIntoView block:'start'` 作用于评论区根，在「评论区贴近页底」的文章上被 maxScroll 截停（target 14799 > max 14543），textarea 实测停在视口外 1225px；且 applyQuote 不聚焦（与问AI路径「光标落在输入框」不对齐）。改为滚动目标=textarea 本身 `block:'center'`（小元素居中不受余量截停影响），+650ms 延迟 `focus()` 让浏览器 focus-scroll 做最终校正（同时吸收懒加载图片导致的布局漂移），两路计时器 onBeforeUnmount 清理。
+
+**测试方法学调整 ×1**：desktop Chrome 无 caret-browsing 时方向键不扩选文档选区（Shift+ArrowRight 对 collapsed selection 无 DOM 变化），改用 `sel.modify('extend')` 走真实 selectionchange 路径断言「无 mousedown 选区也可出 popover」（dragging 不误置）；另确认 `[class*="quote"]` 选择器落空 → quote 条改用 `button[aria-label="删除引用"]` 父容器断言。
+
+**顺带覆盖**：恰好 5 字/≤500 端点、反向选区、li/标题内选区、跨界（内→外）不出现、双击选词、复制后选区保留、二次问AI quote 覆盖、二次引用置顶拼接、commentEnabled=false 引用钮不渲染（route mock site config）、匿名暂存不登录一次性清除、路由离开卸载、切换文章无残留+新文章可用、面板已开再选仍可用、TOC 后可用、主题热切换实时换肤（0px→8px）、paper-dark 可辨、快速重选/popover 内按下外松/modify 连扩等竞态，全程 pageerror=0、横向溢出=0。
