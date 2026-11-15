@@ -6,13 +6,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/scripts/lib.sh"
 
 PROJECT_DIR="$HOME/project/mysite"
-JOURNAL_DIR="$HOME/project/study-journey"
-JOURNAL_REPO="git@github.com:Somehow007/study-journel.git"
 APP_DIR="/opt/mysite"
 APP_JAR="$APP_DIR/mysite.jar"
 APP_START_SCRIPT="$APP_DIR/start.sh"
 NGINX_WEB_ROOT="/var/www/mysite"
-JOURNAL_WEB_ROOT="/var/www/journal"
 UPLOAD_DIR="/data/mysite/uploads"
 DEPLOY_LOG_DIR="/var/log/mysite/deploy"
 
@@ -88,28 +85,6 @@ step_git_pull() {
     log_success "mysite: $(git log --oneline -1)"
 }
 
-step_git_pull_journal() {
-    log_step "拉取手帐仓库"
-    if [ ! -d "$JOURNAL_DIR/.git" ]; then
-        log_info "首次克隆 $JOURNAL_REPO → $JOURNAL_DIR"
-        mkdir -p "$(dirname "$JOURNAL_DIR")"
-        if ! git clone --branch main "$JOURNAL_REPO" "$JOURNAL_DIR" 2>&1 | tee -a "$DEPLOY_LOG"; then
-            die "克隆手帐仓库失败（服务器需能 SSH 访问 GitHub）"
-        fi
-    else
-        cd "$JOURNAL_DIR"
-        if ! git fetch origin 2>&1 | tee -a "$DEPLOY_LOG"; then
-            die "手帐 git fetch 失败"
-        fi
-        git checkout main 2>&1 | tee -a "$DEPLOY_LOG" || die "手帐 checkout main 失败"
-        if ! git pull --ff-only origin main 2>&1 | tee -a "$DEPLOY_LOG"; then
-            die "手帐 git pull 失败"
-        fi
-    fi
-    cd "$JOURNAL_DIR"
-    log_success "study-journey: $(git log --oneline -1)"
-}
-
 step_build_backend() {
     log_step "构建后端"
     cd "$PROJECT_DIR"
@@ -137,19 +112,6 @@ step_build_frontend() {
     fi
     npm run build 2>&1 | tee -a "$DEPLOY_LOG" || die "博客前端构建失败"
     log_success "博客前端构建成功 ($(find dist -type f | wc -l) 个文件)"
-}
-
-step_build_journal() {
-    log_step "构建手帐前端"
-    load_node
-    cd "$JOURNAL_DIR"
-    if [ ! -d "node_modules" ] || [ "package-lock.json" -nt "node_modules" ] 2>/dev/null; then
-        log_info "安装手帐依赖..."
-        npm install 2>&1 | tee -a "$DEPLOY_LOG" || die "手帐依赖安装失败"
-    fi
-    npm run build 2>&1 | tee -a "$DEPLOY_LOG" || die "手帐构建失败"
-    [ -f "$JOURNAL_DIR/dist/index.html" ] || die "手帐 dist/index.html 不存在"
-    log_success "手帐构建成功 ($(find dist -type f | wc -l) 个文件)"
 }
 
 step_stop_service() {
@@ -234,15 +196,6 @@ step_deploy_frontend() {
     sudo rm -rf "$NGINX_WEB_ROOT"/* "$NGINX_WEB_ROOT"/.[!.]* 2>/dev/null || true
     sudo cp -r "$PROJECT_DIR/mysite-frontend/dist/"* "$NGINX_WEB_ROOT/"
     log_success "博客前端部署成功 ($(find "$NGINX_WEB_ROOT" -type f | wc -l) 个文件)"
-}
-
-step_deploy_journal() {
-    log_step "部署手帐前端"
-    [ -f "$JOURNAL_DIR/dist/index.html" ] || die "手帐 dist 不存在，请先构建"
-    sudo mkdir -p "$JOURNAL_WEB_ROOT"
-    sudo rsync -a --delete "$JOURNAL_DIR/dist/" "$JOURNAL_WEB_ROOT/"
-    sudo chown -R www-data:www-data "$JOURNAL_WEB_ROOT"
-    log_success "手帐部署成功 ($(find "$JOURNAL_WEB_ROOT" -type f | wc -l) 个文件 → $JOURNAL_WEB_ROOT)"
 }
 
 step_setup_upload_dir() {
@@ -340,38 +293,16 @@ step_verify() {
         log_warn "上传目录 Nginx 路由返回 HTTP $upload_code（期望 403/404）"
     fi
 
-    log_info "4. 检查手帐静态页"
-    local journal_code
-    journal_code=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8080/journal/ 2>/dev/null || echo "000")
-    if [ "$journal_code" = "200" ]; then
-        log_success "手帐首页 HTTP $journal_code"
-    else
-        die "手帐首页异常 HTTP $journal_code（期望 200）"
-    fi
-    local journal_spa
-    journal_spa=$(curl -sf -o /dev/null -w "%{http_code}" http://localhost:8080/journal/stats 2>/dev/null || echo "000")
-    if [ "$journal_spa" = "200" ]; then
-        log_success "手帐 SPA fallback HTTP $journal_spa"
-    else
-        die "手帐深链异常 HTTP $journal_spa（期望 200）"
-    fi
-
-    log_info "5. 检查手帐 / AI 管理 API（未登录应为 401）"
-    local journal_api ai_api
-    journal_api=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/api/journal/export 2>/dev/null || echo "000")
+    log_info "4. 检查 AI 管理 API（未登录应为 401）"
+    local ai_api
     ai_api=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/v1/admin/ai/providers 2>/dev/null || echo "000")
-    if [ "$journal_api" = "401" ]; then
-        log_success "手帐 API 已挂载 (HTTP 401)"
-    else
-        die "手帐 API 异常 HTTP $journal_api（期望 401）"
-    fi
     if [ "$ai_api" = "401" ]; then
         log_success "AI 管理 API 已挂载 (HTTP 401)"
     else
         die "AI 管理 API 异常 HTTP $ai_api（期望 401）"
     fi
 
-    log_info "6. 检查已上传文件"
+    log_info "5. 检查已上传文件"
     local uploaded_files
     uploaded_files=$(find "$UPLOAD_DIR/images" -type f 2>/dev/null | head -3)
     if [ -n "$uploaded_files" ]; then
@@ -402,15 +333,12 @@ main() {
     init_log
 
     step_git_pull
-    step_git_pull_journal
     step_build_backend
     step_build_frontend
-    step_build_journal
     step_stop_service
     step_deploy_backend
     step_start_service
     step_deploy_frontend
-    step_deploy_journal
     step_setup_upload_dir
     step_sync_nginx
     step_verify
@@ -418,10 +346,8 @@ main() {
     echo ""
     log_success "部署完成！"
     log_info "博客版本: $(cd "$PROJECT_DIR" && git log --oneline -1)"
-    log_info "手帐版本: $(cd "$JOURNAL_DIR" && git log --oneline -1)"
     log_info "后端 JAR:  $(ls -lh "$APP_JAR" | awk '{print $5}')"
     log_info "博客前端:  $(find "$NGINX_WEB_ROOT" -type f | wc -l) 个文件"
-    log_info "手帐前端:  $(find "$JOURNAL_WEB_ROOT" -type f | wc -l) 个文件"
     log_info "部署日志:  $DEPLOY_LOG"
 }
 

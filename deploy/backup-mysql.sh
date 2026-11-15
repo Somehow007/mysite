@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Dump the mysite MySQL database (blog t_* tables + journal sj_* tables).
+# Dump the mysite MySQL database (blog t_* tables; sj_* 手帐表已迁往 study-journey，DROP 前仍随库备份).
 #
 # Run on the host that already has the `mysite-mysql` container.
 # Do not SSH to production from CI; copy this script to the server and cron it there.
