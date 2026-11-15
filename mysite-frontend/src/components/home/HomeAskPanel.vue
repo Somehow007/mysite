@@ -164,7 +164,7 @@ onMounted(async () => {
           @keydown.enter="handleEnter"
         />
         <span class="mr-auto border border-accent px-[9px] py-[3px] text-xs whitespace-nowrap text-accent lg:mr-0">
-          全部文章
+          全部文章 ▾
         </span>
         <button
           type="button"

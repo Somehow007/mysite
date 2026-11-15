@@ -264,9 +264,10 @@ async function applyLaunchOptions(opts: ChatLaunchOptions) {
     chat.selectedKbIds.value = [...opts.kbIds]
   }
   if (opts.quote) pendingQuote.value = opts.quote
-  if (opts.send) {
-    const q = opts.question?.trim()
-    if (q) handleSend(q)
+  const q = opts.question?.trim()
+  // 流式中 sendMessage 会静默丢弃 —— 退回预填路径，保住用户的问题
+  if (opts.send && q && !chat.isStreaming.value) {
+    handleSend(q)
     return
   }
   // 预填 / 仅引用：等面板渲染出 ChatInput 后写入；移动端不聚焦（避免弹键盘）

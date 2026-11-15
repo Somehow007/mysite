@@ -204,6 +204,39 @@ const browser = await chromium.launch()
   await ctx.close()
 }
 
+// ── C2. send=true 但正在流式 → 退回预填（不丢问题）──────────
+{
+  console.log('== C2. 流式中 send → 退回预填 ==')
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  // 挂起第一个流式请求，制造 isStreaming 窗口
+  await ctx.route('**/v1/rag/chat/stream**', async route => {
+    await new Promise(r => setTimeout(r, 6000))
+    await route.fulfill({
+      status: 200, contentType: 'text/event-stream',
+      body: 'data: {"type":"done"}\n\n',
+    })
+  })
+  const page = await ctx.newPage()
+  await page.goto(`${base}/about`, { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(600)
+  await page.evaluate(async () => {
+    const m = await import('/src/composables/useChatLauncher.ts')
+    m.useChatLauncher().open({ question: '第一条占用流的问题', send: true })
+  })
+  await page.waitForSelector('text=第一条占用流的问题', { timeout: 5000 })
+  // 流式中第二次 send → 应落入输入框而非静默丢弃
+  await page.evaluate(async () => {
+    const m = await import('/src/composables/useChatLauncher.ts')
+    m.useChatLauncher().open({ question: '流式中不能丢Q2', send: true })
+  })
+  await page.waitForTimeout(500)
+  const taVal = await page.locator('.chat-panel textarea').inputValue()
+  ok('流式中 send 退回预填', taVal === '流式中不能丢Q2', `got "${taVal}"`)
+  const userMsgCount = await page.locator('.chat-panel .justify-end').count()
+  ok('仅 1 条用户消息（未并发发送）', userMsgCount === 1, `got ${userMsgCount}`)
+  await ctx.close()
+}
+
 // ── D. 配置驱动状态（mock）─────────────────────────────────
 {
   console.log('== D. askDemo 渲染 + KB 空降级 ==')
@@ -256,10 +289,14 @@ const browser = await chromium.launch()
   await ctx2.close()
 }
 
-// ── E. 三主题截图 ─────────────────────────────────────────
+// ── E. 全主题溢出检查（paper 双主题截图，其余断言渲染+溢出）──
 {
-  console.log('== E. 三主题截图 ==')
-  for (const theme of ['paper-light', 'paper-dark', 'classic-light']) {
+  console.log('== E. 全主题检查 ==')
+  const shotThemes = ['paper-light', 'paper-dark', 'classic-light']
+  const allThemes = [...shotThemes,
+    'classic-dark', 'aurora', 'rose-garden', 'ocean-breeze',
+    'warm-sunset', 'liquid-glass', 'liquid-glass-dark']
+  for (const theme of allThemes) {
     for (const vp of [{ w: 1440, h: 900, n: 'd' }, { w: 390, h: 844, n: 'm' }]) {
       const ctx = await browser.newContext({ viewport: { width: vp.w, height: vp.h } })
       await ctx.addInitScript(t => { try { localStorage.setItem('mysite_theme_v2', t) } catch {} }, theme)
@@ -269,9 +306,11 @@ const browser = await chromium.launch()
       await page.waitForTimeout(800)
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
       ok(`溢出=0 ${theme} ${vp.n}`, overflow === 0, `overflow=${overflow}`)
-      // ask 区块单独截图
-      const sec = page.locator('section', { hasText: '不想翻目录' }).first()
-      await sec.screenshot({ path: join(outDir, `e-ask-${theme}-${vp.n}.png`) })
+      // ask 区块单独截图（仅代表性三主题，其余只做断言）
+      if (shotThemes.includes(theme)) {
+        const sec = page.locator('section', { hasText: '不想翻目录' }).first()
+        await sec.screenshot({ path: join(outDir, `e-ask-${theme}-${vp.n}.png`) })
+      }
       await ctx.close()
     }
   }

@@ -67,6 +67,30 @@
 - 截图：`mysite-frontend/scripts/output/t7/`（a-home-ask / b-after-login-chat /
   d-askdemo / d-degraded / e-ask-*-{d,m}）。
 
+## 走查记录（提交后复核）
+
+发现并修复 2 处：
+
+- **概念偏差**：scope 标签少了 `▾`（概念稿为「全部文章 ▾」，示意范围可选）。
+  已补（HomeAskPanel.vue:168）。
+- **潜在丢消息**：`launcher.open({send:true})` 在上一条回复仍流式中时，
+  `sendMessage` 的并发防护会静默丢弃新问题。改为流式中退回预填路径——
+  问题落入输入框由用户手动再发（ChatWidget.vue applyLaunchOptions）。
+  新增 C2 断言用挂起的 SSE route 制造确定性 isStreaming 窗口验证。
+
+排查过确认无问题：
+
+- `api/rag.ts` 原生 `localStorage.getItem` 读 token：已有 `JSON.parse` 主路径
+  + raw 兜底，与 `setItem` 的 JSON 序列化兼容，Authorization 头正确。
+- `getItem('access_token')`（resumePendingAsk 兜底判定）：与 storage.ts 约定一致。
+- FAB 隐藏时 `useFabStack.setVisible(false)` 正确释放堆叠槽位（BackToTop 不留空洞）。
+- 路由名 `home`/`home-page`/`post` 均存在；pending watcher 时序安全
+  （`open()` 同步写 pending+isOpen，flush 时 isOpen 已 true）。
+- `paper-flat`/`paper-card--strong`/`shadow-hard` 均按 T1 约定生效。
+
+走查后验证：`t7-verify.mjs` **57/57**（原 41 + C2 两项 + E 段扩为全 10 主题
+×双视口溢出/渲染断言，截图仍只留 3 主题）；type-check 绿；改动文件 lint 0 错误。
+
 ## Resolution
 
 已完成并提交。
