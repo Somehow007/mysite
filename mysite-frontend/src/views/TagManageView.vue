@@ -135,7 +135,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="flex flex-col gap-5 min-w-0">
     <PageHeader title="标签管理" subtitle="管理文章标签">
       <template #actions>
         <button @click="openCreateModal" class="btn-primary">
@@ -145,7 +145,7 @@ onMounted(() => {
       </template>
     </PageHeader>
 
-    <div v-if="hotTags.length > 0" class="card-solid mb-4 px-4 py-3">
+    <div v-if="hotTags.length > 0" class="card-solid px-4 py-3">
       <div class="flex items-center gap-2 mb-3">
         <TrendingUp :size="16" class="text-accent" />
         <span class="text-sm font-medium text-text-primary">热门标签</span>
@@ -167,7 +167,6 @@ onMounted(() => {
       placeholder="搜索标签名称或别名..."
       :show-sort="false"
       :show-filter="false"
-      class="mb-4"
       @search="() => {}"
       @reset="searchQuery = ''"
     />

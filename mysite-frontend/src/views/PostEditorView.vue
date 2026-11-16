@@ -578,7 +578,7 @@ function removeCover() {
         >
           <ArrowLeft :size="18" class="group-hover:-translate-x-0.5 transition-transform duration-200" />
         </button>
-        <h1 class="text-2xl font-semibold text-text-primary">
+        <h1 class="ui-page-title text-2xl font-semibold text-text-primary">
           {{ pageTitle }}
         </h1>
       </div>

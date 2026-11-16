@@ -5,7 +5,7 @@ import { useUserStore } from '@/stores/user'
 import { changePassword } from '@/api/auth'
 import { useToast } from '@/composables/useToast'
 import { Eye, EyeOff, User, Lock, Mail, Phone, UserCircle, Camera, Loader2, ShieldCheck, BadgeCheck, Laptop } from 'lucide-vue-next'
-import { Badge } from '@/components/ui'
+import { Badge, PageHeader } from '@/components/ui'
 import UserAvatar from '@/components/common/UserAvatar.vue'
 import type { ChangePasswordRequest } from '@/types'
 import { uploadAvatar } from '@/api/user'
@@ -161,13 +161,11 @@ async function handleAvatarUpload(e: Event) {
 </script>
 
 <template>
-  <div class="max-w-4xl">
-    <h1 class="text-2xl font-semibold text-text-primary mb-8">
-      个人设置
-    </h1>
+  <div class="flex flex-col gap-5 min-w-0 max-w-4xl">
+    <PageHeader title="个人设置" subtitle="资料、账号安全与偏好" />
 
-    <div class="space-y-8">
-      <section class="card-solid rounded-2xl p-7 md:p-8">
+    <div class="flex flex-col gap-5">
+      <section class="card-solid p-6">
         <h2 class="text-lg font-medium text-text-primary mb-6 flex items-center gap-2">
           <User :size="20" class="text-accent" />
           个人资料
@@ -305,7 +303,7 @@ async function handleAvatarUpload(e: Event) {
         </form>
       </section>
 
-      <section class="card-solid rounded-2xl p-7 md:p-8">
+      <section class="card-solid p-6">
         <h2 class="text-lg font-medium text-text-primary mb-6 flex items-center gap-2">
           <ShieldCheck :size="20" class="text-accent" />
           账号安全

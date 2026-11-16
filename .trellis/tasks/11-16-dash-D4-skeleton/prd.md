@@ -82,3 +82,46 @@ html.dash-mode[data-theme^="paper"] .ui-table-headrow > * {
 - 截图：知识库页标题不再右下偏；设置页有副标题、卡片与其他页同宽规则；合集编辑页左对齐、返回钮在标题左侧；分类表头与文章表头同款；合集列表为单容器分隔线。
 - 合集编辑页：直接在地址栏打开 `/dashboard/collections/<id>/edit`，点返回 → 回到合集管理（不离站）。
 - classic-light 下以上改动同样生效且不难看；其余页面与基线一致。
+
+## 实现记录（2026-11-16）
+
+**改动文件**（15 个，全部前端）：
+
+- `components/ui/PageHeader.vue`：根 div 删 `mb-6`（`ui-page-header` hook 保留）；新增可选 prop `back?: string`，有值时标题左侧渲染返回钮（`ArrowLeft :size="18"`，样式抄 CollectionEditView 原返回钮），点击 `router.push(back)`。
+- `styles/themes/paper-dashboard.css`：⑥ 表格段末尾追加 `.ui-table-headrow` 两条规则（透明底 + `--border-strong` 下边、`> *` 文字 secondary + letter-spacing），与 prd 定稿一致。
+- `components/ui/CategoryTreeNode.vue`：数字列加 `tabular-nums`；手写状态钮改为 `<button>` 包 `<Badge variant="success|muted" size="sm">`（原状是 button 不是 span，保留 emit toggleStatus 交互）；删 `statusClass`。
+- 9 个 PageHeader 页根节点统一 `flex flex-col gap-5 min-w-0`，删兄弟元素补丁外边距：
+  - `DashboardView`：根补 `min-w-0`；删 SearchFilterBar `mb-4`、批量条 `mb-4`。
+  - `UserManageView`：根改 flex；删统计卡/筛选栏/批量条 3 处 `mb-4`。
+  - `TagManageView`：根改 flex；删热门标签卡/筛选栏 `mb-4`。
+  - `CommentManageView`：根改 flex；删筛选栏 `mb-4`。
+  - `CategoryManageView`：根改 flex；树容器 → `ui-table rounded-lg border border-border overflow-hidden`（去 `bg-bg-secondary`）；表头行加 `ui-table-headrow`、`px-4→px-3`、4 个 span 统一 `text-xs font-medium text-text-muted`。
+  - `CollectionManageView`：根改 flex；删筛选栏 `mb-4`；列表 `space-y-3` → `card-solid divide-y divide-border overflow-hidden` 单容器；行去圆角边框、hover 改 `hover:bg-bg-secondary`；手写胶囊 → `<Badge variant="warning|success" size="sm">`（私有徽标 Lock 图标入插槽、`title` 提示保留）；分页 `card-solid mt-6` → `card-solid`。
+  - `ImageManagerView`：根改 flex；删筛选栏 `mb-4`。
+  - `AiManageView`：根改 flex；删页签栏 `mb-5`、筛选栏 `mb-4`、dashboard 页预设行/统计卡/图表卡/双列栅格 `mb-4`、供应商页说明 `mb-4` 共 6 处。
+  - `KnowledgeManageView`：根 `w-full max-w-6xl mx-auto p-6 space-y-6 min-w-0` → `flex flex-col gap-5 min-w-0`（标题不再右下偏）。
+- `SettingsView.vue`：引 PageHeader；根 → `flex flex-col gap-5 min-w-0 max-w-4xl`；裸 h1 → `<PageHeader title="个人设置" subtitle="资料、账号安全与偏好" />`；内层 `space-y-8` → `flex flex-col gap-5`；两 section `card-solid rounded-2xl p-7 md:p-8` → `card-solid p-6`。
+- `CollectionEditView.vue`：引 PageHeader、删 ArrowLeft 导入；根 `max-w-[900px] mx-auto` → `flex flex-col gap-5 min-w-0 max-w-4xl`；手写返回钮+h1 → `<PageHeader :title="pageTitle" back="/dashboard/collections" />`；错误条删 `mb-6`；两个表单块 `p-6 rounded-xl border border-border bg-bg-primary` → `card-solid p-6`。
+- `PostEditorView.vue`：h1 加 `ui-page-title` hook（不纳入骨架改造）。
+
+**偏离方案**（均已评估，记录备查）：
+
+1. `SettingsView` 内层 `space-y-8` 改为 `flex flex-col gap-5` 而非拆除包裹 div——视觉节奏同为 20px，避免重排 270 行缩进。
+2. `CollectionEditView` 的 `card-solid` 应用于**两个**表单块（基本信息+文章列表），prd 写单数「表单块」——同容器样式，拆一半会更不齐。
+3. PageHeader 返回钮加 `-ml-2`（让图标左缘与标题文字对齐）+ `type="button"` + `aria-label="返回"`；按钮与标题 `gap-3`。
+4. `CategoryTreeNode` 状态是可点击 button（切换启用），保留 button 外壳包 Badge，不是直接换 span；Badge 自动宽度与原 `w-14` 等宽（启用/禁用同字数）。
+5. 合集私有徽标加 `class="gap-1"`（Badge 仅 dot 时才有 gap class）+ Lock `:size="10"`（配 text-xs）。
+6. `ImageManagerView` v-else 内容块内部的 `mb-4/mb-3/mt-6` 保留——它们是单个根子节点内部的版式节奏，非 PageHeader 补偿外边距。
+7. 分类表头按 prd 用 `px-3`（对齐 DataTable 单元格），复选框比树行（paddingLeft=1rem）左偏 4px——prd 明确取值，从之。
+
+**消费点复核**：动手前 rg 复核——PageHeader 调用方=9 后台页（无前台）；本次新增 SettingsView/CollectionEditView 两处消费（均后台路由）；`!rounded`、手写胶囊 span 无其他遗漏；`statusClass`/`ArrowLeft` 删除后 0 残留引用。
+
+**验收输出**：
+
+- `./scripts/verify.sh` → `VERIFY OK (quick)`（后端 hermetic + 前端 type-check）。
+- `npm run type-check` / `npm run build` → 绿；`npm run lint` → oxlint 18 errors **全部存量**（scripts/d2-walkthrough、d3 走查脚本、composables 等），改动文件 0 命中，基线自 15 漂移至 18（D2/D3 走查脚本带入），**0 新增**；`git diff` 确认 lint --fix 无误改无关文件。
+- `DASH_USER/DASH_PASS node scripts/dash-shots.mjs scripts/output/dash-shots-D4` → 66 张 `OK: no overflow, no page error`，overflowX 全 0。
+- 位置断言 `scripts/output/d4-check.mjs`（一次性，不入库）：classic-light 1440 下 10 个 PageHeader 路由 `.ui-page-title` **left=256.00 / top=32.00 全部一致（Δ=0px）**；合集编辑页返回钮点击 → `/dashboard/collections`（不离站）→ **10/10 PASS**。
+- paper-light DOM 断言 `scripts/output/d4-dom-check.mjs`：**17/17 PASS**——5 页标题对齐（含知识库页）、settings 副标题+2×`card-solid p-6` 无 rounded-2xl、collections 单容器 `card-solid.divide-y`+`ui-badge`、categories `ui-table`/`ui-table-headrow` computed（透明底、`border-strong` 下边、secondary 12px 文字、徽标方角）、PostEditor h1 衬线 900。
+- classic-light 回归（PIL 像素 diff vs `dash-shots-baseline`）：21/22 张 DIFF 属预期——间距归一化（16/24px 混用 → 统一 20px）波及所有后台页；desktop 变化量 0.17%–6.69%（posts 6.69% 含相对时间/计数数据漂移，同 D2 观察口径；posts_new 0.17% 近零印证 PostEditor 仅加 hook class）；mobile 0.95%–9.53%（卡片流式重排+间距级联）；`posts_new` mobile 字节级 IDENTICAL。无横向溢出、无 pageerror。
+- 截图目检项（知识库标题不再右下偏、设置页副标题、合集编辑左对齐+返回钮、分类表头同款、合集列表单容器分隔线）已由上面 DOM/computed 断言等价覆盖；人工目检建议终验时补看 `dash-shots-D4/` 对应页。

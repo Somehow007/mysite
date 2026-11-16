@@ -497,7 +497,7 @@ watch(selectedKbId, () => {
 </script>
 
 <template>
-  <div class="w-full max-w-6xl mx-auto p-6 space-y-6 min-w-0">
+  <div class="flex flex-col gap-5 min-w-0">
     <!-- ═══ 页头 ═══ -->
     <PageHeader title="知识库管理" subtitle="管理向量知识库，将博客文章同步为 AI 可检索的文档索引">
       <template #actions>

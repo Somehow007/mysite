@@ -228,7 +228,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="flex flex-col gap-5 min-w-0">
     <PageHeader title="分类管理" subtitle="管理文章分类层级结构">
       <template #actions>
         <button
@@ -264,18 +264,18 @@ onMounted(() => {
       </button>
     </div>
 
-    <div v-else class="rounded-lg border border-border bg-bg-secondary overflow-hidden">
-      <div class="flex items-center gap-3 px-4 py-3 border-b border-border bg-bg-code">
+    <div v-else class="ui-table rounded-lg border border-border overflow-hidden">
+      <div class="ui-table-headrow flex items-center gap-3 px-3 py-3 border-b border-border bg-bg-code">
         <input
           type="checkbox"
           :checked="selectedIds.size === getAllCategoryIds(categories).length"
           @change="toggleSelectAll"
           class="w-4 h-4 rounded border-border"
         />
-        <span class="text-sm font-medium text-text-secondary">分类名称</span>
-        <span class="ml-auto text-sm text-text-muted">文章数</span>
-        <span class="ml-4 text-sm text-text-muted">状态</span>
-        <span class="ml-4 text-sm text-text-muted">操作</span>
+        <span class="text-xs font-medium text-text-muted">分类名称</span>
+        <span class="ml-auto text-xs font-medium text-text-muted">文章数</span>
+        <span class="ml-4 text-xs font-medium text-text-muted">状态</span>
+        <span class="ml-4 text-xs font-medium text-text-muted">操作</span>
       </div>
 
       <div class="divide-y divide-border">

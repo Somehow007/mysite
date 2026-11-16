@@ -384,7 +384,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col gap-5">
+  <div class="flex flex-col gap-5 min-w-0">
     <!-- 页头 -->
     <PageHeader title="文章管理" :subtitle="`共 ${totalArticles} 篇文章`">
       <template #actions>
@@ -404,7 +404,6 @@ onMounted(() => {
       :sort-order="sortOrder"
       :filter-options="publishedFilterOptions"
       :filter-value="publishedFilter === undefined ? '' : String(publishedFilter)"
-      class="mb-4"
       @update:sort-field="sortField = $event; handleSearch()"
       @update:sort-order="sortOrder = $event; handleSearch()"
       @update:filter-value="publishedFilter = $event === '' ? undefined : Number($event); handleSearch()"
@@ -426,7 +425,7 @@ onMounted(() => {
 
     <!-- 批量操作栏（悬浮胶囊） -->
     <Transition name="batch-bar">
-      <div v-if="hasSelection" class="flex justify-center mb-4">
+      <div v-if="hasSelection" class="flex justify-center">
         <div class="inline-flex items-center gap-3 px-4 py-2 rounded-full border border-accent/30 bg-bg-elevated shadow-md">
           <span class="text-[13px] font-semibold text-accent">已选 {{ selectedIds.size }} 项</span>
           <button @click="handleBatchVisibility(0)" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] rounded-full bg-bg-secondary text-text-primary hover:bg-accent/10 hover:text-accent transition-colors">

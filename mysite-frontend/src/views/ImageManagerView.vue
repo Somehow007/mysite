@@ -251,7 +251,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="flex flex-col gap-5 min-w-0">
     <PageHeader title="图片管理" :subtitle="`共 ${total} 张图片`">
       <template #actions>
         <input
@@ -291,7 +291,6 @@ onMounted(() => {
       :sort-field="sortField"
       :sort-order="sortOrder"
       :show-filter="false"
-      class="mb-4"
       @update:sort-field="sortField = $event; fetchImages(1)"
       @update:sort-order="sortOrder = $event; fetchImages(1)"
       @search="handleSearch"

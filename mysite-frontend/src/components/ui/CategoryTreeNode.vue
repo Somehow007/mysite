@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ChevronRight, ChevronDown, Plus, Edit, Trash2 } from 'lucide-vue-next'
+import Badge from './Badge.vue'
 import type { Category } from '@/types'
 
 const props = defineProps<{
@@ -24,12 +25,6 @@ const maxDepth = props.maxDepth ?? 3
 const hasChildren = computed(() => (props.category.children?.length ?? 0) > 0)
 const isExpanded = computed(() => props.expandedIds.has(props.category.id))
 const isSelected = computed(() => props.selectedIds.has(props.category.id))
-
-function statusClass(status: number) {
-  return status === 1
-    ? 'bg-success-subtle text-success'
-    : 'bg-bg-code text-text-muted'
-}
 </script>
 
 <template>
@@ -59,17 +54,18 @@ function statusClass(status: number) {
     <span class="text-sm text-text-secondary flex-1">{{ category.name }}</span>
 
     <!-- Article count -->
-    <span class="text-sm text-text-muted w-12 text-right">
+    <span class="text-sm text-text-muted w-12 text-right tabular-nums">
       {{ category.articleCount || 0 }}
     </span>
 
     <!-- Status toggle -->
     <button
       @click="emit('toggleStatus', category)"
-      class="px-2 py-0.5 text-xs rounded w-14 text-center"
-      :class="statusClass(category.status)"
+      class="inline-flex shrink-0"
     >
-      {{ category.status === 1 ? '启用' : '禁用' }}
+      <Badge :variant="category.status === 1 ? 'success' : 'muted'" size="sm">
+        {{ category.status === 1 ? '启用' : '禁用' }}
+      </Badge>
     </button>
 
     <!-- Actions -->

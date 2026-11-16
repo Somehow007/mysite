@@ -2,11 +2,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useHead } from '@unhead/vue'
-import { ArrowLeft, Save, Loader2, Plus, X, GripVertical, AlertCircle, BookOpen, FilePlus, ChevronUp, ChevronDown, Globe, Lock } from 'lucide-vue-next'
+import { Save, Loader2, Plus, X, GripVertical, AlertCircle, BookOpen, FilePlus, ChevronUp, ChevronDown, Globe, Lock } from 'lucide-vue-next'
 import { createCollection, updateCollection, getCollectionById, addArticleToCollection, removeArticleFromCollection, updateArticleSort, batchAddArticles } from '@/api/collection'
 import { getArticles } from '@/api/article'
 import { uploadImage, MAX_IMAGE_FILE_SIZE } from '@/api/image'
 import { useToast } from '@/composables/useToast'
+import { PageHeader } from '@/components/ui'
 import type { CollectionArticleItem, ArticleListItem } from '@/types'
 
 const route = useRoute()
@@ -327,18 +328,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="max-w-[900px] mx-auto">
-    <div class="flex items-center gap-4 mb-6">
-      <button
-        @click="router.back()"
-        class="p-2 rounded-lg text-text-muted hover:bg-accent-subtle hover:text-accent transition-all duration-200 group"
-      >
-        <ArrowLeft :size="18" class="group-hover:-translate-x-0.5 transition-transform duration-200" />
-      </button>
-      <h1 class="text-2xl font-semibold text-text-primary">{{ pageTitle }}</h1>
-    </div>
+  <div class="flex flex-col gap-5 min-w-0 max-w-4xl">
+    <PageHeader :title="pageTitle" back="/dashboard/collections" />
 
-    <div v-if="error" class="mb-6 p-3 rounded-lg bg-danger-subtle text-danger text-sm flex items-center gap-2">
+    <div v-if="error" class="p-3 rounded-lg bg-danger-subtle text-danger text-sm flex items-center gap-2">
       <AlertCircle :size="16" />
       {{ error }}
     </div>
@@ -353,7 +346,7 @@ onMounted(() => {
 
     <div v-else class="space-y-6">
       <!-- 基本信息 -->
-      <div class="space-y-4 p-6 rounded-xl border border-border bg-bg-primary">
+      <div class="space-y-4 card-solid p-6">
         <div>
           <label class="block text-sm font-medium text-text-primary mb-1.5">合集标题 *</label>
           <input v-model="title" type="text" placeholder="输入合集标题..." class="input-base" />
@@ -456,7 +449,7 @@ onMounted(() => {
       </div>
 
       <!-- 文章列表管理 -->
-      <div class="p-6 rounded-xl border border-border bg-bg-primary">
+      <div class="card-solid p-6">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-lg font-semibold text-text-primary flex items-center gap-2">
             <BookOpen :size="18" class="text-accent" />

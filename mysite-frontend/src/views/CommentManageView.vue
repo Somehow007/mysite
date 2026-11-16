@@ -122,7 +122,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="flex flex-col gap-5 min-w-0">
     <PageHeader title="评论管理" subtitle="审核与管理全站评论" />
 
     <!-- 筛选栏 -->
@@ -134,7 +134,6 @@ onMounted(() => {
       :sort-options="sortOptions"
       :sort-field="sortField"
       :sort-order="sortOrder"
-      class="mb-4"
       @update:filter-value="handleFilterChange"
       @update:sort-field="handleSortFieldChange"
       @update:sort-order="handleSortOrderChange"

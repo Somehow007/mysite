@@ -8,7 +8,7 @@ import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useUserStore } from '@/stores/user'
 import { formatCollectionProgress } from '@/utils/format'
-import { PageHeader, SearchFilterBar, Pagination as PaginationBar } from '@/components/ui'
+import { PageHeader, SearchFilterBar, Pagination as PaginationBar, Badge } from '@/components/ui'
 import type { Collection, Pagination as PaginationMeta } from '@/types'
 
 const router = useRouter()
@@ -120,7 +120,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div>
+  <div class="flex flex-col gap-5 min-w-0">
     <PageHeader title="合集管理" subtitle="管理文章合集与系列">
       <template #actions>
         <button @click="router.push('/dashboard/collections/new')" class="btn-primary">
@@ -137,7 +137,6 @@ onMounted(() => {
       :sort-field="sortField"
       :sort-order="sortOrder"
       :show-filter="false"
-      class="mb-4"
       @update:sort-field="sortField = $event; fetchCollections(1)"
       @update:sort-order="sortOrder = $event; fetchCollections(1)"
       @search="handleSearch"
@@ -162,11 +161,11 @@ onMounted(() => {
       </button>
     </div>
 
-    <div v-else class="space-y-3">
+    <div v-else class="card-solid divide-y divide-border overflow-hidden">
       <div
         v-for="collection in collections"
         :key="collection.id"
-        class="flex items-center gap-4 p-4 rounded-lg border border-border hover:border-accent/30 hover:bg-accent-subtle/30 transition-all duration-200"
+        class="flex items-center gap-4 p-4 transition-colors hover:bg-bg-secondary"
       >
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
@@ -176,20 +175,19 @@ onMounted(() => {
             >
               {{ collection.title }}
             </RouterLink>
-            <span
+            <Badge
               v-if="collection.visibility === 1"
-              class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-warning-subtle text-warning"
+              variant="warning"
+              size="sm"
+              class="gap-1"
               title="私有合集，仅作者和管理员可见"
             >
-              <Lock :size="9" />
+              <Lock :size="10" />
               私有
-            </span>
-            <span
-              v-if="collection.status === 1"
-              class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-success-subtle text-success"
-            >
+            </Badge>
+            <Badge v-if="collection.status === 1" variant="success" size="sm">
               已完结
-            </span>
+            </Badge>
           </div>
           <p v-if="collection.description" class="text-sm text-text-muted line-clamp-1 mt-0.5">
             {{ collection.description }}
@@ -231,7 +229,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <div v-if="pagination && pagination.totalPages > 1" class="card-solid mt-6">
+    <div v-if="pagination && pagination.totalPages > 1" class="card-solid">
       <PaginationBar
         in-card
         :current="currentPage"

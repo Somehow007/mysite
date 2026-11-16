@@ -87,6 +87,14 @@ html.dash-mode[data-theme^="paper"] .ui-table-card {
   background-color: var(--bg-elevated);
   border-color: var(--border);
 }
+html.dash-mode[data-theme^="paper"] .ui-table-headrow {
+  background-color: transparent;
+  border-bottom: 1px solid var(--border-strong);
+}
+html.dash-mode[data-theme^="paper"] .ui-table-headrow > * {
+  color: var(--text-secondary);
+  letter-spacing: .04em;
+}
 
 /* ⑦ 浮层：墨线 + 硬阴影，去玻璃模糊 */
 html.dash-mode[data-theme^="paper"] .modal-panel,

@@ -497,10 +497,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div>
+  <div class="flex flex-col gap-5 min-w-0">
     <PageHeader title="AI 管理" subtitle="LLM 调用记录、用量与供应商配置" />
 
-    <div class="flex items-center gap-1 border-b border-border mb-5 overflow-x-auto">
+    <div class="flex items-center gap-1 border-b border-border overflow-x-auto">
       <button
         v-for="t in TABS"
         :key="t.id"
@@ -529,7 +529,6 @@ onBeforeUnmount(() => {
           { label: '精排', value: 'RERANK' },
         ]"
         :filter-value="callType"
-        class="mb-4"
         @update:filter-value="callType = $event"
         @search="fetchLogs(1)"
         @reset="handleLogReset"
@@ -652,7 +651,7 @@ onBeforeUnmount(() => {
 
     <!-- ════ 消费看板 ════ -->
     <template v-else-if="tab === 'dashboard'">
-      <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-text-secondary">按所选时间区间汇总计费调用</p>
         <div class="inline-flex rounded-lg border border-border p-0.5 bg-bg-elevated">
           <button
@@ -672,7 +671,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div @mousemove="(e) => placeTip(e, costCardTip())" @mouseleave="hideTip">
           <StatsCard :icon="Coins" label="费用" :value="formatCost(summary?.totalCost ?? 0)" icon-color="accent">
             <template #trend>
@@ -721,7 +720,7 @@ onBeforeUnmount(() => {
       <div v-else-if="summaryLoading && !summary" class="card-solid h-56 animate-pulse bg-bg-code/50" />
 
       <template v-else-if="summary">
-        <div class="card-solid p-5 mb-4">
+        <div class="card-solid p-5">
           <div class="flex items-start justify-between gap-3 mb-4">
             <div>
               <h3 class="text-sm font-medium text-text-primary">按日费用</h3>
@@ -781,7 +780,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <div class="grid lg:grid-cols-2 gap-4 mb-4 items-stretch">
+        <div class="grid lg:grid-cols-2 gap-4 items-stretch">
           <div class="card-solid p-5">
             <h3 class="text-sm font-medium text-text-primary mb-4">按模型</h3>
             <div v-if="summary.byModel.length === 0" class="text-sm text-text-muted">暂无</div>
@@ -930,7 +929,7 @@ onBeforeUnmount(() => {
 
     <!-- ════ 模型与 API ════ -->
     <template v-else>
-      <p class="text-sm text-text-secondary mb-4">
+      <p class="text-sm text-text-secondary">
         改动立即对后续对话生效。API Key 加密入库，不回写
         <code class="text-xs bg-bg-code px-1 py-0.5 rounded">{{ providersEnvFile || '.env' }}</code>；
         Chat / Embedding / Rerank 模型名会回写该文件

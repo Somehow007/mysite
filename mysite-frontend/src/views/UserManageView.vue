@@ -266,7 +266,7 @@ function handleUserReset() {
 </script>
 
 <template>
-  <div>
+  <div class="flex flex-col gap-5 min-w-0">
     <PageHeader title="用户管理" :subtitle="userPage ? `共 ${userPage.total} 位注册用户` : ''">
       <template #actions>
         <button @click="viewAllLogs" class="btn-secondary">
@@ -277,7 +277,7 @@ function handleUserReset() {
     </PageHeader>
 
     <!-- Stats -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
       <StatsCard :icon="Users" label="用户总数" :value="userPage?.total ?? 0" />
       <StatsCard :icon="ShieldCheck" label="管理员" :value="users.filter(u => u.role === 'ADMIN').length" />
       <StatsCard :icon="FileText" label="创作者" :value="users.filter(u => u.role === 'CREATOR').length" />
@@ -292,7 +292,6 @@ function handleUserReset() {
       :sort-order="sortOrder"
       :filter-options="roleFilterOptions"
       :filter-value="roleFilter"
-      class="mb-4"
       @update:sort-field="sortField = $event; fetchUsers(1)"
       @update:sort-order="sortOrder = $event; fetchUsers(1)"
       @update:filter-value="roleFilter = $event; fetchUsers(1)"
@@ -307,7 +306,7 @@ function handleUserReset() {
       leave-active-class="transition-all duration-200 ease-in"
       leave-to-class="opacity-0 -translate-y-1"
     >
-      <div v-if="selectedUserIds.size > 0" class="flex justify-center mb-4">
+      <div v-if="selectedUserIds.size > 0" class="flex justify-center">
         <div class="inline-flex items-center gap-3 px-4 py-2 rounded-full border border-accent/30 bg-bg-elevated shadow-md">
           <span class="text-[13px] font-semibold text-accent">已选 {{ selectedUserIds.size }} 项</span>
           <button @click="handleBatchDisable" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-[12.5px] rounded-full bg-warning-subtle text-warning hover:bg-warning/20 transition-colors">
