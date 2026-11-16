@@ -48,3 +48,28 @@
 - 键盘：Tab 焦点可见（paper 下 focus-visible 不能被方角/去阴影规则吃掉）。
 - 对比度脚本复核 D3 取值；前台 paper 页面用到语义色的地方（评论状态、聊天错误提示等）无掉色。
 - 从后台点「回到主页」后 `<html>` 不再带 `dash-mode`。
+
+## 终验记录（2026-11-16，Opus）
+
+**通过项**
+- `./scripts/verify.sh` quick 绿；`npm run type-check` / `npm run build` 绿；lint 16（= D 系列前基线，0 新增；修前为 20）。
+- 提交：D1–D5 共 11 个 commit + 终验 3 个修复 commit，作者均为本人、无 Co-authored-by，一个关注点一个 commit。
+- 截图：`dash-shots-final2/` 66 张 `OK: no overflow, no page error`；paper-light 对比基线——紫渐变头像/彩色统计卡/蓝黄角色徽标清零，方角细线衬线标题与前台同语言。
+- 回归走查（终版代码重跑）：d2 59/0、d3 57/0/12skip（skip 多于原记录 6 个系临时造的 CREATOR/禁用账号已还原）、d4 108/0、d5 26/0。
+- `dash-mode` 生命周期：点「回到主页」→ 摘除，浏览器后退 → 重新挂上（paper-light / classic-light）。
+- 写死颜色：后台范围除图片遮罩外 0 命中。
+
+**终验发现并已修**
+1. **对比度（D3 漏网）**：D3 只核了 4 个语义色，没核新用到的 `accent on accent-subtle`（ADMIN 徽标 4.09）与 `text-muted on bg-code`（USER 徽标 3.61）。复查发现是 token 级问题：paper-light `--text-muted` 在主底上也只有 4.09（全站 406 处），`text-accent + bg-accent-subtle` 组合前后台约 30 处。
+   决策：不改徽标、在 token 层修。浅底调浅会让全站选中态发白，所以保留 `--accent-subtle`，改为微压品牌色明度（同色相）——light `--accent #B4441F→#A33E1C`（各纸面底 ≥4.75、白字 5.5→6.4，hover `#963414` 仍更深）；light `--text-muted #7D7466→#6A6256`（中性底 ≥4.71，与 secondary 仍有层差）；dark `--text-muted #8D8475→#918879`（≥4.74）。代码块专用灰（`--code-token-comment`、深色代码块 `#8D8475`）按其自身底色设计，未动。
+   验证：`scripts/output/contrast-live.mjs`（gitignored）对 paper 双主题 × 8 后台页读 computed 颜色扫徽标/muted/accent 文本——修后 **0** 处 <4.5；stash 回旧值对照跑出 107 处，证明扫描有效。
+2. **焦点**：`.dash-field:focus{outline:none}` 特异性高于 ⑩ `button:focus-visible`，筛选栏「降序」按钮 Tab 焦点无框 → 补 `button.dash-field:focus-visible`。输入框/下拉框聚焦为墨线边框换色（D2 设计如此，可辨识），不算问题。
+3. **lint**：d2/d4 走查脚本 4 个未用变量清掉。
+
+**观察项（不在本次范围）**
+- `t9-verify` 的「空态文章 chips」、`t11-verify` 的「空态示例 chips / 匿名提示条」失败——stash 全部改动后对照同样失败，是 T15 匿名聊天改登录门后脚本断言过期，与本次无关。前台脚本默认 `localhost` 会撞本机另一个 Vite（[::1]:5173），需显式传 `http://127.0.0.1:5173`。
+- `KnowledgeManageView.fetchKbs` 空 catch（方案期已记录）。
+
+## Resolution
+
+D1–D5 全部落地并通过终验；终验修复 3 项（a61fa99 token 达 AA、9dfb511 按钮焦点、d3a2576 lint）。任务归档。

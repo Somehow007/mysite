@@ -137,3 +137,7 @@ html.dash-mode[data-theme^="paper"] .ui-empty-icon {
 - `dash-mode` 生命周期：dashboard 挂载存在、回前台摘除。
 - KB 交互：自动选中后点第二个 KB 卡片正常切换；空状态 `.ui-empty-icon` 64px + 内部 svg 可见。
 - 「非本人文章不显示 ⋯」：`DashboardView.fetchArticles` 对非 admin 恒带 `authorId=user.id` 且前端再过滤，列表内 `canModify` 恒 true——隐藏分支为防御性 v-if，实际不可达（与桌面端 `!canModify` 禁用图标同理），代码路径已核对 `usePermission.canModifyArticle`。
+
+## Resolution
+
+已落地并通过 Opus 终验（见 `../11-16-dash-redesign/prd.md` 终验记录）。

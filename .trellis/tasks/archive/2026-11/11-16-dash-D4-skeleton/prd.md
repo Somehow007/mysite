@@ -135,3 +135,7 @@ html.dash-mode[data-theme^="paper"] .ui-table-headrow > * {
 - §3 逐主题 computed：headrow 底（paper 透明 / classic bg-code）、下边色（paper `--border-strong` / classic `--border`）、文字色（paper secondary / classic muted）+12px/500；徽标圆角 paper 0 / classic 非 0；card-solid 圆角 paper 0 / classic 14px；页标题衬线+900（paper）vs 无衬线（classic）；PostEditor h1 同规则。
 - §4 paper-light 390px：collections/categories/knowledge/settings/posts-new 无横向溢出 + `.ui-page-title` 存在。
 - 首轮 5 个 FAIL 全部为脚本自身缺陷、非应用问题：①分类页无 `.card-solid`（圆角改到合集页量）；②`/serif/i` 会命中 `sans-serif` 子串（改末位 generic token 判定）。修正后复跑全绿。
+
+## Resolution
+
+已落地并通过 Opus 终验（见 `../11-16-dash-redesign/prd.md` 终验记录）。

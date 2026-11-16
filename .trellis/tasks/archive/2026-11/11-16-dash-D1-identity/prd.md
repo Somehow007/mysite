@@ -93,3 +93,7 @@ props: {
 - `dash-shots.mjs` → `OK: no overflow, no page error`（66 张，`scripts/output/dash-shots-D1/`）。
 - DOM 走查（临时脚本，已删）三主题 42/42：侧栏展开=衬线站名「MySite·控制台」副标、折叠=w-16 印章「M」、footer 头像 accent-subtle 底+accent 字（paper-light rgb(240,217,204)/rgb(180,68,31)、paper-dark rgb(58,36,25)/rgb(224,121,79)、classic rgb(238,242,255)/rgb(79,70,229)）、用户页 9 头像 0 渐变、设置页 64px、KB ring=各主题 accent-subtle、勾选图标=text-inverse（paper-dark 正确为深色 rgb(22,19,15)）。
 - 坏 URL 回落实测：footer 头像 img src 改 404 → `@error` → 显示首字「管」，无破图。
+
+## Resolution
+
+已落地并通过 Opus 终验（见 `../11-16-dash-redesign/prd.md` 终验记录）。

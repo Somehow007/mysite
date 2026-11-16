@@ -242,3 +242,7 @@ html.dash-mode[data-theme^="paper"] a:focus-visible {
 **踩坑**：控件带 `transition-colors`（border-color ~150–200ms 过渡），聚焦后立即读 computed 会采到中间帧色值（如 `rgb(30,27,23)`、首轮甚至起点 `rgb(217,207,189)`），断言前须等 ≥300ms——不是样式缺陷，走查脚本已修正。
 
 **复验**：`npm run type-check` / `npm run build` 绿；Toast 断言用标签页空名前端校验零副作用触发；合集下拉需先点「文章信息」展开 meta 面板（`v-show`）。
+
+## Resolution
+
+已落地并通过 Opus 终验（见 `../11-16-dash-redesign/prd.md` 终验记录）。

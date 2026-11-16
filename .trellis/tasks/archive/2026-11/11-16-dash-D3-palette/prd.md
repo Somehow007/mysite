@@ -118,3 +118,7 @@
 - 覆盖到的关键点：禁用=1 时「禁用」卡 icon+数值双 danger；禁用=0 时全 neutral（前次 d3-check 已验）；outline 徽标 computed borderColor=主题 --border、1px；paper+dash-mode 徽标方角 0px、classic pill；文章管理手写「已发布/草稿」徽标 computed 色=success/warning（paper 新值生效）；AI 页仅费用 accent + 成功率语义色。
 - 踩坑：Tailwind v4 `rounded-full` 编译为 `calc(infinity*1px)`，computed border-radius 是 `3.36e+07px` 而非 `9999px`——断言改按 `>=9999` 判 pill。
 - lint：走查脚本 0 新增（oxlint 维持 18 存量）。
+
+## Resolution
+
+已落地并通过 Opus 终验（见 `../11-16-dash-redesign/prd.md` 终验记录）。
