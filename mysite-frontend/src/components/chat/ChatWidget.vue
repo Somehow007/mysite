@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick, watch, onScopeDispose, onBeforeUnmount, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Sparkles, X, RotateCw, PanelLeftOpen, AlertTriangle, Clock, LogIn, Library } from 'lucide-vue-next'
+import { Sparkles, X, RotateCw, PanelLeftOpen, AlertTriangle, Clock, Library } from 'lucide-vue-next'
 import { useMediaQuery } from '@vueuse/core'
 import { useChat } from '@/composables/useChat'
 import { useFabStack } from '@/composables/useFabStack'
@@ -88,6 +88,12 @@ const suggestedQuestions = computed(() =>
 const hasSuggestedQuestions = computed(() => suggestedQuestions.value.length > 0)
 
 const subtitleText = computed(() => {
+  // 匿名用户走登录门，副标题不展示检索状态；post 上下文仍保留「正在阅读」提示
+  if (!userStore.isLoggedIn) {
+    return isPostContext.value
+      ? `正在阅读：${launcher.readingTitle.value || '本文'}`
+      : '登录后使用 AI 助手'
+  }
   if (isPostContext.value) {
     return `正在阅读：${launcher.readingTitle.value || '本文'}`
   }
@@ -119,17 +125,6 @@ function handleSelectConversation(id: string) {
 function handleNewConversation() {
   chat.newConversation()
   showHistory.value = false
-}
-
-function handleDeleteConversation(id: string) {
-  if (chat.conversationId.value === id) {
-    chat.newConversation()
-  }
-  chat.conversations.value = chat.conversations.value.filter(c => c.id !== id)
-}
-
-function handleRenameConversation() {
-  chat.loadConversations(getVisitorId())
 }
 
 // Rate limit countdown
@@ -236,8 +231,11 @@ watch(isOpen, (open) => {
 watch(isOpen, (open) => {
   if (!open) return
   closingByDrag = false // 面板重建后需允许再次拖拽
-  chat.loadConversations(getVisitorId())
-  loadKbs()
+  // 匿名用户走登录门：不拉历史（conversations 需登录）也不拉 KB
+  if (userStore.isLoggedIn) {
+    chat.loadConversations(getVisitorId())
+    loadKbs()
+  }
   showHistory.value = false
   nextTick(() => {
     // 移动端不自动聚焦输入框 —— 打开面板瞬间弹软键盘会直接盖住半个面板，
@@ -257,6 +255,30 @@ function open() {
 function close() {
   launcher.close()
 }
+
+// ── 匿名登录门：点击登录先写标记，回跳后自动重开面板（一次性）──────
+const REOPEN_CHAT_KEY = 'mysite_reopen_chat'
+
+function goLogin() {
+  try {
+    sessionStorage.setItem(REOPEN_CHAT_KEY, '1')
+  } catch { /* sessionStorage 不可用时仅跳登录，不自动重开 */ }
+  router.push({ name: 'login', query: { redirect: route.fullPath } })
+}
+
+watch(() => userStore.isLoggedIn, (loggedIn) => {
+  if (!loggedIn) {
+    // 登出时收起历史抽屉：抽屉不受登录门 v-if 约束，残留会盖在登录门上且点选必 401
+    showHistory.value = false
+    return
+  }
+  try {
+    if (sessionStorage.getItem(REOPEN_CHAT_KEY)) {
+      sessionStorage.removeItem(REOPEN_CHAT_KEY)
+      launcher.open()
+    }
+  } catch { /* ignore */ }
+}, { immediate: true })
 
 // ── launcher 启动参数：预填问题 / 引用 / 立即发送 / KB 范围 ──────
 // pending 在面板已打开时再次 open() 也能生效；ChatWidget 未挂载时由 immediate 兜底。
@@ -389,11 +411,13 @@ onScopeDispose(() => {
   <!-- 遮罩 + 面板：独立 Transition，各自播放进出场动画 -->
   <Teleport to="body">
     <!-- 移动端遮罩（桌面端面板不挡页面，无遮罩）；
-         touchmove.prevent 拦截 iOS 背景滚动穿透 -->
+         touchmove.prevent 拦截 iOS 背景滚动穿透。
+         z-50 与 header/sheet 同级、DOM 序在 header 之后 → 变暗可点击区
+         真正生效（z-40 时整条缝隙都被 header 盖住，遮罩点击是死交互） -->
     <Transition name="fade">
       <div
         v-if="isOpen"
-        class="fixed inset-0 z-40 bg-black/40 sm:hidden"
+        class="fixed inset-0 z-50 bg-black/40 sm:hidden"
         @click="close"
         @touchmove.stop.prevent
       />
@@ -430,8 +454,9 @@ onScopeDispose(() => {
           <!-- Header：60px -->
           <div class="flex items-center gap-2.5 px-3.5 border-b border-border"
                style="height: 60px;">
-          <!-- 历史按钮 -->
+          <!-- 历史按钮（仅登录：匿名走登录门，无历史可看） -->
           <button
+            v-if="userStore.isLoggedIn"
             class="icon-btn w-[34px] h-[34px] rounded-lg flex items-center justify-center shrink-0
                    text-text-secondary hover:bg-accent-subtle hover:text-accent transition-colors"
             :class="showHistory ? 'bg-accent-subtle text-accent' : ''"
@@ -459,6 +484,7 @@ onScopeDispose(() => {
 
           <!-- 操作按钮 -->
           <button
+            v-if="userStore.isLoggedIn"
             class="icon-btn w-[34px] h-[34px] rounded-lg flex items-center justify-center shrink-0
                    text-text-secondary hover:bg-accent-subtle hover:text-accent transition-colors"
             aria-label="新会话"
@@ -479,9 +505,9 @@ onScopeDispose(() => {
         </div>
         <!-- 拖拽区结束 -->
 
-        <!-- KB 选择标签栏 -->
+        <!-- KB 选择标签栏（仅登录：登出瞬间 kbs 可能有残留，需同步门控） -->
         <div
-          v-if="kbs.length > 0"
+          v-if="userStore.isLoggedIn && kbs.length > 0"
           class="shrink-0 px-3.5 py-2 border-b border-border flex items-center gap-1.5 overflow-x-auto scrollbar-thin"
         >
           <Library :size="13" class="text-text-muted shrink-0" />
@@ -499,8 +525,31 @@ onScopeDispose(() => {
           <span v-if="kbsLoading" class="text-[11px] text-text-muted ml-1">加载中...</span>
         </div>
 
+        <!-- 登录门：匿名用户不展示消息/输入/KB，统一引导登录（T15） -->
+        <div
+          v-if="!userStore.isLoggedIn"
+          class="flex-1 flex flex-col items-center justify-center px-8 text-center"
+        >
+          <div class="w-12 h-12 border border-border bg-bg-secondary flex items-center justify-center mb-4">
+            <Sparkles :size="22" class="text-accent" />
+          </div>
+          <p class="font-serif text-base font-semibold text-text-primary mb-1.5">
+            登录后使用 AI 助手
+          </p>
+          <p class="text-xs text-text-muted leading-relaxed mb-5 max-w-[250px]">
+            登录后可向博客文章提问，历史对话保存在你的账号下
+          </p>
+          <button
+            class="bg-text-primary px-5 py-2.5 text-sm font-semibold text-bg-primary
+                   transition-opacity hover:opacity-90"
+            @click="goLogin"
+          >
+            登录 / 注册
+          </button>
+        </div>
+
         <!-- 内容区（历史抽屉已提升为面板级覆盖层，见 ChatInput 之后） -->
-        <div class="flex-1 relative overflow-hidden">
+        <div v-else class="flex-1 relative overflow-hidden">
 
           <!-- 消息列表（overscroll-contain：滚动到顶/底不链到背后页面） -->
           <div
@@ -510,18 +559,6 @@ onScopeDispose(() => {
             aria-live="polite"
             @scroll="handleScroll"
           >
-            <!-- Anonymous user tip -->
-            <div
-              v-if="!userStore.isLoggedIn"
-              class="chat-note mb-4 px-3 py-2 rounded-lg bg-info-subtle border border-info/20 text-xs text-info flex items-center gap-2"
-            >
-              <AlertTriangle :size="14" class="shrink-0" />
-              <span class="flex-1">登录后可保存对话历史，享受更多额度</span>
-              <button class="btn-ghost text-xs shrink-0 px-2 py-1" @click="router.push({ name: 'login' })">
-                <LogIn :size="12" />登录
-              </button>
-            </div>
-
             <!-- Rate limit banner -->
             <div
               v-if="rateLimitSeconds > 0"
@@ -604,8 +641,9 @@ onScopeDispose(() => {
         </div>
         <!-- 内容区结束 -->
 
-        <!-- 输入框 -->
+        <!-- 输入框（仅登录：匿名走上方登录门） -->
         <ChatInput
+          v-if="userStore.isLoggedIn"
           ref="inputComponentRef"
           :streaming="chat.isStreaming.value"
           :quote="pendingQuote"
@@ -645,8 +683,6 @@ onScopeDispose(() => {
               :loading="chat.loadingHistory.value"
               @select="handleSelectConversation"
               @new="handleNewConversation"
-              @deleted="handleDeleteConversation"
-              @renamed="handleRenameConversation"
             />
           </div>
         </Transition>

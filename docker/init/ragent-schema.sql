@@ -69,8 +69,8 @@ CREATE INDEX IF NOT EXISTS idx_vector_embedding ON t_knowledge_vector
 -- 对话会话
 CREATE TABLE IF NOT EXISTS t_conversation (
     id BIGINT PRIMARY KEY,
-    user_id BIGINT,                          -- 可空：匿名聊天不强制登录（见 3.5 节决策 3）
-    visitor_id VARCHAR(64),                  -- 匿名访客标识（前端 localStorage UUID），防 IDOR
+    user_id BIGINT,                          -- 预留字段：登录用户 ID（当前不写入，归属见 visitor_id）
+    visitor_id VARCHAR(64),                  -- 会话归属标识（前端 localStorage UUID），防 IDOR
     title VARCHAR(200),
     message_count INT DEFAULT 0,
     create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

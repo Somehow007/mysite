@@ -97,7 +97,7 @@ public class RagChatService {
      *
      * @param question       用户问题
      * @param conversationId 对话 ID（null = 新对话）
-     * @param visitorId      匿名访客标识
+     * @param visitorId      会话归属标识（浏览器 UUID）
      * @param clientIp       客户端 IP（限流用）
      * @param userRole       用户角色（限流阈值）
      * @param kbIds          用户选择的知识库 ID 列表（null 或空 = 不做检索）

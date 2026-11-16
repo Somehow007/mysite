@@ -18,7 +18,7 @@ Vue 3 Composition API + TypeScript + Vite + Pinia + Tailwind。入口 `src/main.
 
 - 业务 API 一律 `api/client.ts`（axios）。成功判断 `code === '0'`，分页把 MyBatis `records/current/size/total/pages` 转成 `{ list, pagination }`
 - **SSE 禁止 axios**：`GET /v1/rag/chat/stream` 只在 `api/rag.ts` 用 `fetch + ReadableStream`；状态机在 `composables/useChat.ts`（`idle | streaming | error`，`AbortController` 取消）
-- Token：`localStorage` 的 `access_token`；匿名聊天用 `visitorId` UUID
+- Token：`localStorage` 的 `access_token`；聊天需登录，会话归属用 `visitorId` UUID（`api/rag.ts` 的 `getVisitorId`）
 
 ## 类型
 

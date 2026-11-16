@@ -27,7 +27,7 @@ import reactor.core.Disposable;
  * RAG 聊天 SSE 端点。
  *
  * SSE (Server-Sent Events) 协议：
- *   请求：GET /v1/rag/chat/stream?q=xxx&conversationId=123&visitorId=uuid
+ *   请求：GET /v1/rag/chat/stream?q=xxx&conversationId=123&visitorId=uuid（需登录）
  *   响应：Content-Type: text/event-stream
  *   事件格式（每行一个 JSON）：
  *     data: {"type":"meta","conversationId":123}\n\n
@@ -64,7 +64,7 @@ public class RagChatController {
      *
      * @param question       用户问题
      * @param conversationId 对话 ID（null = 新对话，后端自动创建并回传）
-     * @param visitorId      匿名访客标识（前端 localStorage UUID，归属会话）
+     * @param visitorId      会话归属标识（前端 localStorage UUID，登录用户同样携带）
      * @param request        HTTP 请求（取客户端 IP 做限流）
      * @return SseEmitter 长连接，逐事件推送 JSON
      */
@@ -202,7 +202,7 @@ public class RagChatController {
     }
 
     /**
-     * visitorId 是匿名会话唯一凭证，日志只留前缀防泄露后被冒用拉取历史。
+     * visitorId 是会话归属凭证，日志只留前缀防泄露后被冒用拉取历史。
      */
     private static String maskVisitorId(String visitorId) {
         if (visitorId == null || visitorId.isBlank()) {

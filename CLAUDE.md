@@ -121,7 +121,7 @@ mysite-frontend/src/
 - **Chat state machine**: `useChat.ts` — status: `idle | streaming | error`, messages with `pending | failed | truncated` flags, abort via `AbortController`.
 - **Markdown rendering**: `useMarkdown` (articles, async render + TOC + KaTeX + Callouts) vs `useChatMarkdown` (chat, sync render + rAF throttle + DOMPurify).
 - **Snowflake ID safety**: All `Long` IDs in DTOs use `@JsonSerialize(using = ToStringSerializer.class)`. Frontend types use `string` for IDs. Snowflake values exceed JS `Number.MAX_SAFE_INTEGER` (2^53).
-- **Anonymous chat**: `visitorId` (localStorage UUID) for unauthenticated users; rate-limited per IP + role.
+- **Chat access**: login required (`/v1/rag/chat/stream` is authenticated; anonymous users see a login gate in ChatWidget). Conversations are keyed by `visitorId` (browser UUID in localStorage) — `t_conversation.user_id` is reserved but unused.
 - **Role-based rate limits**: ADMIN unlimited, CREATOR 20/h, USER 10/h. Question max 500 chars.
 
 ### Database Schema

@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 
 /**
  * 对话会话。
- * 支持匿名（visitorId）和登录用户（userId）两种归属方式。
+ * 当前所有会话均以 visitorId（浏览器 UUID）归属；userId 列预留，暂未启用。
  */
 @Data
 @TableName("t_conversation")
@@ -17,9 +17,9 @@ public class ConversationDO {
 
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
-    /** 登录用户 ID，匿名聊天时为 null */
+    /** 登录用户 ID，预留字段（当前不写入） */
     private Long userId;
-    /** 匿名访客标识（前端 localStorage UUID），用于非登录用户的会话归属 */
+    /** 会话归属标识（前端 localStorage UUID），会话历史按此归属 */
     private String visitorId;
     private String title;
     private Integer messageCount;

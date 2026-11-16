@@ -41,7 +41,7 @@ Jackson 已允许请求里 String→Long（`JacksonConfig`）。新字段同样�
 |---|---|
 | 文章 CRUD | ADMIN + CREATOR |
 | 分类/标签/用户/评论审核/合集管理/知识库写 | ADMIN |
-| 匿名可读 | 文章/分类/标签/合集 GET、RAG stream、KB 列表 GET |
+| 匿名可读 | 文章/分类/标签/合集 GET、KB 列表 GET |
 | 手帐 `/api/journal/**` | 仅 ADMIN |
 
 角色枚举：`commons.enums.UserRole`。新代码不要分配 `DEVELOPER`。

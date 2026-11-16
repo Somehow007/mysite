@@ -67,13 +67,14 @@ public class ConversationManager {
      * 获取或创建会话
      *
      * @param conversationId     前端带来的会话 ID（null = 新会话）
-     * @param visitorId          匿名访客标识（前端 localStorage UUID）
+     * @param visitorId          会话归属标识（前端 localStorage UUID）
      * @param firstQuestion      新会话用它生成标题
      */
     public ConversationDO getOrCreateConversation(Long conversationId, String visitorId, String firstQuestion) {
         if (conversationId != null) {
             ConversationDO existing = conversationMapper.selectById(conversationId);
             // 防 IDOR：会话必须属于这个 visitor，否则视为新会话
+            // （user_id 列预留未启用，当前所有会话均以 visitor_id 归属）
             if (existing != null && Objects.equals(existing.getVisitorId(), visitorId)) {
                 return existing;
             }

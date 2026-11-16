@@ -30,7 +30,12 @@ export class ChatStreamError extends Error {
 
 const VISITOR_ID_KEY = 'rag-visitor-id'
 
-/** 获取或生成访客标识，用于匿名会话归属。隐私模式下退化为内存 UUID */
+/**
+ * 会话归属标识（浏览器 UUID），用于会话历史归属。
+ * 登录/匿名通用——当前匿名不可聊天（后端限流拒绝 + 端点需登录），
+ * 但登录用户的会话同样以它归属（user_id 列预留未启用）。
+ * 隐私模式下退化为内存 UUID
+ */
 export function getVisitorId(): string {
   try {
     let id = localStorage.getItem(VISITOR_ID_KEY)
@@ -209,7 +214,7 @@ export interface ConversationMessage {
   content: string
 }
 
-/** 获取当前访客/用户的历史对话列表 */
+/** 获取当前会话归属（visitorId）的历史对话列表 */
 export async function getConversations(visitorId: string): Promise<ConversationSummary[]> {
   const params = new URLSearchParams({ visitorId })
   const token = readAuthToken()
@@ -312,28 +317,6 @@ export interface KnowledgeChunk {
 
 export function getDocumentChunks(kbId: string, docId: string, params?: Record<string, unknown>): Promise<{ list: KnowledgeChunk[]; pagination: Pagination }> {
   return getPaginated<KnowledgeChunk>(`/v1/rag/knowledge-bases/${kbId}/docs/${docId}/chunks`, params)
-}
-
-/** 重命名对话 */
-export async function renameConversation(convId: string, title: string): Promise<void> {
-  const token = readAuthToken()
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  const res = await fetch(`/v1/rag/conversations/${convId}/rename`, {
-    method: 'PUT',
-    headers,
-    body: JSON.stringify({ title }),
-  })
-  if (!res.ok) throw new Error(`重命名失败 (HTTP ${res.status})`)
-}
-
-/** 删除对话 */
-export async function deleteConversation(convId: string): Promise<void> {
-  const token = readAuthToken()
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  const res = await fetch(`/v1/rag/conversations/${convId}`, { method: 'DELETE', headers })
-  if (!res.ok) throw new Error(`删除失败 (HTTP ${res.status})`)
 }
 
 function readAuthToken(): string | null {

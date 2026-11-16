@@ -86,13 +86,9 @@ public class WebSecurityConfig {
                         .requestMatchers(
                                 "/uploads/**"
                         ).permitAll()
-                        // RAG AI 聊天：允许匿名提问（visitorId 归属 + 限流保护）
+                        // RAG AI 聊天与对话历史：均需登录（匿名聊天已下线，visitorId 仅作会话归属标识）
                         .requestMatchers(
-                                HttpMethod.GET,
-                                "/v1/rag/chat/stream"
-                        ).permitAll()
-                        // RAG 对话历史：需登录
-                        .requestMatchers(
+                                "/v1/rag/chat/stream",
                                 "/v1/rag/conversations/**"
                         ).authenticated()
                         // RAG 知识库列表：允许匿名浏览（博客读者可见知识库）

@@ -27,12 +27,12 @@ const charCount = computed(() => input.value.length)
 const overLimit = computed(() => charCount.value > MAX_LENGTH)
 const canSend = computed(() => input.value.trim().length > 0 && !overLimit.value && !props.streaming)
 
-// Quota text
+// Quota text（仅登录用户可见面板，匿名走 ChatWidget 登录门）
 const quotaText = computed(() => {
   if (isAdmin.value) return '无限额度'
   const role = userStore.user?.role
   if (role === 'CREATOR') return '剩余额度 20 次/小时'
-  return userStore.isLoggedIn ? '剩余额度 10 次/小时' : '游客额度 10 次/小时'
+  return '剩余额度 10 次/小时'
 })
 
 function handleSend() {

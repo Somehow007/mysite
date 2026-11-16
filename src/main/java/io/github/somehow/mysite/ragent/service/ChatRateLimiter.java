@@ -15,7 +15,7 @@ import java.time.Duration;
  *   ADMIN  → 无限制（adminMaxPerHour == 0 时跳过计数）
  *   CREATOR → 20次/小时（Redis IP 维度计数）
  *   USER    → 10次/小时（Redis IP 维度计数）
- *   未登录  → WebSecurityConfig 已拦截为 401，本类作为双保险拒绝
+ *   未登录  → chat/stream 已是 authenticated 由安全层拦截，本类作为双保险拒绝
  */
 @Slf4j
 @Component

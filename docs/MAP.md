@@ -49,9 +49,9 @@
 ## 3. 数据流（主干）
 
 - **认证**：`AuthController`（/v1/auth/login|register|refresh）→ JWT 双 token；`JwtAuthenticationFilter` → `UserContext`（TransmittableThreadLocal）；前端 axios `client.ts` 注 `Authorization: Bearer`。注册 DTO 无 role 字段 → 服务端默认 USER（`RegisterReqDTO` + `AuthServiceImpl.register:99-134`，`BeanUtil.toBean` 全量拷贝是脆弱点，见风险）。
-- **安全门**：`WebSecurityConfig` 逐条 matcher 控制；`/actuator/**`、`/swagger-ui/**`、`/v3/api-docs/**`、`/uploads/**`、`/v1/rag/chat/stream`(GET) 等 permitAll（WebSecurityConfig:52-92）。
+- **安全门**：`WebSecurityConfig` 逐条 matcher 控制；`/actuator/**`、`/swagger-ui/**`、`/v3/api-docs/**`、`/uploads/**` 等 permitAll，`/v1/rag/chat/stream` 与 `/v1/rag/conversations/**` 均需登录（WebSecurityConfig authorizeHttpRequests）。
 - **文章→RAG**：发布走 Spring Event（`ragent/ingestion/`）→ 分块（MarkdownChunker）→ embedding → `t_knowledge_vector`（pgvector HNSW）。
-- **RAG 问答 SSE**：`GET /v1/rag/chat/stream` → RagChatService：限流(Redis `ChatRateLimiter`)→会话/历史→QueryRewriter→IntentClassifier→检索+Rerank→`Flux<ChatEvent>` 流式（meta→sources→content×N→done/error）→存库。匿名用 `visitorId`。
+- **RAG 问答 SSE**：`GET /v1/rag/chat/stream` → RagChatService：限流(Redis `ChatRateLimiter`)→会话/历史→QueryRewriter→IntentClassifier→检索+Rerank→`Flux<ChatEvent>` 流式（meta→sources→content×N→done/error）→存库。会话归属用 `visitorId`（浏览器 UUID，`user_id` 列预留未启用）。
 - **图片**：`POST /v1/images/upload`(multipart) 与 `/v1/images/upload-url`（服务端抓图，有 `checkSsrf` 但只查初始 URI）→ `./uploads/images`（生产 `/data/mysite/uploads`）→ nginx alias 直出 + webp 转换（`mysite.conf:33-58`）。
 - **统一响应**：`commons/framework/result/Result` + `GlobalExceptionHandler`（validation/登录/上传超限/兜底均有 handler）。
 
