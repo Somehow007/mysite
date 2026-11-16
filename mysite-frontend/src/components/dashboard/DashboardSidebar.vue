@@ -9,6 +9,7 @@ import {
 import { useUserStore } from '@/stores/user'
 import { useSiteStore } from '@/stores/site'
 import { usePermission } from '@/composables/usePermission'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 
 const route = useRoute()
 const userStore = useUserStore()
@@ -80,9 +81,10 @@ const sidebarWidth = computed(() => isCollapsed.value ? 'w-16' : 'w-56')
 const profileUrl = computed(() =>
   userStore.user?.username ? `/user/${userStore.user.username}` : '/dashboard/settings'
 )
-const siteAdminLabel = computed(() =>
-  siteStore.site.title ? `${siteStore.site.title} Admin` : 'Admin'
-)
+
+// 站名 logo：与 AppHeader 一致，「·」分隔符着 accent 色
+const logoSegments = computed(() => siteStore.site.title.split('·'))
+const logoInitial = computed(() => logoSegments.value[0]?.trim().charAt(0).toUpperCase() || '')
 </script>
 
 <template>
@@ -101,15 +103,30 @@ const siteAdminLabel = computed(() =>
         class="flex items-center gap-2.5 text-text-primary hover:opacity-80 transition-opacity"
         :class="isCollapsed ? 'justify-center' : ''"
       >
+        <!-- 折叠态：墨线方框站名字首字（印章式） -->
         <div
-          class="w-[30px] h-[30px] rounded-lg flex items-center justify-center shrink-0"
-          :style="{ background: 'linear-gradient(135deg, var(--accent), #8B5CF6)' }"
+          v-if="isCollapsed"
+          class="w-8 h-8 border border-border-strong font-serif font-black text-text-primary flex items-center justify-center shrink-0 text-sm"
         >
-          <LayoutDashboard :size="16" class="text-white" />
+          <template v-if="logoInitial">{{ logoInitial }}</template>
+          <LayoutDashboard v-else :size="15" />
         </div>
-        <div v-if="!isCollapsed">
-          <p class="text-[15px] font-semibold tracking-wide leading-tight">控制台</p>
-          <p class="text-[11px] text-text-muted leading-tight">{{ siteAdminLabel }}</p>
+        <!-- 展开态：衬线站名 + 控制台副标 -->
+        <div v-else class="min-w-0">
+          <p class="font-serif text-[17px] font-black tracking-tight text-text-primary leading-tight truncate">
+            <template v-if="siteStore.site.title">
+              <template v-for="(seg, i) in logoSegments" :key="i">
+                <span v-if="i > 0" class="text-accent">·</span>{{ seg }}
+              </template>
+            </template>
+            <template v-else>控制台</template>
+          </p>
+          <p
+            v-if="siteStore.site.title"
+            class="text-[11px] text-text-muted tracking-[0.06em] leading-tight mt-0.5"
+          >
+            控制台
+          </p>
         </div>
       </RouterLink>
     </div>
@@ -201,18 +218,11 @@ const siteAdminLabel = computed(() =>
         class="border-t border-border hover:bg-bg-code transition-colors flex items-center gap-2.5"
         :class="isCollapsed ? 'justify-center px-0 py-3' : 'p-3'"
       >
-        <div
-          class="w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-xs font-semibold text-white overflow-hidden"
-          :style="{ background: userStore.user?.avatar ? undefined : 'linear-gradient(135deg, #F59E0B, #EF4444)' }"
-        >
-          <img
-            v-if="userStore.user?.avatar"
-            :src="userStore.user.avatar"
-            :alt="userStore.displayName"
-            class="w-full h-full object-cover"
-          />
-          <span v-else>{{ userStore.displayName?.charAt(0)?.toUpperCase() || 'U' }}</span>
-        </div>
+        <UserAvatar
+          :src="userStore.user?.avatar"
+          :name="userStore.displayName || 'U'"
+          :size="32"
+        />
         <template v-if="!isCollapsed">
           <div class="flex-1 min-w-0">
             <p class="text-[13px] font-medium text-text-primary leading-tight truncate">{{ userStore.displayName }}</p>

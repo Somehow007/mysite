@@ -6,6 +6,7 @@ import { changePassword } from '@/api/auth'
 import { useToast } from '@/composables/useToast'
 import { Eye, EyeOff, User, Lock, Mail, Phone, UserCircle, Camera, Loader2, ShieldCheck, BadgeCheck, Laptop } from 'lucide-vue-next'
 import { Badge } from '@/components/ui'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import type { ChangePasswordRequest } from '@/types'
 import { uploadAvatar } from '@/api/user'
 
@@ -178,10 +179,13 @@ async function handleAvatarUpload(e: Event) {
               头像
             </label>
             <div class="flex items-center gap-4">
-              <div class="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-text-inverse flex items-center justify-center text-xl font-medium overflow-hidden shrink-0 shadow-[0_0_0_3px_var(--bg-elevated),0_0_0_4px_var(--accent-subtle)]">
-                <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" :alt="userStore.displayName" class="w-full h-full object-cover" />
-                <span v-else>{{ userStore.displayName?.charAt(0)?.toUpperCase() || 'U' }}</span>
-              </div>
+              <span class="inline-flex rounded-full shadow-[0_0_0_3px_var(--bg-elevated),0_0_0_4px_var(--accent-subtle)]">
+                <UserAvatar
+                  :src="userStore.user?.avatar"
+                  :name="userStore.displayName || 'U'"
+                  :size="64"
+                />
+              </span>
               <div class="flex flex-col gap-1">
                 <label class="inline-flex w-fit items-center gap-1.5 px-3.5 py-1.5 rounded-lg border border-border text-[13px] font-medium text-text-secondary hover:border-text-muted hover:text-text-primary transition-colors cursor-pointer">
                   <Loader2 v-if="avatarUploading" :size="14" class="animate-spin" />

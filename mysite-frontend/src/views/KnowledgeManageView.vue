@@ -532,16 +532,16 @@ watch(selectedKbId, () => {
     <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <button
         v-for="kb in kbs" :key="kb.id"
-        class="group relative text-left rounded-xl border-[1.5px] p-[18px] transition-all duration-150 cursor-pointer shadow-sm"
+        class="group relative text-left rounded-xl border-[1.5px] p-[18px] transition-all duration-150 cursor-pointer"
         :class="selectedKbId === kb.id
-          ? 'border-accent bg-bg-elevated shadow-[0_0_0_3px_rgba(79,70,229,0.14)]'
-          : 'border-border bg-bg-elevated hover:border-accent hover:-translate-y-0.5 hover:shadow-md'"
+          ? 'border-accent bg-bg-elevated shadow-[0_0_0_3px_var(--accent-subtle)]'
+          : 'border-border bg-bg-elevated shadow-sm hover:border-accent hover:-translate-y-0.5 hover:shadow-md'"
         @click="selectKb(kb.id)"
       >
         <!-- Selected checkmark -->
         <div
           v-if="selectedKbId === kb.id"
-          class="absolute -top-2 -left-2 w-[22px] h-[22px] rounded-full bg-accent text-white flex items-center justify-center shadow-md"
+          class="absolute -top-2 -left-2 w-[22px] h-[22px] rounded-full bg-accent text-text-inverse flex items-center justify-center shadow-md"
         >
           <CheckCircle2 :size="12" />
         </div>
@@ -852,7 +852,7 @@ watch(selectedKbId, () => {
                     ? 'bg-accent border-accent'
                     : 'border-border/60 hover:border-accent/40'"
                 >
-                  <CheckCircle2 v-if="checkedIds.has(a.id)" :size="12" class="text-white" />
+                  <CheckCircle2 v-if="checkedIds.has(a.id)" :size="12" class="text-text-inverse" />
                 </div>
                 <BookOpen :size="14" class="text-text-muted flex-shrink-0" />
                 <span class="flex-1 text-sm text-text-primary truncate">{{ a.title }}</span>

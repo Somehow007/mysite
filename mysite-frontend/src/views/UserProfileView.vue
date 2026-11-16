@@ -7,6 +7,7 @@ import {
   Heart, Loader2, ExternalLink, Eye, Edit3,
 } from 'lucide-vue-next'
 import { Pagination } from '@/components/ui'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import CollectionCard from '@/components/collection/CollectionCard.vue'
 import { useUserStore } from '@/stores/user'
 import { getUserProfile, updateUser } from '@/api/user'
@@ -231,10 +232,13 @@ onMounted(() => {
         <div class="absolute top-0 left-0 right-0 h-[2px] bg-accent/25" />
         <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
           <!-- Avatar -->
-          <div class="w-24 h-24 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-text-inverse flex items-center justify-center text-3xl font-bold shrink-0 overflow-hidden shadow-[0_0_0_4px_var(--bg-elevated),0_0_0_6px_var(--accent-subtle)]">
-            <img v-if="profile.avatar" :src="profile.avatar" :alt="profile.realName" class="w-full h-full object-cover" />
-            <span v-else>{{ (profile.realName || profile.username).charAt(0).toUpperCase() }}</span>
-          </div>
+          <span class="inline-flex rounded-full shadow-[0_0_0_4px_var(--bg-elevated),0_0_0_6px_var(--accent-subtle)] shrink-0">
+            <UserAvatar
+              :src="profile.avatar"
+              :name="profile.realName || profile.username"
+              :size="96"
+            />
+          </span>
 
           <!-- Info -->
           <div class="flex-1 text-center sm:text-left">

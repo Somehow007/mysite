@@ -7,6 +7,7 @@ import type { AdminUser, UserOperationLog, AdminUserPage, OperationLogPage } fro
 import { formatDate } from '@/utils/date'
 import { useToast } from '@/composables/useToast'
 import { Pagination, StatsCard, PageHeader, SearchFilterBar, DataTable, Badge, Dropdown } from '@/components/ui'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import { useConfirm } from '@/composables/useConfirm'
 import type { Column } from '@/components/ui/DataTable.vue'
 
@@ -331,9 +332,7 @@ function handleUserReset() {
     >
       <template #cell-user="{ item }">
         <div class="flex items-center gap-2.5">
-          <div class="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[11px] font-semibold text-white" :style="{ background: 'linear-gradient(135deg, var(--accent), #7C3AED)' }">
-            {{ (item.realName || item.username).charAt(0) }}
-          </div>
+          <UserAvatar :name="item.realName || item.username" :size="28" />
           <!-- table-fixed 下弹性列：长用户名/昵称自行截断 + 悬浮全称 -->
           <div class="min-w-0 flex-1">
             <div class="text-[13.5px] font-medium text-text-primary truncate" :title="'@' + item.username">@{{ item.username }}</div>
@@ -358,7 +357,7 @@ function handleUserReset() {
             </button>
           </template>
           <template #default="{ close: closeRole }">
-            <div class="w-40 py-1 rounded-xl border border-border/60 bg-bg-elevated shadow-[0_12px_40px_-12px_rgba(0,0,0,0.18)]">
+            <div class="w-40 py-1 rounded-xl border border-border/60 bg-bg-elevated shadow-lg">
               <button
                 v-for="opt in ROLE_OPTIONS"
                 :key="opt.value"
