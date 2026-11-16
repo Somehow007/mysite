@@ -214,26 +214,29 @@ export interface ConversationMessage {
   content: string
 }
 
-/** 获取当前会话归属（visitorId）的历史对话列表 */
+/**
+ * 获取历史对话列表。归属 = user_id（登录账号）主 key + visitorId 兜底未认领存量；
+ * 走 client.ts：自动带 token，统一 Result 解包与错误处理。
+ */
 export async function getConversations(visitorId: string): Promise<ConversationSummary[]> {
-  const params = new URLSearchParams({ visitorId })
-  const token = readAuthToken()
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  const res = await fetch(`/v1/rag/conversations?${params}`, { headers })
-  if (!res.ok) throw new Error(`获取对话列表失败 (HTTP ${res.status})`)
-  return res.json()
+  return get<ConversationSummary[]>('/v1/rag/conversations', { visitorId })
 }
 
-/** 获取指定对话的历史消息（visitorId 归属校验，不匹配返回空） */
+/** 获取指定对话的历史消息（归属不匹配返回空，不泄露会话是否存在） */
 export async function getConversationMessages(convId: string, visitorId: string): Promise<ConversationMessage[]> {
-  const params = new URLSearchParams({ visitorId })
-  const token = readAuthToken()
-  const headers: Record<string, string> = {}
-  if (token) headers['Authorization'] = `Bearer ${token}`
-  const res = await fetch(`/v1/rag/conversations/${convId}/messages?${params}`, { headers })
-  if (!res.ok) throw new Error(`获取对话消息失败 (HTTP ${res.status})`)
-  return res.json()
+  return get<ConversationMessage[]>(`/v1/rag/conversations/${convId}/messages`, { visitorId })
+}
+
+/** 重命名对话（归属校验同 messages；visitorId 兜底未认领会话） */
+export async function renameConversation(convId: string, title: string): Promise<void> {
+  const params = new URLSearchParams({ visitorId: getVisitorId() })
+  await put<void>(`/v1/rag/conversations/${convId}/rename?${params}`, { title })
+}
+
+/** 删除对话及其全部消息（归属校验同上） */
+export async function deleteConversation(convId: string): Promise<void> {
+  const params = new URLSearchParams({ visitorId: getVisitorId() })
+  await del<void>(`/v1/rag/conversations/${convId}?${params}`)
 }
 
 // ── 知识库管理 API（走 axios client.ts，自动带 token + 统一错误处理）──
@@ -318,15 +321,4 @@ export interface KnowledgeChunk {
 
 export function getDocumentChunks(kbId: string, docId: string, params?: Record<string, unknown>): Promise<{ list: KnowledgeChunk[]; pagination: Pagination }> {
   return getPaginated<KnowledgeChunk>(`/v1/rag/knowledge-bases/${kbId}/docs/${docId}/chunks`, params)
-}
-
-function readAuthToken(): string | null {
-  try {
-    const raw = localStorage.getItem('mysite_access_token')
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    return typeof parsed === 'string' ? parsed : null
-  } catch {
-    return null
-  }
 }

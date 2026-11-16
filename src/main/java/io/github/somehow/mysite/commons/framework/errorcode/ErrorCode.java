@@ -136,6 +136,12 @@ public enum ErrorCode implements IErrorCode {
     JOURNAL_GOAL_DUPLICATE("A110204", "学习目标 ID 已存在"),
     JOURNAL_TASK_NOT_FOUND("A110205", "子任务不存在"),
 
+    // ---------- A12: RAG 模块错误 ----------
+    RAG_ERROR("A120001", "RAG 模块错误"),
+    RAG_CONVERSATION_NOT_FOUND("A120100", "会话不存在"),
+    RAG_CONVERSATION_TITLE_REQUIRED("A120101", "会话标题不能为空"),
+    RAG_CONVERSATION_TITLE_TOO_LONG("A120102", "会话标题过长"),
+
     // ==================== B: 服务端错误 ====================
     SERVICE_ERROR("B000001", "系统执行出错"),
     SERVICE_TIMEOUT_ERROR("B000100", "系统执行超时"),

@@ -230,42 +230,50 @@ class RagChatControllerTest {
     // ─────────────────────── 会话历史端点 ───────────────────────
 
     @Test
-    void listConversations_visitorId_shouldQueryByVisitor() {
-        when(conversationMapper.selectByVisitorId("v-1")).thenReturn(List.of());
+    void listConversations_shouldQueryVisibleToWithContextUser() {
+        UserContext.setUser(UserInfoDTO.builder()
+                .userId("42").name("u").role(UserRole.USER).build());
+        when(conversationMapper.selectVisibleTo(42L, "v-1")).thenReturn(List.of());
 
-        List<?> result = controller.listConversations("v-1");
+        var result = controller.listConversations("v-1");
 
-        assertTrue(result.isEmpty());
-        verify(conversationMapper).selectByVisitorId("v-1");
+        assertTrue(result.isSuccess());
+        assertTrue(result.getData().isEmpty());
+        verify(conversationMapper).selectVisibleTo(42L, "v-1");
+        // user_id 只认登录态，不再走 selectByVisitorId / selectByUserId 旧分支
+        verify(conversationMapper, never()).selectByVisitorId(any());
         verify(conversationMapper, never()).selectByUserId(anyLong());
     }
 
     @Test
-    void listConversations_noVisitorId_shouldReturnEmpty() {
-        List<?> result = controller.listConversations(null);
-        assertTrue(result.isEmpty());
-        verifyNoInteractions(conversationMapper);
+    void listConversations_anonymousContext_shouldPassNullUserId() {
+        // 端点本身要求登录，此处钉住「上下文缺失时不伪造 userId」的防御行为
+        when(conversationMapper.selectVisibleTo(isNull(), eq("v-1"))).thenReturn(List.of());
+
+        var result = controller.listConversations("v-1");
+
+        assertTrue(result.isSuccess());
+        verify(conversationMapper).selectVisibleTo(isNull(), eq("v-1"));
     }
 
     @Test
     void getMessages_matchingVisitor_shouldMapRoleAndContent() {
         ConversationDO conv = new ConversationDO();
         conv.setId(9L);
-        conv.setVisitorId("v-1");
+        conv.setVisitorId("v-1");   // 未认领 → visitor_id 兜底
         when(conversationMapper.selectById(9L)).thenReturn(conv);
         when(conversationManager.loadHistory(9L)).thenReturn(List.of(
                 ChatMessage.user("问题"),
                 ChatMessage.assistant("回答")));
 
-        List<?> result = controller.getMessages(9L, "v-1");
+        var result = controller.getMessages(9L, "v-1");
 
-        assertEquals(2, result.size());
-        @SuppressWarnings("unchecked")
-        var first = (java.util.Map<String, Object>) result.get(0);
+        assertTrue(result.isSuccess());
+        assertEquals(2, result.getData().size());
+        var first = result.getData().get(0);
         assertEquals("user", first.get("role"));
         assertEquals("问题", first.get("content"));
-        @SuppressWarnings("unchecked")
-        var second = (java.util.Map<String, Object>) result.get(1);
+        var second = result.getData().get(1);
         assertEquals("assistant", second.get("role"));
     }
 
@@ -276,9 +284,10 @@ class RagChatControllerTest {
         conv.setVisitorId("v-1");
         when(conversationMapper.selectById(9L)).thenReturn(conv);
 
-        List<?> result = controller.getMessages(9L, "v-2");
+        var result = controller.getMessages(9L, "v-2");
 
-        assertTrue(result.isEmpty());
+        assertTrue(result.isSuccess());
+        assertTrue(result.getData().isEmpty());
         verify(conversationManager, never()).loadHistory(any());
     }
 
@@ -289,7 +298,9 @@ class RagChatControllerTest {
         conv.setVisitorId("v-1");
         when(conversationMapper.selectById(9L)).thenReturn(conv);
 
-        assertTrue(controller.getMessages(9L, null).isEmpty());
+        var result = controller.getMessages(9L, null);
+
+        assertTrue(result.getData().isEmpty());
         verify(conversationManager, never()).loadHistory(any());
     }
 
@@ -297,7 +308,77 @@ class RagChatControllerTest {
     void getMessages_unknownConversation_shouldReturnEmpty() {
         when(conversationMapper.selectById(9L)).thenReturn(null);
 
-        assertTrue(controller.getMessages(9L, "v-1").isEmpty());
+        var result = controller.getMessages(9L, "v-1");
+
+        assertTrue(result.getData().isEmpty());
         verify(conversationManager, never()).loadHistory(any());
+    }
+
+    @Test
+    void getMessages_claimedConv_matchingUser_anyVisitor_shouldReturnMessages() {
+        // 已认领会话：账号匹配即归属，visitorId 不再是凭证（跨设备可读）
+        UserContext.setUser(UserInfoDTO.builder()
+                .userId("42").name("u").role(UserRole.USER).build());
+        ConversationDO conv = new ConversationDO();
+        conv.setId(9L);
+        conv.setUserId(42L);
+        conv.setVisitorId("browser-a");
+        when(conversationMapper.selectById(9L)).thenReturn(conv);
+        when(conversationManager.loadHistory(9L)).thenReturn(List.of(
+                ChatMessage.user("问题"),
+                ChatMessage.assistant("回答")));
+
+        var result = controller.getMessages(9L, "browser-b");
+
+        assertEquals(2, result.getData().size());
+    }
+
+    @Test
+    void getMessages_claimedConv_wrongUser_matchingVisitor_shouldReturnEmpty() {
+        // 已认领会话：visitorId 匹配但账号不同 → 冒名无效，返回空
+        UserContext.setUser(UserInfoDTO.builder()
+                .userId("7").name("u").role(UserRole.USER).build());
+        ConversationDO conv = new ConversationDO();
+        conv.setId(9L);
+        conv.setUserId(42L);
+        conv.setVisitorId("shared-browser");
+        when(conversationMapper.selectById(9L)).thenReturn(conv);
+
+        var result = controller.getMessages(9L, "shared-browser");
+
+        assertTrue(result.getData().isEmpty());
+        verify(conversationManager, never()).loadHistory(any());
+    }
+
+    // ─────────────────────── 重命名 / 删除端点 ───────────────────────
+
+    @Test
+    void renameConversation_shouldDelegateWithContextUser() {
+        UserContext.setUser(UserInfoDTO.builder()
+                .userId("42").name("u").role(UserRole.USER).build());
+
+        var result = controller.renameConversation(9L, java.util.Map.of("title", "新标题"), "v-1");
+
+        assertTrue(result.isSuccess());
+        verify(conversationManager).renameConversation(9L, 42L, "v-1", "新标题");
+    }
+
+    @Test
+    void renameConversation_missingTitle_shouldPassNull() {
+        var result = controller.renameConversation(9L, java.util.Map.of(), "v-1");
+
+        assertTrue(result.isSuccess());
+        verify(conversationManager).renameConversation(9L, null, "v-1", null);
+    }
+
+    @Test
+    void deleteConversation_shouldDelegateWithContextUser() {
+        UserContext.setUser(UserInfoDTO.builder()
+                .userId("42").name("u").role(UserRole.USER).build());
+
+        var result = controller.deleteConversation(9L, "v-1");
+
+        assertTrue(result.isSuccess());
+        verify(conversationManager).deleteConversation(9L, 42L, "v-1");
     }
 }

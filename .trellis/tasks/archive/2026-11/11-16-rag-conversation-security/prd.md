@@ -66,3 +66,69 @@ visitorId 本身是持有者凭证——知道他人 visitorId 即可冒名（�
 
 - 归属切 user_id 主 key + 存量断代/回填设计；重命名/删除端点补齐后恢复 ChatHistory UI。
 - visitorId 凭证模型固有局限（知凭证即可冒名）随归属切换解决。
+
+---
+
+# 阶段二：归属切 user_id + 重命名/删除端点（2026-11-16 实施）
+
+## 5. 设计（已与 owner 对齐两项契约决策）
+
+**归属谓词**（`ConversationManager.isOwner`，读/写单一事实源）：
+
+- `user_id` 非空 → 只认账号；`visitorId` 立即失效（共享浏览器/跨设备都安全）
+- `user_id` 为空 → 存量会话，`visitor_id` 非空匹配兜底
+
+**写路径**：`getOrCreateConversation(convId, visitorId, userId, question)`——命中归属且
+`user_id` 为空时 lazy claim（`claimUserId` 带 `user_id IS NULL` 条件，并发先到先得）；
+新会话 `user_id`+`visitor_id` 双写。归属不匹配 → 静默开新会话（沿用防 IDOR 口径）。
+
+**读路径**：`listConversations` → `selectVisibleTo(userId, visitorId)`
+（`user_id = ? OR (user_id IS NULL AND visitor_id = ?)`）；`userId` 只取自
+`UserContext`，不接受请求参数。`getMessages` 非属主 → 空列表（不泄露存在性）。
+
+**存量回填**：`RagentSchemaMigration` 幂等 UPDATE——`t_llm_usage` 中该会话
+`COUNT(DISTINCT user_id)=1` 才回填（本地 10/10 会话全部无歧义命中）；
+多用户歧义的留给 lazy claim。
+
+**重命名/删除**：`PUT /conversations/{id}/rename`（body `{title}`）、
+`DELETE /conversations/{id}`，均带 `visitorId` query 兜底参数；归属失败与不存在
+统一 `A120100 会话不存在`（不区分，不泄露存在性）。删除同事务先清
+`t_conversation_message`（FK 无级联）再删会话，`@Transactional("ragentTransactionManager")`。
+conversations 系列端点统一 `Result` 包装（消除历史裸 JSON 债），前端走 `client.ts`。
+
+**已知边界**：未认领会话在共享 visitorId 下对多账号可见（认领前固有歧义，
+续聊即收敛）；空标题 `A120101`、超 200 字 `A120102`。
+
+## Resolution（阶段二）
+
+2026-11-16 完成实施、单测与真实 API 走查。
+
+**实施**
+
+- `ConversationManager`：`isOwner` 谓词、`getOrCreateConversation` +userId/lazy claim、
+  `requireOwnedConversation`/`renameConversation`/`deleteConversation`（写路径）。
+- `ConversationMapper`：`selectVisibleTo`/`claimUserId`/`renameTitle`；
+  `ConversationMessageMapper`：`deleteByConversationId`。
+- `RagChatController`：三端点 `Result` 化 + rename/delete 新端点；
+  `RagChatService.doChat` 透传 userId；`ErrorCode` 新增 A12 RAG 段。
+- `RagentSchemaMigration`：usage 回填（幂等，仅 `user_id IS NULL` 且单 user_id 会话）。
+- 前端：`rag.ts` 四会话 API 全走 `client.ts`（自动 token + Result 解包），
+  恢复 `renameConversation`/`deleteConversation`；`ChatHistory.vue` 从 cade240^
+  恢复重命名/删除 UI；`ChatWidget` 接 `@deleted`/`@renamed`。
+
+**验证**
+
+- `ConversationManagerTest` 27 例（isOwner 四态/getOrCreate 归属+claim/写路径校验）、
+  `RagChatControllerTest` 18 例、`RagChatServiceTest`+`Phase3IntegrationTest` 桩签名同步；
+  verify quick 全绿（hermetic 全量）、前端 type-check/build 绿、lint 15 基线 0 新增。
+- 真实 API 走查（8081 重启后）：回填 10/10 命中；t7check 列表 8 条/admin 2 条
+  （visitorId 无关）；owner 乱填 visitorId 读消息正常；admin 持 t7check 真 visitorId
+  读已认领会话 → 空（凭证失效实锤）；rename 非属主 A120100/属主成功/空标题 A120101；
+  delete 非属主 A120100/属主成功且消息同事务清零；匿名 PUT/DELETE → 401；
+  未认领会话 visitorId 兜底可见（共享浏览器歧义如期）。
+
+**遗留**
+
+- visitorId 凭证模型对「未认领存量 + 共享浏览器」的固有歧义：认领前多账号可见，
+  续聊收敛——个人博客规模可接受，如需彻底可后续加「认领确认」交互。
+- 会话标题目前=首问截断+手动 rename；无自动摘要。

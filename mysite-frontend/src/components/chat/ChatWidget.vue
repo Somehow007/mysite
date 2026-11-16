@@ -127,6 +127,17 @@ function handleNewConversation() {
   showHistory.value = false
 }
 
+function handleDeleteConversation(id: string) {
+  if (chat.conversationId.value === id) {
+    chat.newConversation()
+  }
+  chat.conversations.value = chat.conversations.value.filter(c => c.id !== id)
+}
+
+function handleRenameConversation() {
+  chat.loadConversations(getVisitorId())
+}
+
 // Rate limit countdown
 const rateLimitSeconds = ref(0)
 let rateLimitTimer: ReturnType<typeof setInterval> | null = null
@@ -683,6 +694,8 @@ onScopeDispose(() => {
               :loading="chat.loadingHistory.value"
               @select="handleSelectConversation"
               @new="handleNewConversation"
+              @deleted="handleDeleteConversation"
+              @renamed="handleRenameConversation"
             />
           </div>
         </Transition>

@@ -164,8 +164,9 @@ public class RagChatService {
 
         try {
         // Stage 1: 获取或创建会话 + 加载对话历史
+        // userId 写入会话归属：新会话双写 user_id+visitor_id，存量会话续聊时认领
         ConversationDO conversation = conversationManager
-            .getOrCreateConversation(conversationId, visitorId, question);
+            .getOrCreateConversation(conversationId, visitorId, userId, question);
         Long convId = conversation.getId();
         UsageContext.setConversationId(convId);
         List<ChatMessage> history = conversationManager.loadHistory(convId);

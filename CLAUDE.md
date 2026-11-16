@@ -121,7 +121,7 @@ mysite-frontend/src/
 - **Chat state machine**: `useChat.ts` — status: `idle | streaming | error`, messages with `pending | failed | truncated` flags, abort via `AbortController`.
 - **Markdown rendering**: `useMarkdown` (articles, async render + TOC + KaTeX + Callouts) vs `useChatMarkdown` (chat, sync render + rAF throttle + DOMPurify).
 - **Snowflake ID safety**: All `Long` IDs in DTOs use `@JsonSerialize(using = ToStringSerializer.class)`. Frontend types use `string` for IDs. Snowflake values exceed JS `Number.MAX_SAFE_INTEGER` (2^53).
-- **Chat access**: login required (`/v1/rag/chat/stream` is authenticated; anonymous users see a login gate in ChatWidget). Conversations are keyed by `visitorId` (browser UUID in localStorage) — `t_conversation.user_id` is reserved but unused.
+- **Chat access**: login required (`/v1/rag/chat/stream` is authenticated; anonymous users see a login gate in ChatWidget). Conversation ownership: `user_id` is primary (account survives device/browser change); `visitorId` (browser UUID) is fallback for unclaimed legacy rows only — once `user_id` is set, visitorId is no longer a credential. Unclaimed rows are claimed lazily on next chat (`ConversationManager.isOwner`). Rename/delete endpoints exist with the same ownership check.
 - **Role-based rate limits**: ADMIN unlimited, CREATOR 20/h, USER 10/h. Question max 500 chars.
 
 ### Database Schema
@@ -147,7 +147,7 @@ t_knowledge_base         # KB definitions
 t_knowledge_document     # sourceType: ARTICLE|UPLOAD, status: PENDING→CHUNKING→READY|FAILED
 t_knowledge_chunk        # Text chunks
 t_knowledge_vector       # vector(1024), HNSW, cosine (<=>)
-t_conversation           # visitorId/userId + title
+t_conversation           # user_id 主归属 / visitor_id 兜底 + title
 t_conversation_message   # role, content, sources JSONB
 t_rag_intent             # 扁平意图：KB_RETRIEVAL / CHAT，绑定 kb_id
 

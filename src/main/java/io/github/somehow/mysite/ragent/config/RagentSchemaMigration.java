@@ -113,6 +113,24 @@ public class RagentSchemaMigration implements InitializingBean {
                AND NOT EXISTS (SELECT 1 FROM t_knowledge_base k WHERE k.id = i.kb_id)
             """, "t_rag_intent.orphan_kb_id");
 
+        // 会话归属切换回填：t_llm_usage 记录了每次调用的 user_id+conversation_id，
+        // 对「该会话在 usage 中只出现过一个 user_id」的存量会话无损回填 user_id。
+        // 多用户歧义的会话不回填，留给续聊时 lazy claim（ConversationManager.claimUserId）。
+        // 幂等：只补 user_id IS NULL 的行，重复执行无副作用。
+        execute("""
+            UPDATE t_conversation c
+               SET user_id = sub.user_id
+              FROM (
+                    SELECT conversation_id, MIN(user_id) AS user_id
+                      FROM t_llm_usage
+                     WHERE conversation_id IS NOT NULL AND user_id IS NOT NULL
+                     GROUP BY conversation_id
+                    HAVING COUNT(DISTINCT user_id) = 1
+                   ) sub
+             WHERE c.id = sub.conversation_id
+               AND c.user_id IS NULL
+            """, "t_conversation.user_id_backfill");
+
         // 三类模式意图：统计/管理、内容检索、闲聊（覆盖旧的领域混模式种子）
         execute("""
             INSERT INTO t_rag_intent (id, name, type, kb_id, keywords, description, priority, enabled, custom_prompt_fragment, custom_top_k, create_time)

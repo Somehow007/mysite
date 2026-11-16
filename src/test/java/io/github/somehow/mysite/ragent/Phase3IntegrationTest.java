@@ -226,7 +226,7 @@ class Phase3IntegrationTest {
         // 默认：新建会话
         ConversationDO conv = new ConversationDO();
         conv.setId(1001L);
-        when(conversationManager.getOrCreateConversation(any(), anyString(), anyString()))
+        when(conversationManager.getOrCreateConversation(any(), anyString(), any(), anyString()))
             .thenReturn(conv);
         when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
 

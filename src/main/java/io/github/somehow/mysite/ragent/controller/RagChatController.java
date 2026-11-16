@@ -3,6 +3,8 @@ package io.github.somehow.mysite.ragent.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.commons.context.UserContext;
 import io.github.somehow.mysite.commons.enums.UserRole;
+import io.github.somehow.mysite.commons.framework.result.Result;
+import io.github.somehow.mysite.commons.framework.web.Results;
 import io.github.somehow.mysite.ragent.core.ConversationManager;
 import io.github.somehow.mysite.ragent.dao.entity.ConversationDO;
 import io.github.somehow.mysite.ragent.dao.mapper.ConversationMapper;
@@ -134,19 +136,16 @@ public class RagChatController {
     /**
      * 获取对话历史列表（会话摘要）。
      * 用于前端展示历史对话侧栏，用户可切换或新建对话。
-     * 归属凭证是 visitorId（浏览器 UUID）；user_id 列预留未启用，不接受 userId 参数——
-     * 请求参数可伪造任意用户 ID，属于已堵死的安全洞。
+     * 归属：user_id 主 key（登录账号），visitorId 仅兜底未认领存量会话——
+     * user_id 不接受请求参数（可伪造），一律取自登录态 UserContext。
      */
     @GetMapping("/conversations")
-    public List<Map<String, Object>> listConversations(
+    public Result<List<Map<String, Object>>> listConversations(
             @RequestParam(value = "visitorId", required = false) String visitorId) {
 
-        List<ConversationDO> conversations;
-        if (visitorId != null && !visitorId.isBlank()) {
-            conversations = conversationMapper.selectByVisitorId(visitorId);
-        } else {
-            return List.of();
-        }
+        Long userId = parseUserId(UserContext.getUserId());
+        List<ConversationDO> conversations =
+                conversationMapper.selectVisibleTo(userId, visitorId);
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (ConversationDO conv : conversations) {
@@ -158,23 +157,23 @@ public class RagChatController {
             item.put("updateTime", conv.getUpdateTime());
             result.add(item);
         }
-        return result;
+        return Results.success(result);
     }
 
     /**
      * 获取指定会话的历史消息。
      * 前端切换/恢复历史对话时调用，将消息渲染到聊天面板中。
-     * 归属校验：visitorId 必须与会话归属一致，否则返回空（不泄露会话是否存在）。
+     * 归属校验：必须命中 user_id 主归属或 visitor_id 兜底，否则返回空
+     * （不泄露会话是否存在，与 listConversations 空语义一致）。
      */
     @GetMapping("/conversations/{id}/messages")
-    public List<Map<String, Object>> getMessages(
+    public Result<List<Map<String, Object>>> getMessages(
             @PathVariable Long id,
             @RequestParam(value = "visitorId", required = false) String visitorId) {
         ConversationDO conv = conversationMapper.selectById(id);
-        // visitorId 必须非空且一致：visitor_id 列可空，双方都为 null 时不能视为归属匹配
-        if (conv == null || visitorId == null || visitorId.isBlank()
-                || !Objects.equals(conv.getVisitorId(), visitorId)) {
-            return List.of();
+        Long userId = parseUserId(UserContext.getUserId());
+        if (conv == null || !ConversationManager.isOwner(conv, userId, visitorId)) {
+            return Results.success(List.of());
         }
         List<ChatMessage> messages = conversationManager.loadHistory(id);
         List<Map<String, Object>> result = new ArrayList<>();
@@ -184,7 +183,34 @@ public class RagChatController {
             item.put("content", msg.getContent());
             result.add(item);
         }
-        return result;
+        return Results.success(result);
+    }
+
+    /**
+     * 重命名会话。归属校验失败与会话不存在统一报「会话不存在」，
+     * 不区分两种情形（与读路径不泄露存在性的口径一致）。
+     */
+    @PutMapping("/conversations/{id}/rename")
+    public Result<Void> renameConversation(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            @RequestParam(value = "visitorId", required = false) String visitorId) {
+        Long userId = parseUserId(UserContext.getUserId());
+        conversationManager.renameConversation(id, userId, visitorId,
+                body == null ? null : body.get("title"));
+        return Results.success();
+    }
+
+    /**
+     * 删除会话及其全部消息（同事务）。归属口径同 rename。
+     */
+    @DeleteMapping("/conversations/{id}")
+    public Result<Void> deleteConversation(
+            @PathVariable Long id,
+            @RequestParam(value = "visitorId", required = false) String visitorId) {
+        Long userId = parseUserId(UserContext.getUserId());
+        conversationManager.deleteConversation(id, userId, visitorId);
+        return Results.success();
     }
 
     /**

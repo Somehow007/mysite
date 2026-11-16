@@ -95,7 +95,7 @@ class RagChatServiceTest {
             ConversationDO conv = new ConversationDO();
             conv.setId(42L);
 
-            when(conversationManager.getOrCreateConversation(null, "visitor-1", "测试问题"))
+            when(conversationManager.getOrCreateConversation(null, "visitor-1", null, "测试问题"))
                 .thenReturn(conv);
             when(conversationManager.loadHistory(42L)).thenReturn(List.of());
             when(retrievalEngine.retrieve(eq("测试问题"), eq(5), eq(List.of(1L)))).thenReturn(List.of());
@@ -121,7 +121,7 @@ class RagChatServiceTest {
             ConversationDO conv = new ConversationDO();
             conv.setId(99L);
 
-            when(conversationManager.getOrCreateConversation(null, "v", "q")).thenReturn(conv);
+            when(conversationManager.getOrCreateConversation(null, "v", null, "q")).thenReturn(conv);
             when(conversationManager.loadHistory(99L)).thenReturn(List.of());
             when(retrievalEngine.retrieve(anyString(), anyInt(), any())).thenReturn(List.of());
             when(routingLLMService.chatStream(any()))
@@ -151,7 +151,7 @@ class RagChatServiceTest {
                 new SearchResult(2L, 100L, "文章A", "另一片段", 0.8f, 1L)
             );
 
-            when(conversationManager.getOrCreateConversation(any(), any(), any())).thenReturn(conv);
+            when(conversationManager.getOrCreateConversation(any(), any(), any(), any())).thenReturn(conv);
             when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
             when(retrievalEngine.retrieve(anyString(), anyInt(), any())).thenReturn(results);
             when(routingLLMService.chatStream(any())).thenReturn(Flux.just("答案"));
@@ -189,7 +189,7 @@ class RagChatServiceTest {
             uploadDoc.setSourceType("UPLOAD");
             uploadDoc.setSourceRef("file.pdf");
 
-            when(conversationManager.getOrCreateConversation(any(), any(), any())).thenReturn(conv);
+            when(conversationManager.getOrCreateConversation(any(), any(), any(), any())).thenReturn(conv);
             when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
             when(retrievalEngine.retrieve(anyString(), anyInt(), any())).thenReturn(results);
             when(knowledgeDocumentMapper.selectBatchIds(anyCollection()))
@@ -239,7 +239,7 @@ class RagChatServiceTest {
             ConversationDO conv = new ConversationDO();
             conv.setId(1L);
 
-            when(conversationManager.getOrCreateConversation(any(), any(), any())).thenReturn(conv);
+            when(conversationManager.getOrCreateConversation(any(), any(), any(), any())).thenReturn(conv);
             when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
             when(retrievalEngine.retrieve(anyString(), anyInt(), any())).thenReturn(List.of());
             when(routingLLMService.chatStream(any()))
@@ -271,7 +271,7 @@ class RagChatServiceTest {
                 ChatMessage.assistant("之前的回答")
             );
 
-            when(conversationManager.getOrCreateConversation(5L, "v", "新问题"))
+            when(conversationManager.getOrCreateConversation(5L, "v", null, "新问题"))
                 .thenReturn(conv);
             when(conversationManager.loadHistory(5L)).thenReturn(history);
             when(retrievalEngine.retrieve(eq("新问题"), eq(5), any())).thenReturn(List.of());
@@ -300,7 +300,7 @@ class RagChatServiceTest {
         @Test
         @DisplayName("KB_META 查目录、不走向量检索，sources 为空")
         void metaSkipsVectorSearch() {
-            when(conversationManager.getOrCreateConversation(any(), any(), any())).thenReturn(conversation());
+            when(conversationManager.getOrCreateConversation(any(), any(), any(), any())).thenReturn(conversation());
             when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
             when(intentClassifier.classify(anyString(), anyList(), anyBoolean()))
                 .thenReturn(IntentResult.builder().type("KB_META").confidence(0.95).reason("keyword").build());
@@ -326,7 +326,7 @@ class RagChatServiceTest {
         @Test
         @DisplayName("CHAT 不检索、不查目录")
         void chatSkipsRetrievalAndCatalog() {
-            when(conversationManager.getOrCreateConversation(any(), any(), any())).thenReturn(conversation());
+            when(conversationManager.getOrCreateConversation(any(), any(), any(), any())).thenReturn(conversation());
             when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
             when(intentClassifier.classify(anyString(), anyList(), anyBoolean()))
                 .thenReturn(IntentResult.builder().type("CHAT").confidence(0.95).reason("keyword").build());
@@ -345,7 +345,7 @@ class RagChatServiceTest {
         @Test
         @DisplayName("KB_RETRIEVAL 仍走向量检索")
         void retrievalStillSearches() {
-            when(conversationManager.getOrCreateConversation(any(), any(), any())).thenReturn(conversation());
+            when(conversationManager.getOrCreateConversation(any(), any(), any(), any())).thenReturn(conversation());
             when(conversationManager.loadHistory(anyLong())).thenReturn(List.of());
             when(retrievalEngine.retrieve(anyString(), anyInt(), any())).thenReturn(List.of());
             when(routingLLMService.chatStream(any())).thenReturn(Flux.just("答案"));
