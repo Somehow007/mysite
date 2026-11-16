@@ -49,7 +49,7 @@ async function fetchKbs() {
       kbAutoSelected = true
       selectKb(firstKb.id)
     }
-  } catch { /* ignore */ } finally { loadingKbs.value = false }
+  } catch (e: unknown) { toast.error((e as Error).message || '知识库列表加载失败') } finally { loadingKbs.value = false }
 }
 
 function selectKb(kbId: string) {
