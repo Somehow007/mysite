@@ -236,3 +236,21 @@
 - RSS / Atom 端点（目前后端没有，页脚链接靠配置开关）。
 - “继续读”改成向量相似度推荐（复用 pgvector）。
 - 旧主题去留（T13 之后观察）。
+
+## 遗留问题评估（2026-11-16 T14–T18 阶段评审）
+
+> 评估口径：安全向/认证面变更必须先评审（§2.2）；存量 bug 按影响面决定单独立项还是顺手修。
+> **结论：不并入 T18**——T18 是单点计数口径修复，已收口提交；以下按「建议立项 / 并入 / 观察」分级。
+
+### 建议立项（按优先级）
+
+1. **草稿泄漏（安全，最高优先）**：公开读路径不过滤 `published`——BlogHome/Category/Tag/Search 列表与合集详情 items 均可能把 `del_flag=0` 的未发布草稿暴露给匿名。T14/T18 两次评审确认的独立安全问题，影响面是全部公开列表。→ 单独立项，先过 §2.2 评审（涉及匿名可达响应内容）。
+2. **RAG 会话安全 + 归属切换（合并为一个任务）**：`GET /v1/rag/conversations/{id}/messages` 无归属校验（IDOR）；`GET /conversations?userId=` 可伪造（当前 `user_id` 全 NULL 暂无实际泄露，**启用 user_id 前必须先修**）；登录用户历史按浏览器 visitorId 归属、换设备即丢，切 `user_id` 主 key 需处理存量 NULL 断代/回填；重命名/删除后端端点（`PUT .../rename` + `DELETE .../{id}` 带归属校验）补齐后恢复前端 UI（T15 已删死按钮）。三者同源于归属模型，一次设计比拆开返工少。
+
+### 并入既有任务 / 顺手项（不单独立项）
+
+- **ES 启用补 isTop**：`ArticleDocument` 无字段、ES 路径 isTop 过滤/topTime 排序不生效——当前 `enabled:false` dormant，记入「启用 ES」checklist，不立项。
+- **`t_collection.article_count` 存储列漂移**：T18 已把详情改动态口径；存储列仍会漂移但当前无错误消费点，写路径维护照旧 → 观察项，新消费点出现时改走动态统计。
+- **应用级 storage 访问未防护**（T13 遗留）：theme 首屏已修，user store 等其余 localStorage 访问点未统一防护 → 下次走查顺手修，不立项。
+- **`verify.sh full` 本机可用性存疑**：docker 影子实例已停删后，full 模式的 `docker compose up -d` 会与 brew 端口冲突；needs-infra 测试实际可打 brew 服务但 PG pgvector 扩展未必齐 → 下次跑 full 前先复核（可能需 compose 端口改映射或文档注明本机口径）。
+- **历史编译断档**（`72f2646..8b7c94a`）：并行隔离把 `takePendingQuote` import/export 拆进不同 commit，HEAD 已愈——仅 bisect/单独 checkout 需注意，不修。
