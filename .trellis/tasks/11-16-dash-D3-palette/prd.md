@@ -109,3 +109,12 @@
 - DOM 断言（`scripts/output/d3-check.mjs`，一次性 gitignored）：token computed 值、用户管理 4 卡全 neutral（库内禁用=0，全灰符合预期）、角色徽标 ADMIN accent / USER muted、AI 统计卡仅「费用」accent +「成功率」danger（真实低成功率语义）、调用类型 CHAT accent + EMBED/CLASSIFY outline —— 17/20 PASS；3 项 FAIL 均为种子数据缺失（t_user 无 CREATOR、LLM 日志无 REWRITE/RERANK 行），同一三元/记录字面量代码路径的兄弟分支已验证。
 - 前台回归（`scripts/output/d3-front-check.mjs`）：paper-light/dark 首页 + 文章页 token 正确、无 pageerror。
 - classic-light token computed 复核：`--success #10B981` 等 4 值不变（classic 不引用 paper.css）。
+
+## 走查记录（2026-11-16，`scripts/d3-walkthrough.mjs`）
+
+- 方法：三主题 × 桌面 1440 + paper-light 移动 390，DOM 级断言（computed color / class / border-radius），覆盖 users / posts / ai 三页。
+- 造数：临时将 `t14check` 置 CREATOR+禁用以覆盖条件分支（禁用卡 danger、CREATOR outline、禁用状态徽标），走查后已还原 USER+正常（DB 复核确认）。
+- 结果：**66 pass / 0 fail / 6 skip**。skip = REWRITE/RERANK 调用类型徽标（×3 主题，种子数据无此类日志；与已验证的 CLASSIFY/EMBED 同一记录字面量路径）。
+- 覆盖到的关键点：禁用=1 时「禁用」卡 icon+数值双 danger；禁用=0 时全 neutral（前次 d3-check 已验）；outline 徽标 computed borderColor=主题 --border、1px；paper+dash-mode 徽标方角 0px、classic pill；文章管理手写「已发布/草稿」徽标 computed 色=success/warning（paper 新值生效）；AI 页仅费用 accent + 成功率语义色。
+- 踩坑：Tailwind v4 `rounded-full` 编译为 `calc(infinity*1px)`，computed border-radius 是 `3.36e+07px` 而非 `9999px`——断言改按 `>=9999` 判 pill。
+- lint：走查脚本 0 新增（oxlint 维持 18 存量）。
