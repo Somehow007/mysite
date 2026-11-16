@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type { Component } from 'vue'
 
-type SemanticColor = 'accent' | 'success' | 'warning' | 'danger' | 'info'
+type SemanticColor = 'accent' | 'success' | 'warning' | 'danger' | 'info' | 'neutral'
 
 const props = withDefaults(defineProps<{
   icon?: Component
@@ -24,12 +24,13 @@ const iconClasses: Record<SemanticColor, string> = {
   warning: 'bg-warning-subtle text-warning',
   danger: 'bg-danger-subtle text-danger',
   info: 'bg-info-subtle text-info',
+  neutral: 'bg-bg-secondary text-text-secondary',
 }
 
 const resolvedIconColor = computed<SemanticColor>(() => {
   if (props.iconColor) return props.iconColor
   if (props.accent && props.accent !== 'default') return props.accent
-  return 'accent'
+  return 'neutral'
 })
 
 const valueClass = computed(() => {

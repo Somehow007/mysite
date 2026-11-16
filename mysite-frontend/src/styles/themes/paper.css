@@ -3,14 +3,14 @@
  * 变量结构对齐 classic.css；代码块为暖棕深色底，日/夜主题共用（post.html .code）。 */
 
 [data-theme="paper-light"] {
-  --success: #10B981;
-  --success-subtle: rgb(16 185 129 / 0.12);
-  --warning: #F59E0B;
-  --warning-subtle: rgb(245 158 11 / 0.12);
-  --danger: #EF4444;
-  --danger-subtle: rgb(239 68 68 / 0.12);
-  --info: #3B82F6;
-  --info-subtle: rgb(59 130 246 / 0.12);
+  --success: #2A6B43;
+  --success-subtle: rgb(42 107 67 / 0.12);
+  --warning: #85570F;
+  --warning-subtle: rgb(133 87 15 / 0.12);
+  --danger: #A8261B;
+  --danger-subtle: rgb(168 38 27 / 0.12);
+  --info: #36597A;
+  --info-subtle: rgb(54 89 122 / 0.12);
 
   --bg-primary: #F6F1E7;
   --bg-secondary: #EFE7D8;
@@ -58,14 +58,14 @@
 }
 
 [data-theme="paper-dark"] {
-  --success: #34D399;
-  --success-subtle: rgb(52 211 153 / 0.18);
-  --warning: #FBBF24;
-  --warning-subtle: rgb(251 191 36 / 0.18);
-  --danger: #F87171;
-  --danger-subtle: rgb(248 113 113 / 0.18);
-  --info: #60A5FA;
-  --info-subtle: rgb(96 165 250 / 0.18);
+  --success: #6FBF8A;
+  --success-subtle: rgb(111 191 138 / 0.16);
+  --warning: #E0A84A;
+  --warning-subtle: rgb(224 168 74 / 0.16);
+  --danger: #F07B6E;
+  --danger-subtle: rgb(240 123 110 / 0.16);
+  --info: #8FB0CF;
+  --info-subtle: rgb(143 176 207 / 0.16);
 
   --bg-primary: #16130F;
   --bg-secondary: #1F1B16;

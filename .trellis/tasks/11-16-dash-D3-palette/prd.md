@@ -82,3 +82,30 @@
 - 截图：用户管理统计卡 3 灰 1（禁用=0 时也灰）；AI 管理只有「费用」和「成功率」有颜色；角色列 ADMIN 锈红、CREATOR 线框、USER 灰；调用类型不再红绿。
 - 前台 paper-light / paper-dark：首页、文章页、聊天面板（触发一次错误提示）无掉色。
 - classic-light 截图：除统计卡图标变灰、角色徽标、调用类型徽标外，无变化（这几处是语义修正，所有主题生效，属预期）。
+
+## 实现记录（2026-11-16）
+
+### 改动文件
+
+- `src/styles/themes/paper.css`：paper-light / paper-dark 两块顶部 8 个语义 token 按 §1 表重调（subtle alpha light 0.12 / dark 0.16）。
+- `src/components/ui/StatsCard.vue`：`SemanticColor` 增 `'neutral'`（`bg-bg-secondary text-text-secondary`）；兜底 accent→neutral。
+- `src/components/ui/Badge.vue`：variant 增 `'outline'`（`bg-transparent text-text-secondary border border-border`，dot `bg-text-muted`）。
+- `src/views/UserManageView.vue`：4 张统计卡去彩，`disabledCount` 抽 computed，禁用卡 `>0` 才 danger（icon+color）；角色徽标 ADMIN→accent / CREATOR→outline / USER→muted。
+- `src/views/AiManageView.vue`：Token / 调用次数统计卡去 `icon-color`；`CALL_TYPE_BADGE` 改 CHAT→accent、其余四类→outline（`CALL_TYPE_COLOR` 图表配色不动）。
+
+### 偏离方案
+
+- 无实质偏离。两点说明：
+  1. §1 验算表中 paper-dark subtle 对比度（6.05/6.17/5.09/5.86）按 WCAG 公式复算对不上（subtle 色 alpha 合成到 bg-elevated 得 5.54/5.70/4.73/5.45，合成到 bg-primary 得 6.31/6.51/5.37/6.21）；两种口径全部 ≥4.5，最严口径 dark danger-on-elevated-subtle = 4.73 仍达标。
+  2. `StatsCard` deprecated `accent` prop 类型未加 `'neutral'`（prd 只要求 `SemanticColor`；运行时 accent→iconColor 链路已兼容）。
+
+### 验收输出摘要
+
+- `./scripts/verify.sh` quick：VERIFY OK（后端 hermetic + 前端 type-check）。
+- `npm run type-check` / `npm run build`：绿。
+- `npm run lint`：oxlint 18 errors 全部为存量（stash 后 HEAD 复跑同为 18；总档记 15，D1/D2 走查脚本带入增量），本任务 0 新增；`--fix` 无误改（git status 仅 5 个目标文件）。
+- 对比度脚本（/tmp 一次性，不入库）：paper-light/dark × 4 语义色 × bg-elevated/bg-primary × 纯底/subtle 合成底 = 32 项全部 ≥4.5:1。
+- `dash-shots.mjs` 三主题 × 双视口 × 11 路由：66 张 `OK: no overflow, no page error`。
+- DOM 断言（`scripts/output/d3-check.mjs`，一次性 gitignored）：token computed 值、用户管理 4 卡全 neutral（库内禁用=0，全灰符合预期）、角色徽标 ADMIN accent / USER muted、AI 统计卡仅「费用」accent +「成功率」danger（真实低成功率语义）、调用类型 CHAT accent + EMBED/CLASSIFY outline —— 17/20 PASS；3 项 FAIL 均为种子数据缺失（t_user 无 CREATOR、LLM 日志无 REWRITE/RERANK 行），同一三元/记录字面量代码路径的兄弟分支已验证。
+- 前台回归（`scripts/output/d3-front-check.mjs`）：paper-light/dark 首页 + 文章页 token 正确、无 pageerror。
+- classic-light token computed 复核：`--success #10B981` 等 4 值不变（classic 不引用 paper.css）。

@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 
 const props = withDefaults(defineProps<{
-  variant?: 'success' | 'warning' | 'danger' | 'info' | 'muted' | 'accent'
+  variant?: 'success' | 'warning' | 'danger' | 'info' | 'muted' | 'accent' | 'outline'
   size?: 'sm' | 'md'
   /** 在文字前显示 6px 语义色圆点 */
   dot?: boolean
@@ -27,6 +27,7 @@ const classes = computed(() => {
     info: 'bg-info-subtle text-info',
     muted: 'bg-bg-code text-text-muted',
     accent: 'bg-accent-subtle text-accent',
+    outline: 'bg-transparent text-text-secondary border border-border',
   }
 
   return `${base} ${gap} ${sizeClasses} ${variantMap[props.variant]}`
@@ -40,6 +41,7 @@ const dotClass = computed(() => {
     info: 'bg-info',
     muted: 'bg-text-muted',
     accent: 'bg-accent',
+    outline: 'bg-text-muted',
   }
   return colorMap[props.variant]
 })

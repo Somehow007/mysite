@@ -36,12 +36,12 @@ const CALL_TYPE_LABEL: Record<string, string> = {
   RERANK: '精排',
 }
 
-const CALL_TYPE_BADGE: Record<string, 'accent' | 'info' | 'warning' | 'success' | 'muted'> = {
+const CALL_TYPE_BADGE: Record<string, 'accent' | 'outline'> = {
   CHAT: 'accent',
-  REWRITE: 'info',
-  CLASSIFY: 'warning',
-  EMBED: 'success',
-  RERANK: 'muted',
+  REWRITE: 'outline',
+  CLASSIFY: 'outline',
+  EMBED: 'outline',
+  RERANK: 'outline',
 }
 
 const CALL_TYPE_COLOR: Record<string, string> = {
@@ -681,14 +681,14 @@ onBeforeUnmount(() => {
           </StatsCard>
         </div>
         <div @mousemove="(e) => placeTip(e, tokenCardTip())" @mouseleave="hideTip">
-          <StatsCard :icon="Activity" label="Token" :value="formatTokens(summary?.totalTokens ?? 0)" icon-color="info">
+          <StatsCard :icon="Activity" label="Token" :value="formatTokens(summary?.totalTokens ?? 0)">
             <template #trend>
               <span class="text-text-muted">日均 {{ formatTokens(Math.round(avgOf(summary?.totalTokens ?? 0))) }}</span>
             </template>
           </StatsCard>
         </div>
         <div @mousemove="(e) => placeTip(e, callCardTip())" @mouseleave="hideTip">
-          <StatsCard :icon="Bot" label="调用次数" :value="formatTokens(summary?.totalCalls ?? 0)" icon-color="success">
+          <StatsCard :icon="Bot" label="调用次数" :value="formatTokens(summary?.totalCalls ?? 0)">
             <template #trend>
               <span class="text-text-muted">日均 {{ formatTokens(Math.round(avgOf(summary?.totalCalls ?? 0))) }} 次</span>
             </template>

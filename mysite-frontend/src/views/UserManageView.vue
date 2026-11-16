@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useHead } from '@unhead/vue'
 import { Shield, ShieldCheck, Trash2, Eye, FileText, X, Loader2, ChevronDown, Users, CheckCircle2 } from 'lucide-vue-next'
 import { getAdminUsers, updateUserRole, updateUserStatus, deleteUser, getOperationLogs } from '@/api/admin'
@@ -30,6 +30,8 @@ const logPage = ref<OperationLogPage | null>(null)
 const logLoading = ref(false)
 const showLogs = ref(false)
 const logTargetUserId = ref<string | undefined>(undefined)
+
+const disabledCount = computed(() => users.value.filter(u => u.status === 0).length)
 
 const updatingUserId = ref<string | null>(null)
 
@@ -276,10 +278,10 @@ function handleUserReset() {
 
     <!-- Stats -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-      <StatsCard :icon="Users" label="用户总数" :value="userPage?.total ?? 0" icon-color="accent" />
-      <StatsCard :icon="ShieldCheck" label="管理员" :value="users.filter(u => u.role === 'ADMIN').length" icon-color="warning" />
-      <StatsCard :icon="FileText" label="创作者" :value="users.filter(u => u.role === 'CREATOR').length" icon-color="info" />
-      <StatsCard :icon="Shield" label="禁用" :value="users.filter(u => u.status === 0).length" icon-color="danger" />
+      <StatsCard :icon="Users" label="用户总数" :value="userPage?.total ?? 0" />
+      <StatsCard :icon="ShieldCheck" label="管理员" :value="users.filter(u => u.role === 'ADMIN').length" />
+      <StatsCard :icon="FileText" label="创作者" :value="users.filter(u => u.role === 'CREATOR').length" />
+      <StatsCard :icon="Shield" label="禁用" :value="disabledCount" :icon-color="disabledCount > 0 ? 'danger' : undefined" :color="disabledCount > 0 ? 'danger' : undefined" />
     </div>
 
     <SearchFilterBar
@@ -350,7 +352,7 @@ function handleUserReset() {
               :disabled="updatingUserId === item.id"
               class="inline-flex items-center gap-1 disabled:opacity-50 cursor-pointer"
             >
-              <Badge :variant="item.role === 'ADMIN' ? 'warning' : item.role === 'CREATOR' ? 'accent' : 'info'" dot>
+              <Badge :variant="item.role === 'ADMIN' ? 'accent' : item.role === 'CREATOR' ? 'outline' : 'muted'" dot>
                 {{ ROLE_LABEL[item.role] || item.role }}
               </Badge>
               <ChevronDown :size="10" class="text-text-muted" />
