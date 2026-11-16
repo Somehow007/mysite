@@ -83,6 +83,10 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
             queryWrapper.eq(ArticleDO::getPublished, requestParam.getPublished());
         }
 
+        if (requestParam.getIsTop() != null) {
+            queryWrapper.eq(ArticleDO::getIsTop, requestParam.getIsTop());
+        }
+
         String keyword = requestParam.getKeyword();
         String searchType = StrUtil.blankToDefault(requestParam.getSearchType(), "title");
         String categorySlug = requestParam.getCategorySlug();
@@ -164,6 +168,12 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
                     queryWrapper.orderByDesc(ArticleDO::getViewCount);
                 }
                 break;
+            case "topTime":
+                queryWrapper.orderByDesc(ArticleDO::getIsTop)
+                        .orderByDesc(ArticleDO::getTopTime)
+                        .orderByDesc(ArticleDO::getCreateTime)
+                        .orderByDesc(ArticleDO::getId);
+                break;
             default:
                 if ("asc".equalsIgnoreCase(sortOrder)) {
                     queryWrapper.orderByAsc(ArticleDO::getCreateTime);
@@ -218,6 +228,7 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
                     dto.setReadingTime(article.getReadingTime());
                     dto.setPublished(article.getPublished());
                     dto.setVisibility(article.getVisibility());
+                    dto.setIsTop(article.getIsTop());
                     dto.setAuthorId(article.getAuthorId());
                     dto.setCreateTime(article.getCreateTime());
                     dto.setUpdateTime(article.getUpdateTime());

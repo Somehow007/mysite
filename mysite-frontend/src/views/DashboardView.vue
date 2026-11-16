@@ -4,9 +4,9 @@ import { useHead } from '@unhead/vue'
 import { useRouter } from 'vue-router'
 import {
   FileText, Plus, Trash2, Edit, Eye, EyeOff,
-  Heart, Clock, MoreHorizontal, Lock, Globe, FolderPlus,
+  Heart, Clock, MoreHorizontal, Lock, Globe, FolderPlus, Pin,
 } from 'lucide-vue-next'
-import { getArticles, deleteArticle, batchDeleteArticles, batchUpdateArticleVisibility } from '@/api/article'
+import { getArticles, deleteArticle, batchDeleteArticles, batchUpdateArticleVisibility, setArticleTop } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { getCollections, batchAddArticles } from '@/api/collection'
 import { useUserStore } from '@/stores/user'
@@ -236,6 +236,21 @@ async function handleBatchVisibility(target: 0 | 1) {
     articles.value = articles.value.map((a) =>
       backup.has(a.id) ? { ...a, visibility: backup.get(a.id) } : a
     )
+  }
+}
+
+async function handleToggleTop(article: ArticleListItem) {
+  if (!canModify(article)) return
+  const target = article.isTop === 1 ? 0 : 1
+  const backup = article.isTop
+  article.isTop = target
+  try {
+    await setArticleTop(article.id, target)
+    toast.success(target === 1 ? `已置顶「${article.title}」` : `已取消置顶「${article.title}」`)
+  } catch (e: unknown) {
+    article.isTop = backup
+    const msg = e instanceof Error ? e.message : '置顶操作失败'
+    toast.error(msg)
   }
 }
 
@@ -491,6 +506,7 @@ onMounted(() => {
             {{ item.published === 1 ? '已发布' : '草稿' }}
           </span>
           <Lock v-if="item.visibility === 1" :size="12" class="text-warning" title="仅自己可见" />
+          <Pin v-if="item.isTop === 1" :size="12" class="text-accent" title="已置顶" />
         </div>
       </template>
       <template #cell-stats="{ item }">
@@ -506,6 +522,7 @@ onMounted(() => {
       <template #cell-actions="{ item }">
         <div class="flex items-center gap-0.5">
           <button @click="router.push(`/post/${item.id}`)" class="inline-flex items-center justify-center w-7 h-7 rounded-md text-text-muted hover:bg-accent/10 hover:text-accent transition-colors" title="查看"><Eye :size="14" /></button>
+          <button v-if="canModify(item)" @click="handleToggleTop(item)" class="inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors" :class="item.isTop === 1 ? 'text-accent' : 'text-text-muted hover:bg-accent/10 hover:text-accent'" :title="item.isTop === 1 ? '取消置顶' : '置顶'"><Pin :size="14" :stroke-width="item.isTop === 1 ? 2.5 : 2" /></button>
           <button v-if="canModify(item)" @click="router.push(`/dashboard/posts/${item.id}/edit`)" class="inline-flex items-center justify-center w-7 h-7 rounded-md text-text-muted hover:bg-accent/10 hover:text-accent transition-colors" title="编辑"><Edit :size="14" /></button>
           <button v-if="canModify(item)" @click="handleDelete(item)" :disabled="deletingIds.has(item.id)" class="inline-flex items-center justify-center w-7 h-7 rounded-md text-text-muted hover:bg-danger-subtle hover:text-danger transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="删除"><Trash2 :size="14" /></button>
           <span v-if="!canModify(item)" class="inline-flex items-center justify-center w-7 h-7 text-text-muted opacity-50"><MoreHorizontal :size="14" /></span>
@@ -526,10 +543,12 @@ onMounted(() => {
                 {{ item.published === 1 ? '已发布' : '草稿' }}
               </span>
               <Lock v-if="item.visibility === 1" :size="11" class="text-warning" />
+              <Pin v-if="item.isTop === 1" :size="11" class="text-accent" />
               <span class="text-[11px] text-text-muted">{{ formatDate(item.updateTime) }}</span>
             </div>
             <div class="flex items-center gap-2 mt-1.5">
               <button @click="router.push(`/post/${item.id}`)" class="btn-ghost text-xs py-1 px-2">查看</button>
+              <button v-if="canModify(item)" @click="handleToggleTop(item)" class="btn-ghost text-xs py-1 px-2" :class="item.isTop === 1 && '!text-accent'">{{ item.isTop === 1 ? '取消置顶' : '置顶' }}</button>
               <button v-if="canModify(item)" @click="router.push(`/dashboard/posts/${item.id}/edit`)" class="btn-ghost text-xs py-1 px-2">编辑</button>
               <button v-if="canModify(item)" @click="handleDelete(item)" :disabled="deletingIds.has(item.id)" class="btn-ghost text-xs py-1 px-2 !text-danger">删除</button>
             </div>

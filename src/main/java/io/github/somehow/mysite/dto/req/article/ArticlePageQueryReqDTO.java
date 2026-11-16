@@ -28,7 +28,10 @@ public class ArticlePageQueryReqDTO extends Page {
     @Schema(description = "发布状态: 1-已发布, 0-草稿, null-全部")
     private Integer published;
 
-    @Schema(description = "排序字段: createTime-创建时间, viewCount-浏览量", example = "createTime")
+    @Schema(description = "置顶过滤: 1-仅置顶, 0-仅非置顶, null-全部")
+    private Integer isTop;
+
+    @Schema(description = "排序字段: createTime-创建时间, viewCount-浏览量, topTime-置顶优先(置顶按置顶时间倒序，其余按创建时间倒序)", example = "createTime")
     private String sortField;
 
     @Schema(description = "排序方向: asc-升序, desc-降序", example = "desc")

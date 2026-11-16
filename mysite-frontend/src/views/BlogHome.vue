@@ -61,7 +61,7 @@ const sectionTitle = computed(() => {
 const isFirstPage = computed(() => loadedPage.value === 1)
 const showMasthead = computed(() => isFirstPage.value && !selectedCategorySlug.value)
 
-// 头条与列表去重：头条固定取「最新一篇」（T14 置顶前），与下方排序无关
+// 头条与列表去重：头条固定取「置顶优先，否则最新一篇」（topTime 排序），与下方排序无关
 const displayArticles = computed(() => {
   if (!isFirstPage.value || !leadArticle.value) return articles.value
   const leadId = leadArticle.value.id
@@ -118,7 +118,7 @@ async function fetchLead() {
     const res = await getArticles({
       page: 1,
       size: 1,
-      sortField: 'createTime',
+      sortField: 'topTime',
       sortOrder: 'desc',
       categorySlug: selectedCategorySlug.value || undefined,
     })

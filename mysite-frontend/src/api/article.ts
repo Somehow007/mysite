@@ -77,6 +77,11 @@ export function batchUpdateArticleVisibility(ids: string[], visibility: number):
   return put<void>('/v1/articles/visibility/batch', { ids, visibility })
 }
 
+/** 设置文章置顶状态：isTop=1 置顶（top_time 刷新），0 取消。仅 ADMIN / 作者本人 */
+export function setArticleTop(id: string, isTop: number): Promise<void> {
+  return put<void>(`/v1/articles/${id}/top`, { isTop })
+}
+
 export interface FavoriteResult {
   favorited: boolean
   favoriteCount: number

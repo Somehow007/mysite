@@ -29,6 +29,7 @@ public class ArticleSelectRespDTO {
     private Integer favoriteCount;
     private Integer readingTime;
     private Integer visibility;
+    private Integer isTop;
     private Boolean isFavorited;
     private Date createTime;
     private Date updateTime;

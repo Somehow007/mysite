@@ -77,6 +77,13 @@ public class ArticleController {
         return Results.success();
     }
 
+    @Operation(summary = "设置文章置顶状态（仅 ADMIN / 作者本人）")
+    @PutMapping("/v1/articles/{id}/top")
+    public Result<Void> updateArticleTop(@PathVariable Long id, @RequestBody ArticleTopReqDTO requestParam) {
+        articleService.updateArticleTop(id, requestParam.getIsTop());
+        return Results.success();
+    }
+
     @Operation(summary = "分页搜索文章信息")
     @GetMapping("/v1/articles")
     public Result<IPage<ArticlePageQueryRespDTO>> pageQueryArticle(ArticlePageQueryReqDTO requestParam) {

@@ -89,6 +89,8 @@ CREATE TABLE IF NOT EXISTS `t_article` (
     `author_id` BIGINT NOT NULL COMMENT '作者ID',
     `published` TINYINT NOT NULL DEFAULT 0 COMMENT '是否发布 0:草稿 1:已发布',
     `visibility` TINYINT NOT NULL DEFAULT 0 COMMENT '可见性 0:公开 1:仅自己可见',
+    `is_top` TINYINT NOT NULL DEFAULT 0 COMMENT '置顶 0:否 1:是',
+    `top_time` DATETIME NULL COMMENT '置顶时间，多篇置顶按此倒序',
     `view_count` INT DEFAULT 0 COMMENT '阅读量',
     `favorite_count` INT DEFAULT 0 COMMENT '收藏量',
     `reading_time` INT DEFAULT 0 COMMENT '阅读时间（分钟）',

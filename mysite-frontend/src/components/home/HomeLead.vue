@@ -13,10 +13,10 @@ const props = defineProps<{
 
 const siteStore = useSiteStore()
 
-// kicker 对应概念稿「置顶 · 分类」位：无置顶字段前用「最新」+ 合集/分类
+// kicker 对应概念稿「置顶 · 分类」位：置顶文显示「置顶」，否则「最新」；后接合集/分类
 const leadKicker = computed(() => {
   if (!props.lead) return ''
-  const parts = ['最新']
+  const parts = [props.lead.isTop === 1 ? '置顶' : '最新']
   if (props.lead.collectionTitle) parts.push(props.lead.collectionTitle)
   if (props.lead.categoryName) parts.push(props.lead.categoryName)
   return parts.join(' · ')

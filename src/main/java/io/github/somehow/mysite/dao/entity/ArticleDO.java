@@ -8,6 +8,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
+import java.util.Date;
+
 @Data
 @EqualsAndHashCode(callSuper = false)
 @NoArgsConstructor
@@ -25,6 +27,8 @@ public class ArticleDO extends BaseDO {
     private Long authorId;
     private Integer published;
     private Integer visibility;
+    private Integer isTop;
+    private Date topTime;
     private Integer viewCount;
     private Integer favoriteCount;
     private Integer readingTime;

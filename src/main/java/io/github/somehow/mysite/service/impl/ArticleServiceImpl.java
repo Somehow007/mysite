@@ -323,6 +323,29 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
     }
 
     @Override
+    @Transactional
+    public void updateArticleTop(Long id, Integer isTop) {
+        if (isTop == null || (isTop != 0 && isTop != 1)) {
+            throw new ClientException(ErrorCode.ARTICLE_PARAM_REQUIRED);
+        }
+        checkArticleOwnership(id);
+
+        int rows = baseMapper.update(Wrappers.lambdaUpdate(ArticleDO.class)
+                .set(ArticleDO::getIsTop, isTop)
+                .set(isTop == 1, ArticleDO::getTopTime, new Date())
+                .set(isTop == 0, ArticleDO::getTopTime, null)
+                .eq(ArticleDO::getId, id)
+                .eq(ArticleDO::getDelFlag, 0));
+        if (rows <= 0) {
+            throw new ClientException(ErrorCode.ARTICLE_UPDATE_FAILED);
+        }
+
+        // 详情 DTO 携带 isTop，需驱逐；列表查询无缓存、article_nav 与置顶无关。
+        // 刻意不发 ArticleUpdatedEvent——置顶不改内容，避免触发 RAG 重向量化。
+        articleCacheService.evictArticleDetail(id);
+    }
+
+    @Override
     public IPage<ArticlePageQueryRespDTO> pageQueryArticle(ArticlePageQueryReqDTO requestParam) {
         return articleSearchService.searchArticles(requestParam);
     }

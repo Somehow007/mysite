@@ -77,6 +77,7 @@ export interface Article {
   readingTime?: number
   isFavorited?: boolean
   visibility?: number
+  isTop?: number
   tags: Tag[] | null
   createTime?: string
   updateTime: string
@@ -100,6 +101,7 @@ export interface ArticleListItem {
   published?: number
   isFavorited?: boolean
   visibility?: number
+  isTop?: number
   createTime: string
   updateTime: string
   collectionId?: string | null
