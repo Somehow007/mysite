@@ -90,8 +90,9 @@ Dashboard/CollectionEditView 是**合法草稿消费方**（文章管理、合�
 - `t_collection.article_count` 存储列仍可能漂移（T18 观察项，当前无错误消费点）。
 - KB 孤儿文档：源文章已删的 `t_knowledge_document` 残留（syncAll 对 article==null 只跳过不清除）——
   本机发现 3 条（T14 验证文章），观察项，下次清理任务顺手做。
-- 环境：本机 `.env` `BAILIAN_EMBEDDING_MODEL=qwen3.7-text-embedding` 调 embeddings 返 400，
-  合法文章重同步标 FAILED（环境问题非本任务 bug；key/模型修正后 reprocess 即恢复）。
+- ~~环境：`.env` `BAILIAN_EMBEDDING_MODEL=qwen3.7-text-embedding` 调 embeddings 返 400~~
+  已修：`.env` 改 `text-embedding-v4` 重启后重试 reprocess，文档恢复 READY（13 chunks/13 vectors），
+  KB.embedding_model 同步更新为 v4。期间另遇 DNS 瞬断（热点网络），重启后自愈。
 
 ## 走查记录（2026-11-16 真实 API，brew MySQL+PG，后端新代码）
 
