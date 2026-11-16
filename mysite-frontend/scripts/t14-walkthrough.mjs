@@ -327,7 +327,7 @@ console.log('== I. 边界 isTop 缺失 ==')
   const listHandler = (route) => {
     const url = new URL(route.request().url())
     const sortField = url.searchParams.get('sortField')
-    let list = [NEW1, OWN1].map(a => { const { isTop, ...rest } = a; return rest }) // 完全去掉字段
+    let list = [NEW1, OWN1].map(a => { const rest = { ...a }; delete rest.isTop; return rest }) // 完全去掉字段
     if (sortField === 'viewCount') list = [...list].sort((a, b) => b.viewCount - a.viewCount)
     else list = [...list].sort((a, b) => new Date(b.createTime) - new Date(a.createTime))
     return route.fulfill(jsonRes({ records: list, total: 2, current: 1, size: 10, pages: 1 }))
