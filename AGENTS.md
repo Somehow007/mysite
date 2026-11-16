@@ -48,7 +48,7 @@
 ## 4. 留痕约定（手写复刻 trellis 轻量版）
 
 - 任务级：`.trellis/tasks/<MM-DD>-<名>/prd.md`——记「遇到什么问题/怎么解决的/验证结论/后续方向」。讨论型任务也建（可只有 prd）。
-- 广播位：`.trellis/CHANGES.md` 尾追加一行 `日期 | 事件 | → 指针`；开工先 `tail -30` 增量补课。
+- 广播位：`.trellis/CHANGES.md` 尾追加一行 `日期 | 事件 | → 指针`；开工补课分级——新会话/无法确定最后活跃时点 → 全文读，旧会话恢复 → 从最后活跃时点增量补（`tail -30` 只是起点）；「进度/某功能做没做」类状态问题查状态源（任务档案、git log、`docs/MAP.md`）——事件流里没有 ≠ 没做过。
 - 归档：`task.py` 脚本暂缺（手写复刻期），完成即把任务目录移 `.trellis/tasks/archive/<YYYY-MM>/` 并在 prd 补 `## Resolution`。
 - 经验沉淀：踩坑→最小规则进本文件；成体系了再考虑 `trellis init` 拿全套（spec 分层/skill 路由/journal）。
 
