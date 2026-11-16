@@ -24,6 +24,10 @@ const coverImage = ref('')
 const sortOrder = ref(0)
 // 可见性：0-公开 1-私有（仅自己可见）
 const visibility = ref(0)
+// 计划总篇数（type=number 输入，运行时可能是 number，空=未设计划）
+const plannedCountInput = ref<string | number>('')
+// 连载状态：0-连载中 1-已完结
+const status = ref(0)
 const saving = ref(false)
 const loading = ref(false)
 const error = ref('')
@@ -60,6 +64,8 @@ async function fetchCollectionDetail(id: string) {
         coverImage.value = detail.coverImage || ''
         sortOrder.value = detail.sortOrder
         visibility.value = detail.visibility ?? 0
+        plannedCountInput.value = detail.plannedCount != null ? String(detail.plannedCount) : ''
+        status.value = detail.status ?? 0
       }
       const pageArticles = detail.articles || []
       allArticles.push(...pageArticles)
@@ -173,6 +179,14 @@ async function handleSave() {
     return
   }
 
+  // 空输入（''/null）=未设计划；其余转 number 校验
+  const plannedRaw = plannedCountInput.value
+  const plannedCount = plannedRaw === '' || plannedRaw == null ? null : Number(plannedRaw)
+  if (plannedCount !== null && (!Number.isInteger(plannedCount) || plannedCount < 1)) {
+    error.value = '计划总篇数必须是大于 0 的整数'
+    return
+  }
+
   saving.value = true
   error.value = ''
 
@@ -186,6 +200,8 @@ async function handleSave() {
         description: description.value.trim() || undefined,
         coverImage: coverImage.value.trim() || undefined,
         sortOrder: sortOrder.value,
+        plannedCount,
+        status: status.value,
         visibility: visibility.value,
       })
     } else {
@@ -194,6 +210,8 @@ async function handleSave() {
         description: description.value.trim() || undefined,
         coverImage: coverImage.value.trim() || undefined,
         sortOrder: sortOrder.value,
+        plannedCount,
+        status: status.value,
         visibility: visibility.value,
       })
     }
@@ -368,6 +386,43 @@ onMounted(() => {
         <div>
           <label class="block text-sm font-medium text-text-primary mb-1.5">排序序号</label>
           <input v-model.number="sortOrder" type="number" min="0" class="input-base w-32" />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-text-primary mb-1.5">连载计划</label>
+          <div class="flex flex-wrap items-center gap-3">
+            <input
+              v-model="plannedCountInput"
+              type="number"
+              min="1"
+              step="1"
+              placeholder="计划总篇数（可选）"
+              class="input-base w-44"
+            />
+            <div class="flex gap-2">
+              <button
+                type="button"
+                @click="status = 0"
+                class="px-4 py-2 rounded-lg text-sm border transition-all duration-200"
+                :class="status === 0
+                  ? 'border-accent bg-accent text-text-inverse'
+                  : 'border-border text-text-muted hover:border-accent hover:text-accent'"
+              >
+                连载中
+              </button>
+              <button
+                type="button"
+                @click="status = 1"
+                class="px-4 py-2 rounded-lg text-sm border transition-all duration-200"
+                :class="status === 1
+                  ? 'border-accent bg-accent text-text-inverse'
+                  : 'border-border text-text-muted hover:border-accent hover:text-accent'"
+              >
+                已完结
+              </button>
+            </div>
+          </div>
+          <p class="text-xs text-text-muted mt-1.5">设计划篇数后，前台显示「已发 / 计划」与进度条；清空输入框即取消计划。「已完结」为手动标记，可不设计划。</p>
         </div>
 
         <div>

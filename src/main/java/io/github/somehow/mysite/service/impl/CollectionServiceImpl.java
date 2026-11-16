@@ -82,6 +82,9 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
         if (collectionDO.getSortOrder() == null) {
             collectionDO.setSortOrder(0);
         }
+        if (collectionDO.getStatus() == null) {
+            collectionDO.setStatus(0);
+        }
         if (StrUtil.isBlank(collectionDO.getCoverImage())) {
             collectionDO.setCoverImage(null);
         }
@@ -104,9 +107,15 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
             existing.setCoverImage(StrUtil.isBlank(requestParam.getCoverImage()) ? null : requestParam.getCoverImage());
         }
         if (requestParam.getSortOrder() != null) existing.setSortOrder(requestParam.getSortOrder());
+        if (requestParam.getStatus() != null) existing.setStatus(requestParam.getStatus());
         if (requestParam.getVisibility() != null) existing.setVisibility(requestParam.getVisibility());
 
         collectionMapper.updateById(existing);
+        // planned_count 允许显式置 NULL（清除计划），updateById 的 NOT_NULL 策略写不了 null，走专用 UPDATE；
+        // plannedCount 只在显式传入时更新（不传=不改，传 null=清除，>=1=设置）
+        if (requestParam.isPlannedCountProvided()) {
+            collectionMapper.updatePlannedCount(id, requestParam.getPlannedCount());
+        }
         promoteStagingImagesQuietly(requestParam.getDescription(), requestParam.getCoverImage());
     }
 

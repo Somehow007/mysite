@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router'
 import { BookOpen, Library, Eye, Loader2, Search, ArrowLeft } from 'lucide-vue-next'
 import { getCollections } from '@/api/collection'
 import { formatDate } from '@/utils/date'
-import { formatViewCount } from '@/utils/format'
+import { formatViewCount, formatCollectionCount } from '@/utils/format'
 import { Pagination as PaginationBar } from '@/components/ui'
 import { useScrollReveal } from '@/composables/useScrollReveal'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
@@ -138,7 +138,10 @@ onMounted(() => {
           <div class="flex items-center gap-4 text-xs text-text-muted mt-2">
             <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-accent-subtle text-accent font-medium">
               <BookOpen :size="10" />
-              {{ collection.articleCount ?? 0 }} 篇
+              {{ formatCollectionCount(collection) }}
+            </span>
+            <span :class="collection.status === 1 ? 'text-success' : ''">
+              {{ collection.status === 1 ? '已完结' : '连载中' }}
             </span>
             <span class="inline-flex items-center gap-1">
               <Eye :size="12" />

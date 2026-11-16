@@ -7,6 +7,7 @@ import { getCollections, deleteCollection, updateCollection } from '@/api/collec
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useUserStore } from '@/stores/user'
+import { formatCollectionProgress } from '@/utils/format'
 import { PageHeader, SearchFilterBar, Pagination as PaginationBar } from '@/components/ui'
 import type { Collection, Pagination as PaginationMeta } from '@/types'
 
@@ -183,6 +184,12 @@ onMounted(() => {
               <Lock :size="9" />
               私有
             </span>
+            <span
+              v-if="collection.status === 1"
+              class="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full bg-success-subtle text-success"
+            >
+              已完结
+            </span>
           </div>
           <p v-if="collection.description" class="text-sm text-text-muted line-clamp-1 mt-0.5">
             {{ collection.description }}
@@ -190,7 +197,7 @@ onMounted(() => {
           <div class="flex items-center gap-3 text-xs text-text-muted mt-1">
             <span class="inline-flex items-center gap-1">
               <BookOpen :size="12" />
-              {{ collection.articleCount }} 篇
+              {{ formatCollectionProgress(collection) }}
             </span>
             <span>{{ collection.authorName }}</span>
           </div>

@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { Lock } from 'lucide-vue-next'
 import { useSiteStore } from '@/stores/site'
-import { toRomanNumeral } from '@/utils/format'
+import { toRomanNumeral, collectionProgress, formatCollectionProgress } from '@/utils/format'
 import type { Collection } from '@/types'
 
 defineProps<{
@@ -48,7 +48,17 @@ const authorInitial = computed(() => siteStore.site.author?.charAt(0) || '·')
               />
             </span>
             <span class="mt-1 block text-xs text-text-muted">
-              {{ collection.articleCount ?? 0 }} 篇
+              {{ formatCollectionProgress(collection) }}
+            </span>
+            <span
+              v-if="collectionProgress(collection).percent != null"
+              class="mt-1.5 block h-[3px] w-full bg-border"
+              aria-hidden="true"
+            >
+              <span
+                class="block h-full bg-accent transition-all duration-300"
+                :style="{ width: collectionProgress(collection).percent + '%' }"
+              />
             </span>
           </span>
         </RouterLink>

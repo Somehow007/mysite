@@ -30,6 +30,8 @@
             c.description,
             c.cover_image,
             c.author_id,
+            c.planned_count,
+            c.status,
             c.visibility,
             c.sort_order,
             c.create_time,

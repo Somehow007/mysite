@@ -274,6 +274,10 @@ export interface Collection {
   authorName: string
   /** 当前访问者可见的文章数量（后端动态统计） */
   articleCount: number
+  /** 计划总篇数（连载预告，null/undefined=未设计划） */
+  plannedCount?: number | null
+  /** 连载状态：0-连载中 1-已完结 */
+  status?: number
   /** 可见性：0-公开 1-私有（仅作者和管理员可见） */
   visibility?: number
   sortOrder: number
@@ -317,6 +321,10 @@ export interface CreateCollectionRequest {
   description?: string
   coverImage?: string
   sortOrder?: number
+  /** 计划总篇数（连载预告，不传=未设计划） */
+  plannedCount?: number | null
+  /** 连载状态：0-连载中（默认） 1-已完结 */
+  status?: number
   /** 可见性：0-公开（默认） 1-私有 */
   visibility?: number
 }
@@ -326,6 +334,10 @@ export interface UpdateCollectionRequest {
   description?: string
   coverImage?: string
   sortOrder?: number
+  /** 计划总篇数：正整数=设置；显式 null=清除计划；不传=不修改 */
+  plannedCount?: number | null
+  /** 连载状态：0-连载中 1-已完结 */
+  status?: number
   /** 可见性：0-公开 1-私有 */
   visibility?: number
 }

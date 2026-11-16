@@ -23,6 +23,12 @@ public class CollectionPageQueryRespDTO {
     @Schema(description = "当前访问者可见的文章数量（动态统计，私有文章对非作者不计入）")
     private Integer articleCount;
 
+    @Schema(description = "计划总篇数（连载预告，null=未设计划）")
+    private Integer plannedCount;
+
+    @Schema(description = "连载状态：0-连载中 1-已完结")
+    private Integer status;
+
     @Schema(description = "可见性：0-公开 1-私有")
     private Integer visibility;
 

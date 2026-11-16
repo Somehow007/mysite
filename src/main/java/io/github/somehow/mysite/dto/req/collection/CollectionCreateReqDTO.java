@@ -26,6 +26,15 @@ public class CollectionCreateReqDTO {
     @Schema(description = "排序序号")
     private Integer sortOrder;
 
+    @Schema(description = "计划总篇数（连载预告，不传=未设计划）")
+    @Min(value = 1, message = "计划总篇数必须大于0")
+    private Integer plannedCount;
+
+    @Schema(description = "连载状态：0-连载中（默认） 1-已完结")
+    @Min(value = 0, message = "连载状态只能是 0(连载中) 或 1(已完结)")
+    @Max(value = 1, message = "连载状态只能是 0(连载中) 或 1(已完结)")
+    private Integer status;
+
     @Schema(description = "可见性：0-公开（默认） 1-私有（仅自己可见）")
     @Min(value = 0, message = "可见性只能是 0(公开) 或 1(私有)")
     @Max(value = 1, message = "可见性只能是 0(公开) 或 1(私有)")

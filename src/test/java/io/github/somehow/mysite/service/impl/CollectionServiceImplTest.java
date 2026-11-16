@@ -1,5 +1,6 @@
 package io.github.somehow.mysite.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.commons.context.UserContext;
 import io.github.somehow.mysite.commons.context.UserInfoDTO;
 import io.github.somehow.mysite.commons.enums.UserRole;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -169,6 +171,113 @@ class CollectionServiceImplTest {
         req.setTitle("更新后的标题");
 
         assertThrows(ClientException.class, () -> collectionService.updateCollection(COLLECTION_ID, req));
+    }
+
+    @Test
+    void createCollection_withPlannedCountAndStatus_shouldPersist() {
+        CollectionCreateReqDTO req = new CollectionCreateReqDTO();
+        req.setTitle("连载合集");
+        req.setPlannedCount(9);
+        req.setStatus(1);
+
+        when(collectionMapper.insert(any(CollectionDO.class))).thenReturn(1);
+
+        collectionService.createCollection(req);
+
+        ArgumentCaptor<CollectionDO> captor = ArgumentCaptor.forClass(CollectionDO.class);
+        verify(collectionMapper).insert(captor.capture());
+        assertEquals(9, captor.getValue().getPlannedCount());
+        assertEquals(1, captor.getValue().getStatus());
+    }
+
+    @Test
+    void createCollection_withoutPlannedAndStatus_shouldDefaultStatusZero() {
+        CollectionCreateReqDTO req = new CollectionCreateReqDTO();
+        req.setTitle("普通合集");
+
+        when(collectionMapper.insert(any(CollectionDO.class))).thenReturn(1);
+
+        collectionService.createCollection(req);
+
+        ArgumentCaptor<CollectionDO> captor = ArgumentCaptor.forClass(CollectionDO.class);
+        verify(collectionMapper).insert(captor.capture());
+        assertNull(captor.getValue().getPlannedCount());
+        assertEquals(0, captor.getValue().getStatus());
+    }
+
+    @Test
+    void updateCollection_plannedCountProvided_shouldCallUpdatePlannedCount() {
+        CollectionDO existing = createCollectionDO(COLLECTION_ID, AUTHOR_ID);
+        when(collectionMapper.selectOne(any())).thenReturn(existing);
+
+        CollectionUpdateReqDTO req = new CollectionUpdateReqDTO();
+        req.setPlannedCount(10);
+
+        collectionService.updateCollection(COLLECTION_ID, req);
+
+        verify(collectionMapper).updatePlannedCount(COLLECTION_ID, 10);
+    }
+
+    @Test
+    void updateCollection_plannedCountExplicitNull_shouldClearPlan() {
+        CollectionDO existing = createCollectionDO(COLLECTION_ID, AUTHOR_ID);
+        existing.setPlannedCount(10);
+        when(collectionMapper.selectOne(any())).thenReturn(existing);
+
+        CollectionUpdateReqDTO req = new CollectionUpdateReqDTO();
+        req.setPlannedCount(null);
+
+        collectionService.updateCollection(COLLECTION_ID, req);
+
+        verify(collectionMapper).updatePlannedCount(COLLECTION_ID, null);
+    }
+
+    @Test
+    void updateCollection_plannedCountAbsent_shouldNotTouch() {
+        CollectionDO existing = createCollectionDO(COLLECTION_ID, AUTHOR_ID);
+        when(collectionMapper.selectOne(any())).thenReturn(existing);
+
+        CollectionUpdateReqDTO req = new CollectionUpdateReqDTO();
+        req.setTitle("只改标题");
+
+        collectionService.updateCollection(COLLECTION_ID, req);
+
+        verify(collectionMapper, never()).updatePlannedCount(anyLong(), any());
+    }
+
+    @Test
+    void updateCollection_status_shouldUpdate() {
+        CollectionDO existing = createCollectionDO(COLLECTION_ID, AUTHOR_ID);
+        when(collectionMapper.selectOne(any())).thenReturn(existing);
+
+        CollectionUpdateReqDTO req = new CollectionUpdateReqDTO();
+        req.setStatus(1);
+
+        collectionService.updateCollection(COLLECTION_ID, req);
+
+        ArgumentCaptor<CollectionDO> captor = ArgumentCaptor.forClass(CollectionDO.class);
+        verify(collectionMapper).updateById(captor.capture());
+        assertEquals(1, captor.getValue().getStatus());
+    }
+
+    @Test
+    void updateReqDTO_plannedCountPresenceFlag_shouldDistinguishAbsentNullAndValue() throws Exception {
+        ObjectMapper om = new ObjectMapper();
+
+        // 不传字段 → provided=false（不修改）
+        CollectionUpdateReqDTO absent = om.readValue("{}", CollectionUpdateReqDTO.class);
+        assertFalse(absent.isPlannedCountProvided());
+        assertNull(absent.getPlannedCount());
+
+        // 显式 null → provided=true（清除计划）
+        CollectionUpdateReqDTO explicitNull = om.readValue("{\"plannedCount\":null}", CollectionUpdateReqDTO.class);
+        assertTrue(explicitNull.isPlannedCountProvided());
+        assertNull(explicitNull.getPlannedCount());
+
+        // 传值 → provided=true（设置）
+        CollectionUpdateReqDTO withValue = om.readValue("{\"plannedCount\":9}", CollectionUpdateReqDTO.class);
+        assertTrue(withValue.isPlannedCountProvided());
+        assertEquals(9, withValue.getPlannedCount());
     }
 
     // ==================== 删除合集测试 ====================

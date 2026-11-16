@@ -22,6 +22,12 @@ public class CollectionDetailRespDTO {
     private String authorName;
     private Integer articleCount;
 
+    @Schema(description = "计划总篇数（连载预告，null=未设计划）")
+    private Integer plannedCount;
+
+    @Schema(description = "连载状态：0-连载中 1-已完结")
+    private Integer status;
+
     @Schema(description = "可见性：0-公开 1-私有")
     private Integer visibility;
 

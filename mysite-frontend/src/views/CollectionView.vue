@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useHead } from '@unhead/vue'
 import { ArrowLeft, BookOpen, Calendar, Eye, Clock, Lock } from 'lucide-vue-next'
 import { getCollectionById } from '@/api/collection'
 import { formatDate, calculateReadingTime } from '@/utils/date'
-import { formatViewCount } from '@/utils/format'
+import { formatViewCount, formatCollectionProgress, collectionProgress } from '@/utils/format'
 import { Pagination } from '@/components/ui'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
 import SkeletonCard from '@/components/common/SkeletonCard.vue'
@@ -18,6 +18,10 @@ const loading = ref(false)
 const error = ref(false)
 const currentPage = ref(1)
 const pageSize = 10
+
+const progressPercent = computed(() =>
+  collection.value ? collectionProgress(collection.value).percent : null,
+)
 
 useHead(() => ({
   title: collection.value ? collection.value.title : '合集',
@@ -118,13 +122,21 @@ onMounted(() => {
         <div class="flex items-center gap-4 text-sm text-text-muted">
           <span class="inline-flex items-center gap-1.5">
             <BookOpen :size="14" />
-            {{ collection.articleCount }} 篇文章
+            {{ formatCollectionProgress(collection) }}
           </span>
           <span class="inline-flex items-center gap-1.5">
             <Calendar :size="14" />
             {{ formatDate(collection.createTime) }}
           </span>
           <span>{{ collection.authorName }}</span>
+        </div>
+
+        <div
+          v-if="progressPercent != null"
+          class="mt-4 h-[3px] w-full max-w-2xl bg-border"
+          aria-hidden="true"
+        >
+          <div class="h-full bg-accent" :style="{ width: progressPercent + '%' }" />
         </div>
       </header>
 

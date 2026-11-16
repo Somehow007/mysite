@@ -180,6 +180,8 @@ CREATE TABLE IF NOT EXISTS `t_collection` (
     `cover_image` VARCHAR(500) DEFAULT NULL COMMENT '合集封面图片URL',
     `author_id` BIGINT NOT NULL COMMENT '创建者ID',
     `article_count` INT NOT NULL DEFAULT 0 COMMENT '合集内文章数量',
+    `planned_count` INT DEFAULT NULL COMMENT '计划总篇数（连载预告，NULL=未设计划）',
+    `status` TINYINT NOT NULL DEFAULT 0 COMMENT '连载状态 0:连载中 1:已完结',
     `visibility` TINYINT NOT NULL DEFAULT 0 COMMENT '可见性 0:公开 1:私有(仅作者和管理员可见)',
     `sort_order` INT NOT NULL DEFAULT 0 COMMENT '排序序号',
     `create_time` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

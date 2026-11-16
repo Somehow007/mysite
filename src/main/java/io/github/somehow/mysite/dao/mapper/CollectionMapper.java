@@ -17,6 +17,10 @@ public interface CollectionMapper extends BaseMapper<CollectionDO> {
     @Update("UPDATE t_collection SET article_count = article_count + #{delta} WHERE id = #{id} AND del_flag = 0")
     int updateArticleCount(@Param("id") Long id, @Param("delta") int delta);
 
+    /** 更新计划总篇数；plannedCount 传 null 时置 NULL（updateById 的 NOT_NULL 策略写不了 null） */
+    @Update("UPDATE t_collection SET planned_count = #{plannedCount} WHERE id = #{id} AND del_flag = 0")
+    int updatePlannedCount(@Param("id") Long id, @Param("plannedCount") Integer plannedCount);
+
     /**
      * 分页查询合集（按访问者视角），含作者名、可见文章数和文章总浏览量，支持按浏览量排序。
      *
