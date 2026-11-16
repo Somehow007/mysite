@@ -35,6 +35,8 @@ export function getArticles(params?: {
   tagSlug?: string
   collectionId?: string
   published?: number | null
+  /** 管理视图放开草稿（仅 ADMIN/CREATOR 生效）：true 时可查全量含草稿 */
+  includeDraft?: boolean
   sortField?: string
   sortOrder?: string
 }): Promise<PaginatedResponse<ArticleListItem>> {
@@ -47,6 +49,7 @@ export function getArticles(params?: {
     tagSlug: params?.tagSlug,
     collectionId: params?.collectionId,
     published: params?.published,
+    includeDraft: params?.includeDraft || undefined,
     sortField: params?.sortField,
     sortOrder: params?.sortOrder,
   })

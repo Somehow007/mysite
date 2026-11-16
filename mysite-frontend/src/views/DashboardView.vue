@@ -88,6 +88,7 @@ async function fetchArticles(page = 1) {
       categorySlug: categoryFilter.value || undefined,
       collectionId: collectionFilter.value || undefined,
       published: publishedFilter.value,
+      includeDraft: true,
       sortField: sortField.value,
       sortOrder: sortOrder.value,
       authorId: !isAdmin.value ? userStore.user?.id : undefined,

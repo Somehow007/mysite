@@ -79,8 +79,11 @@ public class DatabaseArticleSearchServiceImpl implements ArticleSearchService {
             }
         }
 
-        if (requestParam.getPublished() != null) {
-            queryWrapper.eq(ArticleDO::getPublished, requestParam.getPublished());
+        // 发布状态门（规则见 ArticleSearchService.resolvePublishedFilter）：公开读恒 published=1，
+        // 管理视图经 published 显式过滤或 includeDraft=true 查全量。
+        Integer publishedFilter = ArticleSearchService.resolvePublishedFilter(requestParam);
+        if (publishedFilter != null) {
+            queryWrapper.eq(ArticleDO::getPublished, publishedFilter);
         }
 
         if (requestParam.getIsTop() != null) {

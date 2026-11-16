@@ -25,8 +25,11 @@ public class ArticlePageQueryReqDTO extends Page {
     @Schema(description = "合集ID，用于按合集过滤文章")
     private Long collectionId;
 
-    @Schema(description = "发布状态: 1-已发布, 0-草稿, null-全部")
+    @Schema(description = "发布状态: 1-已发布, 0-草稿, null-全部（仅 ADMIN/CREATOR 生效，其他角色恒按已发布过滤）")
     private Integer published;
+
+    @Schema(description = "管理视图放开草稿：true 时 ADMIN/CREATOR 可查全量（含草稿）；不传 published 时才有意义")
+    private Boolean includeDraft;
 
     @Schema(description = "置顶过滤: 1-仅置顶, 0-仅非置顶, null-全部")
     private Integer isTop;

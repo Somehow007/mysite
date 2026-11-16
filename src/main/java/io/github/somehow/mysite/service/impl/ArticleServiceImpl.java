@@ -376,6 +376,16 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             }
         }
 
+        // 草稿检查：未发布文章仅作者本人和管理员可见（详情缓存跨用户共享，按请求者实时校验）
+        if (result.getPublished() != null && result.getPublished() != 1) {
+            String currentUserId = UserContext.getUserId();
+            boolean isAuthor = currentUserId != null && currentUserId.equals(
+                    result.getAuthorId() != null ? result.getAuthorId().toString() : null);
+            if (!isAuthor && !UserContext.isAdmin()) {
+                throw new ClientException(ErrorCode.ARTICLE_NOT_FOUND);
+            }
+        }
+
         // 合集归属信息可见性：私有合集对非作者/非管理员隐藏
         // （文章详情缓存跨用户共享，归属信息必须按请求者实时校验）
         if (result.getCollectionId() != null
@@ -421,6 +431,13 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
         // 可见性检查：不允许收藏他人的私有文章
         if (article.getVisibility() != null && article.getVisibility() == 1
                 && !userId.equals(article.getAuthorId())) {
+            throw new ClientException(ErrorCode.ARTICLE_NOT_FOUND);
+        }
+
+        // 草稿检查：与详情端点同语义，未发布文章仅作者本人和管理员可收藏
+        if (!Integer.valueOf(1).equals(article.getPublished())
+                && !userId.equals(article.getAuthorId())
+                && !UserContext.isAdmin()) {
             throw new ClientException(ErrorCode.ARTICLE_NOT_FOUND);
         }
 

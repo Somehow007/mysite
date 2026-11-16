@@ -215,15 +215,22 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
             // 存在性过滤：剔除指向已删/不存在文章的成员行，对管理员同样生效
             // （详情 articleCount 与分页总数必须与下列条目同口径，不能用存储计数列——会漂移）
             List<ArticleDO> existing = articleMapper.selectList(Wrappers.<ArticleDO>lambdaQuery()
-                    .select(ArticleDO::getId, ArticleDO::getVisibility, ArticleDO::getAuthorId)
+                    .select(ArticleDO::getId, ArticleDO::getVisibility, ArticleDO::getAuthorId, ArticleDO::getPublished)
                     .in(ArticleDO::getId, articleIds)
                     .eq(ArticleDO::getDelFlag, 0));
-            // 可见性过滤：私有文章（visibility=1，仅自己可见）只有作者本人和管理员能在合集中看到
+            // 可见性+发布状态过滤：私有/草稿文章只有作者本人和管理员能在合集中看到，
+            // 其余访问者要求 published=1 且 visibility=公开（与文章详情端点同语义）
             String currentUserId = UserContext.getUserId();
             boolean admin = UserContext.isAdmin();
             Set<Long> visibleIds = existing.stream()
-                    .filter(a -> admin || a.getVisibility() == null || a.getVisibility() == 0
-                            || (currentUserId != null && currentUserId.equals(String.valueOf(a.getAuthorId()))))
+                    .filter(a -> {
+                        boolean privileged = admin
+                                || (currentUserId != null
+                                        && currentUserId.equals(String.valueOf(a.getAuthorId())));
+                        return privileged
+                                || (Integer.valueOf(1).equals(a.getPublished())
+                                        && (a.getVisibility() == null || a.getVisibility() == 0));
+                    })
                     .map(ArticleDO::getId)
                     .collect(Collectors.toSet());
             // 用 member 顺序过滤，保留 sortOrder 排序（重建列表会丢排序，导致非管理员分页错位）

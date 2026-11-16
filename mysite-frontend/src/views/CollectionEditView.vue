@@ -86,7 +86,7 @@ async function searchArticles() {
   if (!searchKeyword.value.trim()) return
   searching.value = true
   try {
-    const res = await getArticles({ keyword: searchKeyword.value, size: 20 })
+    const res = await getArticles({ keyword: searchKeyword.value, size: 20, includeDraft: true })
     searchResults.value = res.list
   } catch {
     searchResults.value = []

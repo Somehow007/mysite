@@ -187,9 +187,13 @@ public class CategoryServiceImpl implements CategoryService {
             throw new ClientException(ErrorCode.CATEGORY_NOT_FOUND);
         }
         CategoryRespDTO dto = BeanUtil.toBean(categoryDO, CategoryRespDTO.class);
+        // 展示计数只算公开可列出的文章（缓存跨用户共享，不能按查看者区分）；
+        // visibility NULL 是旧数据的"公开"语义
         dto.setArticleCount(articleMapper.selectCount(Wrappers.lambdaQuery(ArticleDO.class)
                 .eq(ArticleDO::getCategoryId, categoryDO.getId())
-                .eq(ArticleDO::getDelFlag, 0)));
+                .eq(ArticleDO::getDelFlag, 0)
+                .eq(ArticleDO::getPublished, 1)
+                .and(w -> w.eq(ArticleDO::getVisibility, 0).or().isNull(ArticleDO::getVisibility))));
         return dto;
     }
 
@@ -205,7 +209,9 @@ public class CategoryServiceImpl implements CategoryService {
         CategoryRespDTO dto = BeanUtil.toBean(categoryDO, CategoryRespDTO.class);
         dto.setArticleCount(articleMapper.selectCount(Wrappers.lambdaQuery(ArticleDO.class)
                 .eq(ArticleDO::getCategoryId, categoryDO.getId())
-                .eq(ArticleDO::getDelFlag, 0)));
+                .eq(ArticleDO::getDelFlag, 0)
+                .eq(ArticleDO::getPublished, 1)
+                .and(w -> w.eq(ArticleDO::getVisibility, 0).or().isNull(ArticleDO::getVisibility))));
         return dto;
     }
 
@@ -336,6 +342,8 @@ public class CategoryServiceImpl implements CategoryService {
         QueryWrapper<ArticleDO> wrapper = new QueryWrapper<>();
         wrapper.select("category_id", "COUNT(*) AS cnt")
                 .eq("del_flag", 0)
+                .eq("published", 1)
+                .and(w -> w.eq("visibility", 0).or().isNull("visibility"))
                 .in("category_id", categoryIds)
                 .groupBy("category_id");
         List<Map<String, Object>> counts = articleMapper.selectMaps(wrapper);

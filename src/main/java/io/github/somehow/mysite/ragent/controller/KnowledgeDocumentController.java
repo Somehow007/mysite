@@ -106,9 +106,12 @@ public class KnowledgeDocumentController {
             .map(d -> Long.valueOf(d.getSourceRef()))
             .collect(Collectors.toSet());
 
-        // 所有文章，排除已同步的
+        // 所有文章，排除已同步的；仅已发布且公开文章可入库（与 syncArticle 门一致）。
+        // visibility NULL 是旧数据的"公开"语义，不能用 eq(0) 误排
         List<ArticleDO> allArticles = articleMapper.selectList(
             new LambdaQueryWrapper<ArticleDO>()
+                .eq(ArticleDO::getPublished, 1)
+                .and(w -> w.eq(ArticleDO::getVisibility, 0).or().isNull(ArticleDO::getVisibility))
                 .orderByDesc(ArticleDO::getCreateTime));
 
         List<Map<String, Object>> available = new ArrayList<>();
@@ -137,7 +140,10 @@ public class KnowledgeDocumentController {
         int added = 0;
         for (Long articleId : articleIds) {
             ArticleDO article = articleMapper.selectById(articleId);
-            if (article == null || article.getTitle() == null || article.getContent() == null) continue;
+            // 与 syncArticle 公开性门一致：草稿/私有文章不入库，避免 added 计数说谎
+            if (article == null || article.getTitle() == null || article.getContent() == null
+                    || !Integer.valueOf(1).equals(article.getPublished())
+                    || (article.getVisibility() != null && article.getVisibility() == 1)) continue;
             docService.syncArticle(article, kbId);
             added++;
         }
@@ -159,6 +165,7 @@ public class KnowledgeDocumentController {
                 .eq(KnowledgeDocumentDO::getKbId, kbId)
                 .eq(KnowledgeDocumentDO::getSourceType, "ARTICLE"));
         int queued = 0;
+        int removed = 0;
         for (KnowledgeDocumentDO doc : docs) {
             if (doc.getSourceRef() == null) {
                 continue;
@@ -167,12 +174,23 @@ public class KnowledgeDocumentController {
             if (article == null || article.getContent() == null) {
                 continue;
             }
+            // 文章已转草稿/私有：syncArticle 会跳过但旧向量仍在，这里直接清档
+            if (!Integer.valueOf(1).equals(article.getPublished())
+                    || (article.getVisibility() != null && article.getVisibility() == 1)) {
+                vectorStore.deleteByDocId(doc.getId());
+                chunkMapper.deleteByDocId(doc.getId());
+                docMapper.deleteById(doc.getId());
+                removed++;
+                continue;
+            }
             docService.syncArticle(article, kbId);
             queued++;
         }
-        log.info("Queued knowledge-base re-embed: kbId={}, queued={}, total={}", kbId, queued, docs.size());
+        log.info("Queued knowledge-base re-embed: kbId={}, queued={}, removed={}, total={}",
+            kbId, queued, removed, docs.size());
         Map<String, Object> result = new HashMap<>();
         result.put("synced", queued);
+        result.put("removed", removed);
         result.put("total", docs.size());
         return Results.success(result);
     }
@@ -209,6 +227,14 @@ public class KnowledgeDocumentController {
         if ("ARTICLE".equals(doc.getSourceType()) && doc.getSourceRef() != null) {
             ArticleDO article = articleMapper.selectById(Long.valueOf(doc.getSourceRef()));
             if (article != null) {
+                // 文章已转草稿/私有：清档而非重建，避免 PENDING 卡死 + 旧向量残留
+                if (!Integer.valueOf(1).equals(article.getPublished())
+                        || (article.getVisibility() != null && article.getVisibility() == 1)) {
+                    vectorStore.deleteByDocId(docId);
+                    chunkMapper.deleteByDocId(docId);
+                    docMapper.deleteById(docId);
+                    return Results.success();
+                }
                 docService.syncArticle(article, kbId);
             }
         }

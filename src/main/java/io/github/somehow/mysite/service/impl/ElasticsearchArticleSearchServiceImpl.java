@@ -204,6 +204,15 @@ public class ElasticsearchArticleSearchServiceImpl implements ArticleSearchServi
                     .collect(Collectors.toList());
         }
 
+        // 发布状态门（与 DatabaseArticleSearchServiceImpl 同规则，防 ES 启用后回归）
+        Integer publishedFilter = ArticleSearchService.resolvePublishedFilter(requestParam);
+        if (publishedFilter != null) {
+            final Integer pf = publishedFilter;
+            articles = articles.stream()
+                    .filter(a -> pf.equals(a.getPublished()))
+                    .collect(Collectors.toList());
+        }
+
         List<Long> authorIds = articles.stream()
                 .map(ArticleDO::getAuthorId)
                 .distinct()

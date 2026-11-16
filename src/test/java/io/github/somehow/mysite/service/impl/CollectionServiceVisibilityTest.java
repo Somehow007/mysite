@@ -56,6 +56,7 @@ class CollectionServiceVisibilityTest {
     private static final long AUTHOR_ID = 100L;
     private static final long PUBLIC_ARTICLE_ID = 10L;
     private static final long PRIVATE_ARTICLE_ID = 11L;
+    private static final long DRAFT_ARTICLE_ID = 12L;
 
     @Mock
     private CollectionMapper collectionMapper;
@@ -103,6 +104,19 @@ class CollectionServiceVisibilityTest {
     private ArticleDO privateArticle() {
         return ArticleDO.builder().id(PRIVATE_ARTICLE_ID).title("私有文章")
                 .authorId(AUTHOR_ID).published(1).visibility(1).build();
+    }
+
+    private ArticleDO draftArticle() {
+        return ArticleDO.builder().id(DRAFT_ARTICLE_ID).title("草稿文章")
+                .authorId(AUTHOR_ID).published(0).visibility(0).build();
+    }
+
+    private List<CollectionArticleDO> draftRelations() {
+        return List.of(
+                CollectionArticleDO.builder().id(1L).collectionId(COLLECTION_ID)
+                        .articleId(PUBLIC_ARTICLE_ID).sortOrder(0).build(),
+                CollectionArticleDO.builder().id(3L).collectionId(COLLECTION_ID)
+                        .articleId(DRAFT_ARTICLE_ID).sortOrder(1).build());
     }
 
     private UserDO author() {
@@ -165,6 +179,62 @@ class CollectionServiceVisibilityTest {
         when(articleMapper.selectList(any()))
                 .thenReturn(List.of(publicArticle(), privateArticle()))
                 .thenReturn(List.of(publicArticle(), privateArticle()));
+        when(userMapper.selectList(any())).thenReturn(List.of(author()));
+
+        CollectionDetailRespDTO detail = collectionService.getCollectionDetail(COLLECTION_ID, 1, 10);
+
+        assertEquals(2, detail.getArticles().size());
+        assertEquals(2, detail.getArticleCount());
+    }
+
+    @Test
+    @DisplayName("游客查看合集详情 - 草稿成员应被过滤（与文章详情 404 同口径）")
+    void guestShouldNotSeeDraftArticles() {
+        when(collectionMapper.selectOne(any())).thenReturn(collection());
+        when(userMapper.selectById(anyLong())).thenReturn(author());
+        when(collectionArticleMapper.selectList(any())).thenReturn(draftRelations());
+        when(articleMapper.selectList(any()))
+                .thenReturn(List.of(publicArticle(), draftArticle()))
+                .thenReturn(List.of(publicArticle()));
+        when(userMapper.selectList(any())).thenReturn(List.of(author()));
+
+        CollectionDetailRespDTO detail = collectionService.getCollectionDetail(COLLECTION_ID, 1, 10);
+
+        assertEquals(1, detail.getArticles().size());
+        assertEquals(PUBLIC_ARTICLE_ID, detail.getArticles().get(0).getId());
+        assertEquals(1, detail.getArticleCount());
+    }
+
+    @Test
+    @DisplayName("作者本人查看合集详情 - 草稿成员可见（特权口径）")
+    void authorShouldSeeOwnDraftArticles() {
+        loginAs(String.valueOf(AUTHOR_ID), UserRole.CREATOR);
+
+        when(collectionMapper.selectOne(any())).thenReturn(collection());
+        when(userMapper.selectById(anyLong())).thenReturn(author());
+        when(collectionArticleMapper.selectList(any())).thenReturn(draftRelations());
+        when(articleMapper.selectList(any()))
+                .thenReturn(List.of(publicArticle(), draftArticle()))
+                .thenReturn(List.of(publicArticle(), draftArticle()));
+        when(userMapper.selectList(any())).thenReturn(List.of(author()));
+
+        CollectionDetailRespDTO detail = collectionService.getCollectionDetail(COLLECTION_ID, 1, 10);
+
+        assertEquals(2, detail.getArticles().size());
+        assertEquals(2, detail.getArticleCount());
+    }
+
+    @Test
+    @DisplayName("管理员查看合集详情 - 草稿成员可见（特权口径）")
+    void adminShouldSeeDraftArticles() {
+        loginAs("1", UserRole.ADMIN);
+
+        when(collectionMapper.selectOne(any())).thenReturn(collection());
+        when(userMapper.selectById(anyLong())).thenReturn(author());
+        when(collectionArticleMapper.selectList(any())).thenReturn(draftRelations());
+        when(articleMapper.selectList(any()))
+                .thenReturn(List.of(publicArticle(), draftArticle()))
+                .thenReturn(List.of(publicArticle(), draftArticle()));
         when(userMapper.selectList(any())).thenReturn(List.of(author()));
 
         CollectionDetailRespDTO detail = collectionService.getCollectionDetail(COLLECTION_ID, 1, 10);

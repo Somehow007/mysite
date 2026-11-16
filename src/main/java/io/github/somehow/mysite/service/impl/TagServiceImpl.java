@@ -125,10 +125,14 @@ public class TagServiceImpl implements TagService {
         if (CollUtil.isEmpty(tagIds)) {
             return Map.of();
         }
+        // 只数公开可列出的文章（标签计数缓存跨用户共享）：published=1 且 visibility 公开/NULL
         List<Map<String, Object>> counts = articleTagMapper.selectMaps(
                 Wrappers.<ArticleTagDO>query()
                         .select("tag_id AS tagId", "COUNT(*) AS cnt")
                         .eq("del_flag", 0)
+                        .inSql("article_id",
+                                "SELECT id FROM t_article WHERE del_flag = 0 AND published = 1"
+                                        + " AND (visibility = 0 OR visibility IS NULL)")
                         .in("tag_id", tagIds)
                         .groupBy("tag_id"));
         return counts.stream().collect(Collectors.toMap(

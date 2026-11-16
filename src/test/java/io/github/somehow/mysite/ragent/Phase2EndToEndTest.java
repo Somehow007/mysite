@@ -74,6 +74,7 @@ class Phase2EndToEndTest {
 
             ArticleDO article = new ArticleDO();
             article.setId(100L);
+            article.setPublished(1);
             article.setTitle("Spring Security 实战");
             article.setContent("## JWT 过滤器\n\nJWT 认证主要通过 OncePerRequestFilter 实现...");
 
@@ -93,6 +94,7 @@ class Phase2EndToEndTest {
 
             ArticleDO article = new ArticleDO();
             article.setId(200L);
+            article.setPublished(1);
             article.setTitle("更新后的文章");
             article.setContent("更新后的内容...");
 
@@ -328,6 +330,7 @@ class Phase2EndToEndTest {
             // Step 1: 创建测试文章
             ArticleDO article = new ArticleDO();
             article.setId(10001L);
+            article.setPublished(1);
             article.setTitle("Spring Security JWT 认证配置指南");
             article.setContent("""
                 ## JWT 过滤器配置
@@ -445,6 +448,7 @@ class Phase2EndToEndTest {
 
             ArticleDO article = new ArticleDO();
             article.setId(20001L);
+            article.setPublished(1);
             article.setTitle("失败测试");
             article.setContent("这段内容的 embedding 会失败。");
 
@@ -466,6 +470,7 @@ class Phase2EndToEndTest {
         void duplicateSyncShouldBeIdempotent() {
             ArticleDO article = new ArticleDO();
             article.setId(30001L);
+            article.setPublished(1);
             article.setTitle("幂等测试");
             article.setContent("## 幂等性\n\n这段内容会被同步两次，不应产生重复数据。");
 

@@ -61,6 +61,12 @@ public class KnowledgeDocumentService {
      */
     @Async("ragAsyncExecutor")
     public void syncArticle(ArticleDO article) {
+        // 公开性门：草稿/私有文章不入库。取消发布或转私有时走 removeArticle 清掉已入库向量，
+        // 否则旧分块仍可经 AI 问答泄漏非公开内容。
+        if (!isPubliclySyncable(article)) {
+            removeArticle(article.getId());
+            return;
+        }
         List<KnowledgeBaseDO> enabledKbs = kbMapper.selectList(
             new LambdaQueryWrapper<KnowledgeBaseDO>()
                 .eq(KnowledgeBaseDO::getEnabled, true)
@@ -82,6 +88,12 @@ public class KnowledgeDocumentService {
      */
     @Async("ragAsyncExecutor")
     public void syncArticle(ArticleDO article, Long kbId) {
+        // 公开性门（与 1-arg 入口同规则）：草稿/私有文章不同步，防止经 KB 管理接口绕过
+        if (!isPubliclySyncable(article)) {
+            log.debug("跳过非公开文章同步: articleId={}, published={}, visibility={}",
+                article.getId(), article.getPublished(), article.getVisibility());
+            return;
+        }
         KnowledgeDocumentDO doc = null;
         UsageContext.open(UsageContext.State.builder()
             .traceId(UUID.randomUUID().toString())
@@ -191,6 +203,12 @@ public class KnowledgeDocumentService {
         } catch (Exception e) {
             log.error("清理文章 RAG 数据失败, articleId={}", articleId, e);
         }
+    }
+
+    /** 仅已发布且公开的文章允许进入知识库（草稿/私有内容对聊天用户不可见） */
+    private boolean isPubliclySyncable(ArticleDO article) {
+        return Integer.valueOf(1).equals(article.getPublished())
+            && (article.getVisibility() == null || article.getVisibility() == 0);
     }
 
     /** 入库向量必须标运行时模型名，否则改模型后检索会拿新旧向量交叉比较。 */

@@ -2,6 +2,9 @@ package io.github.somehow.mysite.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import io.github.somehow.mysite.commons.context.UserContext;
+import io.github.somehow.mysite.commons.context.UserInfoDTO;
+import io.github.somehow.mysite.commons.enums.UserRole;
 import io.github.somehow.mysite.config.ElasticsearchProperties;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
 import io.github.somehow.mysite.dao.entity.UserDO;
@@ -15,7 +18,9 @@ import io.github.somehow.mysite.dao.mapper.UserFavoriteArticleMapper;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
 import io.github.somehow.mysite.dto.req.article.ArticlePageQueryReqDTO;
 import io.github.somehow.mysite.dto.resp.ArticlePageQueryRespDTO;
+import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.utils.ReadingTimeCalculator;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,6 +78,15 @@ class DatabaseArticleSearchServiceImplTest {
         requestParam = new ArticlePageQueryReqDTO();
         requestParam.setCurrent(1L);
         requestParam.setSize(10L);
+    }
+
+    @AfterEach
+    void tearDown() {
+        UserContext.removeUser();
+    }
+
+    private void loginAs(UserRole role) {
+        UserContext.setUser(UserInfoDTO.builder().userId("1").role(role).build());
     }
 
     private ArticleDO createArticleDO(Long id, String content, Integer readingTime) {
@@ -214,5 +228,52 @@ class DatabaseArticleSearchServiceImplTest {
         IPage<ArticlePageQueryRespDTO> result = searchService.searchArticles(requestParam);
 
         assertEquals(expectedTime, result.getRecords().get(0).getReadingTime());
+    }
+
+    // ==================== published 过滤门（草稿泄漏修复） ====================
+
+    @Test
+    @DisplayName("匿名搜索：published 参数被忽略，恒过滤已发布")
+    void publishedFilter_anonymous_ignoresParam() {
+        UserContext.removeUser();
+        requestParam.setPublished(0);
+        requestParam.setIncludeDraft(true);
+
+        assertEquals(1, ArticleSearchService.resolvePublishedFilter(requestParam));
+    }
+
+    @Test
+    @DisplayName("普通用户搜索：published=0 也拉不到草稿")
+    void publishedFilter_user_ignoresParam() {
+        loginAs(UserRole.USER);
+        requestParam.setPublished(0);
+
+        assertEquals(1, ArticleSearchService.resolvePublishedFilter(requestParam));
+    }
+
+    @Test
+    @DisplayName("管理员显式 published=0 → 按草稿过滤（管理视图）")
+    void publishedFilter_admin_explicitDraft() {
+        loginAs(UserRole.ADMIN);
+        requestParam.setPublished(0);
+
+        assertEquals(0, ArticleSearchService.resolvePublishedFilter(requestParam));
+    }
+
+    @Test
+    @DisplayName("CREATOR + includeDraft → 不过滤（查全量含草稿）")
+    void publishedFilter_creator_includeDraft() {
+        loginAs(UserRole.CREATOR);
+        requestParam.setIncludeDraft(true);
+
+        assertNull(ArticleSearchService.resolvePublishedFilter(requestParam));
+    }
+
+    @Test
+    @DisplayName("管理员不带参数 → 默认仍只看已发布")
+    void publishedFilter_admin_defaultPublished() {
+        loginAs(UserRole.ADMIN);
+
+        assertEquals(1, ArticleSearchService.resolvePublishedFilter(requestParam));
     }
 }

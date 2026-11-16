@@ -280,6 +280,7 @@ class Phase3IntegrationTest {
             // Step 1: 灌入文章
             ArticleDO article = new ArticleDO();
             article.setId(90001L);
+            article.setPublished(1);
             article.setTitle("Spring Security JWT 认证配置指南");
             article.setContent("""
                 ## JWT 过滤器配置
@@ -388,6 +389,7 @@ class Phase3IntegrationTest {
             // 灌入主题 A: JWT
             ArticleDO jwtArticle = new ArticleDO();
             jwtArticle.setId(90002L);
+            jwtArticle.setPublished(1);
             jwtArticle.setTitle("Spring Security JWT 认证配置指南");
             jwtArticle.setContent("""
                 ## JWT 过滤器
@@ -401,6 +403,7 @@ class Phase3IntegrationTest {
             // 灌入主题 B: Redis
             ArticleDO redisArticle = new ArticleDO();
             redisArticle.setId(90003L);
+            redisArticle.setPublished(1);
             redisArticle.setTitle("Redis 缓存最佳实践");
             redisArticle.setContent("""
                 ## 缓存策略
@@ -454,6 +457,7 @@ class Phase3IntegrationTest {
         void seedTestArticle() {
             ArticleDO article = new ArticleDO();
             article.setId(91001L);
+            article.setPublished(1);
             article.setTitle("Spring Security JWT 认证配置指南");
             article.setContent("""
                 ## JWT 过滤器配置
@@ -679,6 +683,7 @@ class Phase3IntegrationTest {
         private void seedCorpus() {
             ArticleDO jwt = new ArticleDO();
             jwt.setId(93001L);
+            jwt.setPublished(1);
             jwt.setTitle("Spring Security JWT 认证配置指南");
             jwt.setContent("""
                 ## JWT 过滤器配置
@@ -722,6 +727,7 @@ class Phase3IntegrationTest {
 
             ArticleDO redis = new ArticleDO();
             redis.setId(93002L);
+            redis.setPublished(1);
             redis.setTitle("Redis 缓存最佳实践");
             redis.setContent("""
                 ## 缓存策略
@@ -759,6 +765,7 @@ class Phase3IntegrationTest {
 
             ArticleDO mysql = new ArticleDO();
             mysql.setId(93003L);
+            mysql.setPublished(1);
             mysql.setTitle("MySQL 索引优化实战");
             mysql.setContent("""
                 ## 索引基础
@@ -795,6 +802,7 @@ class Phase3IntegrationTest {
 
             ArticleDO tx = new ArticleDO();
             tx.setId(93004L);
+            tx.setPublished(1);
             tx.setTitle("Spring 事务传播机制详解");
             tx.setContent("""
                 ## 七种传播行为
@@ -812,6 +820,7 @@ class Phase3IntegrationTest {
 
             ArticleDO docker = new ArticleDO();
             docker.setId(93005L);
+            docker.setPublished(1);
             docker.setTitle("Docker Compose 多服务编排实践");
             docker.setContent("""
                 ## 服务依赖与健康检查
@@ -828,6 +837,7 @@ class Phase3IntegrationTest {
 
             ArticleDO vue = new ArticleDO();
             vue.setId(93006L);
+            vue.setPublished(1);
             vue.setTitle("Vue 3 组合式 API 设计模式");
             vue.setContent("""
                 ## Composable 的抽象原则
@@ -844,6 +854,7 @@ class Phase3IntegrationTest {
 
             ArticleDO nginx = new ArticleDO();
             nginx.setId(93007L);
+            nginx.setPublished(1);
             nginx.setTitle("Nginx 反向代理与缓存配置");
             nginx.setContent("""
                 ## 反向代理基础
@@ -959,6 +970,7 @@ class Phase3IntegrationTest {
         private void seedJwtFamily() {
             ArticleDO filter = new ArticleDO();
             filter.setId(94001L);
+            filter.setPublished(1);
             filter.setTitle("Spring Security JWT 过滤器配置指南");
             filter.setContent("""
                 ## JWT 过滤器配置
@@ -976,6 +988,7 @@ class Phase3IntegrationTest {
 
             ArticleDO refresh = new ArticleDO();
             refresh.setId(94002L);
+            refresh.setPublished(1);
             refresh.setTitle("JWT 双令牌刷新机制实现");
             refresh.setContent("""
                 ## 双令牌设计
@@ -991,6 +1004,7 @@ class Phase3IntegrationTest {
 
             ArticleDO validate = new ArticleDO();
             validate.setId(94003L);
+            validate.setPublished(1);
             validate.setTitle("JWT 令牌校验与异常处理");
             validate.setContent("""
                 ## 令牌校验流程
@@ -1007,6 +1021,7 @@ class Phase3IntegrationTest {
 
             ArticleDO distractor = new ArticleDO();
             distractor.setId(94004L);
+            distractor.setPublished(1);
             distractor.setTitle("Redis 缓存最佳实践");
             distractor.setContent("""
                 ## 缓存策略

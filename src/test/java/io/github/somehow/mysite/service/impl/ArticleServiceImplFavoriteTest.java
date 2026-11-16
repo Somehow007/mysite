@@ -78,6 +78,7 @@ class ArticleServiceImplFavoriteTest {
         articleDO = new ArticleDO();
         articleDO.setId(ARTICLE_ID);
         articleDO.setFavoriteCount(5);
+        articleDO.setPublished(1);
         articleDO.setDelFlag(0);
     }
 

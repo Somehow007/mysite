@@ -113,6 +113,7 @@ class KnowledgeDocumentServiceTest {
 
             ArticleDO article = new ArticleDO();
             article.setId(110L);
+            article.setPublished(1);
             article.setTitle("向量模型对齐");
             article.setContent("## 模型\n\n查询向量与库存向量必须同一模型。");
             when(docMapper.findBySourceRef(1L, "ARTICLE", "110")).thenReturn(null);
@@ -133,6 +134,7 @@ class KnowledgeDocumentServiceTest {
         void newArticleShouldCompleteFullPipeline() {
             ArticleDO article = new ArticleDO();
             article.setId(100L);
+            article.setPublished(1);
             article.setTitle("Spring Security 实战");
             article.setContent("## JWT 过滤器\n\nSpring Security 中 JWT 认证主要通过 OncePerRequestFilter 实现。\n\n" +
                 "### 配置步骤\n\n1. 创建 JwtAuthenticationFilter\n2. 注册到 SecurityFilterChain\n3. 配置 permitAll");
@@ -158,6 +160,7 @@ class KnowledgeDocumentServiceTest {
         void shouldRemoveOldBeforeNew() {
             ArticleDO article = new ArticleDO();
             article.setId(300L);
+            article.setPublished(1);
             article.setTitle("更新后的标题");
             article.setContent("## 更新后的内容\n\n这是更新后的文章正文。");
 
@@ -191,6 +194,7 @@ class KnowledgeDocumentServiceTest {
 
             ArticleDO article = new ArticleDO();
             article.setId(400L);
+            article.setPublished(1);
             article.setTitle("会失败的文章");
             article.setContent("## 测试\n\n这段内容会因为 embedding 失败而标记为 FAILED。");
 
@@ -214,6 +218,7 @@ class KnowledgeDocumentServiceTest {
 
             ArticleDO article = new ArticleDO();
             article.setId(500L);
+            article.setPublished(1);
             article.setTitle("失败2");
             article.setContent("内容");
 
@@ -285,6 +290,7 @@ class KnowledgeDocumentServiceTest {
 
         ArticleDO article = new ArticleDO();
         article.setId(600L);
+        article.setPublished(1);
         article.setTitle("第一篇");
         article.setContent("内容");
 
@@ -293,5 +299,63 @@ class KnowledgeDocumentServiceTest {
         verify(kbMapper, never()).insert(any(KnowledgeBaseDO.class));
         verify(docMapper, never()).insert(any(KnowledgeDocumentDO.class));
         verify(embeddingService, never()).embedBatch(anyList());
+    }
+
+    @Nested
+    @DisplayName("公开性门：草稿/私有文章不入库")
+    class PublicGate {
+
+        @Test
+        @DisplayName("草稿文章 → 不同步，且清掉知识库里已入库的旧索引")
+        void draftArticleShouldSkipAndRemoveStale() {
+            ArticleDO draft = new ArticleDO();
+            draft.setId(700L);
+            draft.setPublished(0);
+            draft.setTitle("草稿");
+            draft.setContent("未发布内容");
+
+            KnowledgeDocumentDO stale = new KnowledgeDocumentDO();
+            stale.setId(9001L);
+            stale.setKbId(1L);
+            when(docMapper.findBySource("ARTICLE", "700")).thenReturn(List.of(stale));
+
+            service.syncArticle(draft);
+
+            verify(docMapper, never()).insert(any(KnowledgeDocumentDO.class));
+            verify(embeddingService, never()).embedBatch(anyList());
+            verify(vectorStore).deleteByDocId(9001L);
+            verify(docMapper).deleteById(9001L);
+        }
+
+        @Test
+        @DisplayName("私有文章（visibility=1）→ 同样跳过")
+        void privateArticleShouldSkip() {
+            ArticleDO priv = new ArticleDO();
+            priv.setId(702L);
+            priv.setPublished(1);
+            priv.setVisibility(1);
+            priv.setTitle("私有");
+            priv.setContent("内容");
+
+            service.syncArticle(priv);
+
+            verify(docMapper, never()).insert(any(KnowledgeDocumentDO.class));
+            verify(embeddingService, never()).embedBatch(anyList());
+        }
+
+        @Test
+        @DisplayName("显式指定知识库同步草稿 → 直接跳过，不触发入库")
+        void draftArticleToSpecificKbShouldSkip() {
+            ArticleDO draft = new ArticleDO();
+            draft.setId(701L);
+            draft.setPublished(0);
+            draft.setTitle("草稿");
+            draft.setContent("内容");
+
+            service.syncArticle(draft, 1L);
+
+            verify(docMapper, never()).insert(any(KnowledgeDocumentDO.class));
+            verify(embeddingService, never()).embedBatch(anyList());
+        }
     }
 }
