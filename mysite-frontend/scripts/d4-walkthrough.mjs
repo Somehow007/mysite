@@ -242,7 +242,7 @@ console.log('== §2 结构断言（paper-light 桌面）==')
 
   // AI 管理：切三个页签，根子节点间距保持 20
   await gotoDash(page, '/ai')
-  for (const [label, expectKids] of [['消费看板', null], ['模型与 API', null]]) {
+  for (const label of ['消费看板', '模型与 API']) {
     await page.click(`text=${label}`)
     await page.waitForTimeout(1200)
     const m = await measurePage(page)
@@ -252,7 +252,6 @@ console.log('== §2 结构断言（paper-light 桌面）==')
   }
 
   // 知识库选中详情面板：面板与上方网格间距 20（有 KB 数据才验）
-  const kbCards = await page.evaluate(() => document.querySelectorAll('main .dash-hoverable').length)
   await gotoDash(page, '/knowledge')
   const kbBtn = page.locator('main .dash-hoverable').first()
   if (await kbBtn.count() > 0) {

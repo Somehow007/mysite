@@ -25,7 +25,6 @@ if (!res?.data?.accessToken) {
 }
 const { accessToken, refreshToken, role } = res.data
 
-const P = 'html.dash-mode[data-theme^="paper"]'
 let pass = 0, fail = 0
 const ck = (name, cond, extra = '') => {
   if (cond) { pass++; console.log(`  PASS ${name}`) }
@@ -46,7 +45,6 @@ async function newPage(theme, vp = { width: 1440, height: 900 }) {
   page.on('pageerror', e => { fail++; console.log(`  PAGEERROR ${e.message}`) })
   return { ctx, page }
 }
-const css = (sel, prop) => `(() => { const e = document.querySelector(${JSON.stringify(sel)}); return e ? getComputedStyle(e)[${JSON.stringify(prop)}] : null })()`
 const hasCls = (cls) => `document.documentElement.classList.contains('${cls}')`
 const INK_LIGHT = 'rgb(29, 26, 22)'   // paper-light --border-strong
 const INK_DARK = 'rgb(236, 228, 214)' // paper-dark --border-strong
