@@ -48,7 +48,7 @@ async function newPage(theme, vp = { width: 1440, height: 900 }) {
 const hasCls = (cls) => `document.documentElement.classList.contains('${cls}')`
 const INK_LIGHT = 'rgb(29, 26, 22)'   // paper-light --border-strong
 const INK_DARK = 'rgb(236, 228, 214)' // paper-dark --border-strong
-const ACCENT_L = 'rgb(180, 68, 31)'   // paper-light --accent
+const ACCENT_L = 'rgb(163, 62, 28)'   // paper-light --accent
 const FOCUS_WAIT = 350                // transition-colors ~150-200ms，聚焦断言前等动画收尾
 
 // ═══ 1. dash-mode 生命周期 ═══

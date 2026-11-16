@@ -102,7 +102,7 @@ if (!target) {
     ok('目录副标已读%', /\d+%/.test(await btns.nth(0).innerText()))
     ok('问这篇 accent 格', await page.locator('.post-dock-ask', { hasText: '✦ 问这篇' }).count() === 1)
     const askBg = await page.locator('.post-dock-ask').evaluate(el => getComputedStyle(el).backgroundColor)
-    ok('问这篇 accent 底', askBg === 'rgb(180, 68, 31)', askBg) // paper-light --accent #B4441F
+    ok('问这篇 accent 底', askBg === 'rgb(163, 62, 28)', askBg) // paper-light --accent #A33E1C
     ok('收藏格计数', /\d+/.test(await btns.nth(2).innerText()))
 
     // dock 位置：底部固定、左右留白

@@ -122,7 +122,7 @@ console.log('== A. 桌面 1440 paper-light ==')
   const cite = page.locator('sup.chat-cite')
   ok('chat-cite 角标×2', await cite.count() === 2, `count=${await cite.count()}`)
   const citeColor = await cite.first().evaluate(el => getComputedStyle(el).color)
-  ok('角标 accent 色', citeColor === 'rgb(180, 68, 31)', citeColor)
+  ok('角标 accent 色', citeColor === 'rgb(163, 62, 28)', citeColor)
 
   // 出处卡：第一张可点跳 /post/，第二张静态
   const cards = page.locator('.chat-source-card')

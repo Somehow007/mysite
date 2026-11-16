@@ -100,7 +100,7 @@ export const THEME_REGISTRY: ThemeMeta[] = [
     icon: 'book-open',
     hasDarkVariant: true,
     darkVariant: 'paper-dark',
-    preview: { bg: '#F6F1E7', accent: '#B4441F' },
+    preview: { bg: '#F6F1E7', accent: '#A33E1C' },
   },
   {
     id: 'paper-dark',
