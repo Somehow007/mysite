@@ -416,7 +416,7 @@ function handleUserReset() {
 
     <Teleport to="body">
       <div v-if="showLogs" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="closeLogs">
-        <div class="card-solid p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto animate-scale-in">
+        <div class="modal-panel card-solid p-6 w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto animate-scale-in">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-text-primary">
               操作日志

@@ -228,3 +228,17 @@ html.dash-mode[data-theme^="paper"] a:focus-visible {
 - classic-light 对比：相对 **D1 产物**（`dash-shots-D1/`，相对 pre-D1 基线含 D1 既定改动）17/22 张字节级 IDENTICAL；5 张差异经像素级定位均为数据/时间漂移（文章列表相对时间列、图片页噪点），与样式无关——paper-dashboard.css 全部规则以 `[data-theme^="paper"]` 门控，classic-light 下 computed 验证 `border-radius:14px`、柔影、无衬线标题全部保持原样。
 - 前台回归：`ui-shots.mjs` 跑通 `OK: no horizontal overflow`；前台页 `dash-mode=false`（home/404/未登录跳转均验），且前台不消费任何被改组件——ui-shots 与 T1 旧基线的差异为期间其他任务（T14–T18 等）的既定改动 + 首篇文章 id 变化，非本任务引入。
 - paper 交互断言（Playwright computed-style，paper-light 实测）：表头 th 墨线下边 `1px rgb(29,26,22)`+透明底、卡片 `radius:0/shadow:none`、页标题 Noto Serif SC/900、徽标方角、侧栏激活 `bg:transparent/color:ink/weight:600`、筛选控件聚焦 `border-strong` 无光环、Modal `6px` 硬阴影无模糊、角色下拉 `4px 4px 0` 硬阴影、移动抽屉方角无模糊墨线右边、KB/图片卡 hover `3px 3px 0` 硬阴影 `transform:none`、Tab 焦点 `2px solid var(--accent)`——全 PASS。paper-dark computed 抽查同绿。
+
+## 走查复核（2026-11-16）
+
+**工具**：`scripts/d2-walkthrough.mjs`（Playwright DOM 级断言 59 项）：dash-mode 生命周期 3 项、hook class 存在性 7 项、paper-light computed 17 项、插槽控件 2 项、浮层 3 项、编辑器/Toast 3 项、hoverable/选中态 3 项、移动端 4 项、焦点可见 3 项、classic-light 8 项、paper-dark 4 项、侧栏折叠 3 项 → **59/59 PASS**。
+
+**发现并修补（PRD 初稿 hook 清单未覆盖的手搓控件/浮层，只加 class 不改样式类）**：
+- `DashboardView` 文章管理插槽 3 个 select、`ImageManagerView` 来源/使用状态 2 个 select、`KnowledgeManageView` 文档搜索与可入库文章搜索 2 个 input、`AiManageView` 成功状态 select —— 补 `dash-field`（聚焦墨线、纸面底）。
+- `PostEditorView` 合集下拉面板、`AiManageView` 图表 tooltip、`ToastContainer` toast 面板 —— 补 `ui-dropdown-panel`（墨线 + 4px 硬阴影、去模糊）。
+- `UserManageView` 手搓操作日志弹层 —— 补 `modal-panel`（墨线 + 6px 硬阴影）。
+- 复核确认其余后台弹层全部走 `<Modal>` 组件（`.modal-panel` 自带），无遗漏。
+
+**踩坑**：控件带 `transition-colors`（border-color ~150–200ms 过渡），聚焦后立即读 computed 会采到中间帧色值（如 `rgb(30,27,23)`、首轮甚至起点 `rgb(217,207,189)`），断言前须等 ≥300ms——不是样式缺陷，走查脚本已修正。
+
+**复验**：`npm run type-check` / `npm run build` 绿；Toast 断言用标签页空名前端校验零副作用触发；合集下拉需先点「文章信息」展开 meta 面板（`v-show`）。

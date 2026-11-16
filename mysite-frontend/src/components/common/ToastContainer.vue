@@ -82,7 +82,7 @@ function onMove(el: Element) {
         <div
           v-for="toast in toasts"
           :key="toast.id"
-          class="pointer-events-auto flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-bg-elevated border border-border shadow-lg"
+          class="ui-dropdown-panel pointer-events-auto flex items-start gap-2.5 px-3.5 py-3 rounded-lg bg-bg-elevated border border-border shadow-lg"
           role="status"
         >
           <span

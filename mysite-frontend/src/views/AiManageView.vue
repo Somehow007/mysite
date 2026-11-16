@@ -536,7 +536,7 @@ onBeforeUnmount(() => {
       >
         <select
           v-model="successFilter"
-          class="px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
+          class="dash-field px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
         >
           <option value="">全部状态</option>
           <option value="true">成功</option>
@@ -951,7 +951,7 @@ onBeforeUnmount(() => {
     <Teleport to="body">
       <div
         v-if="dashTip"
-        class="fixed z-[80] pointer-events-none min-w-[176px] max-w-[240px] rounded-xl border border-border bg-bg-elevated/95 px-3 py-2.5 shadow-lg backdrop-blur-sm"
+        class="ui-dropdown-panel fixed z-[80] pointer-events-none min-w-[176px] max-w-[240px] rounded-xl border border-border bg-bg-elevated/95 px-3 py-2.5 shadow-lg backdrop-blur-sm"
         :style="{ left: dashTip.x + 'px', top: dashTip.y + 'px' }"
       >
           <div class="flex items-center gap-2 mb-2">

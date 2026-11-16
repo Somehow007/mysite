@@ -299,14 +299,14 @@ onMounted(() => {
     >
       <select
         v-model="sourceType"
-        class="px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+        class="dash-field px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
         @change="handleSourceTypeChange"
       >
         <option v-for="opt in imageFilterOptions" :key="String(opt.value)" :value="opt.value">{{ opt.label }}</option>
       </select>
       <select
         v-model="usageStatus"
-        class="px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+        class="dash-field px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
         @change="handleUsageStatusChange"
       >
         <option v-for="opt in usageFilterOptions" :key="String(opt.value)" :value="opt.value">{{ opt.label }}</option>

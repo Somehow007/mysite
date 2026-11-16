@@ -411,14 +411,14 @@ onMounted(() => {
       @search="handleSearch"
       @reset="handleReset"
     >
-      <select v-model="searchType" class="px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary cursor-pointer focus:outline-none focus:border-accent transition-colors" @change="handleSearch">
+      <select v-model="searchType" class="dash-field px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary cursor-pointer focus:outline-none focus:border-accent transition-colors" @change="handleSearch">
         <option v-for="opt in searchTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
       </select>
-      <select v-if="categories.length > 0" v-model="categoryFilter" class="px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary cursor-pointer focus:outline-none focus:border-accent transition-colors" @change="handleSearch">
+      <select v-if="categories.length > 0" v-model="categoryFilter" class="dash-field px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary cursor-pointer focus:outline-none focus:border-accent transition-colors" @change="handleSearch">
         <option value="">全部分类</option>
         <option v-for="cat in categories" :key="cat.id" :value="cat.slug">{{ cat.name }}</option>
       </select>
-      <select v-if="collections.length > 0" v-model="collectionFilter" class="px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary cursor-pointer focus:outline-none focus:border-accent transition-colors" @change="handleSearch">
+      <select v-if="collections.length > 0" v-model="collectionFilter" class="dash-field px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary cursor-pointer focus:outline-none focus:border-accent transition-colors" @change="handleSearch">
         <option value="">全部合集</option>
         <option v-for="col in collections" :key="col.id" :value="col.id">{{ col.title }}</option>
       </select>

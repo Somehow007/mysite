@@ -653,7 +653,7 @@ watch(selectedKbId, () => {
               <Search :size="14" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 v-model="docSearch" type="text" placeholder="搜索文档标题..." @input="onDocSearchInput"
-                class="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-bg-primary text-sm text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 transition-shadow"
+                class="dash-field w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-bg-primary text-sm text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 transition-shadow"
               />
             </div>
             <div class="flex items-center gap-1.5">
@@ -804,7 +804,7 @@ watch(selectedKbId, () => {
               <Search :size="14" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 v-model="availSearch" type="text" placeholder="搜索文章标题..."
-                class="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-bg-primary text-sm text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 transition-shadow"
+                class="dash-field w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-bg-primary text-sm text-text-primary placeholder:text-text-muted/60 focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent/40 transition-shadow"
               />
             </div>
             <button

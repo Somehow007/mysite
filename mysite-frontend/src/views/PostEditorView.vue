@@ -938,7 +938,7 @@ function removeCover() {
               >
                 <div
                   v-if="collectionDropdownOpen"
-                  class="absolute z-30 left-0 right-0 mt-1 rounded-lg border border-border bg-bg-elevated shadow-lg overflow-hidden max-h-60 overflow-y-auto scrollbar-thin"
+                  class="ui-dropdown-panel absolute z-30 left-0 right-0 mt-1 rounded-lg border border-border bg-bg-elevated shadow-lg overflow-hidden max-h-60 overflow-y-auto scrollbar-thin"
                 >
                   <button
                     type="button"
