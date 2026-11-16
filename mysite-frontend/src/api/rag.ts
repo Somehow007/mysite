@@ -225,12 +225,13 @@ export async function getConversations(visitorId: string): Promise<ConversationS
   return res.json()
 }
 
-/** 获取指定对话的历史消息 */
-export async function getConversationMessages(convId: string): Promise<ConversationMessage[]> {
+/** 获取指定对话的历史消息（visitorId 归属校验，不匹配返回空） */
+export async function getConversationMessages(convId: string, visitorId: string): Promise<ConversationMessage[]> {
+  const params = new URLSearchParams({ visitorId })
   const token = readAuthToken()
   const headers: Record<string, string> = {}
   if (token) headers['Authorization'] = `Bearer ${token}`
-  const res = await fetch(`/v1/rag/conversations/${convId}/messages`, { headers })
+  const res = await fetch(`/v1/rag/conversations/${convId}/messages?${params}`, { headers })
   if (!res.ok) throw new Error(`获取对话消息失败 (HTTP ${res.status})`)
   return res.json()
 }

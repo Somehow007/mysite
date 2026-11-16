@@ -134,16 +134,15 @@ public class RagChatController {
     /**
      * 获取对话历史列表（会话摘要）。
      * 用于前端展示历史对话侧栏，用户可切换或新建对话。
+     * 归属凭证是 visitorId（浏览器 UUID）；user_id 列预留未启用，不接受 userId 参数——
+     * 请求参数可伪造任意用户 ID，属于已堵死的安全洞。
      */
     @GetMapping("/conversations")
     public List<Map<String, Object>> listConversations(
-            @RequestParam(value = "visitorId", required = false) String visitorId,
-            @RequestParam(value = "userId", required = false) Long userId) {
+            @RequestParam(value = "visitorId", required = false) String visitorId) {
 
         List<ConversationDO> conversations;
-        if (userId != null) {
-            conversations = conversationMapper.selectByUserId(userId);
-        } else if (visitorId != null && !visitorId.isBlank()) {
+        if (visitorId != null && !visitorId.isBlank()) {
             conversations = conversationMapper.selectByVisitorId(visitorId);
         } else {
             return List.of();
@@ -165,9 +164,18 @@ public class RagChatController {
     /**
      * 获取指定会话的历史消息。
      * 前端切换/恢复历史对话时调用，将消息渲染到聊天面板中。
+     * 归属校验：visitorId 必须与会话归属一致，否则返回空（不泄露会话是否存在）。
      */
     @GetMapping("/conversations/{id}/messages")
-    public List<Map<String, Object>> getMessages(@PathVariable Long id) {
+    public List<Map<String, Object>> getMessages(
+            @PathVariable Long id,
+            @RequestParam(value = "visitorId", required = false) String visitorId) {
+        ConversationDO conv = conversationMapper.selectById(id);
+        // visitorId 必须非空且一致：visitor_id 列可空，双方都为 null 时不能视为归属匹配
+        if (conv == null || visitorId == null || visitorId.isBlank()
+                || !Objects.equals(conv.getVisitorId(), visitorId)) {
+            return List.of();
+        }
         List<ChatMessage> messages = conversationManager.loadHistory(id);
         List<Map<String, Object>> result = new ArrayList<>();
         for (ChatMessage msg : messages) {

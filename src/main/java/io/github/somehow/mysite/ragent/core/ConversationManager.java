@@ -74,8 +74,10 @@ public class ConversationManager {
         if (conversationId != null) {
             ConversationDO existing = conversationMapper.selectById(conversationId);
             // 防 IDOR：会话必须属于这个 visitor，否则视为新会话
-            // （user_id 列预留未启用，当前所有会话均以 visitor_id 归属）
-            if (existing != null && Objects.equals(existing.getVisitorId(), visitorId)) {
+            // （user_id 列预留未启用，当前所有会话均以 visitor_id 归属；
+            //   visitor_id 可空，双方都为 null 时不能视为归属匹配）
+            if (existing != null && visitorId != null && !visitorId.isBlank()
+                    && Objects.equals(existing.getVisitorId(), visitorId)) {
                 return existing;
             }
         }

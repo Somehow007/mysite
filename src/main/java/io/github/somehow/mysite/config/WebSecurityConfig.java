@@ -95,7 +95,7 @@ public class WebSecurityConfig {
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/v1/rag/knowledge-bases",
-                                "/v1/rag/knowledge-bases/{id}"
+                                "/v1/rag/knowledge-bases/*"
                         ).permitAll()
                         // RAG 知识库管理：仅 ADMIN
                         .requestMatchers(

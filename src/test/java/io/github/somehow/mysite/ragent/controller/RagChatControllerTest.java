@@ -230,31 +230,10 @@ class RagChatControllerTest {
     // ─────────────────────── 会话历史端点 ───────────────────────
 
     @Test
-    void listConversations_userId_shouldQueryByUserId() {
-        ConversationDO conv = new ConversationDO();
-        conv.setId(7L);
-        conv.setTitle("标题");
-        conv.setMessageCount(3);
-        conv.setCreateTime(LocalDateTime.of(2026, 1, 1, 10, 0));
-        conv.setUpdateTime(LocalDateTime.of(2026, 1, 2, 10, 0));
-        when(conversationMapper.selectByUserId(42L)).thenReturn(List.of(conv));
-
-        List<?> result = controller.listConversations(null, 42L);
-
-        assertEquals(1, result.size());
-        @SuppressWarnings("unchecked")
-        var item = (java.util.Map<String, Object>) result.get(0);
-        assertEquals("7", item.get("id"));   // Snowflake ID 序列化为 string
-        assertEquals("标题", item.get("title"));
-        assertEquals(3, item.get("messageCount"));
-        verify(conversationMapper, never()).selectByVisitorId(any());
-    }
-
-    @Test
     void listConversations_visitorId_shouldQueryByVisitor() {
         when(conversationMapper.selectByVisitorId("v-1")).thenReturn(List.of());
 
-        List<?> result = controller.listConversations("v-1", null);
+        List<?> result = controller.listConversations("v-1");
 
         assertTrue(result.isEmpty());
         verify(conversationMapper).selectByVisitorId("v-1");
@@ -262,19 +241,23 @@ class RagChatControllerTest {
     }
 
     @Test
-    void listConversations_neitherParam_shouldReturnEmpty() {
-        List<?> result = controller.listConversations(null, null);
+    void listConversations_noVisitorId_shouldReturnEmpty() {
+        List<?> result = controller.listConversations(null);
         assertTrue(result.isEmpty());
         verifyNoInteractions(conversationMapper);
     }
 
     @Test
-    void getMessages_shouldMapRoleAndContent() {
+    void getMessages_matchingVisitor_shouldMapRoleAndContent() {
+        ConversationDO conv = new ConversationDO();
+        conv.setId(9L);
+        conv.setVisitorId("v-1");
+        when(conversationMapper.selectById(9L)).thenReturn(conv);
         when(conversationManager.loadHistory(9L)).thenReturn(List.of(
                 ChatMessage.user("问题"),
                 ChatMessage.assistant("回答")));
 
-        List<?> result = controller.getMessages(9L);
+        List<?> result = controller.getMessages(9L, "v-1");
 
         assertEquals(2, result.size());
         @SuppressWarnings("unchecked")
@@ -284,5 +267,37 @@ class RagChatControllerTest {
         @SuppressWarnings("unchecked")
         var second = (java.util.Map<String, Object>) result.get(1);
         assertEquals("assistant", second.get("role"));
+    }
+
+    @Test
+    void getMessages_wrongVisitor_shouldReturnEmpty() {
+        ConversationDO conv = new ConversationDO();
+        conv.setId(9L);
+        conv.setVisitorId("v-1");
+        when(conversationMapper.selectById(9L)).thenReturn(conv);
+
+        List<?> result = controller.getMessages(9L, "v-2");
+
+        assertTrue(result.isEmpty());
+        verify(conversationManager, never()).loadHistory(any());
+    }
+
+    @Test
+    void getMessages_missingVisitor_shouldReturnEmpty() {
+        ConversationDO conv = new ConversationDO();
+        conv.setId(9L);
+        conv.setVisitorId("v-1");
+        when(conversationMapper.selectById(9L)).thenReturn(conv);
+
+        assertTrue(controller.getMessages(9L, null).isEmpty());
+        verify(conversationManager, never()).loadHistory(any());
+    }
+
+    @Test
+    void getMessages_unknownConversation_shouldReturnEmpty() {
+        when(conversationMapper.selectById(9L)).thenReturn(null);
+
+        assertTrue(controller.getMessages(9L, "v-1").isEmpty());
+        verify(conversationManager, never()).loadHistory(any());
     }
 }

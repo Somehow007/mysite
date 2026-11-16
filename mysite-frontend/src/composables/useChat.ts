@@ -10,7 +10,7 @@
 
 import { ref, computed } from 'vue'
 import {
-  createChatStream, ChatStreamError,
+  createChatStream, ChatStreamError, getVisitorId,
   getConversations, getConversationMessages,
   type ChatStreamErrorKind,
   type ConversationSummary,
@@ -185,7 +185,7 @@ export function useChat() {
     cancelGeneration()
     loadingHistory.value = true
     try {
-      const history = await getConversationMessages(convId)
+      const history = await getConversationMessages(convId, getVisitorId())
       messages.value = history.map(msg => ({
         id: nextMessageId++,
         role: msg.role === 'USER' ? 'user' : 'assistant',
