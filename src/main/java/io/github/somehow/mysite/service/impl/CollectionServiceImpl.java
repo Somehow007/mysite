@@ -212,21 +212,24 @@ public class CollectionServiceImpl extends ServiceImpl<CollectionMapper, Collect
                     .map(CollectionArticleDO::getArticleId)
                     .collect(Collectors.toList());
 
+            // 存在性过滤：剔除指向已删/不存在文章的成员行，对管理员同样生效
+            // （详情 articleCount 与分页总数必须与下列条目同口径，不能用存储计数列——会漂移）
+            List<ArticleDO> existing = articleMapper.selectList(Wrappers.<ArticleDO>lambdaQuery()
+                    .select(ArticleDO::getId, ArticleDO::getVisibility, ArticleDO::getAuthorId)
+                    .in(ArticleDO::getId, articleIds)
+                    .eq(ArticleDO::getDelFlag, 0));
             // 可见性过滤：私有文章（visibility=1，仅自己可见）只有作者本人和管理员能在合集中看到
-            if (!UserContext.isAdmin()) {
-                String currentUserId = UserContext.getUserId();
-                List<ArticleDO> visibilityCheck = articleMapper.selectList(Wrappers.<ArticleDO>lambdaQuery()
-                        .select(ArticleDO::getId, ArticleDO::getVisibility, ArticleDO::getAuthorId)
-                        .in(ArticleDO::getId, articleIds)
-                        .eq(ArticleDO::getDelFlag, 0));
-                articleIds = visibilityCheck.stream()
-                        .filter(a -> a.getVisibility() == null || a.getVisibility() == 0
-                                || (currentUserId != null && currentUserId.equals(String.valueOf(a.getAuthorId()))))
-                        .map(ArticleDO::getId)
-                        .collect(Collectors.toList());
-                // 文章计数按当前访问者可见数量修正，避免"共 5 篇"却只列出 3 篇
-                detail.setArticleCount(articleIds.size());
-            }
+            String currentUserId = UserContext.getUserId();
+            boolean admin = UserContext.isAdmin();
+            Set<Long> visibleIds = existing.stream()
+                    .filter(a -> admin || a.getVisibility() == null || a.getVisibility() == 0
+                            || (currentUserId != null && currentUserId.equals(String.valueOf(a.getAuthorId()))))
+                    .map(ArticleDO::getId)
+                    .collect(Collectors.toSet());
+            // 用 member 顺序过滤，保留 sortOrder 排序（重建列表会丢排序，导致非管理员分页错位）
+            articleIds = articleIds.stream().filter(visibleIds::contains).collect(Collectors.toList());
+            // 文章计数统一按当前访问者可列出数量，与 items 同口径
+            detail.setArticleCount(articleIds.size());
 
             // 分页处理
             int totalArticles = articleIds.size();

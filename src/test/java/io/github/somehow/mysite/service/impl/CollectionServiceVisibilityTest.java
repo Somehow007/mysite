@@ -174,22 +174,47 @@ class CollectionServiceVisibilityTest {
     }
 
     @Test
-    @DisplayName("管理员查看合集详情 - 可见所有私有文章且跳过可见性检查查询")
+    @DisplayName("管理员查看合集详情 - 可见所有私有文章，计数按实际成员行而非存储列")
     void adminShouldSeeAllPrivateArticles() {
         loginAs("888", UserRole.ADMIN);
 
         when(collectionMapper.selectOne(any())).thenReturn(collection());
         when(userMapper.selectById(anyLong())).thenReturn(author());
         when(collectionArticleMapper.selectList(any())).thenReturn(relations());
+        // 第 1 次 selectList：存在性检查；第 2 次：分页拉取文章
         when(articleMapper.selectList(any()))
+                .thenReturn(List.of(publicArticle(), privateArticle()))
                 .thenReturn(List.of(publicArticle(), privateArticle()));
         when(userMapper.selectList(any())).thenReturn(List.of(author()));
 
         CollectionDetailRespDTO detail = collectionService.getCollectionDetail(COLLECTION_ID, 1, 10);
 
         assertEquals(2, detail.getArticles().size());
-        // 管理员直接跳过可见性检查，articleMapper.selectList 只调用一次（分页拉取）
-        verify(articleMapper, times(1)).selectList(any());
+        assertEquals(2, detail.getArticleCount());
+        verify(articleMapper, times(2)).selectList(any());
+    }
+
+    @Test
+    @DisplayName("管理员查看合集详情 - 成员行指向已删文章时计数与条目剔除悬空行")
+    void adminDetailShouldDropDanglingMemberRows() {
+        loginAs("888", UserRole.ADMIN);
+        // 存储计数漂移为 5，但实际只剩 1 篇未删成员文章
+        CollectionDO drifted = CollectionDO.builder()
+                .id(COLLECTION_ID).title("测试合集").authorId(AUTHOR_ID).articleCount(5).build();
+
+        when(collectionMapper.selectOne(any())).thenReturn(drifted);
+        when(userMapper.selectById(anyLong())).thenReturn(author());
+        when(collectionArticleMapper.selectList(any())).thenReturn(relations());
+        // 存在性检查：私有文章已被删（del_flag=1），查询只返回公开文章
+        when(articleMapper.selectList(any()))
+                .thenReturn(List.of(publicArticle()))
+                .thenReturn(List.of(publicArticle()));
+        when(userMapper.selectList(any())).thenReturn(List.of(author()));
+
+        CollectionDetailRespDTO detail = collectionService.getCollectionDetail(COLLECTION_ID, 1, 10);
+
+        assertEquals(1, detail.getArticles().size());
+        assertEquals(1, detail.getArticleCount());
     }
 
     // ==================== 合集文章导航 ====================
