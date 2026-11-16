@@ -86,5 +86,32 @@ Dashboard/CollectionEditView 是**合法草稿消费方**（文章管理、合�
 
 **遗留/观察**
 
-- 真实环境抽查（匿名拉列表/详情/合集、KB 同步）待下次起服务验证，逻辑已由单测覆盖。
+- ~~真实环境抽查~~ 已做（见下走查记录）。
 - `t_collection.article_count` 存储列仍可能漂移（T18 观察项，当前无错误消费点）。
+- KB 孤儿文档：源文章已删的 `t_knowledge_document` 残留（syncAll 对 article==null 只跳过不清除）——
+  本机发现 3 条（T14 验证文章），观察项，下次清理任务顺手做。
+- 环境：本机 `.env` `BAILIAN_EMBEDDING_MODEL=qwen3.7-text-embedding` 调 embeddings 返 400，
+  合法文章重同步标 FAILED（环境问题非本任务 bug；key/模型修正后 reprocess 即恢复）。
+
+## 走查记录（2026-11-16 真实 API，brew MySQL+PG，后端新代码）
+
+| 场景 | 结果 |
+|---|---|
+| 匿名 `/v1/articles` size=50 | total=9，草稿 2108477975514066944 缺席 ✓ |
+| 匿名 `?published=0` | total=9（参数被忽略）✓ |
+| 匿名 `?includeDraft=true` | 同上被忽略 ✓ |
+| 匿名 GET 草稿详情 | `A030100 文章不存在` ✓；已发布 200 ✓ |
+| ADMIN `?published=0` | total=3 草稿 ✓；`?includeDraft=true` → 12 全量 ✓ |
+| USER `?published=0` / `?includeDraft=true` | 均被忽略 total=9 ✓ |
+| USER 非作者草稿详情 | `A030100` ✓；ADMIN 200 ✓ |
+| 合集详情 | articleCount=3 = 可列出成员数 ✓ |
+| 分类/标签计数 | 仅公开文章口径 ✓ |
+| USER 收藏草稿 | `A030100` ✓；收藏已发布成功（已复原）✓ |
+| `conversations/{id}/messages` | 正确 visitorId→2 条；错误/缺失/不存在→空 ✓ |
+| `conversations?userId=1` 伪造 | 参数已删→空（不再可查他人）✓ |
+| 匿名 conversations | `A070100` 未登录 ✓ |
+| 匿名 KB list/detail | 200/200（死 pattern `{id}`→`*` 修复生效）✓ |
+| USER 访问 KB 管理 | 403 ✓ |
+| **存量泄漏实锤** | 草稿 2108477975514066944 早已入库 KB `READY`——新 `syncAll` 清档 `removed=1` 已删 ✓ |
+
+验证结论：全部预期语义通过；唯一非预期=合法文章重同步因 .env 坏模型名 FAILED（环境）。

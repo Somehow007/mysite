@@ -59,6 +59,8 @@ visitorId 本身是持有者凭证——知道他人 visitorId 即可冒名（�
 - `RagChatControllerTest`：归属四态（匹配→消息 / 错访客→空且不查库 / 缺 visitorId→空 /
   会话不存在→空）+ listConversations 无参→空；13/13 绿。
 - 全量 hermetic 505/505 绿；前端 type-check/build 绿。
+- 真实 API 走查（2026-11-16）：正确 visitorId→消息返回；伪造/缺参/不存在→空；
+  `?userId=1` 伪造失效（参数已删）；匿名→A070100；KB 详情匿名 200、USER 管理 403。
 
 **遗留（本任务后续阶段，按 PRD §3 原计划留档）**
 
