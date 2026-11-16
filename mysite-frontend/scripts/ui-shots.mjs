@@ -1,12 +1,12 @@
 // UI 截图脚本：切主题 × 双视口 × 页面列表，检查横向溢出。
 // 用法：node scripts/ui-shots.mjs [baseUrl] [outDir] [theme1,theme2,...]
-// 依赖 dev server 已启动（默认 http://localhost:5173）和 playwright（devDependency）。
+// 依赖 dev server 已启动（默认 http://127.0.0.1:5173）和 playwright（devDependency）。
 // 主题通过 localStorage mysite_theme_v2 在页面脚本执行前注入。
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const base = (process.argv[2] ?? 'http://localhost:5173').replace(/\/$/, '')
+const base = (process.argv[2] ?? 'http://127.0.0.1:5173').replace(/\/$/, '')
 const outDir = process.argv[3] ?? 'scripts/output/ui-shots'
 const themes = (process.argv[4] ?? 'paper-light,paper-dark,classic-light').split(',')
 const routes = ['/', '/archive', '/about']

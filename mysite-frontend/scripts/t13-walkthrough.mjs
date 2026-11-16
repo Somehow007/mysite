@@ -1,13 +1,13 @@
 // T13 走查：默认主题=跟随系统的 DOM 级复核
 // 用法: node scripts/t13-walkthrough.mjs [baseUrl]
-// 依赖 dev server（默认 http://localhost:5173）+ playwright。
+// 依赖 dev server（默认 http://127.0.0.1:5173）+ playwright。
 // 覆盖 t13-verify 未查的面：首屏一致性(防闪)、dark/colorScheme 状态一致、
 // 跨标签页 storage 同步、面板交互细节、页面级回归、边界值。
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const base = (process.argv[2] ?? 'http://localhost:5173').replace(/\/$/, '')
+const base = (process.argv[2] ?? 'http://127.0.0.1:5173').replace(/\/$/, '')
 const outDir = join(new URL('.', import.meta.url).pathname, 'output/t13-walkthrough')
 mkdirSync(outDir, { recursive: true })
 

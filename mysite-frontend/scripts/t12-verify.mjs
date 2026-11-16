@@ -1,12 +1,12 @@
 // T12 验证：404 兜底页 + About 重做
 // 用法: node scripts/t12-verify.mjs [baseUrl]
-// 依赖 dev server（默认 http://localhost:5173）+ 后端（/v1 代理）+ playwright。
+// 依赖 dev server（默认 http://127.0.0.1:5173）+ 后端（/v1 代理）+ playwright。
 // /v1/site/config 在 D 段用 route mock 注入 aboutContent/techStack 验证 markdown 链路。
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const base = (process.argv[2] ?? 'http://localhost:5173').replace(/\/$/, '')
+const base = (process.argv[2] ?? 'http://127.0.0.1:5173').replace(/\/$/, '')
 const outDir = join(new URL('.', import.meta.url).pathname, 'output/t12')
 mkdirSync(outDir, { recursive: true })
 

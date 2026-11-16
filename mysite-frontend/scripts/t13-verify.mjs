@@ -1,12 +1,12 @@
 // T13 验证：默认主题切换到纸本 + 跟随系统
 // 用法: node scripts/t13-verify.mjs [baseUrl]
-// 依赖 dev server（默认 http://localhost:5173）+ playwright。
+// 依赖 dev server（默认 http://127.0.0.1:5173）+ playwright。
 // 覆盖：无存储×亮/暗系统、emulateMedia 实时跟随、手动选择保持、跟随系统入口、溢出。
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const base = (process.argv[2] ?? 'http://localhost:5173').replace(/\/$/, '')
+const base = (process.argv[2] ?? 'http://127.0.0.1:5173').replace(/\/$/, '')
 const outDir = join(new URL('.', import.meta.url).pathname, 'output/t13')
 mkdirSync(outDir, { recursive: true })
 

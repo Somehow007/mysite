@@ -1,12 +1,12 @@
 // T8 验证：文章页重做（刊头/封面/双栏/文末/右栏/合集导航/继续读/提问卡）
 // 用法: node scripts/t8-verify.mjs [baseUrl]
-// 依赖 dev server（默认 http://localhost:5173）+ 后端（/v1 代理）+ playwright。
+// 依赖 dev server（默认 http://127.0.0.1:5173）+ 后端（/v1 代理）+ playwright。
 // E 段需要一个 USER 账号：脚本先自注册（已存在则复用），SSE 流为 mock。
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const base = (process.argv[2] ?? 'http://localhost:5173').replace(/\/$/, '')
+const base = (process.argv[2] ?? 'http://127.0.0.1:5173').replace(/\/$/, '')
 const outDir = join(new URL('.', import.meta.url).pathname, 'output/t8')
 mkdirSync(outDir, { recursive: true })
 

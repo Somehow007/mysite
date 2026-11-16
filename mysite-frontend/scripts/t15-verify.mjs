@@ -1,6 +1,6 @@
 // T15 验证：匿名聊天死代码清理 —— 登录门 + visitorId 语义 + 死按钮移除
 // 用法: node scripts/t15-verify.mjs [baseUrl]
-// 依赖 dev server（默认 http://localhost:5173）+ playwright。
+// 依赖 dev server（默认 http://127.0.0.1:5173）+ playwright。
 // 后端不在时用 route mock 模拟登录态（/v1/auth/me + /v1/rag/*）。
 // 覆盖：匿名登录门（桌面/移动）、零 RAG 请求、登录跳转+标记、
 //       登录态面板正常（历史钮/KB栏/输入框/额度文案）、横向溢出。
@@ -8,7 +8,7 @@ import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const base = (process.argv[2] ?? 'http://localhost:5173').replace(/\/$/, '')
+const base = (process.argv[2] ?? 'http://127.0.0.1:5173').replace(/\/$/, '')
 const outDir = join(new URL('.', import.meta.url).pathname, 'output/t15')
 mkdirSync(outDir, { recursive: true })
 

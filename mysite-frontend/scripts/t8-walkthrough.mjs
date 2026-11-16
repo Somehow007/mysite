@@ -6,7 +6,7 @@ import { chromium } from 'playwright'
 import { mkdirSync } from 'fs'
 import { join } from 'path'
 
-const BASE = process.env.T8_BASE ?? 'http://localhost:5173'
+const BASE = process.env.T8_BASE ?? 'http://127.0.0.1:5173'
 const API = process.env.T8_API ?? 'http://localhost:8081'
 const outDir = join(new URL('.', import.meta.url).pathname, 'output/t8-walk')
 mkdirSync(outDir, { recursive: true })

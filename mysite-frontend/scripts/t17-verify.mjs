@@ -1,12 +1,12 @@
 // T17 验证：合集连载状态与进度（plannedCount/status）
 // 用法: node scripts/t17-verify.mjs [baseUrl] [token]
-// 依赖 dev server（默认 http://localhost:5173）+ 已迁移 DB + 新后端（8081）。
+// 依赖 dev server（默认 http://127.0.0.1:5173）+ 已迁移 DB + 新后端（8081）。
 // token: admin accessToken（不传则跳过后台页面验证）
 import { chromium } from 'playwright'
 import { mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const base = (process.argv[2] ?? 'http://localhost:5173').replace(/\/$/, '')
+const base = (process.argv[2] ?? 'http://127.0.0.1:5173').replace(/\/$/, '')
 const tokenArg = process.argv[3] ?? ''
 let token = tokenArg
 if (!token) {

@@ -1,12 +1,12 @@
 // T10 验证：选中文字问 AI（SelectionPopover）
 // 用法: node scripts/t10-verify.mjs [baseUrl]
-// 依赖 dev server（默认 http://localhost:5173）+ 后端（/v1 代理）。
+// 依赖 dev server（默认 http://127.0.0.1:5173）+ 后端（/v1 代理）。
 // C/D/E/F 段需要登录：脚本自注册 t10check 账号；SSE 不发送（只验证面板/引用条/聚焦）。
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const base = (process.argv[2] ?? 'http://localhost:5173').replace(/\/$/, '')
+const base = (process.argv[2] ?? 'http://127.0.0.1:5173').replace(/\/$/, '')
 const outDir = join(new URL('.', import.meta.url).pathname, 'output/t10')
 mkdirSync(outDir, { recursive: true })
 

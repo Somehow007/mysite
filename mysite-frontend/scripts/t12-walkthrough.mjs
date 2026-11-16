@@ -1,11 +1,11 @@
 // T12 走查：DOM 级复核（对照 t9/t11-walkthrough）
 // 用法: node scripts/t12-walkthrough.mjs [baseUrl]
-// 依赖 dev server（默认 http://localhost:5173）+ 后端（/v1 代理）+ playwright。
+// 依赖 dev server（默认 http://127.0.0.1:5173）+ 后端（/v1 代理）+ playwright。
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const base = (process.argv[2] ?? 'http://localhost:5173').replace(/\/$/, '')
+const base = (process.argv[2] ?? 'http://127.0.0.1:5173').replace(/\/$/, '')
 const outDir = join(new URL('.', import.meta.url).pathname, 'output/t12-walkthrough')
 mkdirSync(outDir, { recursive: true })
 
