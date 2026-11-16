@@ -92,10 +92,10 @@ function getSortIcon(field: string) {
          长标题无法挤压其他列，弹性列靠单元格 truncate + title 收敛。
          默认 auto 布局下，nowrap 单元格的"理想宽度"= 全文长度，长标题
          会把整列撑宽、挤压其余列，甚至触发横向滚动。 -->
-    <div class="hidden md:block overflow-x-auto rounded-lg border border-border">
+    <div class="ui-table hidden md:block overflow-x-auto rounded-lg border border-border">
       <table class="w-full text-sm table-fixed">
         <thead>
-          <tr class="bg-bg-code">
+          <tr class="ui-table-head bg-bg-code">
             <!-- Select column -->
             <th v-if="selectable" class="w-10 px-3 py-3">
               <button
@@ -213,7 +213,7 @@ function getSortIcon(field: string) {
         v-else
         v-for="item in data"
         :key="String(item[idKey])"
-        class="p-4 rounded-lg border border-border bg-bg-secondary hover:border-accent/30 transition-colors"
+        class="ui-table-card p-4 rounded-lg border border-border bg-bg-secondary hover:border-accent/30 transition-colors"
         :class="expandable ? 'cursor-pointer' : ''"
         @click="expandable && emit('toggle-expand', String(item[idKey]))"
       >

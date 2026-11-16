@@ -357,7 +357,7 @@ function handleUserReset() {
             </button>
           </template>
           <template #default="{ close: closeRole }">
-            <div class="w-40 py-1 rounded-xl border border-border/60 bg-bg-elevated shadow-lg">
+            <div class="ui-dropdown-panel w-40 py-1 rounded-xl border border-border/60 bg-bg-elevated shadow-lg">
               <button
                 v-for="opt in ROLE_OPTIONS"
                 :key="opt.value"

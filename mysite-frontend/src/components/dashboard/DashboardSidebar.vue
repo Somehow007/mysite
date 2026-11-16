@@ -90,7 +90,7 @@ const logoInitial = computed(() => logoSegments.value[0]?.trim().charAt(0).toUpp
 <template>
   <aside
     :class="sidebarWidth"
-    class="hidden md:flex h-screen sticky top-0 border-r border-border bg-bg-elevated transition-[width] duration-300 ease-out relative flex-col shrink-0"
+    class="dash-sidebar hidden md:flex h-screen sticky top-0 border-r border-border bg-bg-elevated transition-[width] duration-300 ease-out relative flex-col shrink-0"
     :aria-expanded="!isCollapsed"
   >
     <!-- ============ Header ============ -->
@@ -158,14 +158,15 @@ const logoInitial = computed(() => logoSegments.value[0]?.trim().charAt(0).toUpp
             <RouterLink
               :to="item.path"
               :title="isCollapsed ? item.label : ''"
-              class="relative flex items-center gap-2.5 rounded-lg text-[13.5px] transition-all duration-150"
+              class="dash-nav-item relative flex items-center gap-2.5 rounded-lg text-[13.5px] transition-all duration-150"
               :class="[
                 isCollapsed
                   ? 'justify-center px-0 py-2.5'
                   : 'px-3 py-2',
                 route.path === item.path
                   ? 'bg-accent-subtle text-accent font-medium'
-                  : 'text-text-secondary hover:bg-accent-subtle/50 hover:text-text-primary'
+                  : 'text-text-secondary hover:bg-accent-subtle/50 hover:text-text-primary',
+                route.path === item.path && 'is-active',
               ]"
             >
               <component :is="item.icon" :size="17" class="shrink-0" />

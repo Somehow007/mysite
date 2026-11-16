@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { RouterView } from 'vue-router'
 import { Menu } from 'lucide-vue-next'
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar.vue'
@@ -7,6 +7,10 @@ import Drawer from '@/components/ui/Drawer.vue'
 import { gsap } from 'gsap'
 
 const drawerOpen = ref(false)
+
+// 纸本后台作用域：挂 <html> 而非根 div，因为 Modal/Drawer/Dropdown Teleport 到 body
+onMounted(() => document.documentElement.classList.add('dash-mode'))
+onBeforeUnmount(() => document.documentElement.classList.remove('dash-mode'))
 
 // GSAP page transition hooks
 function onBeforeEnter(el: Element) {

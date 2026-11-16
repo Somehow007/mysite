@@ -532,7 +532,7 @@ watch(selectedKbId, () => {
     <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <button
         v-for="kb in kbs" :key="kb.id"
-        class="group relative text-left rounded-xl border-[1.5px] p-[18px] transition-all duration-150 cursor-pointer"
+        class="dash-hoverable group relative text-left rounded-xl border-[1.5px] p-[18px] transition-all duration-150 cursor-pointer"
         :class="selectedKbId === kb.id
           ? 'border-accent bg-bg-elevated shadow-[0_0_0_3px_var(--accent-subtle)]'
           : 'border-border bg-bg-elevated shadow-sm hover:border-accent hover:-translate-y-0.5 hover:shadow-md'"
@@ -588,7 +588,7 @@ watch(selectedKbId, () => {
 
     <!-- ═══ 知识库详情面板 ═══ -->
     <template v-if="selectedKb">
-      <div class="w-full min-w-0 card-solid overflow-hidden !rounded-2xl">
+      <div class="w-full min-w-0 card-solid overflow-hidden">
         <!-- 统计条：竖向单元格 -->
         <div class="grid grid-cols-4 border-b border-border">
           <div class="px-5 py-4 text-center border-r border-border last:border-r-0">

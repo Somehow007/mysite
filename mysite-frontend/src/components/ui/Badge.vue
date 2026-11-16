@@ -16,7 +16,7 @@ const props = withDefaults(defineProps<{
 })
 
 const classes = computed(() => {
-  const base = 'inline-flex items-center font-medium rounded-full'
+  const base = 'ui-badge inline-flex items-center font-medium rounded-full'
   const gap = props.dot ? 'gap-1.5' : ''
   const sizeClasses = props.size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-2.5 py-1 text-sm'
 

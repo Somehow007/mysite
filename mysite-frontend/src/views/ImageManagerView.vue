@@ -380,7 +380,7 @@ onMounted(() => {
         <div
           v-for="image in images"
           :key="image.id"
-          class="group relative rounded-xl card-solid overflow-hidden transition-all duration-200 hover:shadow-md"
+          class="dash-hoverable group relative rounded-xl card-solid overflow-hidden transition-all duration-200 hover:shadow-md"
           :class="selectedIds.has(image.id) ? 'ring-2 ring-accent border-accent' : ''"
         >
           <!-- Select checkbox -->

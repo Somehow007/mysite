@@ -206,3 +206,25 @@ html.dash-mode[data-theme^="paper"] a:focus-visible {
 - 前台：`node scripts/ui-shots.mjs http://127.0.0.1:5173` 跑一遍，与改动前一致（T1 产物在 `scripts/output/ui-shots/`）。
 - paper-light / paper-dark：卡片方角无柔影；表头墨线；Modal（删文章确认）、角色 Dropdown、移动端抽屉均为墨线 + 硬阴影；知识库卡/图片卡 hover 硬阴影不上浮；筛选栏聚焦为墨线无光环；页标题衬线；Tab 键焦点可见。
 - 从后台点「回到主页」：devtools 确认 `<html>` 已无 `dash-mode`，前台卡片圆角/阴影恢复原样。
+
+## 实现记录（2026-11-16）
+
+**改动文件**：
+- `app/layouts/DashboardLayout.vue`：onMounted/onBeforeUnmount 给 `<html>` 挂/摘 `dash-mode`（Teleport 浮层才能命中）。
+- `styles/themes/paper-dashboard.css`（新建，138 行）：§3 规格 CSS 全量落地，规则全部在 `@layer` 外、选择器统一 `html.dash-mode[data-theme^="paper"]` 前缀；`styles/main.css` 紧随 `paper.css` 引入。
+- 组件 hook class（只加不改）：`PageHeader`（`ui-page-header`/`ui-page-title`）、`DataTable`（`ui-table`/`ui-table-head`/`ui-table-card`，骨架屏卡未加）、`SearchFilterBar`（4 控件 `dash-field`）、`Badge`（`classes` 串加 `ui-badge`）、`UserManageView` 角色下拉插槽（`ui-dropdown-panel`）、`DashboardSidebar`（`dash-sidebar`/`dash-nav-item`+`is-active`）、`KnowledgeManageView` KB 卡与 `ImageManagerView` 图片卡（`dash-hoverable`）。
+- `KnowledgeManageView.vue`：删除 `!rounded-2xl`，`rg '!rounded' src/` 复核 0 命中。
+- Modal/Drawer/Dropdown 组件本体未动（`.modal-panel`/`.drawer-panel` 已有类名，Dropdown 面板样式走调用方插槽）。
+
+**偏离方案**：仅 §3.① 允许的微调一处——补 `.rounded-t-md`（`AiManageView.vue:760/767` 成本图柱条顶角，后台范围内唯一遗漏的中圆角类）；其余取值与 prd 定稿一致，未自发挥。
+
+**消费点复核**：动手前 rg 复核——`!rounded` 仅 KnowledgeManageView 1 处；后台 Dropdown 调用方仅 UserManageView（前台 AppHeader/ThemeToggle/BlogHome 插槽自带样式不受影响）；Badge/PageHeader/DataTable/SearchFilterBar 全部调用方均为后台视图，无前台消费。
+
+**验收输出**：
+- `./scripts/verify.sh` → `VERIFY OK (quick)`（后端 hermetic + 前端 type-check）。
+- `npm run lint` → oxlint 16 errors 均为存量（test-callout.js/useToc.ts 等），改动文件 0 命中，基线持平。
+- `npm run build` → 绿。
+- `DASH_USER/DASH_PASS` 环境变量注入 `node scripts/dash-shots.mjs scripts/output/dash-shots-D2` → 66 张 `OK: no overflow, no page error`，overflowX 全 0。
+- classic-light 对比：相对 **D1 产物**（`dash-shots-D1/`，相对 pre-D1 基线含 D1 既定改动）17/22 张字节级 IDENTICAL；5 张差异经像素级定位均为数据/时间漂移（文章列表相对时间列、图片页噪点），与样式无关——paper-dashboard.css 全部规则以 `[data-theme^="paper"]` 门控，classic-light 下 computed 验证 `border-radius:14px`、柔影、无衬线标题全部保持原样。
+- 前台回归：`ui-shots.mjs` 跑通 `OK: no horizontal overflow`；前台页 `dash-mode=false`（home/404/未登录跳转均验），且前台不消费任何被改组件——ui-shots 与 T1 旧基线的差异为期间其他任务（T14–T18 等）的既定改动 + 首篇文章 id 变化，非本任务引入。
+- paper 交互断言（Playwright computed-style，paper-light 实测）：表头 th 墨线下边 `1px rgb(29,26,22)`+透明底、卡片 `radius:0/shadow:none`、页标题 Noto Serif SC/900、徽标方角、侧栏激活 `bg:transparent/color:ink/weight:600`、筛选控件聚焦 `border-strong` 无光环、Modal `6px` 硬阴影无模糊、角色下拉 `4px 4px 0` 硬阴影、移动抽屉方角无模糊墨线右边、KB/图片卡 hover `3px 3px 0` 硬阴影 `transform:none`、Tab 焦点 `2px solid var(--accent)`——全 PASS。paper-dark computed 抽查同绿。

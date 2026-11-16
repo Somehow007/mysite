@@ -9,6 +9,7 @@
 @import "./themes/warm-sunset.css";
 @import "./themes/liquid-glass.css";
 @import "./themes/paper.css";
+@import "./themes/paper-dashboard.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 

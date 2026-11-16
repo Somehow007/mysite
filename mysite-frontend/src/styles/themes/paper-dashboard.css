@@ -1,0 +1,138 @@
+/* 后台纸本外壳：仅 paper 主题 + 后台路由生效（DashboardLayout 给 <html> 挂 .dash-mode）。
+   不放进 @layer，保证压过 Tailwind utilities；旧主题与前台不受影响。 */
+
+/* ① 方角：中大圆角归零。保留 rounded / rounded-sm / rounded-full（复选框、头像、状态圆点、侧栏折叠钮） */
+html.dash-mode[data-theme^="paper"] .rounded-md,
+html.dash-mode[data-theme^="paper"] .rounded-lg,
+html.dash-mode[data-theme^="paper"] .rounded-xl,
+html.dash-mode[data-theme^="paper"] .rounded-2xl,
+html.dash-mode[data-theme^="paper"] .rounded-\[10px\],
+html.dash-mode[data-theme^="paper"] .rounded-t-md,
+html.dash-mode[data-theme^="paper"] .rounded-r-sm,
+html.dash-mode[data-theme^="paper"] .card-solid,
+html.dash-mode[data-theme^="paper"] .input-base,
+html.dash-mode[data-theme^="paper"] .btn-primary,
+html.dash-mode[data-theme^="paper"] .btn-secondary,
+html.dash-mode[data-theme^="paper"] .btn-danger,
+html.dash-mode[data-theme^="paper"] .btn-ghost,
+html.dash-mode[data-theme^="paper"] .ui-badge {
+  border-radius: 0;
+}
+
+/* ② 容器：细线、无柔影 */
+html.dash-mode[data-theme^="paper"] .card-solid {
+  box-shadow: none;
+  border-color: var(--border);
+}
+html.dash-mode[data-theme^="paper"] .shadow-sm,
+html.dash-mode[data-theme^="paper"] .shadow-md,
+html.dash-mode[data-theme^="paper"] .card-shadow,
+html.dash-mode[data-theme^="paper"] .card-shadow-hover {
+  box-shadow: none;
+}
+
+/* ③ 可点击卡片：hover 墨线 + 小硬阴影，不上浮 */
+html.dash-mode[data-theme^="paper"] .dash-hoverable {
+  transition: border-color .15s, box-shadow .15s;
+}
+html.dash-mode[data-theme^="paper"] .dash-hoverable:hover {
+  border-color: var(--border-strong);
+  box-shadow: 3px 3px 0 var(--border-strong);
+  transform: none;
+}
+
+/* ④ 按钮：去上浮与发光；次按钮透明底 + 细线 */
+html.dash-mode[data-theme^="paper"] .btn-primary:hover,
+html.dash-mode[data-theme^="paper"] .btn-danger:hover {
+  transform: none;
+  box-shadow: none;
+}
+html.dash-mode[data-theme^="paper"] .btn-secondary {
+  background-color: transparent;
+}
+html.dash-mode[data-theme^="paper"] .btn-secondary:hover {
+  background-color: var(--bg-secondary);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+
+/* ⑤ 表单控件：纸面底、细线；聚焦换墨线，不要发光环 */
+html.dash-mode[data-theme^="paper"] .input-base,
+html.dash-mode[data-theme^="paper"] .dash-field {
+  background-color: var(--bg-primary);
+  border-color: var(--border);
+  border-radius: 0;
+}
+html.dash-mode[data-theme^="paper"] .input-base:focus,
+html.dash-mode[data-theme^="paper"] .dash-field:focus {
+  border-color: var(--border-strong);
+  box-shadow: none;
+  outline: none;
+}
+
+/* ⑥ 表格：表头透明 + 墨线下边，行线保留细线 */
+html.dash-mode[data-theme^="paper"] .ui-table {
+  border-color: var(--border);
+  background-color: var(--bg-elevated);
+}
+html.dash-mode[data-theme^="paper"] .ui-table-head {
+  background-color: transparent;
+}
+html.dash-mode[data-theme^="paper"] .ui-table-head > th {
+  border-bottom: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  letter-spacing: .04em;
+}
+html.dash-mode[data-theme^="paper"] .ui-table-card {
+  background-color: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+/* ⑦ 浮层：墨线 + 硬阴影，去玻璃模糊 */
+html.dash-mode[data-theme^="paper"] .modal-panel,
+html.dash-mode[data-theme^="paper"] .ui-dropdown-panel {
+  border-radius: 0;
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-hard);
+  background: var(--bg-elevated);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html.dash-mode[data-theme^="paper"] .ui-dropdown-panel {
+  box-shadow: 4px 4px 0 var(--border-strong);
+}
+html.dash-mode[data-theme^="paper"] .drawer-panel {
+  border-radius: 0;
+  background: var(--bg-elevated);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  border-right: 1px solid var(--border-strong);
+}
+
+/* ⑧ 侧栏：激活项去色块，墨字加粗，保留左侧锈红竖条 */
+html.dash-mode[data-theme^="paper"] .dash-sidebar {
+  background-color: var(--bg-primary);
+}
+html.dash-mode[data-theme^="paper"] .dash-nav-item.is-active {
+  background-color: transparent;
+  color: var(--text-primary);
+  font-weight: 600;
+}
+html.dash-mode[data-theme^="paper"] .dash-nav-item:not(.is-active):hover {
+  background-color: var(--bg-secondary);
+}
+
+/* ⑨ 页标题：衬线 */
+html.dash-mode[data-theme^="paper"] .ui-page-title {
+  font-family: var(--font-serif);
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+/* ⑩ 焦点可见性兜底：方角/去阴影后键盘焦点仍要看得见 */
+html.dash-mode[data-theme^="paper"] button:focus-visible,
+html.dash-mode[data-theme^="paper"] a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

@@ -71,7 +71,7 @@ function toggleSortOrder() {
         :value="localKeyword"
         type="text"
         :placeholder="placeholder"
-        class="w-full pl-9 pr-8 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-transparent transition-colors"
+        class="dash-field w-full pl-9 pr-8 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-transparent transition-colors"
         @input="(e: Event) => localKeyword = (e.target as HTMLInputElement).value"
         @keydown.enter="handleSearch"
       />
@@ -88,7 +88,7 @@ function toggleSortOrder() {
     <select
       v-if="showFilter && filterOptions && filterOptions.length > 0"
       :value="filterValue"
-      class="px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+      class="dash-field px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
       @change="emit('update:filterValue', ($event.target as HTMLSelectElement).value)"
     >
       <option
@@ -104,7 +104,7 @@ function toggleSortOrder() {
     <template v-if="showSort && sortOptions && sortOptions.length > 0">
       <select
         :value="sortField"
-        class="px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
+        class="dash-field px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-colors"
         @change="emit('update:sortField', ($event.target as HTMLSelectElement).value)"
       >
         <option
@@ -117,7 +117,7 @@ function toggleSortOrder() {
       </select>
       <button
         @click="toggleSortOrder"
-        class="flex items-center gap-1 px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary hover:bg-bg-code transition-colors"
+        class="dash-field flex items-center gap-1 px-3 py-2 text-sm rounded-lg border border-border bg-bg-secondary text-text-primary hover:bg-bg-code transition-colors"
         title="切换排序方向"
       >
         <SortAsc v-if="sortOrder === 'asc'" :size="14" />
