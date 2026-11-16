@@ -5,7 +5,7 @@ server:
 spring:
   profiles:
     active: production
-    
+
   lifecycle:
     timeout-per-shutdown-phase: 30s
     
@@ -62,10 +62,12 @@ jwt:
 cors:
   allowed-origins: "*"
 
-# 生产关闭 API 文档端点（knife4j.production 使 doc.html/api-docs 返回 404；
-# springdoc 开关兜底 /v3/api-docs 与 swagger-ui，开发环境不受影响）
+# 生产关闭 API 文档端点：knife4j.enable=false 走官方开关整组关闭自动装配
+#（knife4jOpenApiCustomizer 依赖 SpringDocConfigProperties，若只关 springdoc
+# 该 bean 缺失会导致启动失败——knife4j 4.5.0，2026-11-17 生产事故）；
+# springdoc 两个开关兜底 /v3/api-docs 与 swagger-ui。开发环境不受影响
 knife4j:
-  production: true
+  enable: false
 springdoc:
   api-docs:
     enabled: false
