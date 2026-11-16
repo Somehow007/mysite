@@ -140,6 +140,7 @@ html.dash-mode[data-theme^="paper"] .ui-page-title {
 
 /* ⑩ 焦点可见性兜底：方角/去阴影后键盘焦点仍要看得见 */
 html.dash-mode[data-theme^="paper"] button:focus-visible,
+html.dash-mode[data-theme^="paper"] button.dash-field:focus-visible,
 html.dash-mode[data-theme^="paper"] a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
