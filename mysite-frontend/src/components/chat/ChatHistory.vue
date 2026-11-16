@@ -101,6 +101,8 @@ function handleKeydown(e: KeyboardEvent, convId: string) {
     e.preventDefault()
     saveEdit(convId)
   } else if (e.key === 'Escape') {
+    // 阻止冒泡：Esc 只取消行内编辑这一层，不触发面板级 handleEsc 关掉整个历史抽屉
+    e.stopPropagation()
     cancelEdit()
   }
 }

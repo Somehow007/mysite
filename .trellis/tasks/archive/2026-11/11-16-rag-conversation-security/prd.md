@@ -132,3 +132,13 @@ conversations 系列端点统一 `Result` 包装（消除历史裸 JSON 债）�
 - visitorId 凭证模型对「未认领存量 + 共享浏览器」的固有歧义：认领前多账号可见，
   续聊收敛——个人博客规模可接受，如需彻底可后续加「认领确认」交互。
 - 会话标题目前=首问截断+手动 rename；无自动摘要。
+
+**UI 走查补记（2026-11-16）**：新增 `mysite-frontend/scripts/ragsec-walkthrough.mjs`
+（Playwright + route mock，wire=Result 包装），33/33 过——历史 Result 解包+visitorId
+透传、hover 双钮、rename 全流程（预填/PUT 带 visitorId/列表重拉/toast）、Esc 取消、
+空标题守卫、delete 确认弹窗+URL 断言+列表移除、删当前会话回空态、A120100 error
+toast、非属主 messages 空不报错、匿名登录门不拉 conversations、移动端抽屉。
+**走查发现并修**：行内编辑 Esc 冒泡触发面板级 `handleEsc`（分级退出先于恢复的重命名
+UI 落地，未含编辑层），Esc 取消编辑同时误关整个历史抽屉 → `handleKeydown` 补
+`stopPropagation`，Esc 只剥编辑层。另确认抽屉为面板级覆盖层时 header 历史钮被盖住，
+关闭走抽屉自身 X/遮罩（设计行为非缺陷）。
