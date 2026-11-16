@@ -92,7 +92,6 @@ console.log('== W3. 边界路径 ==')
   for (const [path, name] of nfCases) {
     await page.goto(`${base}${path}`, { waitUntil: 'domcontentloaded' })
     await page.waitForTimeout(400)
-    const is404 = await page.locator('text=这一页不在本站').or(page.locator('h1:has-text("关于")')).count() > 0
     const real404 = await page.locator('text=这一页不在本站').count() > 0
     const isAbout = await page.locator('h1:has-text("关于")').count() > 0
     // /about// 双斜杠：vue-router 不合并 → dev 下 404 可接受（生产 nginx merge_slashes 归一）

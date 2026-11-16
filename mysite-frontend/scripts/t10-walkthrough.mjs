@@ -431,7 +431,7 @@ console.log('== W5. 动作细节 ==')
 
   // 已有草稿 + 引用 → 引用块置顶
   await ta.fill('这是我的已有草稿')
-  const sq2 = await makeSelection(p3, { start: 40, end: 60, min: 80 })
+  await makeSelection(p3, { start: 40, end: 60, min: 80 })
   await p3.waitForSelector('.sel-pop.is-visible', { timeout: 5000 }).catch(() => {})
   await p3.click('.sel-pop-btn:has-text("引用")')
   await sleep(600)
