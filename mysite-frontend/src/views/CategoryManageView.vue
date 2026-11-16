@@ -16,7 +16,7 @@ import type { Category } from '@/types'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import CategoryTreeNode from '@/components/ui/CategoryTreeNode.vue'
-import { Modal, PageHeader } from '@/components/ui'
+import { Modal, PageHeader, EmptyState } from '@/components/ui'
 
 const { success, error: toastError } = useToast()
 const { confirm } = useConfirm()
@@ -253,16 +253,14 @@ onMounted(() => {
       加载中...
     </div>
 
-    <div v-else-if="categories.length === 0" class="py-16 text-center">
-      <FolderTree :size="48" class="mx-auto mb-4 text-text-muted" />
-      <p class="text-text-muted">还没有分类，开始创建第一个吧</p>
-      <button
-        @click="openCreateModal()"
-        class="btn-primary"
-      >
-        新建分类
-      </button>
-    </div>
+    <EmptyState
+      v-else-if="categories.length === 0"
+      :icon="FolderTree"
+      title="还没有分类"
+      description="分类用于组织文章，支持多级"
+      action-label="新建分类"
+      @action="openCreateModal()"
+    />
 
     <div v-else class="ui-table rounded-lg border border-border overflow-hidden">
       <div class="ui-table-headrow flex items-center gap-3 px-3 py-3 border-b border-border bg-bg-code">

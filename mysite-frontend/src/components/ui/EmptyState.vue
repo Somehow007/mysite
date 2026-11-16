@@ -19,7 +19,7 @@ defineEmits<{
 
 <template>
   <div class="flex flex-col items-center justify-center py-16 px-4 text-center">
-    <div class="w-16 h-16 rounded-2xl bg-bg-code flex items-center justify-center mb-4">
+    <div class="ui-empty-icon w-16 h-16 rounded-2xl bg-bg-code flex items-center justify-center mb-4">
       <component :is="icon" :size="28" class="text-text-muted" />
     </div>
     <h3 class="text-base font-medium text-text-primary mb-1">{{ title }}</h3>

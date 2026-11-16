@@ -8,7 +8,7 @@ import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { useUserStore } from '@/stores/user'
 import { formatCollectionProgress } from '@/utils/format'
-import { PageHeader, SearchFilterBar, Pagination as PaginationBar, Badge } from '@/components/ui'
+import { PageHeader, SearchFilterBar, Pagination as PaginationBar, Badge, EmptyState } from '@/components/ui'
 import type { Collection, Pagination as PaginationMeta } from '@/types'
 
 const router = useRouter()
@@ -152,14 +152,20 @@ onMounted(() => {
       <button @click="fetchCollections(currentPage)" class="btn-secondary">重试</button>
     </div>
 
-    <div v-else-if="collections.length === 0" class="py-16 text-center">
-      <BookOpen :size="48" class="mx-auto mb-4 text-text-muted opacity-30" />
-      <p class="text-text-muted mb-4">{{ keyword ? '没有匹配的合集' : '暂无合集' }}</p>
-      <button v-if="!keyword" @click="router.push('/dashboard/collections/new')" class="btn-secondary">
-        <Plus :size="14" />
-        创建第一个合集
-      </button>
-    </div>
+    <EmptyState
+      v-else-if="collections.length === 0 && keyword"
+      :icon="BookOpen"
+      title="没有匹配的合集"
+      description="换个关键词试试"
+    />
+    <EmptyState
+      v-else-if="collections.length === 0"
+      :icon="BookOpen"
+      title="还没有合集"
+      description="把相关文章串成系列，读者可以按顺序阅读"
+      action-label="新建合集"
+      @action="router.push('/dashboard/collections/new')"
+    />
 
     <div v-else class="card-solid divide-y divide-border overflow-hidden">
       <div

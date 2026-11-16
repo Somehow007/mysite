@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { useHead } from '@unhead/vue'
 import { useRouter } from 'vue-router'
 import {
@@ -13,7 +13,7 @@ import { useUserStore } from '@/stores/user'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import { Pagination, PageHeader, SearchFilterBar, DataTable, Badge, Modal } from '@/components/ui'
+import { Pagination, PageHeader, SearchFilterBar, DataTable, Badge, Modal, Dropdown } from '@/components/ui'
 import type { ArticleListItem, Pagination as PaginationType, Category, Collection } from '@/types'
 import type { Column } from '@/components/ui/DataTable.vue'
 
@@ -31,6 +31,7 @@ const articles = ref<ArticleListItem[]>([])
 const pagination = ref<PaginationType | null>(null)
 const loading = ref(false)
 const deletingIds = ref<Set<string>>(new Set())
+const brokenCovers = reactive(new Set<string>())
 const categories = ref<Category[]>([])
 const collections = ref<Collection[]>([])
 
@@ -485,8 +486,8 @@ onMounted(() => {
     >
       <template #cell-title="{ item }">
         <div class="flex items-start gap-3">
-          <div v-if="item.coverImage" class="shrink-0 w-14 h-[38px] rounded-md overflow-hidden bg-bg-secondary">
-            <img :src="item.coverImage" :alt="item.title" class="w-full h-full object-cover" />
+          <div v-if="item.coverImage && !brokenCovers.has(item.id)" class="shrink-0 w-14 h-[38px] rounded-md overflow-hidden bg-bg-secondary">
+            <img :src="item.coverImage" :alt="item.title" class="w-full h-full object-cover" loading="lazy" @error="brokenCovers.add(item.id)" />
           </div>
           <div class="flex-1 min-w-0">
             <button class="block font-medium text-text-primary text-left hover:text-accent transition-colors truncate max-w-full leading-relaxed" @click="router.push(`/post/${item.id}`)" :title="item.title">
@@ -530,8 +531,8 @@ onMounted(() => {
       </template>
       <template #mobile-card="{ item }">
         <div class="flex items-start gap-3">
-          <div v-if="item.coverImage" class="shrink-0 w-14 h-[38px] rounded-md overflow-hidden bg-bg-secondary mt-0.5">
-            <img :src="item.coverImage" :alt="item.title" class="w-full h-full object-cover" />
+          <div v-if="item.coverImage && !brokenCovers.has(item.id)" class="shrink-0 w-14 h-[38px] rounded-md overflow-hidden bg-bg-secondary mt-0.5">
+            <img :src="item.coverImage" :alt="item.title" class="w-full h-full object-cover" loading="lazy" @error="brokenCovers.add(item.id)" />
           </div>
           <div class="flex-1 min-w-0">
             <button class="block font-medium text-text-primary text-left text-sm hover:text-accent transition-colors truncate" @click="router.push(`/post/${item.id}`)">
@@ -547,10 +548,33 @@ onMounted(() => {
               <span class="text-[11px] text-text-muted">{{ formatDate(item.updateTime) }}</span>
             </div>
             <div class="flex items-center gap-2 mt-1.5">
-              <button @click="router.push(`/post/${item.id}`)" class="btn-ghost text-xs py-1 px-2">查看</button>
-              <button v-if="canModify(item)" @click="handleToggleTop(item)" class="btn-ghost text-xs py-1 px-2" :class="item.isTop === 1 && '!text-accent'">{{ item.isTop === 1 ? '取消置顶' : '置顶' }}</button>
-              <button v-if="canModify(item)" @click="router.push(`/dashboard/posts/${item.id}/edit`)" class="btn-ghost text-xs py-1 px-2">编辑</button>
-              <button v-if="canModify(item)" @click="handleDelete(item)" :disabled="deletingIds.has(item.id)" class="btn-ghost text-xs py-1 px-2 !text-danger">删除</button>
+              <button @click="router.push(`/post/${item.id}`)" class="btn-ghost text-xs px-2.5 py-1.5">查看</button>
+              <button v-if="canModify(item)" @click="router.push(`/dashboard/posts/${item.id}/edit`)" class="btn-ghost text-xs px-2.5 py-1.5">编辑</button>
+              <Dropdown v-if="canModify(item)" trigger="click" placement="bottom-end" :spacing="4" class="ml-auto">
+                <template #trigger>
+                  <button class="btn-ghost px-2 py-1.5" aria-label="更多操作">
+                    <MoreHorizontal :size="16" />
+                  </button>
+                </template>
+                <template #default="{ close }">
+                  <div class="ui-dropdown-panel w-36 py-1 rounded-xl border border-border bg-bg-elevated shadow-lg">
+                    <button
+                      class="w-full text-left px-3 py-2 text-sm hover:bg-bg-secondary"
+                      @click="handleToggleTop(item); close()"
+                    >
+                      {{ item.isTop === 1 ? '取消置顶' : '置顶' }}
+                    </button>
+                    <div class="my-1 border-t border-border" />
+                    <button
+                      class="w-full text-left px-3 py-2 text-sm text-danger hover:bg-bg-secondary disabled:opacity-40 disabled:cursor-not-allowed"
+                      :disabled="deletingIds.has(item.id)"
+                      @click="handleDelete(item); close()"
+                    >
+                      删除
+                    </button>
+                  </div>
+                </template>
+              </Dropdown>
             </div>
           </div>
         </div>

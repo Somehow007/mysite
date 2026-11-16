@@ -144,3 +144,9 @@ html.dash-mode[data-theme^="paper"] a:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+/* ⑪ 空状态：虚线框图标（呼应前台 chip 的虚线语言） */
+html.dash-mode[data-theme^="paper"] .ui-empty-icon {
+  background-color: transparent;
+  border: 1px dashed var(--border);
+}

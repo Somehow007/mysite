@@ -82,3 +82,50 @@ html.dash-mode[data-theme^="paper"] .ui-empty-icon {
 - 移动 390：卡片只有「查看 / 编辑 / ⋯」；⋯ 展开为墨线硬阴影菜单（paper），「删除」红字且有分隔线，点删除仍弹确认框；置顶切换后菜单关闭、徽标更新；非本人文章（CREATOR 账号看他人文章时）不显示 ⋯。
 - 空状态：清空搜索条件后搜一个不存在的合集名 → 「没有匹配的合集」无按钮；paper 下图标为虚线框。
 - 知识库页：进入即选中第一个知识库并展示文档；点击已选中的卡片取消选中 → 显示新占位文案，且不会被自动选回。
+
+## 实现记录（2026-11-16）
+
+**改动文件**（7 个应用文件 + 1 个走查脚本）：
+
+- `views/DashboardView.vue`：
+  - script：`reactive` 入 vue 导入；新增 `brokenCovers = reactive(new Set<string>())`；`Dropdown` 入 `@/components/ui` 导入。
+  - 桌面 `#cell-title` 与移动 `#mobile-card` 两处封面：`v-if="item.coverImage && !brokenCovers.has(item.id)"`；`<img>` 加 `loading="lazy"` + `@error="brokenCovers.add(item.id)"`。失败后整个缩略图位不占位。
+  - 移动 `#mobile-card` 操作行重构：`查看`/`编辑` 保留文字钮（`btn-ghost text-xs px-2.5 py-1.5`，编辑仍 `canModify(item)`）；新增 `<Dropdown trigger="click" placement="bottom-end" :spacing="4" class="ml-auto">`（仅 canModify 渲染），trigger 为 `MoreHorizontal :size="16"` + `aria-label="更多操作"` + `btn-ghost px-2 py-1.5`；面板 `ui-dropdown-panel w-36 py-1 rounded-xl border border-border bg-bg-elevated shadow-lg`，含 `置顶/取消置顶`（原 `handleToggleTop`）、`my-1 border-t border-border` 分隔线、`text-danger` `删除`（原 `handleDelete`，`deletingIds` disabled 保留），各项点击后调插槽 `close()`。桌面端图标操作列未动。
+- `views/CommentManageView.vue`：裸 `<img v-if="comment.avatar" class="w-6 h-6 rounded-full">` → `<UserAvatar :src="comment.avatar" :name="comment.nickname" :size="24" />`（去 v-if，无头像也显示首字）；新增 `import UserAvatar from '@/components/common/UserAvatar.vue'`。
+- `components/ui/EmptyState.vue`：图标容器加 `ui-empty-icon` hook class（共享层，消费点复核见下）。
+- `styles/themes/paper-dashboard.css`：追加 ⑪ `.ui-empty-icon` 虚线框规则（`html.dash-mode[data-theme^="paper"]` 作用域，透明底 + `1px dashed var(--border)`）。
+- `views/CategoryManageView.vue`：手写空态 → `<EmptyState :icon="FolderTree" title="还没有分类" description="分类用于组织文章，支持多级" action-label="新建分类" @action="openCreateModal()" />`；`EmptyState` 入 ui 导入。
+- `views/CollectionManageView.vue`：手写空态 → 两个 `<EmptyState v-else-if>`：`keyword` 有值 → `title="没有匹配的合集" description="换个关键词试试"`（无按钮）；否则 `title="还没有合集" description="把相关文章串成系列，读者可以按顺序阅读" action-label="新建合集" @action="router.push('/dashboard/collections/new')"`；`EmptyState` 入 ui 导入。
+- `views/KnowledgeManageView.vue`：
+  - `fetchKbs()` 成功后：`!kbAutoSelected && selectedKbId === null && firstKb` → `kbAutoSelected = true; selectKb(firstKb.id)`（新增 `let kbAutoSelected = false` 标志，仅首载自动选中，用户取消后不再选回；`selectKb` toggle 语义不变）。
+  - 零库手写空态 → `<EmptyState :icon="Database" title="还没有知识库" description="创建知识库后，可将博客文章同步为向量索引，为 AI 助手提供知识来源" action-label="新建知识库" @action="openCreate" />`（文案保留原文）。
+  - 未选中占位文案「选择一个知识库以查看和管理文档」→「点击上方知识库查看文档」。
+
+**偏离方案**（均已评估，记录备查）：
+
+1. `brokenCovers` 用 `reactive(new Set())` 而非 `ref(new Set())`——Set 需原地 `.add()` 触发渲染，Vue3 响应式集合正统做法；模板内 `brokenCovers.has(item.id)` / `@error="brokenCovers.add(item.id)"` 直写。
+2. KB 自动选中因 `noUncheckedIndexedAccess` 先取 `const firstKb = kbs.value[0]` 判空再 `selectKb(firstKb.id)`（首轮 type-check 报 TS2532，修后复跑绿）。
+3. 合集空态拆成两个 `<EmptyState v-else-if>` 分支（keyword / 默认），比 prd 表格单行描述更直白；两分支互斥、与 loading/loadError 链衔接正确。
+4. 知识库空态 icon 用 `Database` 保留原视觉意象（prd 未指定 icon，EmptyState 默认 Inbox 会偏离原设计）。
+5. 移动端「更多」Dropdown 直接挂 `class="ml-auto"`——属性落根节点 `.dropdown-root`（inline-flex），在 `flex items-center gap-2` 行内实现行尾对齐。
+6. `fetchKbs` 的 `catch { /* ignore */ }` 按 prd「不做」保留，记观察项（违反 AGENTS §3 catch 必须落日志，另开任务）。
+
+**消费点复核**：动手前 rg 复核——`EmptyState` 既有消费方 = `DataTable.vue`、`ArticleList.vue`（前台！）、`CommentManageView`、`AiManageView`，本次新增 3 处后台消费；`ui-empty-icon` 仅加 class 不改结构，虚线框规则限定 `dash-mode + paper`，前台 `ArticleList` 与旧主题不受影响（classic-light computed 断言已验）。`UserAvatar` 消费方 = D1 的 Sidebar/Settings/UserManage/UserProfile + 本次 CommentManageView。
+
+**验收输出**：
+
+- `./scripts/verify.sh` → `VERIFY OK (quick)`（后端 hermetic + 前端 type-check；首轮 type-check 报 `kbs.value[0]` TS2532 已修）。
+- `npm run type-check` / `npm run build` → 绿；`npm run lint` → oxlint+eslint **20 errors 全部存量**（test-callout.js 控制字符、composables、d2/d4/ragsec 走查脚本等），本次改动文件 0 命中、**0 新增**（基线 18→20 系 d4-walkthrough.mjs 带入 2 个，非本次）；`git status` 确认 lint --fix 无误改无关文件。
+- `DASH_USER/DASH_PASS node scripts/dash-shots.mjs scripts/output/dash-shots-D5` → 66 张 `OK: no overflow, no page error`，overflowX 全 0。
+- 走查脚本 `scripts/d5-walkthrough.mjs`（入库，同 d2/d3/d4 惯例）：**26 pass / 0 fail / 0 skip**——详见走查记录。
+- classic-light 回归（PIL 像素 diff vs `dash-shots-D4`，隔离 D1–D4 已合入改动）：22 路由中 16 张 0.00% 逐像素一致；变化仅落在本任务明示范围——`comments`（0.07–0.28%，UserAvatar）、`knowledge` 桌面/移动（0.9–2.0%，自动选中出详情面板）、`posts` 移动（1.25–1.31%，操作收敛）、`posts` 桌面（0.86–0.87%，含相对时间数据漂移+个别真破图封面被移除）；`paper-light-mobile-tags`/`paper-dark-mobile-users` 等未触及页 ≤1.3% 为时间戳/计数数据漂移（同 D2–D4 观察口径）。无横向溢出、无 pageerror。
+
+## 走查记录（2026-11-16）
+
+脚本 `mysite-frontend/scripts/d5-walkthrough.mjs`（入库）：**26 pass / 0 fail / 0 skip**。
+
+- §1 破图兜底：`page.route` 拦截 `/v1/articles` 给首条注入 `127.0.0.1:9` 必失败封面 → 桌面+移动端坏 img 全部移除、`loading="lazy"` 在位、空封面块=0、行/卡数不丢、移动无横向溢出。
+- §2 评论头像：`role="img"`（UserAvatar）存在、旧 `img.w-6.h-6.rounded-full` 清零；对头像内 img 派发 `error` → 回退首字保留。
+- §3 移动端操作（390px）：卡片仅 查看/编辑/⋯；⋯ 展开面板含置顶项+分隔线+`text-danger` 删除；点删除弹原确认框（点取消未真删）；点置顶菜单关闭+文案翻转（置顶↔取消置顶，走查后已还原）；非本人文章 ⋯ 隐藏分支无第二账号种子，未覆盖（同 D3 skip 口径说明）。
+- §4 空状态：拦截 `/v1/categories/tree`→[] 验证 paper 下 `.ui-empty-icon` computed = `dashed/1px/transparent`、文案+新建分类按钮；classic-light 同拦截验证无虚线框（作用域隔离）；合集搜 nonsense keyword →「没有匹配的合集」+ 无操作按钮；拦截 `/v1/rag/knowledge-bases`→[] → 零库空态文案+新建知识库按钮。
+- §5 知识库自动选中：进页未点击即见「文档总数」面板+卡片选中态；点已选中卡片 → 占位「点击上方知识库查看文档」+面板收起，等待后未被自动选回；再点同卡片恢复选中。

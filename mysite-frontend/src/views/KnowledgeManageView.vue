@@ -15,7 +15,7 @@ import {
 } from '@/api/rag'
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
-import { Pagination, PageHeader, DataTable, Badge, StatusDot, Modal } from '@/components/ui'
+import { Pagination, PageHeader, DataTable, Badge, StatusDot, Modal, EmptyState } from '@/components/ui'
 import type { KnowledgeBase, KnowledgeDocument } from '@/types'
 import type { AvailableArticle } from '@/api/rag'
 import type { Column } from '@/components/ui/DataTable.vue'
@@ -33,6 +33,8 @@ const kbs = ref<KnowledgeBase[]>([])
 const loadingKbs = ref(false)
 const selectedKbId = ref<string | null>(null)
 const activeTab = ref<'docs' | 'articles' | 'settings'>('docs')
+// 首次加载自动选中第一个知识库；用户主动取消选中后不再自动选回
+let kbAutoSelected = false
 
 const selectedKb = computed(() =>
   kbs.value.find(k => k.id === selectedKbId.value) ?? null,
@@ -40,7 +42,14 @@ const selectedKb = computed(() =>
 
 async function fetchKbs() {
   loadingKbs.value = true
-  try { kbs.value = await getKnowledgeBases() } catch { /* ignore */ } finally { loadingKbs.value = false }
+  try {
+    kbs.value = await getKnowledgeBases()
+    const firstKb = kbs.value[0]
+    if (!kbAutoSelected && selectedKbId.value === null && firstKb) {
+      kbAutoSelected = true
+      selectKb(firstKb.id)
+    }
+  } catch { /* ignore */ } finally { loadingKbs.value = false }
 }
 
 function selectKb(kbId: string) {
@@ -517,17 +526,14 @@ watch(selectedKbId, () => {
       </div>
     </div>
 
-    <div v-else-if="kbs.length === 0" class="text-center py-20">
-      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-accent-subtle mb-4">
-        <Database :size="28" class="text-accent opacity-70" />
-      </div>
-      <h3 class="text-base font-medium text-text-primary mb-1">还没有知识库</h3>
-      <p class="text-sm text-text-muted mb-5">创建知识库后，可将博客文章同步为向量索引，为 AI 助手提供知识来源</p>
-      <button class="btn btn-primary flex items-center gap-2 mx-auto" @click="openCreate">
-        <Plus :size="16" />
-        创建第一个知识库
-      </button>
-    </div>
+    <EmptyState
+      v-else-if="kbs.length === 0"
+      :icon="Database"
+      title="还没有知识库"
+      description="创建知识库后，可将博客文章同步为向量索引，为 AI 助手提供知识来源"
+      action-label="新建知识库"
+      @action="openCreate"
+    />
 
     <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
       <button
@@ -583,7 +589,7 @@ watch(selectedKbId, () => {
     <!-- ═══ KB 未选中占位 ═══ -->
     <div v-if="kbs.length > 0 && !selectedKb" class="text-center py-12 text-text-muted">
       <Database :size="32" class="mx-auto mb-2 opacity-25" />
-      <p class="text-sm">选择一个知识库以查看和管理文档</p>
+      <p class="text-sm">点击上方知识库查看文档</p>
     </div>
 
     <!-- ═══ 知识库详情面板 ═══ -->

@@ -6,6 +6,7 @@ import { getAdminComments, updateCommentStatus, deleteComment } from '@/api/comm
 import { useToast } from '@/composables/useToast'
 import { useConfirm } from '@/composables/useConfirm'
 import { PageHeader, SearchFilterBar, Badge, Pagination, EmptyState } from '@/components/ui'
+import UserAvatar from '@/components/common/UserAvatar.vue'
 import type { CommentAdmin, Pagination as PaginationType } from '@/types'
 
 useHead(() => ({
@@ -165,11 +166,10 @@ onMounted(() => {
           <div class="flex items-start justify-between gap-4">
             <div class="flex-1 min-w-0">
               <div class="flex items-center gap-2 mb-2">
-                <img
-                  v-if="comment.avatar"
+                <UserAvatar
                   :src="comment.avatar"
-                  :alt="comment.nickname"
-                  class="w-6 h-6 rounded-full"
+                  :name="comment.nickname"
+                  :size="24"
                 />
                 <span class="text-sm font-medium text-text-primary">{{ comment.nickname }}</span>
                 <Badge :variant="statusMap[comment.status]?.variant ?? 'muted'" dot>
