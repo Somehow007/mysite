@@ -65,7 +65,7 @@
 | Elasticsearch | 可选，默认关（`elasticsearch.enabled:false`），回退 DB LIKE | `ElasticsearchConfiguration`、mapper LIKE 用 `CONCAT('%',#{kw},'%')` 参数化 ✓ |
 | LLM：DeepSeek(P1,启用)/BaiLian(P2,启用+embedding+rerank)/SiliconFlow(P3,关)/AIHubMix(P4,关)/Ollama(P9,关) | RAG 聊天与向量化，OpenAI 兼容 + 熔断(2连败熔断,30s冷却) | `rag.llm.providers.*`、`ragent/llm/` |
 | Maven 依赖 | SB 3.5.7（⚠ CLAUDE.md 写 3.0.7，已漂移）/ MyBatis-Plus 3.5.14 / jjwt 0.12.6 / WebFlux(WebClient) / hutool / fastjson2 / knife4j | `pom.xml` |
-| npm 依赖 | Vue3.5 / Pinia3 / axios / marked18 / dompurify / Milkdown Crepe 7.21 / KaTeX / Prism / tailwind4；**playwright 已装但无配置无测试（死依赖）** | `package.json` |
+| npm 依赖 | Vue3.5 / Pinia3 / axios / marked18 / dompurify / Milkdown Crepe 7.21 / KaTeX / Prism / tailwind4；playwright 已装，无 vitest/jest 单测框架，UI 验证靠 `scripts/t*-verify/walkthrough.mjs` 手动脚本（~20 个） | `package.json` |
 
 > ⚠ 本机开发实际用 **brew 服务**：`mysql@8.4`（3306，多项目共享 ~15 库，勿删）、`redis`、`postgresql@17`。docker 容器（mysite-mysql/redis/pgvector）与 brew 端口冲突属影子实例，2026-11-16 已停删；`docker-compose.yml` 保留给干净机器/生产语义。迁移须同时灌 brew 库（`mysql -h127.0.0.1`）。
 
@@ -81,11 +81,11 @@
 | `npm run build` | 存在 | = `vue-tsc --build` + `vite build` |
 | `npm run type-check` | 存在 | vue-tsc --build |
 | `npm run lint` | 存在 | oxlint+eslint `--fix`（注意：lint 默认改文件，摸底期慎用） |
-| 前端单测 | **不存在** | 无 vitest/jest 脚本；playwright 装了没用过 |
-| `./deploy/deploy.sh` | 存在 | `mvnw clean package -DskipTests`（⚠ 部署构建跳测试）+ 前端 build + 打 tar.gz |
+| 前端单测 | **不存在** | 无 vitest/jest；UI 验证靠 `scripts/t*-verify/walkthrough.mjs` Playwright 手动脚本 |
+| `./deploy/deploy.sh` | 存在 | `mvnw clean package -DexcludedGroups=needs-infra`（跑 hermetic 测试）+ 前端 build + 打 tar.gz |
 | `./deploy/server-deploy.sh` | 存在 | 服务器侧；另拉 `~/project/study-journey` 部署手帐 |
 | `./mvnw clean package -Pproduction` | ⚠ **文档漂移** | CLAUDE.md 写的 profile 在 pom.xml 不存在；生产配置走 `deploy/config/application-production.yml` 外挂 |
-| CI | **不存在** | 无 `.github/`、无任何流水线 |
+| CI | 存在 | `.github/workflows/ci.yml` 随 push/PR(main) 跑 verify quick 同口径（后端 hermetic + 前端 type-check/build） |
 | 备份/运维 | 存在未实测 | `deploy/backup-mysql.sh`、`deploy/scripts/{monitor,convert-webp,start,lib}.sh` |
 
 ## 6. 文档景观与新鲜度
