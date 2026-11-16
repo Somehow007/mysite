@@ -129,3 +129,11 @@ html.dash-mode[data-theme^="paper"] .ui-empty-icon {
 - §3 移动端操作（390px）：卡片仅 查看/编辑/⋯；⋯ 展开面板含置顶项+分隔线+`text-danger` 删除；点删除弹原确认框（点取消未真删）；点置顶菜单关闭+文案翻转（置顶↔取消置顶，走查后已还原）；非本人文章 ⋯ 隐藏分支无第二账号种子，未覆盖（同 D3 skip 口径说明）。
 - §4 空状态：拦截 `/v1/categories/tree`→[] 验证 paper 下 `.ui-empty-icon` computed = `dashed/1px/transparent`、文案+新建分类按钮；classic-light 同拦截验证无虚线框（作用域隔离）；合集搜 nonsense keyword →「没有匹配的合集」+ 无操作按钮；拦截 `/v1/rag/knowledge-bases`→[] → 零库空态文案+新建知识库按钮。
 - §5 知识库自动选中：进页未点击即见「文档总数」面板+卡片选中态；点已选中卡片 → 占位「点击上方知识库查看文档」+面板收起，等待后未被自动选回；再点同卡片恢复选中。
+
+**终验补充**（`scripts/output/d5-review.mjs`，一次性不入库）：**15 pass / 0 fail / 0 skip**——
+
+- ⋯菜单 computed（390px）：paper-light `border-radius:0` + 硬阴影（`4px 4px 0` 系 `--border-strong`）vs classic-light 圆角+柔影，作用域正确；菜单不越出视口；ESC 与外部点击均关闭。
+- 桌面操作列回归：首行仍为查看/置顶/编辑/删除图标按钮（title 断言）。
+- `dash-mode` 生命周期：dashboard 挂载存在、回前台摘除。
+- KB 交互：自动选中后点第二个 KB 卡片正常切换；空状态 `.ui-empty-icon` 64px + 内部 svg 可见。
+- 「非本人文章不显示 ⋯」：`DashboardView.fetchArticles` 对非 admin 恒带 `authorId=user.id` 且前端再过滤，列表内 `canModify` 恒 true——隐藏分支为防御性 v-if，实际不可达（与桌面端 `!canModify` 禁用图标同理），代码路径已核对 `usePermission.canModifyArticle`。
