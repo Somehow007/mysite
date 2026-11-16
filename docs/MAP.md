@@ -67,6 +67,8 @@
 | Maven 依赖 | SB 3.5.7（⚠ CLAUDE.md 写 3.0.7，已漂移）/ MyBatis-Plus 3.5.14 / jjwt 0.12.6 / WebFlux(WebClient) / hutool / fastjson2 / knife4j | `pom.xml` |
 | npm 依赖 | Vue3.5 / Pinia3 / axios / marked18 / dompurify / Milkdown Crepe 7.21 / KaTeX / Prism / tailwind4；**playwright 已装但无配置无测试（死依赖）** | `package.json` |
 
+> ⚠ 本机开发实际用 **brew 服务**：`mysql@8.4`（3306，多项目共享 ~15 库，勿删）、`redis`、`postgresql@17`。docker 容器（mysite-mysql/redis/pgvector）与 brew 端口冲突属影子实例，2026-11-16 已停删；`docker-compose.yml` 保留给干净机器/生产语义。迁移须同时灌 brew 库（`mysql -h127.0.0.1`）。
+
 ## 5. 命令现状（逐条核对）
 
 | 命令 | 状态 | 证据/注意 |
