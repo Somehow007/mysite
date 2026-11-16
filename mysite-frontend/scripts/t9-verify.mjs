@@ -1,12 +1,12 @@
 // T9 验证：移动端文章 dock + sheet
 // 用法: node scripts/t9-verify.mjs [baseUrl]
-// 依赖 dev server（默认 http://localhost:5173）+ 后端（/v1 代理）+ playwright。
+// 依赖 dev server（默认 http://127.0.0.1:5173）+ 后端（/v1 代理）+ playwright。
 // F 段需要 USER 账号：脚本自注册（已存在则复用）；SSE 流为 mock。
 import { chromium, webkit } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const base = (process.argv[2] ?? 'http://localhost:5173').replace(/\/$/, '')
+const base = (process.argv[2] ?? 'http://127.0.0.1:5173').replace(/\/$/, '')
 const outDir = join(new URL('.', import.meta.url).pathname, 'output/t9')
 mkdirSync(outDir, { recursive: true })
 
@@ -217,8 +217,10 @@ if (!target) {
     ok('标题=✦ 问这篇文章', await page.locator('.chat-panel h1', { hasText: '✦ 问这篇文章' }).count() === 1)
     const sub = await page.locator('.chat-panel .flex-1.min-w-0 p').innerText()
     ok('副标=正在阅读：标题', sub.includes('正在阅读：') && sub.includes(target.title.slice(0, 6)), sub)
-    // 文章向空态 chips
-    ok('空态文章 chips', await page.locator('.chat-empty-chip', { hasText: '总结成 3 点' }).count() === 1)
+    // 匿名走登录门（T15）：不展示空态 chips/输入框，引导登录；chips 登录态覆盖见 F 段
+    ok('匿名登录门文案', await page.locator('text=登录后使用 AI 助手').count() >= 1)
+    ok('匿名登录按钮', await page.locator('button', { hasText: '登录 / 注册' }).count() === 1)
+    ok('匿名无空态 chips', await page.locator('.chat-empty-chip').count() === 0)
     // 关闭：X 按钮（移动 sheet 遮罩只剩顶部 24px 缝隙，X 是稳定路径）
     await page.locator('.chat-panel button[aria-label="关闭"]').click()
     await page.waitForSelector('.chat-panel', { state: 'detached', timeout: 3000 }).catch(() => {})

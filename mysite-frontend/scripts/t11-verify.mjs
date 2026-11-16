@@ -1,11 +1,11 @@
 // T11 验证：聊天面板换肤（用户墨块/AI 衬线正文/[n] 角标/出处卡/输入框/面板 chrome/历史抽屉）
 // 用法: node scripts/t11-verify.mjs [baseUrl]
-// 依赖 dev server（默认 http://localhost:5173）+ playwright；SSE 与会话接口全部 mock。
+// 依赖 dev server（默认 http://127.0.0.1:5173）+ playwright；SSE 与会话接口全部 mock。
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 
-const base = (process.argv[2] ?? 'http://localhost:5173').replace(/\/$/, '')
+const base = (process.argv[2] ?? 'http://127.0.0.1:5173').replace(/\/$/, '')
 const outDir = join(new URL('.', import.meta.url).pathname, 'output/t11')
 mkdirSync(outDir, { recursive: true })
 
@@ -19,6 +19,28 @@ const ok = (name, cond, extra = '') => {
 const listJson = await (await fetch(`${base}/v1/articles?current=1&size=1&published=1`)).json()
 const realArticleId = String(listJson?.data?.records?.[0]?.id ?? listJson?.data?.list?.[0]?.id ?? '1')
 console.log(`realArticleId=${realArticleId}`)
+
+// T15 起匿名聊天走登录门：需要登录态的用例先注册/登录拿 token（同 t9-verify）
+const T11_USER = process.env.T11_USER ?? 't11check'
+const T11_PASS = process.env.T11_PASS ?? 'T11check!2026'
+let tokens = null
+{
+  await fetch(`${base}/v1/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: T11_USER, password: T11_PASS,
+      email: `${T11_USER}@example.com`, realName: 'T11 Check', phoneNumber: '13900000011',
+    }),
+  }).catch(() => {})
+  const loginRes = await fetch(`${base}/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: T11_USER, password: T11_PASS }),
+  }).then(r => r.json()).catch(() => null)
+  tokens = loginRes?.data ?? null
+  console.log(`login token: ${tokens?.accessToken ? 'ok' : 'MISSING'}`)
+}
 
 const SSE_BODY = [
   'data: {"type":"meta","conversationId":"t11-mock-conv"}', '',
@@ -34,9 +56,15 @@ const CONV_LIST = [
 
 const browser = await chromium.launch()
 
-async function newPageWithMocks(theme, viewport) {
+async function newPageWithMocks(theme, viewport, tk = null) {
   const ctx = await browser.newContext({ viewport })
-  await ctx.addInitScript(t => { try { localStorage.setItem('mysite_theme_v2', t) } catch {} }, theme)
+  await ctx.addInitScript(([t, tk]) => {
+    try { localStorage.setItem('mysite_theme_v2', t) } catch {}
+    if (tk?.accessToken) {
+      localStorage.setItem('mysite_access_token', JSON.stringify(tk.accessToken))
+      localStorage.setItem('mysite_refresh_token', JSON.stringify(tk.refreshToken))
+    }
+  }, [theme, tk])
   // SSE：首次延迟 1.2s（制造「正在生成」窗口），之后固定流
   let sseCount = 0
   await ctx.route('**/v1/rag/chat/stream**', async route => {
@@ -44,23 +72,41 @@ async function newPageWithMocks(theme, viewport) {
     if (sseCount === 1) await new Promise(r => setTimeout(r, 1200))
     await route.fulfill({ status: 200, contentType: 'text/event-stream', body: SSE_BODY })
   })
+  // 会话接口走 axios client，需 Result 包壳（同 ragsec-walkthrough 的 jsonRes）
+  const jsonRes = data => ({ contentType: 'application/json', body: JSON.stringify({ code: '0', message: 'ok', data }) })
   await ctx.route('**/v1/rag/conversations**', route => {
     const url = route.request().url()
     if (url.includes('/messages')) {
-      return route.fulfill({ contentType: 'application/json', body: JSON.stringify([
+      return route.fulfill(jsonRes([
         { role: 'USER', content: '历史里的问题' },
         { role: 'ASSISTANT', content: '历史里的回答，没有来源卡。' },
-      ]) })
+      ]))
     }
-    return route.fulfill({ contentType: 'application/json', body: JSON.stringify(CONV_LIST) })
+    return route.fulfill(jsonRes(CONV_LIST))
   })
   return { ctx, page: await ctx.newPage() }
 }
 
-// ── A. 桌面 paper-light：全要素 ──────────────────────────────
-console.log('== A. 桌面 1440 paper-light ==')
+// ── A0. 匿名登录门（T15）：匿名不展示消息/输入/chips/KB ──────
+console.log('== A0. 匿名登录门 ==')
 {
   const { ctx, page } = await newPageWithMocks('paper-light', { width: 1440, height: 900 })
+  await page.goto(`${base}/about`, { waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('.chat-fab', { timeout: 15000 })
+  await page.click('.chat-fab')
+  await page.waitForSelector('.chat-panel', { state: 'visible', timeout: 5000 })
+  ok('登录门文案', await page.locator('text=登录后使用 AI 助手').count() >= 1)
+  ok('登录/注册按钮', await page.locator('button', { hasText: '登录 / 注册' }).count() === 1)
+  ok('匿名无输入框', await page.locator('.chat-input-box').count() === 0)
+  ok('匿名无空态 chips', await page.locator('.chat-empty-chip').count() === 0)
+  ok('匿名无 KB 标签', await page.locator('.chat-kb-pill').count() === 0)
+  await ctx.close()
+}
+
+// ── A. 桌面 paper-light：全要素（登录态） ──────────────────────
+console.log('== A. 桌面 1440 paper-light ==')
+{
+  const { ctx, page } = await newPageWithMocks('paper-light', { width: 1440, height: 900 }, tokens)
   const errors = []
   page.on('pageerror', e => errors.push(String(e)))
 
@@ -82,9 +128,8 @@ console.log('== A. 桌面 1440 paper-light ==')
   const titleFont = await page.locator('.chat-panel h1').evaluate(el => getComputedStyle(el).fontFamily)
   ok('标题衬线', /serif|Songti|Noto/i.test(titleFont), titleFont)
 
-  // 空态 + 匿名提示（未登录）
+  // 空态示例 chips（登录态；匿名走登录门见 A0）
   ok('空态示例 chips', await page.locator('.chat-empty-chip').count() >= 3)
-  ok('匿名提示条', await page.locator('.chat-note').count() >= 1)
 
   // KB 标签（真实后端返回若干 KB）
   const kbCount = await page.locator('.chat-kb-pill').count()
@@ -166,13 +211,19 @@ console.log('== A. 桌面 1440 paper-light ==')
 console.log('== B. 失败态 ==')
 {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } })
-  await ctx.addInitScript(() => { try { localStorage.setItem('mysite_theme_v2', 'paper-light') } catch {} })
+  await ctx.addInitScript(tk => {
+    try { localStorage.setItem('mysite_theme_v2', 'paper-light') } catch {}
+    if (tk?.accessToken) {
+      localStorage.setItem('mysite_access_token', JSON.stringify(tk.accessToken))
+      localStorage.setItem('mysite_refresh_token', JSON.stringify(tk.refreshToken))
+    }
+  }, tokens)
   await ctx.route('**/v1/rag/chat/stream**', route => route.fulfill({
     status: 200, contentType: 'text/event-stream',
     body: 'data: {"type":"meta","conversationId":"x"}\n\ndata: {"type":"error","message":"模拟服务故障"}\n\n',
   }))
   await ctx.route('**/v1/rag/conversations**', route =>
-    route.fulfill({ contentType: 'application/json', body: '[]' }))
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({ code: '0', message: 'ok', data: [] }) }))
   const page = await ctx.newPage()
   await page.goto(`${base}/archive`, { waitUntil: 'domcontentloaded' })
   await page.waitForSelector('.chat-fab', { timeout: 15000 })
@@ -192,7 +243,7 @@ console.log('== B. 失败态 ==')
 console.log('== C. 主题×视口 ==')
 for (const theme of ['paper-light', 'paper-dark', 'classic-light']) {
   for (const vp of [{ name: 'desktop', width: 1440, height: 900 }, { name: 'mobile', width: 390, height: 844 }]) {
-    const { ctx, page } = await newPageWithMocks(theme, { width: vp.width, height: vp.height })
+    const { ctx, page } = await newPageWithMocks(theme, { width: vp.width, height: vp.height }, tokens)
     await page.goto(`${base}/about`, { waitUntil: 'domcontentloaded' })
     await page.waitForSelector('.chat-fab', { timeout: 15000 })
     await page.click('.chat-fab')
