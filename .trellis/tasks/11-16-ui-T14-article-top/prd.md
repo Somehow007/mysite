@@ -108,3 +108,22 @@ ALTER TABLE `t_article`
 - 草稿泄漏存量 bug（公开列表不过滤 published）→ 建议另立项，影响 BlogHome/Category/Tag/Search 全部公开列表。
 - ES 启用时需补 `ArticleDocument.isTop` + repository 过滤/排序（当前 dormant）。
 - T17（合集连载状态）schema 评审可与本任务一并过——其 migration `20261116-collection-status.sql` 已在树内。
+
+## 走查记录（2026-11-16）
+
+`mysite-frontend/scripts/t14-walkthrough.mjs` **46/46**（全 mock，无真实后端依赖）：
+
+- **首页置顶头条**：kicker「置顶 · Spring Boot 系列」、lead=被置顶旧文（createTime 最旧但 is_top=1，唯一能区分 topTime 排序的形态）、列表区 `section.min-w-0` 去重、lead 请求 URL 断言 `sortField=topTime`、最受欢迎栏回归。
+- **无置顶回落**：kicker「最新」+ lead=最新文；mock 按真实语义建模——取消置顶 `top_time=NULL`，否则残留时间会干扰 topTime 排序。
+- **分类筛选透传**：lead 请求携带 `categorySlug + sortField=topTime`；置顶文属 spring 时选 frontend 分类 → 头条回落该分类最新文（跨分类置顶不抢占，评审拍板行为兑现）。
+- **/page/2**：不发 topTime 请求（fetchLead 仅首页触发）。
+- **Dashboard**：CREATOR 自己文章 pin 钮可见、非管理员他人文章前端过滤不可见、PUT `{isTop:1/0}` 载荷断言、状态列 Pin 徽标出现/消失、PUT 500 乐观回滚+toast 出现。
+- **USER 自己文章操作钮可见**：`canModifyArticle = 作者本人 || ADMIN` 存量语义（与编辑/删除钮一致），后端 `PUT /v1/articles/**` role 门独立把关 403；非本次引入，记录备查。
+- **移动端/主题/边界**：390 卡片文字钮链路；paper-light/paper-dark/classic-light 三主题 kicker + 溢出=0；DTO 缺 `isTop` 字段回落「最新」不崩。
+
+静态复核结论：
+
+- `sortField=topTime` 恒定 DESC、忽略 sortOrder——有意（lead 专用排序），Schema 已注明。
+- toast 失败文案=原始错误信息（与既有 handler 同口径，未单独包装）。
+- `updateArticle` 显式 SET 列清单不含 `is_top/top_time` → 编辑文章不丢置顶态（代码级确认，互不影响）。
+- brew MySQL（应用实际连接库）已迁移；docker 影子实例当前未运行，部署时 migration 按约定手动执行。
