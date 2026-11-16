@@ -125,3 +125,13 @@ html.dash-mode[data-theme^="paper"] .ui-table-headrow > * {
 - paper-light DOM 断言 `scripts/output/d4-dom-check.mjs`：**17/17 PASS**——5 页标题对齐（含知识库页）、settings 副标题+2×`card-solid p-6` 无 rounded-2xl、collections 单容器 `card-solid.divide-y`+`ui-badge`、categories `ui-table`/`ui-table-headrow` computed（透明底、`border-strong` 下边、secondary 12px 文字、徽标方角）、PostEditor h1 衬线 900。
 - classic-light 回归（PIL 像素 diff vs `dash-shots-baseline`）：21/22 张 DIFF 属预期——间距归一化（16/24px 混用 → 统一 20px）波及所有后台页；desktop 变化量 0.17%–6.69%（posts 6.69% 含相对时间/计数数据漂移，同 D2 观察口径；posts_new 0.17% 近零印证 PostEditor 仅加 hook class）；mobile 0.95%–9.53%（卡片流式重排+间距级联）；`posts_new` mobile 字节级 IDENTICAL。无横向溢出、无 pageerror。
 - 截图目检项（知识库标题不再右下偏、设置页副标题、合集编辑左对齐+返回钮、分类表头同款、合集列表单容器分隔线）已由上面 DOM/computed 断言等价覆盖；人工目检建议终验时补看 `dash-shots-D4/` 对应页。
+
+## 走查记录（2026-11-16）
+
+脚本 `mysite-frontend/scripts/d4-walkthrough.mjs`（入库，同 d2/d3 惯例）：**108 pass / 0 fail / 0 skip**——三主题桌面全量矩阵 + 结构断言 + 交互 + paper-light 移动抽查。应用代码零改动。
+
+- §1 三主题 × 10 个 PageHeader 路由：`.ui-page-title` left/top 逐页全一致（Δ≤1px）；页面根可见子元素相邻间距全部 =20px（30 页 × 若干间隙，含 AI 页签切换后、知识库选中详情面板）。
+- §2 paper-light 结构：knowledge 根类、settings 副标题+2×`card-solid p-6` 无 rounded-2xl+内层 20px、collections 单容器 divide-y+行内 Badge、categories `ui-table`/`ui-table-headrow`/`tabular-nums`/状态 Badge、comments 单容器结构保持、合集 new/edit `PageHeader back`+`max-w-4xl`+返回回 `/dashboard/collections`（不离站）、dash-mode 挂载/摘除生命周期。
+- §3 逐主题 computed：headrow 底（paper 透明 / classic bg-code）、下边色（paper `--border-strong` / classic `--border`）、文字色（paper secondary / classic muted）+12px/500；徽标圆角 paper 0 / classic 非 0；card-solid 圆角 paper 0 / classic 14px；页标题衬线+900（paper）vs 无衬线（classic）；PostEditor h1 同规则。
+- §4 paper-light 390px：collections/categories/knowledge/settings/posts-new 无横向溢出 + `.ui-page-title` 存在。
+- 首轮 5 个 FAIL 全部为脚本自身缺陷、非应用问题：①分类页无 `.card-solid`（圆角改到合集页量）；②`/serif/i` 会命中 `sans-serif` 子串（改末位 generic token 判定）。修正后复跑全绿。
