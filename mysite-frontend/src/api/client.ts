@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios'
-import { getItem, removeItem } from '@/utils/storage'
-import type { ApiResponse } from '@/types'
+import { getItem, setItem, removeItem } from '@/utils/storage'
+import type { ApiResponse, AuthTokens } from '@/types'
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
@@ -9,6 +9,43 @@ const apiClient: AxiosInstance = axios.create({
 })
 
 const noAuthPaths = ['/v1/auth/login', '/v1/auth/register', '/v1/auth/refresh']
+
+// access token 过期时的静默续期：并发 401 共享同一个 refresh Promise，
+// 避免 refresh token 轮换下多次刷新互相覆盖；settle 后下次 401 重新发起。
+let refreshPromise: Promise<boolean> | null = null
+
+function refreshAccessToken(): Promise<boolean> {
+  const refreshToken = getItem<string>('refresh_token')
+  if (!refreshToken) return Promise.resolve(false)
+  refreshPromise ??= apiClient
+    .post<ApiResponse<AuthTokens>>('/v1/auth/refresh', { refreshToken })
+    .then((resp) => {
+      const data = resp.data?.data
+      if (!data?.accessToken) return false
+      setItem('access_token', data.accessToken)
+      if (data.refreshToken) setItem('refresh_token', data.refreshToken)
+      return true
+    })
+    .catch(() => false)
+    .finally(() => { refreshPromise = null })
+  return refreshPromise
+}
+
+function clearAuthAndRedirect() {
+  removeItem('access_token')
+  removeItem('refresh_token')
+  removeItem('user_role')
+  const currentPath = window.location.pathname
+  const publicPaths = ['/', '/login', '/register', '/about', '/search', '/archive']
+  const isPublicPath = publicPaths.some(p => currentPath === p) ||
+    currentPath.startsWith('/post/') ||
+    currentPath.startsWith('/category/') ||
+    currentPath.startsWith('/tag/') ||
+    currentPath.startsWith('/page/')
+  if (!isPublicPath) {
+    window.location.href = '/login'
+  }
+}
 
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
@@ -41,19 +78,18 @@ apiClient.interceptors.response.use(
   (error) => {
     const isNoAuthPath = noAuthPaths.some(path => error.config?.url?.includes(path))
     if (error.response?.status === 401 && !isNoAuthPath) {
-      removeItem('access_token')
-      removeItem('refresh_token')
-      removeItem('user_role')
-      const currentPath = window.location.pathname
-      const publicPaths = ['/', '/login', '/register', '/about', '/search', '/archive']
-      const isPublicPath = publicPaths.some(p => currentPath === p) ||
-        currentPath.startsWith('/post/') ||
-        currentPath.startsWith('/category/') ||
-        currentPath.startsWith('/tag/') ||
-        currentPath.startsWith('/page/')
-      if (!isPublicPath) {
-        window.location.href = '/login'
+      const config = error.config as (InternalAxiosRequestConfig & { __retried?: boolean }) | undefined
+      // access token 过期：先静默 refresh 并重试一次，refresh 失败才登出
+      if (config && !config.__retried) {
+        config.__retried = true
+        return refreshAccessToken().then((ok) => {
+          if (ok) return apiClient.request(config)
+          clearAuthAndRedirect()
+          const message = error.response?.data?.message || error.message || '网络错误'
+          return Promise.reject(new Error(message))
+        })
       }
+      clearAuthAndRedirect()
     }
     if (error.response?.status === 403) {
       const message = error.response?.data?.message || '权限不足，无法访问该资源'
