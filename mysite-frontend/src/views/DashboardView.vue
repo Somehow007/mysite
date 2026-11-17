@@ -81,6 +81,8 @@ async function fetchCollections() {
 async function fetchArticles(page = 1) {
   loading.value = true
   try {
+    // 等用户就绪再取数：isAdmin/user.id 决定 authorId 过滤，避免 /me 未回时按错误角色拉取
+    await userStore.ensureUser()
     const params = {
       page,
       size: 20,
