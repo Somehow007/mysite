@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
 import RegisterForm from '@/components/auth/RegisterForm.vue'
+import { useSeo } from '@/composables/useSeo'
 
 const router = useRouter()
 const route = useRoute()
+
+useSeo({
+  title: '注册',
+  noindex: true,
+})
 
 function onRegisterSuccess() {
   const redirect = route.query.redirect as string

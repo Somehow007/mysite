@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
-import { useHead } from '@unhead/vue'
 import {
   User, Calendar, MapPin, Link, FileText, BookOpen,
   Heart, Loader2, ExternalLink, Eye, Edit3,
@@ -16,6 +15,7 @@ import { getCollections } from '@/api/collection'
 import { getPaginated } from '@/api/client'
 import { usePermission } from '@/composables/usePermission'
 import { useToast } from '@/composables/useToast'
+import { useSeo } from '@/composables/useSeo'
 import { formatDate } from '@/utils/date'
 import { formatViewCount } from '@/utils/format'
 import type { UserProfile, Collection } from '@/types'
@@ -72,11 +72,20 @@ const ROLE_BADGE: Record<string, string> = {
   'DEVELOPER': 'bg-warning-subtle text-warning',
 }
 
-useHead(() => ({
-  title: profile.value
-    ? profile.value.realName || profile.value.username
-    : username.value,
-}))
+useSeo({
+  title: () => profile.value?.realName || profile.value?.username || username.value,
+  description: () => {
+    const p = profile.value
+    if (!p) return undefined
+    const parts = [
+      p.bio,
+      p.articleCount ? `共 ${p.articleCount} 篇文章` : '',
+    ].filter(Boolean)
+    return parts.length ? `${p.realName || p.username}：${parts.join('，')}` : undefined
+  },
+  image: () => profile.value?.avatar,
+  noindex: () => !!error.value,
+})
 
 async function fetchProfile() {
   loading.value = true

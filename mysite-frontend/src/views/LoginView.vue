@@ -5,9 +5,15 @@ import LoginForm from '@/components/auth/LoginForm.vue'
 import { useUserStore } from '@/stores/user'
 import { getRedirectUrl, getRedirectUrlFromQuery, setRedirectUrl, clearRedirectUrl } from '@/utils/redirect'
 import { getItem } from '@/utils/storage'
+import { useSeo } from '@/composables/useSeo'
 
 const router = useRouter()
 const userStore = useUserStore()
+
+useSeo({
+  title: '登录',
+  noindex: true,
+})
 
 onMounted(async () => {
   const token = getItem<string>('access_token')

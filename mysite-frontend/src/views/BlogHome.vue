@@ -6,6 +6,8 @@ import { getArticles } from '@/api/article'
 import { getCategories } from '@/api/category'
 import { getCollections } from '@/api/collection'
 import { useUserStore } from '@/stores/user'
+import { useSiteStore } from '@/stores/site'
+import { useSeo, useSiteOrigin } from '@/composables/useSeo'
 import { useFavorite } from '@/composables/useFavorite'
 import { useScrollReveal } from '@/composables/useScrollReveal'
 import { Dropdown } from '@/components/ui'
@@ -23,6 +25,34 @@ type SortOrder = 'desc' | 'asc'
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const siteStore = useSiteStore()
+const siteOrigin = useSiteOrigin()
+
+// 首页默认即站点名/站点简介（useSeo 缺省回落 site.description）；
+// 附 WebSite + SearchAction 结构化数据，帮助搜索引擎理解站内搜索入口
+const homeJsonLd = computed(() => {
+  const site = siteStore.site
+  const root = siteOrigin()
+  if (!root || !site.title) return null
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: site.title,
+    ...(site.description ? { description: site.description } : {}),
+    url: root,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${root}/search?q={search_term_string}`,
+      'query-input': 'required name=search_term_string',
+    },
+  }
+})
+
+useSeo({
+  image: () => siteStore.site.avatar,
+  jsonLd: homeJsonLd,
+})
+
 const { setFavoriteStatus, setFavoriteCount } = useFavorite()
 
 const articles = ref<ArticleListItem[]>([])

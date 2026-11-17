@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useHead } from '@unhead/vue'
 import { Heart, Search, X } from 'lucide-vue-next'
 import { getFavoriteArticles } from '@/api/article'
 import { useFavorite } from '@/composables/useFavorite'
+import { useSeo } from '@/composables/useSeo'
 import ArticleList from '@/components/article/ArticleList.vue'
 import type { ArticleListItem, Pagination } from '@/types'
 
@@ -17,12 +17,11 @@ const loading = ref(false)
 const searchKeyword = ref('')
 const searchInput = ref('')
 
-useHead(() => ({
+useSeo({
   title: '我的收藏',
-  meta: [
-    { name: 'description', content: '我收藏的文章列表' },
-  ],
-}))
+  description: '我收藏的文章列表',
+  noindex: true,
+})
 
 async function fetchFavorites(page = 1) {
   loading.value = true

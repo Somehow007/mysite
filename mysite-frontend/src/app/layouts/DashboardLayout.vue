@@ -5,6 +5,12 @@ import { Menu } from 'lucide-vue-next'
 import DashboardSidebar from '@/components/dashboard/DashboardSidebar.vue'
 import Drawer from '@/components/ui/Drawer.vue'
 import { gsap } from 'gsap'
+import { useHead } from '@unhead/vue'
+
+// 后台所有页面不收录
+useHead({
+  meta: [{ name: 'robots', content: 'noindex' }],
+})
 
 const drawerOpen = ref(false)
 

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useHead } from '@unhead/vue'
 import { Lock } from 'lucide-vue-next'
 import { getArticleById, getArticles } from '@/api/article'
 import { getArticleNavigation } from '@/api/collection'
@@ -11,6 +10,8 @@ import { useFavorite } from '@/composables/useFavorite'
 import { useChatLauncher } from '@/composables/useChatLauncher'
 import { takePendingAsk, takePendingQuote, hasAuthSession } from '@/composables/usePendingAsk'
 import { useSiteStore } from '@/stores/site'
+import { useSeo, useSiteOrigin } from '@/composables/useSeo'
+import { absoluteUrl, isoDateTime, siteUrl } from '@/utils/seo'
 import ArticleContent from '@/components/article/ArticleContent.vue'
 import ArticleToc from '@/components/article/ArticleToc.vue'
 import PostDock from '@/components/article/PostDock.vue'
@@ -61,26 +62,47 @@ const showArticleNav = computed(() => {
   )
 })
 
-useHead(() => ({
-  title: article.value
-    ? article.value.title
-    : errorKind.value === 'notfound'
-      ? '页面不存在'
-      : errorKind.value === 'error' ? '加载失败' : '加载中...',
-  meta: article.value
-    ? [
-        { name: 'description', content: article.value.summary || '' },
-        { property: 'og:title', content: article.value.title },
-        { property: 'og:description', content: article.value.summary || '' },
-        { property: 'og:type', content: 'article' },
-        ...(article.value.coverImage ? [{ property: 'og:image', content: article.value.coverImage }] : []),
-        ...(article.value.createTime
-          ? [{ property: 'article:published_time', content: article.value.createTime }]
-          : []),
-        { property: 'article:modified_time', content: article.value.updateTime },
-      ]
-    : [],
-}))
+const origin = useSiteOrigin()
+
+// BlogPosting 结构化数据：与 OG article:* 同源数据，抓取/AI 摘要更友好
+const seoJsonLd = computed(() => {
+  const a = article.value
+  if (!a) return null
+  const site = siteStore.site
+  const root = origin()
+  const pageUrl = siteUrl(`/post/${a.id}`, root)
+  const cover = absoluteUrl(a.coverImage, root)
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: a.title,
+    ...(a.summary ? { description: a.summary } : {}),
+    ...(cover ? { image: cover } : {}),
+    ...(isoDateTime(a.createTime) ? { datePublished: isoDateTime(a.createTime) } : {}),
+    ...(isoDateTime(a.updateTime) ? { dateModified: isoDateTime(a.updateTime) } : {}),
+    author: { '@type': 'Person', name: a.authorName || site.author || site.title },
+    publisher: { '@type': 'Organization', name: site.title },
+    ...(pageUrl ? { url: pageUrl, mainEntityOfPage: { '@type': 'WebPage', '@id': pageUrl } } : {}),
+    ...(a.categoryName ? { articleSection: a.categoryName } : {}),
+    ...(a.tags?.length ? { keywords: a.tags.map(t => t.name).join(', ') } : {}),
+  }
+})
+
+useSeo({
+  title: () => article.value?.title
+    ?? (errorKind.value === 'notfound' ? '页面不存在'
+      : errorKind.value === 'error' ? '加载失败' : '加载中...'),
+  description: () => article.value?.summary,
+  image: () => article.value?.coverImage,
+  ogType: () => (article.value ? 'article' : 'website'),
+  noindex: () => !article.value && (errorKind.value === 'notfound' || errorKind.value === 'error'),
+  publishedTime: () => article.value?.createTime,
+  modifiedTime: () => article.value?.updateTime,
+  section: () => article.value?.categoryName ?? undefined,
+  author: () => article.value?.authorName || siteStore.site.author || undefined,
+  tags: () => article.value?.tags?.map(t => t.name),
+  jsonLd: seoJsonLd,
+})
 
 function handleTocReady(items: TocItem[]) {
   tocItems.value = items

@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { useHead } from '@unhead/vue'
 import { ArrowLeft, BookOpen, Calendar, Eye, Clock, Lock } from 'lucide-vue-next'
 import { getCollectionById } from '@/api/collection'
 import { formatDate, calculateReadingTime } from '@/utils/date'
 import { formatViewCount, formatCollectionProgress, collectionProgress } from '@/utils/format'
+import { useSeo } from '@/composables/useSeo'
 import { Pagination } from '@/components/ui'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
 import SkeletonCard from '@/components/common/SkeletonCard.vue'
@@ -23,17 +23,13 @@ const progressPercent = computed(() =>
   collection.value ? collectionProgress(collection.value).percent : null,
 )
 
-useHead(() => ({
-  title: collection.value ? collection.value.title : '合集',
-  meta: collection.value
-    ? [
-        { name: 'description', content: collection.value.description || '' },
-        { property: 'og:title', content: collection.value.title },
-        { property: 'og:description', content: collection.value.description || '' },
-        ...(collection.value.coverImage ? [{ property: 'og:image', content: collection.value.coverImage }] : []),
-      ]
-    : [],
-}))
+useSeo({
+  title: () => collection.value?.title || '合集',
+  description: () => collection.value?.description ?? undefined,
+  image: () => collection.value?.coverImage,
+  // 私有合集/加载失败不收录
+  noindex: () => error.value || collection.value?.visibility === 1,
+})
 
 async function fetchCollection(id: string, page = 1) {
   loading.value = true

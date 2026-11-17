@@ -1,20 +1,26 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useHead } from '@unhead/vue'
 import { useRouter } from 'vue-router'
-import { BookOpen, Library, Eye, Loader2, Search, ArrowLeft } from 'lucide-vue-next'
+import { BookOpen, Library, Eye, Search, ArrowLeft } from 'lucide-vue-next'
 import { getCollections } from '@/api/collection'
 import { formatDate } from '@/utils/date'
 import { formatViewCount, formatCollectionCount } from '@/utils/format'
 import { Pagination as PaginationBar } from '@/components/ui'
 import { useScrollReveal } from '@/composables/useScrollReveal'
+import { useSeo } from '@/composables/useSeo'
 import OptimizedImage from '@/components/common/OptimizedImage.vue'
 import SkeletonCard from '@/components/common/SkeletonCard.vue'
 import type { Collection, Pagination } from '@/types'
 
 const router = useRouter()
 
-useHead(() => ({ title: '合集' }))
+useSeo({
+  title: '合集',
+  description: () =>
+    pagination.value?.total
+      ? `浏览全部文章合集，共 ${pagination.value.total} 个合集，每个合集围绕一个主题展开`
+      : '浏览全部文章合集，每个合集围绕一个主题展开',
+})
 
 const collections = ref<Collection[]>([])
 const pagination = ref<Pagination | null>(null)

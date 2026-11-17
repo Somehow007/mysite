@@ -1,16 +1,15 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useHead } from '@unhead/vue'
+import { useRoute } from 'vue-router'
 import { Search as SearchIcon, Library } from 'lucide-vue-next'
 import { searchArticles } from '@/api/article'
 import { getCollections } from '@/api/collection'
+import { useSeo } from '@/composables/useSeo'
 import ArticleList from '@/components/article/ArticleList.vue'
 import CollectionCard from '@/components/collection/CollectionCard.vue'
 import type { ArticleListItem, Collection, Pagination } from '@/types'
 
 const route = useRoute()
-const router = useRouter()
 
 const articles = ref<ArticleListItem[]>([])
 const pagination = ref<Pagination | null>(null)
@@ -19,9 +18,11 @@ const loadError = ref('')
 const keyword = ref('')
 const collections = ref<Collection[]>([])
 
-useHead(() => ({
-  title: keyword.value ? `搜索: ${keyword.value}` : '搜索',
-}))
+useSeo({
+  title: () => keyword.value ? `搜索: ${keyword.value}` : '搜索',
+  // 搜索结果页不收录（关键词组合无限，易产生薄内容）
+  noindex: true,
+})
 
 async function doSearch(q: string, page = 1) {
   if (!q) return

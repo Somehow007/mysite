@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { useHead } from '@unhead/vue'
+import { useSeo } from '@/composables/useSeo'
 import NotFoundPanel from '@/components/common/NotFoundPanel.vue'
 
-useHead(() => ({
+useSeo({
   title: '页面不存在',
-  meta: [
-    { name: 'description', content: '页面不存在' },
-    { name: 'robots', content: 'noindex' },
-  ],
-}))
+  description: '页面不存在',
+  noindex: true,
+})
 </script>
 
 <template>

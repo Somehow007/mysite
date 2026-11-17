@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useHead } from '@unhead/vue'
+import { useSeo } from '@/composables/useSeo'
 import { useSiteStore } from '@/stores/site'
 import ArticleContent from '@/components/article/ArticleContent.vue'
 
-useHead(() => ({
-  title: '关于',
-  meta: [
-    { name: 'description', content: '关于本站' },
-  ],
-}))
-
 const siteStore = useSiteStore()
+
+useSeo({
+  title: '关于',
+  description: () => {
+    const site = siteStore.site
+    const parts = [site.description, site.authorBio].filter(Boolean)
+    return parts.length ? parts.join(' — ') : `关于${site.title || '本站'}`
+  },
+  image: () => siteStore.site.avatar,
+})
 
 const authorInitial = computed(() => siteStore.site.author?.charAt(0) || '·')
 // 长文走 site.aboutContent（markdown）；未配置时整块不渲染，作者卡已含短简介

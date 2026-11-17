@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useHead } from '@unhead/vue'
+import { ref, onMounted, computed } from 'vue'
+import { useSeo } from '@/composables/useSeo'
 import { getArchiveList } from '@/api/article'
 import { Calendar } from 'lucide-vue-next'
 import type { ArchiveItem, ArchiveArticle } from '@/types'
 
-useHead(() => ({
-  title: '归档',
-  meta: [
-    { name: 'description', content: '所有文章按时间归档' },
-  ],
-}))
-
 const archives = ref<ArchiveItem[]>([])
 const loading = ref(false)
+
+const totalArticles = computed(() =>
+  archives.value.reduce((n, a) => n + flattenArticles(a).length, 0),
+)
+
+useSeo({
+  title: '归档',
+  description: () =>
+    totalArticles.value
+      ? `所有文章按时间归档，共 ${totalArticles.value} 篇`
+      : '所有文章按时间归档',
+})
 
 function flattenArticles(archive: ArchiveItem): ArchiveArticle[] {
   const articles: ArchiveArticle[] = []
