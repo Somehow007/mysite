@@ -4,9 +4,10 @@ import { useHead } from '@unhead/vue'
 import { useUserStore } from '@/stores/user'
 import { changePassword } from '@/api/auth'
 import { useToast } from '@/composables/useToast'
-import { Eye, EyeOff, User, Lock, Mail, Phone, UserCircle, Camera, Loader2, ShieldCheck, BadgeCheck, Laptop } from 'lucide-vue-next'
+import { Eye, EyeOff, User, Lock, Mail, Phone, UserCircle, Camera, Loader2, ShieldCheck, BadgeCheck, Laptop, Palette } from 'lucide-vue-next'
 import { Badge, PageHeader } from '@/components/ui'
 import UserAvatar from '@/components/common/UserAvatar.vue'
+import ThemePicker from '@/components/common/ThemePicker.vue'
 import type { ChangePasswordRequest } from '@/types'
 import { uploadAvatar } from '@/api/user'
 
@@ -301,6 +302,14 @@ async function handleAvatarUpload(e: Event) {
             </span>
           </div>
         </form>
+      </section>
+
+      <section class="card-solid p-6">
+        <h2 class="text-lg font-medium text-text-primary mb-6 flex items-center gap-2">
+          <Palette :size="20" class="text-accent" />
+          外观
+        </h2>
+        <ThemePicker />
       </section>
 
       <section class="card-solid p-6">

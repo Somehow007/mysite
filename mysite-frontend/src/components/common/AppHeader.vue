@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
-import { Menu, X, LogOut, PenSquare, LayoutDashboard, Settings, Heart, Camera, Loader2, User, Search, Sun, Moon } from 'lucide-vue-next'
+import { Menu, X, LogOut, PenSquare, LayoutDashboard, Settings, Heart, Camera, Loader2, User, Search, Sun, Moon, Palette } from 'lucide-vue-next'
 import ThemeToggle from './ThemeToggle.vue'
+import ThemePicker from './ThemePicker.vue'
 import SearchDialog from './SearchDialog.vue'
 import { useSiteStore } from '@/stores/site'
 import { useUserStore } from '@/stores/user'
@@ -18,7 +19,14 @@ const { currentTheme, isDark, toggleDarkMode, getThemeMeta } = useTheme()
 const { open: openSearch } = useSearch()
 
 const mobileMenuOpen = ref(false)
+const mobileThemeOpen = ref(false)
 const avatarUploading = ref(false)
+
+// 当前主题有明暗 variant 时显示日/月直切快捷钮；调色板入口（ThemeToggle）始终可见
+const canToggleDark = computed(() => {
+  const meta = getThemeMeta(currentTheme.value)
+  return !!(meta?.darkVariant || meta?.lightVariant)
+})
 
 const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.userAgent)
 const kbdHint = isMac ? '⌘K' : 'Ctrl K'
@@ -26,11 +34,7 @@ const kbdHint = isMac ? '⌘K' : 'Ctrl K'
 // logo：站名里的「·」分隔符着 accent 色（如「某某·手记」）
 const logoSegments = computed(() => siteStore.site.title.split('·'))
 
-// 当前主题有明暗 variant 时顶栏直切；否则回落 ThemeToggle 主题面板（现有行为）
-const canToggleDark = computed(() => {
-  const meta = getThemeMeta(currentTheme.value)
-  return !!(meta?.darkVariant || meta?.lightVariant)
-})
+// 调色板入口常驻顶栏：variant 主题（classic/paper）下直切钮只做快捷通道，完整选择走面板
 
 function isNavActive(path: string) {
   if (path === '/') return route.name === 'home' || route.name === 'home-page'
@@ -142,7 +146,7 @@ async function handleAvatarUpload(e: Event) {
           <Sun v-if="isDark" :size="17" />
           <Moon v-else :size="17" />
         </button>
-        <ThemeToggle v-else />
+        <ThemeToggle />
 
         <template v-if="!userStore.isLoggedIn">
           <RouterLink
@@ -288,6 +292,19 @@ async function handleAvatarUpload(e: Event) {
             >
               手帐
             </a>
+
+            <button
+              type="button"
+              class="flex w-full items-center gap-2.5 border-l-2 border-transparent py-3 pl-3 text-left text-[15px] text-text-secondary transition-colors hover:text-text-primary"
+              :aria-expanded="mobileThemeOpen"
+              @click="mobileThemeOpen = !mobileThemeOpen"
+            >
+              <Palette :size="16" class="text-text-muted" />
+              主题外观
+            </button>
+            <div v-if="mobileThemeOpen" class="pb-2">
+              <ThemePicker />
+            </div>
 
             <template v-if="!userStore.isLoggedIn">
               <RouterLink
