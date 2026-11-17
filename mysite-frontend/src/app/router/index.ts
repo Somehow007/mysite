@@ -163,6 +163,12 @@ const router = createRouter({
           component: () => import('@/views/SettingsView.vue'),
         },
         {
+          path: 'site',
+          name: 'site-settings',
+          component: () => import('@/views/SiteSettingsView.vue'),
+          meta: { requiresAdmin: true },
+        },
+        {
           path: 'knowledge',
           name: 'knowledge-manage',
           component: () => import('@/views/KnowledgeManageView.vue'),

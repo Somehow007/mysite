@@ -2,9 +2,9 @@
 import { ref, computed, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import {
-  FileText, PenSquare, FolderTree, Users, Settings, LogOut, ChevronLeft,
+  FileText, PenSquare, FolderTree, Users, LogOut, ChevronLeft,
   Image as ImageIcon, Tags, MessageSquare, BookOpen, Database, Bot,
-  LayoutDashboard, Home, NotebookPen,
+  LayoutDashboard, Home, NotebookPen, Globe,
 } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { useSiteStore } from '@/stores/site'
@@ -37,6 +37,7 @@ const navGroups = computed(() => {
     { label: '图片管理', path: '/dashboard/images', icon: ImageIcon, requireAdmin: true, requireCreator: false },
     { label: '知识库', path: '/dashboard/knowledge', icon: Database, requireAdmin: true, requireCreator: false },
     { label: 'AI 管理', path: '/dashboard/ai', icon: Bot, requireAdmin: true, requireCreator: false },
+    { label: '站点设置', path: '/dashboard/site', icon: Globe, requireAdmin: true, requireCreator: false },
   ]
 
   const allGroups = [

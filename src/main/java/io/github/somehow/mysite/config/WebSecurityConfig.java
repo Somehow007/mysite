@@ -71,6 +71,10 @@ public class WebSecurityConfig {
                                 "/v1/categories/id/*",
                                 "/v1/categories/{slug}"
                         ).permitAll()
+                        // 站点配置写入仅 ADMIN；必须置于下方 /v1/site/** permitAll 之前
+                        .requestMatchers(
+                                HttpMethod.PUT, "/v1/site/config"
+                        ).hasRole("ADMIN")
                         .requestMatchers(
                                 "/v1/tags/**",
                                 "/v1/site/**",

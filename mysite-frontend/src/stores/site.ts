@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { SiteConfig } from '@/types'
-import { get } from '@/api/client'
+import { getSiteConfig } from '@/api/site'
 
 export const useSiteStore = defineStore('site', () => {
   const site = ref<SiteConfig>({
@@ -21,7 +21,7 @@ export const useSiteStore = defineStore('site', () => {
   async function fetchSite() {
     loading.value = true
     try {
-      const data = await get<SiteConfig>('/v1/site/config')
+      const data = await getSiteConfig()
       if (data) {
         site.value = data
       }

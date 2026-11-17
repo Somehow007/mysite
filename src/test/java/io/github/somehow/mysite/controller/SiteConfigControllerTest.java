@@ -3,6 +3,8 @@ package io.github.somehow.mysite.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.somehow.mysite.commons.framework.result.Result;
 import io.github.somehow.mysite.config.SiteProperties;
+import io.github.somehow.mysite.dto.req.site.SiteConfigUpdateReqDTO;
+import io.github.somehow.mysite.service.SiteConfigService;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
@@ -12,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /**
  * {@code GET /v1/site/config} 契约测试：返回 {@link SiteProperties} 序列化结果，
@@ -19,7 +22,9 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class SiteConfigControllerTest {
 
-    private final SiteConfigController controller = new SiteConfigController(new SiteProperties());
+    private final SiteConfigService siteConfigService = mock(SiteConfigService.class);
+    private final SiteConfigController controller =
+            new SiteConfigController(new SiteProperties(), siteConfigService);
 
     @Test
     void returnsSuccessResultWithSiteProperties() {
@@ -90,6 +95,21 @@ class SiteConfigControllerTest {
         assertEquals(2, bound.getNavigation().size());
         assertEquals("首页", bound.getNavigation().get(0).getLabel());
         assertEquals("/archive", bound.getNavigation().get(1).getPath());
+    }
+
+    @Test
+    void putDelegatesToServiceAndReturnsUpdatedConfig() {
+        SiteProperties updated = new SiteProperties();
+        updated.setTitle("Updated Title");
+        when(siteConfigService.update(any(SiteConfigUpdateReqDTO.class))).thenReturn(updated);
+
+        SiteConfigUpdateReqDTO dto = new SiteConfigUpdateReqDTO();
+        dto.setTitle("Updated Title");
+        Result<SiteProperties> result = controller.updateSiteConfig(dto);
+
+        assertTrue(result.isSuccess());
+        assertEquals("Updated Title", result.getData().getTitle());
+        verify(siteConfigService).update(dto);
     }
 
     @Test

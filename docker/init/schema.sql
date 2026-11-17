@@ -289,6 +289,30 @@ CREATE TABLE IF NOT EXISTS `t_comment_like` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='评论点赞表';
 
 -- ==============================================
+-- 12. 站点配置表 (t_site_config，单行 id=1，后台可改)
+-- ==============================================
+CREATE TABLE IF NOT EXISTS `t_site_config` (
+    `id`               BIGINT       NOT NULL COMMENT '固定为 1 的单行配置',
+    `title`            VARCHAR(128) DEFAULT NULL COMMENT '站点标题，NULL=继承 env 默认',
+    `subtitle`         VARCHAR(255) DEFAULT NULL COMMENT '站点副标题',
+    `description`      VARCHAR(512) DEFAULT NULL COMMENT '站点简介（meta description / og:description）',
+    `author`           VARCHAR(64)  DEFAULT NULL COMMENT '作者署名',
+    `author_bio`       TEXT         DEFAULT NULL COMMENT '作者简介',
+    `author_tagline`   VARCHAR(255) DEFAULT NULL COMMENT '作者一句话签名',
+    `about_content`    MEDIUMTEXT   DEFAULT NULL COMMENT '关于页长文（markdown，支持多行）',
+    `tech_stack`       VARCHAR(255) DEFAULT NULL COMMENT '技术栈一句话',
+    `avatar`           VARCHAR(512) DEFAULT NULL COMMENT '站点/作者头像 URL',
+    `url`              VARCHAR(255) DEFAULT NULL COMMENT '站点绝对地址（canonical / og:url / JSON-LD）',
+    `github`           VARCHAR(255) DEFAULT NULL COMMENT 'GitHub 主页',
+    `rss`              VARCHAR(255) DEFAULT NULL COMMENT 'RSS 地址',
+    `comment_enabled`  TINYINT(1)   DEFAULT NULL COMMENT '评论开关，NULL=继承 env 默认',
+    `create_time`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `del_flag`         TINYINT      NOT NULL DEFAULT 0 COMMENT '删除标识 0:未删除 1:已删除',
+    PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='站点配置（单行，后台可改；NULL 字段继承 env/yaml 默认）';
+
+-- ==============================================
 -- 学习手帐（花期 Blossom）子系统表（sj_ 前缀，第二期后端化）
 -- 依据：study-journey《网站集成与 MySQL 存储方案 v2.0》§3
 -- 约定：时间字段 BIGINT 存 Unix 毫秒（与前端 createdAt/updatedAt 一致，避免时区换算）；
