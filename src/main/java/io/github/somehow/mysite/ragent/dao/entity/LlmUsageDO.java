@@ -27,6 +27,10 @@ public class LlmUsageDO {
     private Integer promptTokens;
     private Integer completionTokens;
     private Integer totalTokens;
+    private Integer cacheReadTokens;
+    private Integer cacheWriteTokens;
+    private Long priceId;
+    private Boolean peak;
     private String tokenSource;
     private BigDecimal cost;
     private String currency;

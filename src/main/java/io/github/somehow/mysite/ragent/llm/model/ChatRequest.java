@@ -16,7 +16,7 @@ import java.util.List;
 @AllArgsConstructor
 public class ChatRequest {
 
-    private String model;                // 模型名（如 qwen3-max）
+    private String model;                // 模型名（如 qwen3.5-plus；多数调用方留空，由 provider 配置决定）
     private List<ChatMessage> messages;
     private double temperature;          // 0.0~2.0，创作性越高越大
     private int maxTokens;              // 最大输出 token 数

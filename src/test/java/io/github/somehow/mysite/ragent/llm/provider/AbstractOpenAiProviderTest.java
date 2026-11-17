@@ -270,5 +270,36 @@ class AbstractOpenAiProviderTest {
             String json = "{\"choices\":[{\"delta\":{\"content\":\"A\"},\"index\":0}]}";
             assertNull(provider.extractUsage(json));
         }
+
+        @Test
+        @DisplayName("OpenAI 系 cached_tokens → cacheReadTokens")
+        void shouldExtractCachedTokens() {
+            String json = "{\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110,"
+                + "\"prompt_tokens_details\":{\"cached_tokens\":80}}}";
+            TokenUsage usage = provider.extractUsage(json);
+            assertNotNull(usage);
+            assertEquals(80, usage.cacheReadTokens());
+            assertEquals(0, usage.cacheWriteTokens());
+        }
+
+        @Test
+        @DisplayName("DeepSeek prompt_cache_hit_tokens → cacheReadTokens")
+        void shouldExtractDeepSeekCacheHit() {
+            String json = "{\"usage\":{\"prompt_tokens\":100,\"completion_tokens\":10,\"total_tokens\":110,"
+                + "\"prompt_cache_hit_tokens\":60,\"prompt_cache_miss_tokens\":40}}";
+            TokenUsage usage = provider.extractUsage(json);
+            assertNotNull(usage);
+            assertEquals(60, usage.cacheReadTokens());
+        }
+
+        @Test
+        @DisplayName("cacheRead 超过 prompt 时钳制")
+        void shouldClampCacheReadToPrompt() {
+            String json = "{\"usage\":{\"prompt_tokens\":50,\"completion_tokens\":5,\"total_tokens\":55,"
+                + "\"prompt_cache_hit_tokens\":80}}";
+            TokenUsage usage = provider.extractUsage(json);
+            assertNotNull(usage);
+            assertEquals(50, usage.cacheReadTokens());
+        }
     }
 }

@@ -88,6 +88,102 @@ public class RagentSchemaMigration implements InitializingBean {
             "idx_llm_usage_type");
         execute("CREATE INDEX IF NOT EXISTS idx_llm_usage_model ON t_llm_usage(model, create_time DESC)",
             "idx_llm_usage_model");
+        execute("ALTER TABLE t_llm_usage ADD COLUMN IF NOT EXISTS cache_read_tokens INT DEFAULT 0",
+            "t_llm_usage.cache_read_tokens");
+        execute("ALTER TABLE t_llm_usage ADD COLUMN IF NOT EXISTS cache_write_tokens INT DEFAULT 0",
+            "t_llm_usage.cache_write_tokens");
+        execute("ALTER TABLE t_llm_usage ADD COLUMN IF NOT EXISTS price_id BIGINT",
+            "t_llm_usage.price_id");
+        execute("ALTER TABLE t_llm_usage ADD COLUMN IF NOT EXISTS peak BOOLEAN",
+            "t_llm_usage.peak");
+
+        execute("""
+            CREATE TABLE IF NOT EXISTS t_llm_model_price (
+                id BIGINT PRIMARY KEY,
+                provider VARCHAR(32) NOT NULL,
+                model VARCHAR(128) NOT NULL,
+                display_name VARCHAR(128),
+                currency VARCHAR(8) NOT NULL DEFAULT 'CNY',
+                unit VARCHAR(32) NOT NULL DEFAULT 'PER_MILLION_TOKENS',
+                input_price NUMERIC(12,6),
+                cache_read_price NUMERIC(12,6),
+                cache_read_factor NUMERIC(8,4),
+                cache_write_price NUMERIC(12,6),
+                cache_write_factor NUMERIC(8,4),
+                output_price NUMERIC(12,6),
+                peak_windows TEXT,
+                off_peak_factor NUMERIC(6,4),
+                exclude_holidays BOOLEAN DEFAULT false,
+                tiers TEXT,
+                effective_from TIMESTAMP,
+                effective_to TIMESTAMP,
+                source VARCHAR(32),
+                note TEXT,
+                create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """, "t_llm_model_price");
+        execute("CREATE INDEX IF NOT EXISTS idx_llm_model_price_key ON t_llm_model_price(provider, model, effective_from DESC)",
+            "idx_llm_model_price_key");
+        execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_llm_model_price_ver ON t_llm_model_price(provider, model, effective_from)",
+            "uq_llm_model_price_ver");
+
+        execute("""
+            CREATE TABLE IF NOT EXISTS t_llm_holiday (
+                holiday_date DATE PRIMARY KEY,
+                name VARCHAR(64)
+            )
+            """, "t_llm_holiday");
+
+        // 种子灌入标记：保证每类内置种子只在首次启动时写入一次，
+        // 之后管理员在「计价」页的增删改不会被重启覆盖复活。
+        execute("""
+            CREATE TABLE IF NOT EXISTS t_llm_seed_marker (
+                seed_key VARCHAR(64) PRIMARY KEY,
+                seeded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """, "t_llm_seed_marker");
+
+        execute("""
+            CREATE TABLE IF NOT EXISTS t_llm_balance_snapshot (
+                id BIGINT PRIMARY KEY,
+                provider VARCHAR(32) NOT NULL,
+                ok BOOLEAN,
+                payload TEXT,
+                latency_ms INT,
+                create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """, "t_llm_balance_snapshot");
+        execute("CREATE INDEX IF NOT EXISTS idx_llm_balance_snapshot_provider ON t_llm_balance_snapshot(provider, create_time DESC)",
+            "idx_llm_balance_snapshot_provider");
+
+        // 2026 年法定节假日放假安排（国办发明电〔2025〕7号，2025-11-04 发布）。
+        // 只含放假调休日；调休上班日（2/14、2/28、5/9、9/20、10/10）不算节假日。
+        // 后续年份由管理端「计价」页维护，本表不自动滚动。
+        execute("""
+            WITH marker AS (
+                INSERT INTO t_llm_seed_marker (seed_key)
+                SELECT 'holidays_2026'
+                WHERE NOT EXISTS (SELECT 1 FROM t_llm_holiday)
+                ON CONFLICT (seed_key) DO NOTHING
+                RETURNING seed_key
+            )
+            INSERT INTO t_llm_holiday (holiday_date, name)
+            SELECT v.holiday_date, v.name
+            FROM (VALUES
+                ('2026-01-01'::date,'元旦'),('2026-01-02','元旦'),('2026-01-03','元旦'),
+                ('2026-02-15','春节'),('2026-02-16','春节'),('2026-02-17','春节'),('2026-02-18','春节'),
+                ('2026-02-19','春节'),('2026-02-20','春节'),('2026-02-21','春节'),('2026-02-22','春节'),('2026-02-23','春节'),
+                ('2026-04-04','清明节'),('2026-04-05','清明节'),('2026-04-06','清明节'),
+                ('2026-05-01','劳动节'),('2026-05-02','劳动节'),('2026-05-03','劳动节'),('2026-05-04','劳动节'),('2026-05-05','劳动节'),
+                ('2026-06-19','端午节'),('2026-06-20','端午节'),('2026-06-21','端午节'),
+                ('2026-09-25','中秋节'),('2026-09-26','中秋节'),('2026-09-27','中秋节'),
+                ('2026-10-01','国庆节'),('2026-10-02','国庆节'),('2026-10-03','国庆节'),('2026-10-04','国庆节'),
+                ('2026-10-05','国庆节'),('2026-10-06','国庆节'),('2026-10-07','国庆节')
+            ) AS v(holiday_date, name)
+            WHERE EXISTS (SELECT 1 FROM marker)
+            ON CONFLICT (holiday_date) DO NOTHING
+            """, "t_llm_holiday.seed_2026");
 
         execute("""
             CREATE TABLE IF NOT EXISTS t_llm_provider_setting (

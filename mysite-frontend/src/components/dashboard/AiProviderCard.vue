@@ -16,8 +16,8 @@ const emit = defineEmits<{
 const { success, error: toastError } = useToast()
 
 const CHAT_MODEL_HINTS: Record<string, string[]> = {
-  deepseek: ['deepseek-v4-flash', 'deepseek-chat', 'deepseek-reasoner'],
-  bailian: ['qwen3-max', 'qwen-plus', 'qwen-turbo', 'qwen-max'],
+  deepseek: ['deepseek-flash', 'deepseek-v4-pro'],
+  bailian: ['qwen3.5-plus', 'qwen3.7-plus', 'qwen-max', 'qwen-plus'],
   siliconflow: ['glm-4.7', 'Qwen/Qwen3-8B'],
   aihubmix: ['gpt-5.4', 'gpt-4o'],
   ollama: ['qwen3:8b', 'qwen2.5:7b'],
@@ -28,7 +28,7 @@ const EMBEDDING_MODEL_HINTS: Record<string, string[]> = {
 }
 
 const RERANK_MODEL_HINTS: Record<string, string[]> = {
-  bailian: ['qwen3-rerank', 'gte-rerank', 'gte-rerank-hybrid'],
+  bailian: ['qwen3.7-text-rerank', 'qwen3-rerank', 'gte-rerank', 'gte-rerank-hybrid'],
 }
 
 const EMBEDDING_DIM_HINTS = [2048, 1536, 1024, 768, 512, 256]

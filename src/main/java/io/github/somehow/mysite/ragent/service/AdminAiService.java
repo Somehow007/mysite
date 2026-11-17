@@ -76,19 +76,27 @@ public class AdminAiService {
         LocalDateTime end = to != null ? toLdt(to) : LocalDateTime.now().plusSeconds(1);
         LocalDateTime start = from != null ? toLdt(from) : end.minusDays(7);
 
-        Map<String, Object> totals = usageMapper.selectTotals(start, end);
         LlmUsageSummaryDTO dto = new LlmUsageSummaryDTO();
-        dto.setCurrency(ragProperties.getLlm().getPricing().getCurrency());
-        dto.setTotalCost(decimal(totals, "total_cost"));
-        dto.setTotalTokens(longVal(totals, "total_tokens"));
-        dto.setTotalCalls(longVal(totals, "total_calls"));
-        long successCalls = longVal(totals, "success_calls");
-        dto.setSuccessRate(dto.getTotalCalls() == 0 ? 0
-                : (successCalls * 100.0 / dto.getTotalCalls()));
+        long totalCalls = 0;
+        long successCalls = 0;
+        for (Map<String, Object> row : usageMapper.selectTotals(start, end)) {
+            LlmUsageSummaryDTO.CurrencySlice c = new LlmUsageSummaryDTO.CurrencySlice();
+            c.setCurrency(str(row, "currency"));
+            c.setTotalCost(decimal(row, "total_cost"));
+            c.setTotalTokens(longVal(row, "total_tokens"));
+            c.setTotalCalls(longVal(row, "total_calls"));
+            c.setSuccessCalls(longVal(row, "success_calls"));
+            dto.getByCurrency().add(c);
+            totalCalls += c.getTotalCalls();
+            successCalls += c.getSuccessCalls();
+        }
+        dto.setTotalCalls(totalCalls);
+        dto.setSuccessRate(totalCalls == 0 ? 0 : successCalls * 100.0 / totalCalls);
 
         for (Map<String, Object> row : usageMapper.selectDaily(start, end)) {
             LlmUsageSummaryDTO.DailyPoint p = new LlmUsageSummaryDTO.DailyPoint();
             p.setDay(String.valueOf(row.get("day")));
+            p.setCurrency(str(row, "currency"));
             p.setCost(decimal(row, "cost"));
             p.setTokens(longVal(row, "tokens"));
             p.setCalls(longVal(row, "calls"));
@@ -98,6 +106,7 @@ public class AdminAiService {
             LlmUsageSummaryDTO.NamedSlice s = new LlmUsageSummaryDTO.NamedSlice();
             s.setName(str(row, "model"));
             s.setProvider(str(row, "provider"));
+            s.setCurrency(str(row, "currency"));
             s.setCost(decimal(row, "cost"));
             s.setTokens(longVal(row, "tokens"));
             s.setCalls(longVal(row, "calls"));
@@ -106,6 +115,7 @@ public class AdminAiService {
         for (Map<String, Object> row : usageMapper.selectByCallType(start, end)) {
             LlmUsageSummaryDTO.NamedSlice s = new LlmUsageSummaryDTO.NamedSlice();
             s.setName(str(row, "call_type"));
+            s.setCurrency(str(row, "currency"));
             s.setCost(decimal(row, "cost"));
             s.setTokens(longVal(row, "tokens"));
             s.setCalls(longVal(row, "calls"));
@@ -117,6 +127,7 @@ public class AdminAiService {
             Object uid = row.get("user_id");
             u.setUserId(uid == null ? null : String.valueOf(uid));
             u.setVisitorId(str(row, "visitor_id"));
+            u.setCurrency(str(row, "currency"));
             u.setCost(decimal(row, "cost"));
             u.setTokens(longVal(row, "tokens"));
             u.setCalls(longVal(row, "calls"));

@@ -6,6 +6,7 @@ import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.usage.LlmUsageRecorder;
 import io.github.somehow.mysite.ragent.usage.TokenUsage;
 import io.github.somehow.mysite.ragent.usage.UsageContext;
+import io.github.somehow.mysite.ragent.usage.UsageJsonSupport;
 import io.github.somehow.mysite.ragent.vector.VectorStore.SearchResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -135,7 +136,9 @@ public class BaiLianRerankProvider implements RerankService {
                     usage.path("input_tokens").asInt(usage.path("total_tokens").asInt(0)));
                 int total = usage.path("total_tokens").asInt(prompt);
                 if (prompt > 0 || total > 0) {
-                    return TokenUsage.api(prompt, 0, total);
+                    return TokenUsage.api(prompt, 0, total,
+                        UsageJsonSupport.cacheReadTokens(usage),
+                        UsageJsonSupport.cacheWriteTokens(usage));
                 }
             }
         } catch (Exception ignored) {

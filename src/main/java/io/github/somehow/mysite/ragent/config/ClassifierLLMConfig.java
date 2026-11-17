@@ -19,7 +19,9 @@ import java.util.Map;
  *
  * <h3>为什么需要独立的 cheap LLM bean？</h3>
  * 意图分类和查询改写都是"非流式、短输出、高频调用"的场景，
- * 使用 cheap model（如 deepseek-chat）比使用主力生成模型（deepseek-v4-flash）便宜 10×。
+ * 使用 cheap model（如 deepseek-flash / qwen-flash）控制成本：
+ * 分类/改写输出短、prompt 小，模型档位取低档或与主力同档均可，
+ * 成本大头在调用次数而非单价。
  * 这个 bean 不注册为 LLMProvider（不会进入 RoutingLLMService 的降级链），
  * 只是分类器和改写器内部使用。
  */
@@ -72,10 +74,10 @@ public class ClassifierLLMConfig {
         }
         String baseUrl = provider.getBaseUrl();
         if (baseUrl != null && baseUrl.contains("deepseek")) {
-            return "deepseek-chat";
+            return "deepseek-flash";
         }
         if (baseUrl != null && baseUrl.contains("dashscope")) {
-            return "qwen-turbo";
+            return "qwen-flash";
         }
         return provider.getChatModel();
     }

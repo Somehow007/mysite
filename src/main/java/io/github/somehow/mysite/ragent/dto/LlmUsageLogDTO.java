@@ -28,6 +28,11 @@ public class LlmUsageLogDTO {
     private Integer promptTokens;
     private Integer completionTokens;
     private Integer totalTokens;
+    private Integer cacheReadTokens;
+    private Integer cacheWriteTokens;
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long priceId;
+    private Boolean peak;
     private String tokenSource;
     private BigDecimal cost;
     private String currency;

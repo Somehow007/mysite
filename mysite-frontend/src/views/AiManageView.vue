@@ -4,7 +4,7 @@ import type { Component } from 'vue'
 import { useHead } from '@unhead/vue'
 import {
   Bot, Coins, Cpu, List, PieChart, Activity, CheckCircle2,
-  BarChart3, Users,
+  BarChart3, Users, Tags,
 } from 'lucide-vue-next'
 import {
   getAiProviders, getAiUsageLogs, getAiUsageSummary,
@@ -15,16 +15,19 @@ import {
   Badge, DataTable, EmptyState, PageHeader, SearchFilterBar, StatsCard,
 } from '@/components/ui'
 import AiProviderCard from '@/components/dashboard/AiProviderCard.vue'
+import AiPricingPanel from '@/components/dashboard/AiPricingPanel.vue'
+import AiBillingCard from '@/components/dashboard/AiBillingCard.vue'
 import type { Column } from '@/components/ui/DataTable.vue'
 
 useHead(() => ({ title: 'AI 管理' }))
 
-type Tab = 'logs' | 'dashboard' | 'providers'
+type Tab = 'logs' | 'dashboard' | 'prices' | 'providers'
 const tab = ref<Tab>('logs')
 
 const TABS: { id: Tab; label: string; icon: Component }[] = [
   { id: 'logs', label: '调用记录', icon: List },
   { id: 'dashboard', label: '消费看板', icon: BarChart3 },
+  { id: 'prices', label: '计价', icon: Tags },
   { id: 'providers', label: '模型与 API', icon: Cpu },
 ]
 
@@ -60,13 +63,20 @@ function actorOf(row: LlmUsageLog) {
   return '匿名'
 }
 
-function formatCost(n: number | null | undefined) {
+const CURRENCY_SYMBOL: Record<string, string> = { CNY: '¥', USD: '$' }
+
+function currencySymbol(currency?: string | null) {
+  if (!currency) return '¥'
+  return CURRENCY_SYMBOL[currency] ?? `${currency} `
+}
+
+function formatCost(n: number | null | undefined, currency?: string | null) {
   if (n == null || Number.isNaN(Number(n))) return '—'
   const v = Number(n)
-  if (v === 0) return '¥0'
-  if (v < 0.0001) return `¥${v.toFixed(6)}`
-  if (v < 0.01) return `¥${v.toFixed(4)}`
-  return `¥${v.toFixed(4)}`
+  const sym = currencySymbol(currency)
+  if (v === 0) return `${sym}0`
+  if (v < 0.0001) return `${sym}${v.toFixed(6)}`
+  return `${sym}${v.toFixed(4)}`
 }
 
 function formatTokens(n: number | null | undefined) {
@@ -159,6 +169,7 @@ const logColumns: Column<LlmUsageLog>[] = [
   { key: 'callType', label: '类型', width: '96px' },
   { key: 'model', label: '模型' },
   { key: 'tokens', label: 'Token', width: '118px', align: 'right' },
+  { key: 'cache', label: '缓存', width: '92px', align: 'right', hideMobile: true },
   { key: 'cost', label: '费用', width: '88px', align: 'right' },
   { key: 'latencyMs', label: '耗时', width: '72px', align: 'right', hideMobile: true },
   { key: 'success', label: '状态', width: '76px' },
@@ -168,6 +179,55 @@ const logColumns: Column<LlmUsageLog>[] = [
 const dashPreset = ref<'today' | '7d' | '30d' | 'month'>('7d')
 const summary = ref<LlmUsageSummary | null>(null)
 const summaryLoading = ref(false)
+
+// ── 币种分组：不同币种金额不可相加，看板按币种切换视图 ──
+const activeCurrency = ref('')
+const currencies = computed(() => summary.value?.byCurrency ?? [])
+const dashCurrency = computed(() =>
+  activeCurrency.value || currencies.value[0]?.currency || '',
+)
+
+interface DashView {
+  currency: string
+  totalCost: number
+  totalTokens: number
+  totalCalls: number
+  successRate: number
+  series: LlmUsageSummary['series']
+  byModel: LlmUsageSummary['byModel']
+  byCallType: LlmUsageSummary['byCallType']
+  byUser: LlmUsageSummary['byUser']
+}
+
+const dash = computed<DashView>(() => {
+  const s = summary.value
+  const empty: DashView = {
+    currency: dashCurrency.value, totalCost: 0, totalTokens: 0,
+    totalCalls: 0, successRate: 0,
+    series: [], byModel: [], byCallType: [], byUser: [],
+  }
+  if (!s) return empty
+  const cur = dashCurrency.value
+  const slice = s.byCurrency.find(c => c.currency === cur)
+  const pick = <T extends { currency: string }>(arr: T[]) =>
+    cur ? arr.filter(x => x.currency === cur) : arr
+  return {
+    currency: cur,
+    totalCost: Number(slice?.totalCost ?? 0),
+    totalTokens: slice?.totalTokens ?? 0,
+    totalCalls: slice?.totalCalls ?? s.totalCalls,
+    successRate: s.successRate,
+    series: pick(s.series),
+    byModel: pick(s.byModel),
+    byCallType: pick(s.byCallType),
+    byUser: pick(s.byUser),
+  }
+})
+
+function setCurrency(c: string) {
+  clearHover()
+  activeCurrency.value = c
+}
 
 async function fetchSummary() {
   summaryLoading.value = true
@@ -187,11 +247,11 @@ function setPreset(p: 'today' | '7d' | '30d' | 'month') {
 }
 
 const maxDailyCost = computed(() => {
-  const series = summary.value?.series ?? []
+  const series = dash.value.series
   return Math.max(...series.map(s => Number(s.cost) || 0), 0.000001)
 })
 
-const hoverPoint = ref<LlmUsageSummary['series'][number] | null>(null)
+const hoverPoint = ref<DashView['series'][number] | null>(null)
 const hoverSeg = ref<string | null>(null)
 const hoverModelKey = ref<string | null>(null)
 const hoverUserKey = ref<string | null>(null)
@@ -240,13 +300,13 @@ function avgCostPerCall(cost: number, calls: number) {
   return formatCost(Number(cost) / calls)
 }
 
-function barTipData(point: LlmUsageSummary['series'][number]): Omit<DashTip, 'x' | 'y'> {
-  const series = summary.value?.series ?? []
+function barTipData(point: DashView['series'][number]): Omit<DashTip, 'x' | 'y'> {
+  const series = dash.value.series
   return {
     title: formatFullDay(point.day),
     accent: 'var(--accent)',
     rows: [
-      { label: '费用', value: formatCost(point.cost) },
+      { label: '费用', value: formatCost(point.cost, point.currency) },
       { label: '调用', value: `${formatTokens(point.calls)} 次` },
       { label: 'Token', value: formatTokens(point.tokens) },
       { label: '占区间费用', value: `${sliceShare(point.cost, series).toFixed(1)}%` },
@@ -255,14 +315,14 @@ function barTipData(point: LlmUsageSummary['series'][number]): Omit<DashTip, 'x'
   }
 }
 
-function modelTipData(s: LlmUsageSummary['byModel'][number], idx: number): Omit<DashTip, 'x' | 'y'> {
-  const list = summary.value?.byModel ?? []
+function modelTipData(s: DashView['byModel'][number], idx: number): Omit<DashTip, 'x' | 'y'> {
+  const list = dash.value.byModel
   return {
     title: s.name,
     subtitle: s.provider || undefined,
     accent: MODEL_BAR_COLORS[idx % MODEL_BAR_COLORS.length],
     rows: [
-      { label: '费用', value: formatCost(s.cost) },
+      { label: '费用', value: formatCost(s.cost, s.currency) },
       { label: '占比', value: `${sliceShare(s.cost, list).toFixed(1)}%` },
       { label: '调用', value: `${formatTokens(s.calls)} 次` },
       { label: 'Token', value: formatTokens(s.tokens) },
@@ -273,18 +333,19 @@ function modelTipData(s: LlmUsageSummary['byModel'][number], idx: number): Omit<
 
 function typeTipData(s: {
   name: string
+  currency?: string
   cost: number
   tokens: number
   calls: number
   pct?: number
   color?: string
 }): Omit<DashTip, 'x' | 'y'> {
-  const pct = s.pct != null ? s.pct * 100 : sliceShare(s.cost, summary.value?.byCallType ?? [])
+  const pct = s.pct != null ? s.pct * 100 : sliceShare(s.cost, dash.value.byCallType)
   return {
     title: CALL_TYPE_LABEL[s.name] || s.name,
     accent: s.color || CALL_TYPE_COLOR[s.name] || 'var(--accent)',
     rows: [
-      { label: '费用', value: formatCost(s.cost) },
+      { label: '费用', value: formatCost(s.cost, s.currency) },
       { label: '占比', value: `${pct.toFixed(1)}%` },
       { label: '调用', value: `${formatTokens(s.calls)} 次` },
       { label: 'Token', value: formatTokens(s.tokens) },
@@ -293,13 +354,13 @@ function typeTipData(s: {
   }
 }
 
-function userTipData(u: LlmUsageSummary['byUser'][number]): Omit<DashTip, 'x' | 'y'> {
-  const list = summary.value?.byUser ?? []
+function userTipData(u: DashView['byUser'][number]): Omit<DashTip, 'x' | 'y'> {
+  const list = dash.value.byUser
   return {
     title: u.actor,
     accent: 'var(--accent)',
     rows: [
-      { label: '费用', value: formatCost(u.cost) },
+      { label: '费用', value: formatCost(u.cost, u.currency) },
       { label: '占用户费用', value: `${sliceShare(u.cost, list).toFixed(1)}%` },
       { label: '调用', value: `${formatTokens(u.calls)} 次` },
       { label: 'Token', value: formatTokens(u.tokens) },
@@ -313,7 +374,11 @@ function logTipData(item: LlmUsageLog): Omit<DashTip, 'x' | 'y'> {
     { label: '类型', value: CALL_TYPE_LABEL[item.callType] || item.callType },
     { label: '输入 Token', value: formatTokens(item.promptTokens) },
     { label: '输出 Token', value: formatTokens(item.completionTokens) },
-    { label: '费用', value: formatCost(item.cost) },
+    ...(item.cacheReadTokens || item.cacheWriteTokens
+      ? [{ label: '缓存读/写', value: `${formatTokens(item.cacheReadTokens ?? 0)} / ${formatTokens(item.cacheWriteTokens ?? 0)}` }]
+      : []),
+    ...(item.peak != null ? [{ label: '峰谷', value: item.peak ? '峰时价' : '谷时价' }] : []),
+    { label: '费用', value: formatCost(item.cost, item.currency) },
     { label: '耗时', value: item.latencyMs != null ? `${item.latencyMs}ms` : '—' },
     { label: '计量', value: item.tokenSource === 'ESTIMATED' ? '估算' : 'API 实计' },
   ]
@@ -329,60 +394,60 @@ function logTipData(item: LlmUsageLog): Omit<DashTip, 'x' | 'y'> {
 }
 
 function peakDay() {
-  const series = summary.value?.series ?? []
+  const series = dash.value.series
   if (!series.length) return null
   return series.reduce((a, b) => (Number(a.cost) >= Number(b.cost) ? a : b))
 }
 
 function costCardTip(): Omit<DashTip, 'x' | 'y'> {
-  const s = summary.value
+  const s = dash.value
   const peak = peakDay()
   return {
-    title: '费用',
+    title: `费用（${s.currency || '—'}）`,
     accent: 'var(--accent)',
     rows: [
-      { label: '合计', value: formatCost(s?.totalCost ?? 0) },
-      { label: '日均', value: formatCost(avgOf(s?.totalCost ?? 0)) },
-      { label: '峰值日', value: peak ? `${String(peak.day).slice(5)} ${formatCost(peak.cost)}` : '—' },
+      { label: '合计', value: formatCost(s.totalCost, s.currency) },
+      { label: '日均', value: formatCost(avgOf(s.totalCost), s.currency) },
+      { label: '峰值日', value: peak ? `${String(peak.day).slice(5)} ${formatCost(peak.cost, peak.currency)}` : '—' },
     ],
   }
 }
 
 function tokenCardTip(): Omit<DashTip, 'x' | 'y'> {
-  const s = summary.value
+  const s = dash.value
   return {
     title: 'Token',
     accent: 'var(--info)',
     rows: [
-      { label: '合计', value: formatTokens(s?.totalTokens ?? 0) },
-      { label: '日均', value: formatTokens(Math.round(avgOf(s?.totalTokens ?? 0))) },
-      { label: '次均', value: s?.totalCalls ? formatTokens(Math.round((s.totalTokens || 0) / s.totalCalls)) : '—' },
+      { label: '合计', value: formatTokens(s.totalTokens) },
+      { label: '日均', value: formatTokens(Math.round(avgOf(s.totalTokens))) },
+      { label: '次均', value: s.totalCalls ? formatTokens(Math.round(s.totalTokens / s.totalCalls)) : '—' },
     ],
   }
 }
 
 function callCardTip(): Omit<DashTip, 'x' | 'y'> {
-  const s = summary.value
+  const s = dash.value
   return {
     title: '调用次数',
     accent: 'var(--success)',
     rows: [
-      { label: '合计', value: `${formatTokens(s?.totalCalls ?? 0)} 次` },
-      { label: '日均', value: `${formatTokens(Math.round(avgOf(s?.totalCalls ?? 0)))} 次` },
-      { label: '次均费用', value: avgCostPerCall(s?.totalCost ?? 0, s?.totalCalls ?? 0) },
+      { label: '合计', value: `${formatTokens(s.totalCalls)} 次` },
+      { label: '日均', value: `${formatTokens(Math.round(avgOf(s.totalCalls)))} 次` },
+      { label: '次均费用', value: avgCostPerCall(s.totalCost, s.totalCalls) },
     ],
   }
 }
 
 function successCardTip(): Omit<DashTip, 'x' | 'y'> {
-  const s = summary.value
-  const total = s?.totalCalls ?? 0
-  const failed = Math.round(total * (1 - (s?.successRate ?? 0) / 100))
+  const s = dash.value
+  const total = s.totalCalls
+  const failed = Math.round(total * (1 - (s.successRate ?? 0) / 100))
   return {
     title: '成功率',
     accent: successTone.value === 'success' ? 'var(--success)' : successTone.value === 'warning' ? 'var(--warning)' : 'var(--danger)',
     rows: [
-      { label: '成功率', value: `${(s?.successRate ?? 0).toFixed(1)}%` },
+      { label: '成功率', value: `${(s.successRate ?? 0).toFixed(1)}%` },
       { label: '成功', value: `${formatTokens(total - failed)} 次` },
       { label: '失败', value: `${formatTokens(failed)} 次` },
     ],
@@ -390,13 +455,13 @@ function successCardTip(): Omit<DashTip, 'x' | 'y'> {
 }
 
 const seriesBarMaxWidth = computed(() => {
-  const n = summary.value?.series.length ?? 0
+  const n = dash.value.series.length
   if (n <= 8) return '52px'
   if (n <= 14) return '36px'
   return '100%'
 })
 
-const chartCompact = computed(() => (summary.value?.series.length ?? 0) <= 14)
+const chartCompact = computed(() => dash.value.series.length <= 14)
 
 const successTone = computed<'success' | 'warning' | 'danger'>(() => {
   const rate = summary.value?.successRate ?? 0
@@ -413,7 +478,7 @@ const daysInRange = computed(() => {
 })
 
 const donutSegments = computed(() => {
-  const slices = summary.value?.byCallType ?? []
+  const slices = dash.value.byCallType
   const total = slices.reduce((s, x) => s + (Number(x.cost) || 0), 0) || 1
   let acc = 0
   return slices.map(s => {
@@ -589,15 +654,28 @@ onBeforeUnmount(() => {
             @mouseleave="hideTip"
           >
             {{ formatTokens(item.promptTokens) }} / {{ formatTokens(item.completionTokens) }}
+            <span v-if="item.cacheReadTokens" class="text-[10px] text-text-muted">·缓存{{ formatTokens(item.cacheReadTokens) }}</span>
             <span v-if="item.tokenSource === 'ESTIMATED'" class="text-text-muted">估</span>
           </span>
         </template>
-        <template #cell-cost="{ item }">
+        <template #cell-cache="{ item }">
           <span
             class="text-xs tabular-nums"
             @mousemove="(e) => placeTip(e, logTipData(item))"
             @mouseleave="hideTip"
-          >{{ formatCost(item.cost) }}</span>
+          >{{ item.cacheReadTokens || item.cacheWriteTokens ? `${formatTokens(item.cacheReadTokens ?? 0)}/${formatTokens(item.cacheWriteTokens ?? 0)}` : '—' }}</span>
+        </template>
+        <template #cell-cost="{ item }">
+          <span class="inline-flex items-center gap-1">
+            <span
+              class="text-xs tabular-nums"
+              @mousemove="(e) => placeTip(e, logTipData(item))"
+              @mouseleave="hideTip"
+            >{{ formatCost(item.cost, item.currency) }}</span>
+            <Badge v-if="item.peak != null" size="sm" :variant="item.peak ? 'warning' : 'success'">
+              {{ item.peak ? '峰' : '谷' }}
+            </Badge>
+          </span>
         </template>
         <template #cell-latencyMs="{ item }">
           <span class="text-xs tabular-nums text-text-secondary">{{ item.latencyMs != null ? `${item.latencyMs}ms` : '—' }}</span>
@@ -622,7 +700,7 @@ onBeforeUnmount(() => {
               {{ CALL_TYPE_LABEL[item.callType] || item.callType }}
             </Badge>
             <span class="truncate">{{ item.model }}</span>
-            <span class="tabular-nums ml-auto">{{ formatCost(item.cost) }}</span>
+            <span class="tabular-nums ml-auto">{{ formatCost(item.cost, item.currency) }}</span>
           </div>
         </template>
         <template #expand="{ item }">
@@ -640,7 +718,7 @@ onBeforeUnmount(() => {
                 </Badge>
                 <span class="truncate">{{ rel.model }}</span>
                 <span class="tabular-nums text-text-secondary">{{ formatTokens(rel.totalTokens) }} tok</span>
-                <span class="tabular-nums">{{ formatCost(rel.cost) }}</span>
+                <span class="tabular-nums">{{ formatCost(rel.cost, rel.currency) }}</span>
                 <span class="text-text-muted">{{ rel.latencyMs }}ms</span>
               </li>
             </ul>
@@ -671,25 +749,40 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
+      <div v-if="currencies.length > 1" class="flex flex-wrap items-center gap-1.5">
+        <span class="text-xs text-text-muted mr-1">币种：</span>
+        <button
+          v-for="c in currencies"
+          :key="c.currency"
+          class="px-3 py-1.5 text-xs rounded-lg border transition-colors tabular-nums"
+          :class="dashCurrency === c.currency
+            ? 'border-accent bg-accent-subtle text-accent font-medium'
+            : 'border-border text-text-secondary hover:text-text-primary'"
+          @click="setCurrency(c.currency)"
+        >
+          {{ c.currency }} {{ formatCost(c.totalCost, c.currency) }}
+        </button>
+      </div>
+
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div @mousemove="(e) => placeTip(e, costCardTip())" @mouseleave="hideTip">
-          <StatsCard :icon="Coins" label="费用" :value="formatCost(summary?.totalCost ?? 0)" icon-color="accent">
+          <StatsCard :icon="Coins" :label="`费用${dash.currency ? '（' + dash.currency + '）' : ''}`" :value="formatCost(dash.totalCost, dash.currency)" icon-color="accent">
             <template #trend>
-              <span class="text-text-muted">日均 {{ formatCost(avgOf(summary?.totalCost ?? 0)) }}</span>
+              <span class="text-text-muted">日均 {{ formatCost(avgOf(dash.totalCost), dash.currency) }}</span>
             </template>
           </StatsCard>
         </div>
         <div @mousemove="(e) => placeTip(e, tokenCardTip())" @mouseleave="hideTip">
-          <StatsCard :icon="Activity" label="Token" :value="formatTokens(summary?.totalTokens ?? 0)">
+          <StatsCard :icon="Activity" label="Token" :value="formatTokens(dash.totalTokens)">
             <template #trend>
-              <span class="text-text-muted">日均 {{ formatTokens(Math.round(avgOf(summary?.totalTokens ?? 0))) }}</span>
+              <span class="text-text-muted">日均 {{ formatTokens(Math.round(avgOf(dash.totalTokens))) }}</span>
             </template>
           </StatsCard>
         </div>
         <div @mousemove="(e) => placeTip(e, callCardTip())" @mouseleave="hideTip">
-          <StatsCard :icon="Bot" label="调用次数" :value="formatTokens(summary?.totalCalls ?? 0)">
+          <StatsCard :icon="Bot" label="调用次数" :value="formatTokens(dash.totalCalls)">
             <template #trend>
-              <span class="text-text-muted">日均 {{ formatTokens(Math.round(avgOf(summary?.totalCalls ?? 0))) }} 次</span>
+              <span class="text-text-muted">日均 {{ formatTokens(Math.round(avgOf(dash.totalCalls))) }} 次</span>
             </template>
           </StatsCard>
         </div>
@@ -697,13 +790,13 @@ onBeforeUnmount(() => {
           <StatsCard
             :icon="CheckCircle2"
             label="成功率"
-            :value="`${(summary?.successRate ?? 0).toFixed(1)}%`"
+            :value="`${(dash.successRate ?? 0).toFixed(1)}%`"
             :icon-color="successTone"
             :color="successTone"
           >
             <template #trend>
               <span class="text-text-muted">
-                失败 {{ Math.round((summary?.totalCalls ?? 0) * (1 - (summary?.successRate ?? 0) / 100)) }} 次
+                失败 {{ Math.round(dash.totalCalls * (1 - (dash.successRate ?? 0) / 100)) }} 次
               </span>
             </template>
           </StatsCard>
@@ -724,12 +817,12 @@ onBeforeUnmount(() => {
           <div class="flex items-start justify-between gap-3 mb-4">
             <div>
               <h3 class="text-sm font-medium text-text-primary">按日费用</h3>
-              <p class="text-xs text-text-muted mt-0.5">峰值 {{ formatCost(maxDailyCost) }} / 天</p>
+              <p class="text-xs text-text-muted mt-0.5">峰值 {{ formatCost(maxDailyCost, dash.currency) }} / 天</p>
             </div>
             <p class="text-xs tabular-nums text-text-secondary text-right min-h-[2.5rem]">
               <template v-if="hoverPoint">
                 <span class="block text-text-primary font-medium">{{ formatFullDay(hoverPoint.day) }}</span>
-                {{ formatCost(hoverPoint.cost) }} · {{ hoverPoint.calls }} 次 · {{ formatTokens(hoverPoint.tokens) }} tok
+                {{ formatCost(hoverPoint.cost, hoverPoint.currency) }} · {{ hoverPoint.calls }} 次 · {{ formatTokens(hoverPoint.tokens) }} tok
               </template>
               <template v-else>
                 <span class="text-text-muted">悬停柱体查看明细</span>
@@ -737,12 +830,12 @@ onBeforeUnmount(() => {
             </p>
           </div>
 
-          <div v-if="summary.series.length === 0" class="text-sm text-text-muted py-10 text-center">暂无趋势数据</div>
+          <div v-if="dash.series.length === 0" class="text-sm text-text-muted py-10 text-center">暂无趋势数据</div>
           <div v-else class="relative h-52" :class="chartCompact ? 'max-w-2xl' : ''">
             <div class="hidden sm:flex absolute left-0 top-0 bottom-7 w-12 flex-col justify-between text-[10px] text-text-muted tabular-nums text-right pr-2 leading-none">
-              <span>{{ formatCost(maxDailyCost) }}</span>
-              <span>{{ formatCost(maxDailyCost / 2) }}</span>
-              <span>¥0</span>
+              <span>{{ formatCost(maxDailyCost, dash.currency) }}</span>
+              <span>{{ formatCost(maxDailyCost / 2, dash.currency) }}</span>
+              <span>{{ currencySymbol(dash.currency) }}0</span>
             </div>
             <div class="absolute inset-x-0 sm:left-12 top-0 bottom-7 flex flex-col justify-between pointer-events-none">
               <div class="border-t border-border/80" />
@@ -754,7 +847,7 @@ onBeforeUnmount(() => {
               @mouseleave="hoverPoint = null; hideTip()"
             >
               <div
-                v-for="point in summary.series"
+                v-for="point in dash.series"
                 :key="point.day"
                 class="relative h-full flex items-end justify-center min-w-0 cursor-pointer rounded-t-md"
                 :class="hoverPoint?.day === point.day ? 'bg-accent/10' : ''"
@@ -771,11 +864,11 @@ onBeforeUnmount(() => {
             </div>
             <div class="absolute inset-x-0 sm:left-12 bottom-0 h-7 flex justify-start gap-2">
               <span
-                v-for="(point, i) in summary.series"
+                v-for="(point, i) in dash.series"
                 :key="point.day"
                 class="text-[10px] text-text-muted text-center truncate leading-7"
                 :style="{ flex: '1 1 0', maxWidth: seriesBarMaxWidth }"
-              >{{ dayTick(point.day, i, summary.series.length) }}</span>
+              >{{ dayTick(point.day, i, dash.series.length) }}</span>
             </div>
           </div>
         </div>
@@ -783,10 +876,10 @@ onBeforeUnmount(() => {
         <div class="grid lg:grid-cols-2 gap-4 items-stretch">
           <div class="card-solid p-5">
             <h3 class="text-sm font-medium text-text-primary mb-4">按模型</h3>
-            <div v-if="summary.byModel.length === 0" class="text-sm text-text-muted">暂无</div>
+            <div v-if="dash.byModel.length === 0" class="text-sm text-text-muted">暂无</div>
             <ul v-else class="space-y-4">
               <li
-                v-for="(s, idx) in summary.byModel"
+                v-for="(s, idx) in dash.byModel"
                 :key="s.name + (s.provider || '')"
                 class="rounded-lg -mx-2 px-2 py-1.5 transition-colors cursor-default"
                 :class="hoverModelKey === s.name + (s.provider || '') ? 'bg-bg-code/70' : 'hover:bg-bg-code/40'"
@@ -802,20 +895,20 @@ onBeforeUnmount(() => {
                     <span class="truncate text-text-primary">{{ s.name }}</span>
                     <span class="text-text-muted shrink-0">{{ s.provider }}</span>
                   </div>
-                  <span class="tabular-nums shrink-0 text-text-primary">{{ formatCost(s.cost) }}</span>
+                  <span class="tabular-nums shrink-0 text-text-primary">{{ formatCost(s.cost, s.currency) }}</span>
                 </div>
                 <div class="h-2 rounded-full bg-bg-code overflow-hidden">
                   <div
                     class="h-full rounded-full transition-all duration-150"
                     :style="{
-                      width: `${(Number(s.cost) / sliceMax(summary.byModel)) * 100}%`,
+                      width: `${(Number(s.cost) / sliceMax(dash.byModel)) * 100}%`,
                       background: MODEL_BAR_COLORS[idx % MODEL_BAR_COLORS.length],
                       opacity: hoverModelKey && hoverModelKey !== s.name + (s.provider || '') ? 0.35 : 1,
                     }"
                   />
                 </div>
                 <p class="mt-1 text-[11px] text-text-muted tabular-nums">
-                  {{ sliceShare(s.cost, summary.byModel).toFixed(0) }}% · {{ formatTokens(s.calls) }} 次 · {{ formatTokens(s.tokens) }} tok
+                  {{ sliceShare(s.cost, dash.byModel).toFixed(0) }}% · {{ formatTokens(s.calls) }} 次 · {{ formatTokens(s.tokens) }} tok
                 </p>
               </li>
             </ul>
@@ -823,7 +916,7 @@ onBeforeUnmount(() => {
 
           <div class="card-solid p-5 flex flex-col">
             <h3 class="text-sm font-medium text-text-primary mb-4">按调用类型</h3>
-            <div v-if="summary.byCallType.length === 0" class="text-sm text-text-muted">暂无</div>
+            <div v-if="dash.byCallType.length === 0" class="text-sm text-text-muted">暂无</div>
             <div v-else class="flex-1 flex flex-col sm:flex-row items-center gap-6">
               <div class="relative w-36 h-36 shrink-0">
                 <svg viewBox="0 0 36 36" class="w-full h-full -rotate-90">
@@ -849,11 +942,11 @@ onBeforeUnmount(() => {
                 </svg>
                 <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-3 text-center">
                   <template v-if="hoverSegData">
-                    <span class="text-sm font-bold tabular-nums leading-none">{{ formatCost(hoverSegData.cost) }}</span>
+                    <span class="text-sm font-bold tabular-nums leading-none">{{ formatCost(hoverSegData.cost, hoverSegData.currency) }}</span>
                     <span class="text-[11px] text-text-muted mt-1 truncate w-full">{{ CALL_TYPE_LABEL[hoverSegData.name] || hoverSegData.name }}</span>
                   </template>
                   <template v-else>
-                    <span class="text-lg font-bold tabular-nums leading-none">{{ formatTokens(summary.totalCalls) }}</span>
+                    <span class="text-lg font-bold tabular-nums leading-none">{{ formatTokens(dash.totalCalls) }}</span>
                     <span class="text-[11px] text-text-muted mt-1">次调用</span>
                   </template>
                 </div>
@@ -871,7 +964,7 @@ onBeforeUnmount(() => {
                   <span class="w-2 h-2 rounded-full shrink-0" :style="{ background: s.color }" />
                   <span class="flex-1 truncate">{{ CALL_TYPE_LABEL[s.name] || s.name }}</span>
                   <span class="tabular-nums text-text-muted shrink-0">{{ formatTokens(s.calls) }} 次</span>
-                  <span class="tabular-nums shrink-0 w-[4.5rem] text-right">{{ formatCost(s.cost) }}</span>
+                  <span class="tabular-nums shrink-0 w-[4.5rem] text-right">{{ formatCost(s.cost, s.currency) }}</span>
                 </li>
               </ul>
             </div>
@@ -883,7 +976,7 @@ onBeforeUnmount(() => {
             <Users :size="14" class="text-text-muted" />
             <h3 class="text-sm font-medium text-text-primary">Top 用户</h3>
           </div>
-          <div v-if="summary.byUser.length" class="overflow-x-auto">
+          <div v-if="dash.byUser.length" class="overflow-x-auto">
             <table class="w-full text-sm table-fixed">
               <thead>
                 <tr class="text-left text-xs text-text-muted border-b border-border">
@@ -896,7 +989,7 @@ onBeforeUnmount(() => {
               </thead>
               <tbody>
                 <tr
-                  v-for="(u, i) in summary.byUser"
+                  v-for="(u, i) in dash.byUser"
                   :key="u.actor + (u.userId || u.visitorId || '')"
                   class="border-t border-border/70 transition-colors cursor-default"
                   :class="hoverUserKey === u.actor + (u.userId || u.visitorId || '') ? 'bg-bg-code/60' : 'hover:bg-bg-code/35'"
@@ -912,10 +1005,10 @@ onBeforeUnmount(() => {
                       <div class="hidden sm:block h-1.5 w-16 rounded-full bg-bg-code overflow-hidden">
                         <div
                           class="h-full bg-accent rounded-full"
-                          :style="{ width: `${sliceShare(u.cost, summary.byUser)}%` }"
+                          :style="{ width: `${sliceShare(u.cost, dash.byUser)}%` }"
                         />
                       </div>
-                      <span class="tabular-nums shrink-0">{{ formatCost(u.cost) }}</span>
+                      <span class="tabular-nums shrink-0">{{ formatCost(u.cost, u.currency) }}</span>
                     </div>
                   </td>
                 </tr>
@@ -925,10 +1018,17 @@ onBeforeUnmount(() => {
           <p v-else class="text-sm text-text-muted">暂无</p>
         </div>
       </template>
+
+      <AiBillingCard />
+    </template>
+
+    <!-- ════ 计价 ════ -->
+    <template v-else-if="tab === 'prices'">
+      <AiPricingPanel />
     </template>
 
     <!-- ════ 模型与 API ════ -->
-    <template v-else>
+    <template v-else-if="tab === 'providers'">
       <p class="text-sm text-text-secondary">
         改动立即对后续对话生效。API Key 加密入库，不回写
         <code class="text-xs bg-bg-code px-1 py-0.5 rounded">{{ providersEnvFile || '.env' }}</code>；

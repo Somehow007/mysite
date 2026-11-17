@@ -135,7 +135,7 @@ rag:
         priority: 1
         base-url: https://api.deepseek.com/v1
         api-key: ${DEEPSEEK_API_KEY:}
-        chat-model: ${DEEPSEEK_CHAT_MODEL:deepseek-v4-flash}
+        chat-model: ${DEEPSEEK_CHAT_MODEL:deepseek-flash}
         chat-timeout: 120s
 
       # P1: 阿里百炼 —— 国内首选，延迟低，中文能力强
@@ -145,7 +145,7 @@ rag:
         priority: 2
         base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
         api-key: ${BAILIAN_API_KEY:}
-        chat-model: ${BAILIAN_CHAT_MODEL:qwen3-max}
+        chat-model: ${BAILIAN_CHAT_MODEL:qwen3.5-plus}
         embedding-model: ${BAILIAN_EMBEDDING_MODEL:text-embedding-v4}
         embedding-dimension: ${BAILIAN_EMBEDDING_DIMENSION:1024}      # 与 PG vector(n) 绑定；更换 = 改列并清空已有向量
         rerank-model: ${BAILIAN_RERANK_MODEL:qwen3-rerank}            # 走 DashScope 原生接口，非 OpenAI 兼容（见 3.2）
@@ -186,39 +186,6 @@ rag:
     circuit-breaker:
       failure-threshold: 2       # 连续失败 N 次 → 熔断
       cooldown-seconds: 30       # 熔断后冷却 N 秒 → 半开
-
-    # 用量看板计价：每百万 token 单价（CNY）。写入时按当时单价算死，改价不影响历史。
-    # 未列出的模型 cost=0，看板显示「未标价」。数字按公开价填，可随时改。
-    pricing:
-      currency: CNY
-      models:
-        deepseek-v4-flash:
-          input: 0.2
-          output: 0.8
-        deepseek-chat:
-          input: 0.28
-          output: 0.42
-        qwen3-max:
-          input: 2.5
-          output: 10
-        qwen-turbo:
-          input: 0.3
-          output: 0.6
-        "qwen3:8b":
-          input: 0
-          output: 0
-        glm-4.7:
-          input: 1
-          output: 1
-        gpt-5.4:
-          input: 15
-          output: 60
-        text-embedding-v4:
-          input: 0.5
-          output: 0
-        qwen3-rerank:
-          input: 0.5
-          output: 0
 
   # 分块参数
   chunk:

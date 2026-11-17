@@ -9,6 +9,7 @@ import io.github.somehow.mysite.ragent.llm.model.ChatRequest;
 import io.github.somehow.mysite.ragent.usage.LlmUsageRecorder;
 import io.github.somehow.mysite.ragent.usage.TokenUsage;
 import io.github.somehow.mysite.ragent.usage.UsageContext;
+import io.github.somehow.mysite.ragent.usage.UsageJsonSupport;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Flux;
@@ -209,7 +210,9 @@ public abstract class AbstractOpenAiProvider implements LLMService {
             if (prompt == 0 && completion == 0 && total == 0) {
                 return null;
             }
-            return TokenUsage.api(prompt, completion, total);
+            return TokenUsage.api(prompt, completion, total,
+                UsageJsonSupport.cacheReadTokens(usage),
+                UsageJsonSupport.cacheWriteTokens(usage));
         } catch (Exception e) {
             return null;
         }

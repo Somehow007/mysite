@@ -1,8 +1,9 @@
 package io.github.somehow.mysite.ragent.usage;
 
-import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.dao.entity.LlmUsageDO;
 import io.github.somehow.mysite.ragent.dao.mapper.LlmUsageMapper;
+import io.github.somehow.mysite.ragent.pricing.ModelPriceResolver;
+import io.github.somehow.mysite.ragent.pricing.ResolvedPrice;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -15,6 +16,7 @@ import java.util.concurrent.Executor;
 
 /**
  * 异步写入用量。失败只打日志，不影响主路径。
+ * 计价走 t_llm_model_price 价卡（峰谷/阶梯/缓存维度），写入时算死，改价不影响历史。
  */
 @Slf4j
 @Component
@@ -24,14 +26,14 @@ public class LlmUsageRecorder {
 
     private final LlmUsageMapper mapper;
     private final Executor executor;
-    private final RagProperties properties;
+    private final ModelPriceResolver priceResolver;
 
     public LlmUsageRecorder(LlmUsageMapper mapper,
                             @Qualifier("ragAsyncExecutor") Executor executor,
-                            RagProperties properties) {
+                            ModelPriceResolver priceResolver) {
         this.mapper = mapper;
         this.executor = executor;
-        this.properties = properties;
+        this.priceResolver = priceResolver;
     }
 
     @PostConstruct
@@ -66,7 +68,6 @@ public class LlmUsageRecorder {
 
     private LlmUsageDO buildRow(UsageContext.State ctx, String provider, String model,
                                 TokenUsage usage, long latencyMs, boolean success, String error) {
-        RagProperties.PricingProperties pricing = properties.getLlm().getPricing();
         LlmUsageDO row = new LlmUsageDO();
         row.setTraceId(ctx.getTraceId());
         row.setCallType(ctx.getCallType() != null ? ctx.getCallType() : "CHAT");
@@ -82,9 +83,24 @@ public class LlmUsageRecorder {
         row.setPromptTokens(u.promptTokens());
         row.setCompletionTokens(u.completionTokens());
         row.setTotalTokens(u.totalTokens());
+        row.setCacheReadTokens(u.cacheReadTokens());
+        row.setCacheWriteTokens(u.cacheWriteTokens());
         row.setTokenSource(u.fromApi() ? "API" : "ESTIMATED");
-        row.setCost(calculateCost(model, u, pricing));
-        row.setCurrency(pricing.getCurrency() != null ? pricing.getCurrency() : "CNY");
+        // 计价时点取请求开始时刻近似（记录时刻 - 调用耗时）：长流跨峰谷边界时按请求侧判定更贴近官方口径
+        LocalDateTime at = LocalDateTime.now()
+                .minusNanos(Math.max(0, latencyMs) * 1_000_000L);
+        ResolvedPrice price = resolvePrice(row.getProvider(), row.getModel(), at, u.promptTokens());
+        if (price != null) {
+            row.setCost(price.cost(u));
+            row.setCurrency(price.currency());
+            row.setPriceId(price.priceId());
+            // peak 只在卡声明了峰谷窗时才有意义：无峰谷概念的模型落 NULL，前端不显示徽标
+            row.setPeak(price.peakAware() ? price.peak() : null);
+        } else {
+            // 未标价模型：cost 恒 0，currency 仅为列占位（不产生任何币种金额）
+            row.setCost(BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP));
+            row.setCurrency("CNY");
+        }
         row.setLatencyMs((int) Math.min(Integer.MAX_VALUE, Math.max(0, latencyMs)));
         row.setSuccess(success);
         if (error != null && error.length() > 1000) {
@@ -96,25 +112,17 @@ public class LlmUsageRecorder {
         return row;
     }
 
-    static BigDecimal calculateCost(String model, TokenUsage usage, RagProperties.PricingProperties pricing) {
-        if (pricing == null || model == null || usage == null) {
-            return BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP);
+    /**
+     * 价卡解析失败（tiers/peak_windows 畸形 JSON 等）降级为未命中，
+     * 保证 cost=0 的占位记录不丢，usage 主链路不受计价侧数据问题影响。
+     */
+    private ResolvedPrice resolvePrice(String provider, String model, LocalDateTime at, int promptTokens) {
+        try {
+            return priceResolver.resolve(provider, model, at, promptTokens);
+        } catch (Exception e) {
+            log.warn("[usage] price resolve failed for {}/{}: {}", provider, model, e.getMessage());
+            return null;
         }
-        RagProperties.ModelPrice price = pricing.getModels().get(model);
-        if (price == null) {
-            return BigDecimal.ZERO.setScale(6, RoundingMode.HALF_UP);
-        }
-        BigDecimal million = new BigDecimal("1000000");
-        BigDecimal input = nvl(price.getInput())
-                .multiply(BigDecimal.valueOf(usage.promptTokens()))
-                .divide(million, 8, RoundingMode.HALF_UP);
-        BigDecimal output = nvl(price.getOutput())
-                .multiply(BigDecimal.valueOf(usage.completionTokens()))
-                .divide(million, 8, RoundingMode.HALF_UP);
-        return input.add(output).setScale(6, RoundingMode.HALF_UP);
-    }
-
-    private static BigDecimal nvl(BigDecimal v) {
-        return v != null ? v : BigDecimal.ZERO;
     }
 }
+

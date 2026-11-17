@@ -5,7 +5,6 @@ import lombok.Getter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,25 +55,11 @@ public class RagProperties {
     public static class LLMProperties {
         private Map<String, Provider> providers = new HashMap<>();
         private CircuitBreakerProperties circuitBreaker = new CircuitBreakerProperties();
-        private PricingProperties pricing = new PricingProperties();
         /**
          * 后台保存 chat-model 等非秘密配置时回写的 .env 路径（API Key 不回写）。
          * 空则自动探测：生产 {@code /opt/mysite/.env}，否则 {@code ${user.dir}/.env}。
          */
         private String envFile;
-    }
-
-    @Data
-    public static class PricingProperties {
-        private String currency = "CNY";
-        /** 模型名 → 每百万 token 单价 */
-        private Map<String, ModelPrice> models = new HashMap<>();
-    }
-
-    @Data
-    public static class ModelPrice {
-        private BigDecimal input = BigDecimal.ZERO;
-        private BigDecimal output = BigDecimal.ZERO;
     }
 
     @Data

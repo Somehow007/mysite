@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 class BaiLianIntegrationTest {
 
     private static final String BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
-    private static final String CHAT_MODEL = "qwen3-max";
+    private static final String CHAT_MODEL = "qwen3.5-plus";
     private static final String EMBEDDING_MODEL = "text-embedding-v4";
 
     private static String apiKey;
@@ -56,7 +56,6 @@ class BaiLianIntegrationTest {
     @Test
     @DisplayName("DEBUG: 直接打印百炼 chat API 原始响应（非流式 + 流式）")
     void debugRawApiResponse() {
-        apiKey = "sk-58d0aa5347a242e2b5da0bccdd6d3dc4";
         WebClient rawClient = WebClient.builder()
             .baseUrl(BASE_URL)
             .defaultHeader("Authorization", "Bearer " + apiKey)

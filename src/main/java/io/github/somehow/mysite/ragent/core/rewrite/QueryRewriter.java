@@ -81,8 +81,13 @@ public class QueryRewriter {
         try {
             UsageContext.setCallType("REWRITE");
             String prompt = buildRewritePrompt(question, history, reading);
+            // model 由 CheapLLMService 按后端解析（deepseek→deepseek-flash，百炼→qwen-flash），此处不指定
             String llmOutput = classificationLLM.chat(
-                ChatRequest.of("deepseek-chat", prompt));
+                ChatRequest.builder()
+                    .messages(List.of(ChatMessage.user(prompt)))
+                    .temperature(0.7)
+                    .maxTokens(2048)
+                    .build());
             return parseRewriteResult(llmOutput, question);
         } catch (Exception e) {
             log.warn("[rewrite] LLM call failed, using original query: {}", e.getMessage());

@@ -1,5 +1,6 @@
-import { get, getPaginated, post, put } from './client'
-import type { PaginatedResponse } from '@/types'
+import { del, get, getPaginated, post, put } from './client'
+import apiClient from './client'
+import type { ApiResponse, PaginatedResponse } from '@/types'
 
 export type LlmCallType = 'CHAT' | 'REWRITE' | 'CLASSIFY' | 'EMBED' | 'RERANK'
 
@@ -18,6 +19,10 @@ export interface LlmUsageLog {
   promptTokens: number
   completionTokens: number
   totalTokens: number
+  cacheReadTokens?: number | null
+  cacheWriteTokens?: number | null
+  priceId?: string | null
+  peak?: boolean | null
   tokenSource: 'API' | 'ESTIMATED' | string
   cost: number
   currency: string
@@ -28,15 +33,19 @@ export interface LlmUsageLog {
 }
 
 export interface LlmUsageSummary {
-  totalCost: number
-  totalTokens: number
   totalCalls: number
   successRate: number
-  currency: string
-  series: { day: string; cost: number; tokens: number; calls: number }[]
-  byModel: { name: string; provider?: string; cost: number; tokens: number; calls: number }[]
-  byCallType: { name: string; cost: number; tokens: number; calls: number }[]
-  byUser: { actor: string; userId?: string | null; visitorId?: string | null; cost: number; tokens: number; calls: number }[]
+  byCurrency: {
+    currency: string
+    totalCost: number
+    totalTokens: number
+    totalCalls: number
+    successCalls: number
+  }[]
+  series: { day: string; currency: string; cost: number; tokens: number; calls: number }[]
+  byModel: { name: string; provider?: string; currency: string; cost: number; tokens: number; calls: number }[]
+  byCallType: { name: string; currency: string; cost: number; tokens: number; calls: number }[]
+  byUser: { actor: string; userId?: string | null; visitorId?: string | null; currency: string; cost: number; tokens: number; calls: number }[]
 }
 
 export interface LlmProviderView {
@@ -76,6 +85,58 @@ export interface LlmProviderPing {
   preview?: string | null
   latencyMs: number
   message?: string | null
+}
+
+// ── 价卡 ──
+
+export interface LlmModelPrice {
+  id: string
+  provider: string
+  model: string
+  displayName?: string | null
+  currency: string
+  unit: string
+  inputPrice?: number | null
+  cacheReadPrice?: number | null
+  cacheReadFactor?: number | null
+  cacheWritePrice?: number | null
+  cacheWriteFactor?: number | null
+  outputPrice?: number | null
+  peakWindows?: string | null
+  offPeakFactor?: number | null
+  excludeHolidays?: boolean | null
+  tiers?: string | null
+  effectiveFrom?: string | null
+  effectiveTo?: string | null
+  source?: string | null
+  note?: string | null
+  current?: boolean | null
+}
+
+export interface LlmModelPriceUpsert {
+  provider?: string
+  model?: string
+  displayName?: string | null
+  currency?: string
+  inputPrice?: number | null
+  cacheReadPrice?: number | null
+  cacheReadFactor?: number | null
+  cacheWritePrice?: number | null
+  cacheWriteFactor?: number | null
+  outputPrice?: number | null
+  peakWindows?: string | null
+  offPeakFactor?: number | null
+  excludeHolidays?: boolean | null
+  tiers?: string | null
+  effectiveFrom?: string | null
+  note?: string | null
+}
+
+// ── 节假日 ──
+
+export interface LlmHoliday {
+  holidayDate: string
+  name?: string | null
 }
 
 export interface UsageQuery {
@@ -120,4 +181,67 @@ export function updateAiProvider(name: string, body: LlmProviderUpdate): Promise
 
 export function pingAiProvider(name: string): Promise<LlmProviderPing> {
   return post<LlmProviderPing>(`/v1/admin/ai/providers/${encodeURIComponent(name)}/ping`, undefined, { timeout: 25000 })
+}
+
+// ── 价卡 / 节假日 ──
+
+export function getAiPrices(): Promise<LlmModelPrice[]> {
+  return get<LlmModelPrice[]>('/v1/admin/ai/prices')
+}
+
+export function createAiPrice(body: LlmModelPriceUpsert): Promise<LlmModelPrice[]> {
+  return post<LlmModelPrice[]>('/v1/admin/ai/prices', body)
+}
+
+export function reviseAiPrice(id: string, body: LlmModelPriceUpsert): Promise<LlmModelPrice[]> {
+  return put<LlmModelPrice[]>(`/v1/admin/ai/prices/${encodeURIComponent(id)}`, body)
+}
+
+export function retireAiPrice(id: string): Promise<LlmModelPrice[]> {
+  return del<LlmModelPrice[]>(`/v1/admin/ai/prices/${encodeURIComponent(id)}`)
+}
+
+export function getAiHolidays(): Promise<LlmHoliday[]> {
+  return get<LlmHoliday[]>('/v1/admin/ai/holidays')
+}
+
+export function replaceAiHolidays(items: LlmHoliday[]): Promise<LlmHoliday[]> {
+  return put<LlmHoliday[]>('/v1/admin/ai/holidays', { items })
+}
+
+// ── 官方账单对账 ──
+
+export interface LlmBillingBalance {
+  currency: string
+  totalBalance?: string | null
+  grantedBalance?: string | null
+  toppedUpBalance?: string | null
+}
+
+export interface LlmBillingDelta {
+  fromSnapshotId: string
+  fromTime: string
+  periodSpend?: Record<string, string>
+  fromTotal?: Record<string, string>
+  toTotal?: Record<string, string>
+}
+
+export interface LlmBillingProvider {
+  provider: string
+  ok: boolean
+  latencyMs?: number | null
+  message?: string | null
+  data?: Record<string, unknown> | null
+  delta?: LlmBillingDelta | null
+}
+
+export interface LlmBilling {
+  probedAt: string
+  providers: LlmBillingProvider[]
+}
+
+export async function getAiBilling(): Promise<LlmBilling> {
+  // 探针逐 provider 串行调官方接口（单家最长 ~10s），给足超时
+  const response = await apiClient.get<ApiResponse<LlmBilling>>('/v1/admin/ai/billing', { timeout: 45000 })
+  return response.data.data as LlmBilling
 }

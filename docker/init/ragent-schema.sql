@@ -176,6 +176,10 @@ CREATE TABLE IF NOT EXISTS t_llm_usage (
     prompt_tokens INT DEFAULT 0,
     completion_tokens INT DEFAULT 0,
     total_tokens INT DEFAULT 0,
+    cache_read_tokens INT DEFAULT 0,
+    cache_write_tokens INT DEFAULT 0,
+    price_id BIGINT,
+    peak BOOLEAN,
     token_source VARCHAR(16) NOT NULL DEFAULT 'ESTIMATED',
     cost NUMERIC(12,6) DEFAULT 0,
     currency VARCHAR(8) DEFAULT 'CNY',
@@ -208,3 +212,66 @@ CREATE TABLE IF NOT EXISTS t_llm_provider_setting (
     api_key TEXT,
     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- ============================================================
+-- 模型计价卡（版本化）+ 中国法定节假日（DeepSeek 峰谷排除依据）
+-- 峰谷/阶梯/缓存价 JSON 见 t_llm_model_price.tiers / peak_windows
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS t_llm_model_price (
+    id BIGINT PRIMARY KEY,
+    provider VARCHAR(32) NOT NULL,
+    model VARCHAR(128) NOT NULL,
+    display_name VARCHAR(128),
+    currency VARCHAR(8) NOT NULL DEFAULT 'CNY',
+    unit VARCHAR(32) NOT NULL DEFAULT 'PER_MILLION_TOKENS',
+    input_price NUMERIC(12,6),
+    cache_read_price NUMERIC(12,6),
+    cache_read_factor NUMERIC(8,4),
+    cache_write_price NUMERIC(12,6),
+    cache_write_factor NUMERIC(8,4),
+    output_price NUMERIC(12,6),
+    peak_windows TEXT,
+    off_peak_factor NUMERIC(6,4),
+    exclude_holidays BOOLEAN DEFAULT false,
+    tiers TEXT,
+    effective_from TIMESTAMP,
+    effective_to TIMESTAMP,
+    source VARCHAR(32),
+    note TEXT,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_model_price_key
+    ON t_llm_model_price(provider, model, effective_from DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_llm_model_price_ver
+    ON t_llm_model_price(provider, model, effective_from);
+
+CREATE TABLE IF NOT EXISTS t_llm_holiday (
+    holiday_date DATE PRIMARY KEY,
+    name VARCHAR(64)
+);
+
+-- 种子灌入标记：内置种子（节假日等）只在首次启动写入一次，
+-- 防止重启把管理员在「计价」页删掉的数据复活。
+CREATE TABLE IF NOT EXISTS t_llm_seed_marker (
+    seed_key VARCHAR(64) PRIMARY KEY,
+    seeded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================================
+-- 官方账单探针快照（余额/配额定时拉取，差值反推周期实花）
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS t_llm_balance_snapshot (
+    id BIGINT PRIMARY KEY,
+    provider VARCHAR(32) NOT NULL,
+    ok BOOLEAN,
+    payload TEXT,
+    latency_ms INT,
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_llm_balance_snapshot_provider
+    ON t_llm_balance_snapshot(provider, create_time DESC);
