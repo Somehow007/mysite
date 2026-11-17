@@ -104,5 +104,13 @@
 - **验证**：`./scripts/verify.sh`（quick）绿；`npm run build` 绿；
   `npm run lint` 16 errors 全为存量（useMarkdown/useChatMarkdown/
   gravatar/test-callout 等，本次文件 0 命中）。
+- **走查**：新增 `scripts/theme-nav-walkthrough.mjs`（全 API mock +
+  /me 延迟 2.5s），14/14 PASS——水合收益、ensureUser 时序、主题入口
+  并存/切换持久、设置页外观分区、移动菜单、无缓存对照组全覆盖。
+  插曲：fixture 初版误用 JSON 带引号写 theme（实际 useStorage 'any'
+  序列化存原始串）+ addInitScript 每次导航重播种，修正后全绿。
+- **部署**：2026-11-17 11:00 server-deploy 一次过——git FF 至 9170f4e、
+  后端 82M、前端 307 文件、nginx 重载；终验 site/config 真数据、
+  新 bundle `index-hyhICCql.js` 含 `user_profile`、health/401/200 全过。
 - **插曲**：ThemePicker/ThemeToggle 两文件尾部各混入一行 `</file-view>`
   残留（早前写入事故），build 报 Invalid end tag，已清除重建通过。
