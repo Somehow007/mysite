@@ -26,6 +26,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -75,6 +78,9 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
     );
 
     private static final float WEBP_QUALITY = 0.8f;
+
+    /** 管理列表缩略图最长边（px）：网格展示约 150-250px，512 覆盖 2x DPR */
+    private static final int THUMB_MAX_SIZE = 512;
 
     /** WebP 编码器可用性（首次使用时探测一次并缓存，避免不支持的平台每次上传都触发原生库加载失败） */
     private static volatile Boolean webpWriterAvailable;
@@ -200,6 +206,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
                     width = image.getWidth();
                     height = image.getHeight();
                     generateWebpCopy(image, filePath);
+                    generateThumbCopy(image, filePath);
                 }
             } catch (Throwable e) {
                 log.warn("读取图片尺寸失败: {}", filePath, e);
@@ -351,6 +358,7 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
                     width = image.getWidth();
                     height = image.getHeight();
                     generateWebpCopy(image, filePath);
+                    generateThumbCopy(image, filePath);
                 }
             } catch (Throwable e) {
                 log.warn("读取远程图片尺寸失败", e);
@@ -537,6 +545,12 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
         } catch (IOException e) {
             log.warn("删除暂存图片WebP副本失败: {}", webpPath, e);
         }
+        Path thumbPath = resolveThumbPath(filePath);
+        try {
+            Files.deleteIfExists(thumbPath);
+        } catch (IOException e) {
+            log.warn("删除暂存图片缩略图失败: {}", thumbPath, e);
+        }
     }
 
     @Override
@@ -568,6 +582,12 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
             Files.deleteIfExists(webpPath);
         } catch (IOException e) {
             log.warn("删除WebP副本失败: {}", webpPath, e);
+        }
+        Path thumbPath = resolveThumbPath(filePath);
+        try {
+            Files.deleteIfExists(thumbPath);
+        } catch (IOException e) {
+            log.warn("删除缩略图失败: {}", thumbPath, e);
         }
 
         int rows = baseMapper.deleteById(id);
@@ -629,6 +649,61 @@ public class ImageServiceImpl extends ServiceImpl<ImageMapper, ImageDO> implemen
         String originalName = originalPath.getFileName().toString();
         String webpName = originalName.replaceAll("\\.(png|jpg|jpeg|gif)$", ".webp");
         return originalPath.resolveSibling(webpName);
+    }
+
+    /**
+     * 生成管理列表用缩略图：最长边 {@link #THUMB_MAX_SIZE}px 的 WebP，
+     * 命名 {原文件名去扩展名}_thumb.webp（storedName 由服务端生成，不会与用户文件冲突）。
+     * 仅 WebP 可用、非 SVG、且原图超过缩略尺寸时生成；缩略图缺失时前端回退原图。
+     */
+    private void generateThumbCopy(BufferedImage image, Path originalPath) {
+        if (!isWebpWriterAvailable()) {
+            return;
+        }
+        String originalName = originalPath.getFileName().toString();
+        if (originalName.endsWith(".svg")) {
+            return;
+        }
+        if (Math.max(image.getWidth(), image.getHeight()) <= THUMB_MAX_SIZE) {
+            return;
+        }
+        String thumbName = originalName.replaceFirst("\\.[a-zA-Z0-9]+$", "") + "_thumb.webp";
+        Path thumbPath = originalPath.resolveSibling(thumbName);
+        if (Files.exists(thumbPath)) {
+            return;
+        }
+        try {
+            double scale = (double) THUMB_MAX_SIZE / Math.max(image.getWidth(), image.getHeight());
+            int tw = Math.max(1, (int) Math.round(image.getWidth() * scale));
+            int th = Math.max(1, (int) Math.round(image.getHeight() * scale));
+            BufferedImage thumb = new BufferedImage(tw, th, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = thumb.createGraphics();
+            try {
+                // 透明 PNG 统一铺白底，避免缩略图透明区变黑
+                g.setColor(Color.WHITE);
+                g.fillRect(0, 0, tw, th);
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                g.drawImage(image, 0, 0, tw, th, null);
+            } finally {
+                g.dispose();
+            }
+            if (!ImageIO.write(thumb, "webp", thumbPath.toFile())) {
+                Files.deleteIfExists(thumbPath);
+            }
+        } catch (Throwable e) {
+            log.warn("生成缩略图失败: {}", thumbName, e);
+            try {
+                Files.deleteIfExists(thumbPath);
+            } catch (IOException ignored) {
+            }
+        }
+    }
+
+    private Path resolveThumbPath(Path originalPath) {
+        String originalName = originalPath.getFileName().toString();
+        String thumbName = originalName.replaceFirst("\\.[a-zA-Z0-9]+$", "") + "_thumb.webp";
+        return originalPath.resolveSibling(thumbName);
     }
 
     private void checkUploadRateLimit() {

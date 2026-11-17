@@ -96,6 +96,22 @@ function formatDate(dateStr: string): string {
   return d.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
+// 缩略图：后端上传时生成 {原名}_thumb.webp（最长边512）；缺失/加载失败回退原图
+const thumbFailedIds = ref<Set<string>>(new Set())
+
+function thumbUrl(image: ImageItem): string {
+  return image.url.replace(/\.(png|jpe?g|gif|webp)$/i, '_thumb.webp')
+}
+
+function gridSrc(image: ImageItem): string {
+  return thumbFailedIds.value.has(image.id) ? image.url : thumbUrl(image)
+}
+
+function onGridImgError(image: ImageItem, e: Event) {
+  thumbFailedIds.value = new Set(thumbFailedIds.value).add(image.id)
+  ;(e.target as HTMLImageElement).src = image.url
+}
+
 function contentTypeLabel(ct: string): string {
   const map: Record<string, string> = {
     'image/jpeg': 'JPEG',
@@ -396,10 +412,11 @@ onMounted(() => {
             @click="selectedForPreview = image"
           >
             <img
-              :src="image.url"
+              :src="gridSrc(image)"
               :alt="image.originalName"
               class="w-full h-full object-cover"
               loading="lazy"
+              @error="onGridImgError(image, $event)"
             />
             <!-- Hover overlay for preview -->
             <div class="absolute inset-0 bg-black/0 group-hover:bg-black/30 flex items-center justify-center transition-colors">
