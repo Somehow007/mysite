@@ -69,4 +69,4 @@
 
 ## Resolution
 
-（待讨论后回填：哪些点立项、哪些否决及理由）
+- 2026-11-19 | ①④ 立项 → `.trellis/tasks/11-19-rag-ingest-dedup/prd.md`（方案 A 同步内复用 + B content_hash 门禁，设计两轮复审确认，拆两 commit 待实施）；②③⑤⑥ 未立项，候选池见 `docs/ragent/RAG问题与方案笔记.md` §2。
