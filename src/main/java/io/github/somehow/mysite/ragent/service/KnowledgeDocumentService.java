@@ -2,6 +2,8 @@ package io.github.somehow.mysite.ragent.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.github.somehow.mysite.dao.entity.ArticleDO;
+import io.github.somehow.mysite.ragent.chunking.MarkdownChunker;
+import io.github.somehow.mysite.ragent.config.RagProperties;
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeBaseDO;
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeChunkDO;
 import io.github.somehow.mysite.ragent.dao.entity.KnowledgeDocumentDO;
@@ -16,10 +18,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -49,19 +57,22 @@ public class KnowledgeDocumentService {
     private final DocumentChunker chunker;
     private final EmbeddingService embeddingService;
     private final VectorStore vectorStore;
+    private final RagProperties properties;
 
     public KnowledgeDocumentService(KnowledgeBaseMapper kbMapper,
                                      KnowledgeDocumentMapper docMapper,
                                      KnowledgeChunkMapper chunkMapper,
                                      DocumentChunker chunker,
                                      EmbeddingService embeddingService,
-                                     VectorStore vectorStore) {
+                                     VectorStore vectorStore,
+                                     RagProperties properties) {
         this.kbMapper = kbMapper;
         this.docMapper = docMapper;
         this.chunkMapper = chunkMapper;
         this.chunker = chunker;
         this.embeddingService = embeddingService;
         this.vectorStore = vectorStore;
+        this.properties = properties;
     }
 
     /**
@@ -86,7 +97,36 @@ public class KnowledgeDocumentService {
             log.warn("没有启用的知识库，跳过文章同步: articleId={}", article.getId());
             return;
         }
-        ingestArticle(article, enabledKbs);
+
+        // hash 门（仅事件路径）：READY 且 content_hash 匹配的 KB 跳过重建——
+        // 标题/标签/封面等元数据更新不再触发 K×C 次重建。
+        // FAILED/PENDING/CHUNKING/NULL hash（存量旧数据）一律重建，首事件同步后自愈回填。
+        // 显式 2-arg 路径（addArticles/syncKb/reprocessDoc）不过此门，语义=强制重建。
+        String hash = contentHash(article);
+        Map<Long, KnowledgeDocumentDO> docByKb = new HashMap<>();
+        for (KnowledgeDocumentDO doc : docMapper.findBySource("ARTICLE", article.getId().toString())) {
+            if (doc.getKbId() != null) {
+                docByKb.putIfAbsent(doc.getKbId(), doc);
+            }
+        }
+        List<KnowledgeBaseDO> rebuildKbs = new ArrayList<>(enabledKbs.size());
+        for (KnowledgeBaseDO kb : enabledKbs) {
+            KnowledgeDocumentDO doc = docByKb.get(kb.getId());
+            if (doc != null && "READY".equals(doc.getStatus()) && hash.equals(doc.getContentHash())) {
+                // hash 不含标题：标题变更不重建，但要把展示用的标题刷成最新
+                if (!Objects.equals(doc.getTitle(), article.getTitle())) {
+                    doc.setTitle(article.getTitle());
+                    docMapper.updateById(doc);
+                }
+                continue;
+            }
+            rebuildKbs.add(kb);
+        }
+        if (rebuildKbs.isEmpty()) {
+            log.info("文章内容未变化，跳过向量化: articleId={}, kbs={}", article.getId(), enabledKbs.size());
+            return;
+        }
+        ingestArticle(article, rebuildKbs);
     }
 
     /**
@@ -128,6 +168,7 @@ public class KnowledgeDocumentService {
             .callType("EMBED")
             .build());
         try {
+            String hash = contentHash(article);
             // Phase A：逐 KB 建档
             List<KbDocPair> pairs = new ArrayList<>(kbs.size());
             for (KnowledgeBaseDO kb : kbs) {
@@ -146,6 +187,7 @@ public class KnowledgeDocumentService {
                     doc.setSourceRef(article.getId().toString());
                     doc.setFileType("MD");
                     doc.setStatus("PENDING");
+                    doc.setContentHash(hash);
                     docMapper.insert(doc);
                     pairs.add(new KbDocPair(kb, doc));
                 } catch (Exception e) {
@@ -285,6 +327,33 @@ public class KnowledgeDocumentService {
     private boolean isPubliclySyncable(ArticleDO article) {
         return Integer.valueOf(1).equals(article.getPublished())
             && (article.getVisibility() == null || article.getVisibility() == 0);
+    }
+
+    /**
+     * 内容 hash = sha256(正文 | CHUNKER_VERSION | 全局分块参数 | embedding 模型 | 维度)。
+     * <p>
+     * 输入用 \u0001 分隔防拼接歧义；模型/维度必须进 hash——yaml 直改 embedding 配置
+     * + 重启不走 {@code onGlobalEmbeddingChanged}（那只在后台 LlmRuntimeConfigService
+     * 里标 FAILED），不进 hash 的话被编辑过的文章会永远跳过、旧向量残留。
+     * package-private：测试同包可取期望值。
+     */
+    String contentHash(ArticleDO article) {
+        RagProperties.ChunkProperties chunk = properties.getChunk();
+        String raw = String.join("\u0001",
+            String.valueOf(article.getContent()),
+            MarkdownChunker.CHUNKER_VERSION,
+            String.valueOf(chunk.getSize()),
+            String.valueOf(chunk.getOverlap()),
+            String.valueOf(chunk.getMinChars()),
+            String.valueOf(chunk.getMaxChunksPerDoc()),
+            String.valueOf(embeddingService.currentModel()),
+            String.valueOf(embeddingService.currentDimension()));
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                .digest(raw.getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 不可用", e);
+        }
     }
 
     /** 入库向量必须标运行时模型名，否则改模型后检索会拿新旧向量交叉比较。 */

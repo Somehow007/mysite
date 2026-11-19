@@ -25,6 +25,13 @@ import java.util.List;
 @Component
 public class MarkdownChunker implements DocumentChunker {
 
+    /**
+     * 分块算法版本号，写入文档 content_hash。
+     * 分块逻辑任何影响产物的改动都必须手动 bump（当前 v3 = block-aware 实现），
+     * 否则旧文档 hash 仍匹配、事件路径会跳过本该发生的重建。
+     */
+    public static final String CHUNKER_VERSION = "md-v3";
+
     private final RagProperties properties;
 
     public MarkdownChunker(RagProperties properties) {

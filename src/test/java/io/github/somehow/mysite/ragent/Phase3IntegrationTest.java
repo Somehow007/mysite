@@ -198,7 +198,7 @@ class Phase3IntegrationTest {
 
         // 组装 KnowledgeDocumentService
         docService = new KnowledgeDocumentService(
-            kbMapper, docMapper, chunkMapper, chunker, embeddingService, vectorStore);
+            kbMapper, docMapper, chunkMapper, chunker, embeddingService, vectorStore, chunkProps);
 
         // ---- 构建 RAG Chat 管线组件 ----
         // Rerank: 暂不测试（需要额外配置），用 null RerankService → 走向量截断

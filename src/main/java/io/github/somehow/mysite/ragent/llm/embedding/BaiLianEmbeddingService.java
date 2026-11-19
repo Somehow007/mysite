@@ -111,6 +111,11 @@ public class BaiLianEmbeddingService implements EmbeddingService {
     }
 
     @Override
+    public Integer currentDimension() {
+        return dimensions;
+    }
+
+    @Override
     public List<float[]> embedBatch(List<String> texts) {
         if (texts.isEmpty()) return List.of();
 

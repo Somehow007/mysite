@@ -3,6 +3,7 @@ package io.github.somehow.mysite.ragent.dao.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
@@ -33,6 +34,9 @@ public class KnowledgeDocumentDO {
     private String status;
     /** 失败原因（仅在 FAILED 状态时有值） */
     private String failReason;
+    /** 内容 hash（正文+分块参数+embedding 模型/维度）；READY 且匹配时事件路径跳过重建。内部字段，不进 API 响应 */
+    @JsonIgnore
+    private String contentHash;
     private Integer chunkCount;
     private Integer charCount;
     private LocalDateTime createTime;

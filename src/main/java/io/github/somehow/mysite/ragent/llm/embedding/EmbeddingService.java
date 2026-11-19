@@ -30,4 +30,13 @@ public interface EmbeddingService {
     default String currentModel() {
         return null;
     }
+
+    /**
+     * 当前 embedding 输出维度。与 {@link #currentModel()} 同理用于内容 hash：
+     * 维度单独变更（模型名不变）也会改变向量空间，必须触发重建。
+     * 未实现时返回 {@code null}。
+     */
+    default Integer currentDimension() {
+        return null;
+    }
 }

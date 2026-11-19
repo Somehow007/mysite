@@ -122,6 +122,7 @@ class Phase2EndToEndTest {
         private KnowledgeChunkMapper chunkMapper;
         private MarkdownChunker chunker;
         private DocumentChunker chunkerInterface;
+        private RagProperties ragProps;
 
         private static final long TEST_KB_ID = 99999L;
 
@@ -307,16 +308,16 @@ class Phase2EndToEndTest {
             }).when(docMapper).updateById(any(KnowledgeDocumentDO.class));
 
             // 创建 chunker
-            RagProperties props = new RagProperties();
-            props.getChunk().setSize(800);
-            props.getChunk().setOverlap(100);
-            props.getChunk().setMaxChunksPerDoc(50);
-            chunker = new MarkdownChunker(props);
+            ragProps = new RagProperties();
+            ragProps.getChunk().setSize(800);
+            ragProps.getChunk().setOverlap(100);
+            ragProps.getChunk().setMaxChunksPerDoc(50);
+            chunker = new MarkdownChunker(ragProps);
             chunkerInterface = chunker;
 
             // 组装 KnowledgeDocumentService
             docService = new KnowledgeDocumentService(
-                kbMapper, docMapper, chunkMapper, chunkerInterface, embeddingService, vectorStore);
+                kbMapper, docMapper, chunkMapper, chunkerInterface, embeddingService, vectorStore, ragProps);
         }
 
         @AfterEach
@@ -444,7 +445,7 @@ class Phase2EndToEndTest {
             );
 
             KnowledgeDocumentService failingDocService = new KnowledgeDocumentService(
-                kbMapper, docMapper, chunkMapper, chunkerInterface, badEmbedding, vectorStore);
+                kbMapper, docMapper, chunkMapper, chunkerInterface, badEmbedding, vectorStore, ragProps);
 
             ArticleDO article = new ArticleDO();
             article.setId(20001L);

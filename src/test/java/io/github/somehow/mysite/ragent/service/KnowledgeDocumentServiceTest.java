@@ -45,6 +45,7 @@ class KnowledgeDocumentServiceTest {
     private DocumentChunker chunker;
     private EmbeddingService embeddingService;
     private VectorStore vectorStore;
+    private RagProperties props;
     private KnowledgeDocumentService service;
     private KnowledgeBaseDO defaultKb;
 
@@ -56,7 +57,7 @@ class KnowledgeDocumentServiceTest {
         embeddingService = mock(EmbeddingService.class);
         vectorStore = mock(VectorStore.class);
 
-        RagProperties props = new RagProperties();
+        props = new RagProperties();
         props.getChunk().setSize(800);
         props.getChunk().setOverlap(100);
         props.getChunk().setMaxChunksPerDoc(50);
@@ -101,7 +102,7 @@ class KnowledgeDocumentServiceTest {
         }).when(chunkMapper).insert(any(KnowledgeChunkDO.class));
 
         service = new KnowledgeDocumentService(
-            kbMapper, docMapper, chunkMapper, chunker, embeddingService, vectorStore);
+            kbMapper, docMapper, chunkMapper, chunker, embeddingService, vectorStore, props);
     }
 
     @Nested
@@ -192,7 +193,7 @@ class KnowledgeDocumentServiceTest {
                 .thenThrow(new RuntimeException("连接超时: dashscope.aliyuncs.com"));
 
             KnowledgeDocumentService failingSvc = new KnowledgeDocumentService(
-                kbMapper, docMapper, chunkMapper, chunker, failingEmb, vectorStore);
+                kbMapper, docMapper, chunkMapper, chunker, failingEmb, vectorStore, props);
 
             ArticleDO article = new ArticleDO();
             article.setId(400L);
@@ -216,7 +217,7 @@ class KnowledgeDocumentServiceTest {
                 .thenThrow(new RuntimeException("API 限流"));
 
             KnowledgeDocumentService failingSvc = new KnowledgeDocumentService(
-                kbMapper, docMapper, chunkMapper, chunker, failingEmb, vectorStore);
+                kbMapper, docMapper, chunkMapper, chunker, failingEmb, vectorStore, props);
 
             ArticleDO article = new ArticleDO();
             article.setId(500L);
@@ -440,7 +441,7 @@ class KnowledgeDocumentServiceTest {
             // 本用例只关心去重扩回，收窄回单 KB
             when(kbMapper.selectList(any())).thenReturn(List.of(defaultKb));
             KnowledgeDocumentService svc = new KnowledgeDocumentService(
-                kbMapper, docMapper, chunkMapper, mockChunker, embeddingService, vectorStore);
+                kbMapper, docMapper, chunkMapper, mockChunker, embeddingService, vectorStore, props);
 
             svc.syncArticle(publicArticle(801L));
 
@@ -465,12 +466,158 @@ class KnowledgeDocumentServiceTest {
                 .thenThrow(new RuntimeException("API 限流"));
             List<String> statuses = recordUpdateStatuses();
             KnowledgeDocumentService svc = new KnowledgeDocumentService(
-                kbMapper, docMapper, chunkMapper, chunker, failingEmb, vectorStore);
+                kbMapper, docMapper, chunkMapper, chunker, failingEmb, vectorStore, props);
 
             svc.syncArticle(publicArticle(802L));
 
             assertEquals(List.of("CHUNKING", "CHUNKING", "FAILED", "FAILED"), statuses);
             verify(vectorStore, never()).insert(anyList());
+        }
+    }
+
+    @Nested
+    @DisplayName("内容 hash 门禁（仅 1-arg 事件路径）")
+    class ContentHashGate {
+
+        private ArticleDO article(long id, String content) {
+            ArticleDO a = new ArticleDO();
+            a.setId(id);
+            a.setPublished(1);
+            a.setTitle("hash门禁文章");
+            a.setContent(content);
+            return a;
+        }
+
+        private KnowledgeDocumentDO docInKb(long docId, long kbId, String status,
+                                            String hash, String title) {
+            KnowledgeDocumentDO doc = new KnowledgeDocumentDO();
+            doc.setId(docId);
+            doc.setKbId(kbId);
+            doc.setTitle(title);
+            doc.setSourceType("ARTICLE");
+            doc.setStatus(status);
+            doc.setContentHash(hash);
+            doc.setChunkCount(3);
+            doc.setCharCount(100);
+            return doc;
+        }
+
+        @Test
+        @DisplayName("READY + hash 匹配 → 零重建：无 insert/embedBatch/vector 写入，标题相同连 updateById 都不调")
+        void readyDocWithMatchingHashShouldSkip() {
+            ArticleDO article = article(810L, "这是一篇正文内容。");
+            KnowledgeDocumentDO doc = docInKb(7001L, 1L, "READY",
+                service.contentHash(article), article.getTitle());
+            when(docMapper.findBySource("ARTICLE", "810")).thenReturn(List.of(doc));
+
+            service.syncArticle(article);
+
+            verify(embeddingService, never()).embedBatch(anyList());
+            verify(docMapper, never()).insert(any(KnowledgeDocumentDO.class));
+            verify(vectorStore, never()).insert(anyList());
+            verify(docMapper, never()).updateById(any(KnowledgeDocumentDO.class));
+        }
+
+        @Test
+        @DisplayName("READY + hash 匹配但标题变了 → 只刷标题，不重建")
+        void titleChangeShouldRefreshWithoutRebuild() {
+            ArticleDO article = article(811L, "正文不变。");
+            article.setTitle("新标题");
+            KnowledgeDocumentDO doc = docInKb(7002L, 1L, "READY",
+                service.contentHash(article), "旧标题");
+            when(docMapper.findBySource("ARTICLE", "811")).thenReturn(List.of(doc));
+
+            service.syncArticle(article);
+
+            verify(embeddingService, never()).embedBatch(anyList());
+            verify(docMapper, never()).insert(any(KnowledgeDocumentDO.class));
+            verify(docMapper, times(1)).updateById(
+                org.mockito.Mockito.<KnowledgeDocumentDO>argThat(d -> "新标题".equals(d.getTitle())));
+        }
+
+        @Test
+        @DisplayName("READY + hash 不匹配 → 正常重建（删旧档→建档→embed）")
+        void hashMismatchShouldRebuild() {
+            ArticleDO article = article(812L, "正文改了。");
+            KnowledgeDocumentDO doc = docInKb(7003L, 1L, "READY", "stale-hash", article.getTitle());
+            when(docMapper.findBySource("ARTICLE", "812")).thenReturn(List.of(doc));
+            when(docMapper.findBySourceRef(1L, "ARTICLE", "812")).thenReturn(doc);
+
+            service.syncArticle(article);
+
+            verify(docMapper).deleteById(7003L);
+            verify(docMapper, times(1)).insert(any(KnowledgeDocumentDO.class));
+            verify(embeddingService, times(1)).embedBatch(anyList());
+        }
+
+        @Test
+        @DisplayName("FAILED + hash 匹配 → status 门不放行，仍重建")
+        void failedDocShouldRebuildEvenWithMatchingHash() {
+            ArticleDO article = article(813L, "正文不变。");
+            KnowledgeDocumentDO doc = docInKb(7004L, 1L, "FAILED",
+                service.contentHash(article), article.getTitle());
+            doc.setFailReason("历史失败");
+            when(docMapper.findBySource("ARTICLE", "813")).thenReturn(List.of(doc));
+            when(docMapper.findBySourceRef(1L, "ARTICLE", "813")).thenReturn(doc);
+
+            service.syncArticle(article);
+
+            verify(docMapper).deleteById(7004L);
+            verify(embeddingService, times(1)).embedBatch(anyList());
+        }
+
+        @Test
+        @DisplayName("存量 NULL content_hash → 重建，新档回填 hash")
+        void nullHashShouldRebuildAndBackfill() {
+            ArticleDO article = article(814L, "正文不变。");
+            KnowledgeDocumentDO doc = docInKb(7005L, 1L, "READY", null, article.getTitle());
+            when(docMapper.findBySource("ARTICLE", "814")).thenReturn(List.of(doc));
+            when(docMapper.findBySourceRef(1L, "ARTICLE", "814")).thenReturn(doc);
+
+            service.syncArticle(article);
+
+            verify(embeddingService, times(1)).embedBatch(anyList());
+            ArgumentCaptor<KnowledgeDocumentDO> captor = ArgumentCaptor.forClass(KnowledgeDocumentDO.class);
+            verify(docMapper).insert(captor.capture());
+            assertEquals(service.contentHash(article), captor.getValue().getContentHash());
+        }
+
+        @Test
+        @DisplayName("多 KB 部分命中：READY+hash 匹配的跳过，仅缺失/过期 KB 重建")
+        void partialHashMatchShouldRebuildOnlyStale() {
+            KnowledgeBaseDO kb2 = new KnowledgeBaseDO();
+            kb2.setId(2L);
+            kb2.setName("第二知识库");
+            kb2.setEmbeddingModel("text-embedding-v4");
+            when(kbMapper.selectList(any())).thenReturn(List.of(defaultKb, kb2));
+
+            ArticleDO article = article(815L, "正文不变。");
+            // kb1 已 READY 且 hash 匹配 → 跳过；kb2 无文档 → 重建
+            KnowledgeDocumentDO doc1 = docInKb(7006L, 1L, "READY",
+                service.contentHash(article), article.getTitle());
+            when(docMapper.findBySource("ARTICLE", "815")).thenReturn(List.of(doc1));
+
+            service.syncArticle(article);
+
+            verify(embeddingService, times(1)).embedBatch(anyList());
+            ArgumentCaptor<KnowledgeDocumentDO> captor = ArgumentCaptor.forClass(KnowledgeDocumentDO.class);
+            verify(docMapper, times(1)).insert(captor.capture());
+            assertEquals(2L, captor.getValue().getKbId());
+            assertEquals(service.contentHash(article), captor.getValue().getContentHash());
+        }
+
+        @Test
+        @DisplayName("2-arg 显式路径不过 hash 门：READY+hash 匹配也强制重建")
+        void explicitPathBypassesHashGate() {
+            ArticleDO article = article(816L, "正文不变。");
+            KnowledgeDocumentDO doc = docInKb(7007L, 1L, "READY",
+                service.contentHash(article), article.getTitle());
+            when(docMapper.findBySourceRef(1L, "ARTICLE", "816")).thenReturn(doc);
+
+            service.syncArticle(article, 1L);
+
+            verify(docMapper).deleteById(7007L);
+            verify(embeddingService, times(1)).embedBatch(anyList());
         }
     }
 }
