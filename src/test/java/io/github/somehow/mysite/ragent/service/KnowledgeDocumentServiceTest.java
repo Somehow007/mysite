@@ -19,6 +19,8 @@ import org.junit.jupiter.api.Test;
 
 import org.mockito.ArgumentCaptor;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -356,6 +358,119 @@ class KnowledgeDocumentServiceTest {
 
             verify(docMapper, never()).insert(any(KnowledgeDocumentDO.class));
             verify(embeddingService, never()).embedBatch(anyList());
+        }
+    }
+
+    @Nested
+    @DisplayName("多知识库同步：分块/embedding 只做一次")
+    class MultiKb {
+
+        private KnowledgeBaseDO kb2;
+
+        @BeforeEach
+        void setUpKb2() {
+            kb2 = new KnowledgeBaseDO();
+            kb2.setId(2L);
+            kb2.setName("第二知识库");
+            kb2.setCollectionName("kb2");
+            kb2.setEmbeddingModel("text-embedding-v4");
+            kb2.setEmbeddingDimension(1024);
+            when(kbMapper.selectList(any())).thenReturn(List.of(defaultKb, kb2));
+        }
+
+        private ArticleDO publicArticle(long id) {
+            ArticleDO article = new ArticleDO();
+            article.setId(id);
+            article.setPublished(1);
+            article.setTitle("多库同步文章");
+            article.setContent("## 标题\n\n第一段内容。\n\n第二段内容。\n\n第三段内容。");
+            return article;
+        }
+
+        /** 记录 updateById 调用时刻的 status（doc 对象事后会被原地改状态，事后断言不可靠） */
+        private List<String> recordUpdateStatuses() {
+            List<String> statuses = new ArrayList<>();
+            doAnswer(inv -> {
+                statuses.add(((KnowledgeDocumentDO) inv.getArgument(0)).getStatus());
+                return 1;
+            }).when(docMapper).updateById(any(KnowledgeDocumentDO.class));
+            return statuses;
+        }
+
+        @Test
+        @DisplayName("2 个 KB → embedBatch 只调 1 次，向量按 KB 各批量写一次，两 doc 均 READY")
+        void shouldEmbedOnceAndWriteVectorsPerKb() {
+            List<String> statuses = recordUpdateStatuses();
+
+            service.syncArticle(publicArticle(800L));
+
+            verify(embeddingService, times(1)).embedBatch(anyList());
+            ArgumentCaptor<List<VectorStore.VectorEntry>> captor = ArgumentCaptor.forClass(List.class);
+            verify(vectorStore, times(2)).insert(captor.capture());
+            assertEquals(2, captor.getAllValues().size());
+            assertTrue(captor.getAllValues().stream().allMatch(l -> !l.isEmpty()));
+            // 两个 KB 各自独立的 chunkId/kbId
+            assertNotEquals(
+                captor.getAllValues().get(0).get(0).kbId(),
+                captor.getAllValues().get(1).get(0).kbId());
+
+            assertEquals(List.of("CHUNKING", "CHUNKING", "READY", "READY"), statuses);
+            verify(docMapper, times(2)).insert(any(KnowledgeDocumentDO.class));
+        }
+
+        @Test
+        @DisplayName("embeddingText 去重：重复文本只 embed 一次，向量按原 chunk 序扩回")
+        void shouldDeduplicateEmbeddingTexts() {
+            DocumentChunker mockChunker = mock(DocumentChunker.class);
+            when(mockChunker.chunk(anyString(), any(), any())).thenReturn(List.of(
+                new DocumentChunker.Chunk(0L, 0L, 0, "展示0", "text-A"),
+                new DocumentChunker.Chunk(0L, 0L, 1, "展示1", "text-B"),
+                new DocumentChunker.Chunk(0L, 0L, 2, "展示2", "text-A")
+            ));
+            // 可区分向量：text-A → 全 1.0，text-B → 全 2.0
+            when(embeddingService.embedBatch(anyList())).thenAnswer(inv -> {
+                @SuppressWarnings("unchecked")
+                List<String> texts = inv.getArgument(0);
+                return texts.stream().map(t -> {
+                    float[] v = new float[4];
+                    Arrays.fill(v, "text-A".equals(t) ? 1f : 2f);
+                    return v;
+                }).toList();
+            });
+            // 本用例只关心去重扩回，收窄回单 KB
+            when(kbMapper.selectList(any())).thenReturn(List.of(defaultKb));
+            KnowledgeDocumentService svc = new KnowledgeDocumentService(
+                kbMapper, docMapper, chunkMapper, mockChunker, embeddingService, vectorStore);
+
+            svc.syncArticle(publicArticle(801L));
+
+            ArgumentCaptor<List<String>> textsCaptor = ArgumentCaptor.forClass(List.class);
+            verify(embeddingService, times(1)).embedBatch(textsCaptor.capture());
+            assertEquals(List.of("text-A", "text-B"), textsCaptor.getValue());
+
+            ArgumentCaptor<List<VectorStore.VectorEntry>> captor = ArgumentCaptor.forClass(List.class);
+            verify(vectorStore).insert(captor.capture());
+            List<VectorStore.VectorEntry> entries = captor.getValue();
+            assertEquals(3, entries.size());
+            assertEquals(1f, entries.get(0).embedding()[0]);
+            assertEquals(2f, entries.get(1).embedding()[0]);
+            assertEquals(1f, entries.get(2).embedding()[0]);  // text-A 复用首个向量
+        }
+
+        @Test
+        @DisplayName("embedding 失败 → 所有已建档 doc 标 FAILED，向量不写入")
+        void embedFailureShouldFailAllDocs() {
+            EmbeddingService failingEmb = mock(EmbeddingService.class);
+            when(failingEmb.embedBatch(anyList()))
+                .thenThrow(new RuntimeException("API 限流"));
+            List<String> statuses = recordUpdateStatuses();
+            KnowledgeDocumentService svc = new KnowledgeDocumentService(
+                kbMapper, docMapper, chunkMapper, chunker, failingEmb, vectorStore);
+
+            svc.syncArticle(publicArticle(802L));
+
+            assertEquals(List.of("CHUNKING", "CHUNKING", "FAILED", "FAILED"), statuses);
+            verify(vectorStore, never()).insert(anyList());
         }
     }
 }
