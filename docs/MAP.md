@@ -1,6 +1,7 @@
 # MySite 项目地图（接管摸底版）
 
 > 生成：2026-11-12，阶段 0 摸底（只读，未改代码/未装依赖）。
+> 更新：2026-11-20，docs/ 大整理后同步（归档结构、表数修正、CLAUDE.md 漂移已修复）。
 > 每条结论附文件证据；标注「未实测」= 从源码读出、本会话未运行验证。
 > 代码与文档冲突时以代码为准。风险明细见 `.trellis/tasks/archive/2026-11/11-12-takeover-survey/risks.md`。
 
@@ -22,11 +23,11 @@
 | `mysite-frontend/` | 主站 Vue3+TS+Vite+Pinia，127 个 src 文件、25 个 view | `find mysite-frontend/src` |
 | `../study-journey`（平级兄弟仓库，2026-11-15 起不再嵌套） | 独立 git 仓库（remote=Somehow007/study-journel.git），手帐完整仓库（前端+剥离中后端+规范），规范以其自身 `AGENTS.md` 为准 | `git -C ../study-journey remote -v` |
 | `docker/` | docker-compose（MySQL8.4/Redis7/PG17+pgvector，ES/ollama 未启用或注释）+ init SQL | `docker/docker-compose.yml`、`docker/init/` |
-| `docker/init/` | schema.sql(19 表) + journal-schema.sql(7 表) + ragent-schema.sql(9 表) + data.sql(种子) + migrations/ | `grep -c 'CREATE TABLE'` 实测 |
+| `docker/init/` | schema.sql(20 表) + journal-schema.sql(6 表) + ragent-schema.sql(13 表) + data.sql(种子) + migrations/ | `grep -c 'CREATE TABLE'` 实测 |
 | `deploy/` | 构建打包 + 生产配置 + nginx + 运维脚本 | `deploy/deploy.sh`、`server-deploy.sh`、`config/application-production.yml`、`nginx/mysite.conf` |
-| `docs/` | 20+ 设计/验证文档，**17 份未提交**（untracked） | `git status` |
+| `docs/` | 现役 6 篇（MAP/DESIGN/DEPLOYMENT_GUIDE/分类API/错误码/RAG笔记）+ `archive/` 历史归档（rag/collections/frontend/features/ops，迭代文档带 v 版本号）；`CHANGELOG.md` 已于 2026-11 整理移除，变更记录由 `.trellis/CHANGES.md` 承担 | `ls docs/` |
 | `.cursor/rules/*.mdc` | Cursor 规则 5 份（架构/后端/前端/journal/ragent） | `ls .cursor/rules/` |
-| `CLAUDE.md` | Claude Code 项目说明（多处数据已漂移，见 §6） | `CLAUDE.md` |
+| `CLAUDE.md` | Claude Code 项目说明（2026-11-20 已对照代码修正漂移） | `CLAUDE.md` |
 | `.claude/settings.local.json` | 工具权限白名单，无密钥 | 已读 |
 | `login-test.html` | 根目录遗留手工测试页，硬编码 testuser2/123456 | `git ls-files` 追踪中 |
 | `target/`、`uploads/`、`node_modules/` | 产物/上传/依赖目录，均已 gitignore | `git check-ignore` 确认 |
@@ -90,10 +91,10 @@
 
 ## 6. 文档景观与新鲜度
 
-- `CLAUDE.md`：最全但已漂移——Spring Boot 版本、表数量（13 vs 实测 19）、手帐表数（3 vs 7）、`-Pproduction` 均过期。
+- `CLAUDE.md`：2026-11-20 已对照代码修正漂移——Spring Boot 3.5.7、MySQL 14 t_*+6 sj_*、PG 13 表、去 `-Pproduction`、文档清单改指 `docs/archive/`。
 - `.cursor/rules/*.mdc`：架构/后端/前端/journal/ragent 四份，编码约定可靠（snowflake→string、Result 封装、user_id 隔离已抽查属实）。
-- `docs/`：20+ 篇设计/验证文档，17 篇未提交；`CHANGELOG.md` 最新条目 2026-07-29（与近 3 个月 RAG/手帐大改不符，已停更）。
-- 无 AGENTS.md、无 .trellis、无 MAP（本文件为首版）。
+- `docs/`：2026-11 整理后剩 6 篇现役文档，历史方案/设计稿归档至 `docs/archive/`（按模块分目录，迭代文档带 v1–v4 版本号）。
+- `AGENTS.md`、`.trellis/` 已建立（11-12 起）；本文件为权威项目地图。
 
 ## 7. 部署形态
 

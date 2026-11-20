@@ -15,7 +15,7 @@ import '@milkdown/crepe/theme/frame.css'
  *
  * 所有 Milkdown 相关代码收敛在 src/editor/ 内，业务侧只面对
  * MarkdownWysiwygEditor.vue 这一个普通 Vue 组件（见
- * docs/editor-redesign-plan.md §4.1）。
+ * docs/archive/frontend/v4-editor-redesign-plan.md §4.1）。
  */
 
 export interface EditorHandle {

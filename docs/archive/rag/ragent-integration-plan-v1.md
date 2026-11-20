@@ -1,6 +1,6 @@
 # MySite RAG + AI 交互集成实施方案
 
-> 基于 [ragent-integration-design.md](./ragent-integration-design.md) 架构设计 +
+> 基于 [ragent-integration-design-v1.md](./ragent-integration-design-v1.md) 架构设计 +
 > [ragent-project-summary.md](./ragent-project-summary.md) Ragent 学习笔记 +
 > 当前 mysite 代码库实际结构，制定的详细落地计划。
 >

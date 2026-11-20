@@ -1,7 +1,7 @@
 # mysite 前端 UI 重构设计方案
 
 > 范围：RAG 模块（知识库管理 + 智能问答聊天）、系统管理员各管理界面、个人主页/个人中心
-> 产出：本文档 + `mockups/` 下 4 张高保真静态效果图（浏览器直接打开即可预览，支持亮/暗主题切换）
+> 产出：本文档 + `v3-mockups/` 下 4 张高保真静态效果图（浏览器直接打开即可预览，支持亮/暗主题切换）
 > 基于现状代码调研编写（2026-07），涉及文件均已在文中标注
 
 ---
@@ -111,7 +111,7 @@
 
 ## 四、RAG 模块重构方案
 
-效果图：`mockups/01-rag-knowledge.html`（知识库管理）、`mockups/02-rag-chat.html`（智能问答）
+效果图：`v3-mockups/01-rag-knowledge.html`（知识库管理）、`v3-mockups/02-rag-chat.html`（智能问答）
 
 ### 4.1 知识库管理（KnowledgeManageView）
 
@@ -153,7 +153,7 @@
 
 ## 五、管理后台重构方案
 
-效果图：`mockups/03-admin-console.html`（以用户管理为完整示例）
+效果图：`v3-mockups/03-admin-console.html`（以用户管理为完整示例）
 
 ### 5.1 布局与导航
 
@@ -183,7 +183,7 @@
 
 ## 六、个人主页与个人中心方案
 
-效果图：`mockups/04-profile.html`
+效果图：`v3-mockups/04-profile.html`
 
 ### 6.1 新增公开个人主页 `/user/:username`
 
@@ -237,9 +237,9 @@
 
 | 文件 | 对应章节 | 演示重点 |
 |------|----------|----------|
-| `mockups/01-rag-knowledge.html` | §4.1 | 两级视图、统计条实时状态、文档表格、行展开分块预览、语义状态徽章 |
-| `mockups/02-rag-chat.html` | §4.2 | 玻璃拟态面板、可点击来源卡片、流式光标、失败重试、限流横幅、历史会话管理 |
-| `mockups/03-admin-console.html` | §5 | 统一页面骨架、DataTable、批量操作浮条、智能分页、ConfirmDialog（输入确认）、Toast 组、统计卡 |
-| `mockups/04-profile.html` | §6 | 公开个人主页（访客视角）、Tab、文章流、本人视角的个人中心设置预览（状态徽章/账号安全） |
+| `v3-mockups/01-rag-knowledge.html` | §4.1 | 两级视图、统计条实时状态、文档表格、行展开分块预览、语义状态徽章 |
+| `v3-mockups/02-rag-chat.html` | §4.2 | 玻璃拟态面板、可点击来源卡片、流式光标、失败重试、限流横幅、历史会话管理 |
+| `v3-mockups/03-admin-console.html` | §5 | 统一页面骨架、DataTable、批量操作浮条、智能分页、ConfirmDialog（输入确认）、Toast 组、统计卡 |
+| `v3-mockups/04-profile.html` | §6 | 公开个人主页（访客视角）、Tab、文章流、本人视角的个人中心设置预览（状态徽章/账号安全） |
 
 4 张效果图均为独立 HTML（零依赖，内联 CSS/JS），右上角可切换亮/暗主题，直接双击用浏览器打开即可。

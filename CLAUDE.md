@@ -10,11 +10,11 @@ Cursor 会话记忆：`.cursor/rules/`（架构 alwaysApply；后端/前端/RAG/
 
 | Layer | Stack |
 |-------|-------|
-| Backend | Spring Boot 3.0.7 + MyBatis-Plus + Spring WebFlux (Reactor) |
+| Backend | Spring Boot 3.5.7 + MyBatis-Plus + Spring WebFlux (Reactor) |
 | Frontend | Vue 3 + TypeScript + Vite + Pinia |
-| Primary DB | MySQL 8.4 (13 tables, all logical-deletion) |
+| Primary DB | MySQL 8.4（博客 14 张 `t_*` 逻辑删除 + 手帐 6 张 `sj_*`） |
 | Cache | Redis 7 (strategy-pattern TTL per entity) |
-| RAG DB | PostgreSQL 17 + pgvector (6 tables: KB, docs, chunks, vectors, conversations) |
+| RAG DB | PostgreSQL 17 + pgvector（13 张表：KB/文档/切片/向量 + 会话 + LLM 计费 6 张） |
 
 ## Quick Start Commands
 
@@ -34,7 +34,7 @@ cd docker && docker compose --profile ollama up -d
 ./mvnw spring-boot:run          # Dev server (port 8081)
 ./mvnw compile                   # Compile check
 ./mvnw test                      # Run tests
-./mvnw clean package -Pproduction # Production build
+./mvnw clean package -DexcludedGroups=needs-infra  # 与 deploy.sh 同口径（无 -Pproduction profile）
 ```
 
 ### Frontend (Vue 3 + Vite)
@@ -66,7 +66,7 @@ src/main/java/io/github/somehow/mysite/
 ├── service/         # Business logic
 │   └── impl/        # Service implementations
 ├── dao/             # Data access (MyBatis-Plus)
-│   ├── entity/      # 13 MySQL entities with logical deletion
+│   ├── entity/      # 14 MySQL entities with logical deletion
 │   └── mapper/      # MyBatis mapper interfaces
 ├── dto/             # Request/response DTOs (Long IDs → @JsonSerialize ToString)
 ├── commons/         # Shared: UserContext, error codes, exceptions, enums
@@ -126,18 +126,20 @@ mysite-frontend/src/
 
 ### Database Schema
 
-**MySQL — 博客 13 张表（均有 `del_flag` 逻辑删除）：**
+**MySQL — 博客 14 张表（均有 `del_flag` 逻辑删除）：**
 
 ```
 t_user, t_article, t_category, t_tag, t_article_tag,
 t_collection, t_collection_article, t_comment, t_comment_like,
-t_image, t_user_follow, t_user_article_favorites, t_user_operation_log
+t_image, t_site_config, t_user_follow, t_user_article_favorites,
+t_user_operation_log
 ```
 
-**MySQL — 学习手帐 3 张表（无 del_flag，`/api/journal`，仅 ADMIN）：**
+**MySQL — 学习手帐 6 张表（无 del_flag，`/api/journal`，仅 ADMIN）：**
 
 ```
-sj_day_record, sj_learning_item, sj_custom_mood
+sj_day_record, sj_learning_item, sj_custom_mood   # 日记录
+sj_goal, sj_goal_task, sj_goal_checkin              # 月目标/任务/打卡
 ```
 
 **PostgreSQL + pgvector（RAG）：**
@@ -150,6 +152,9 @@ t_knowledge_vector       # vector(1024), HNSW, cosine (<=>)
 t_conversation           # user_id 主归属 / visitor_id 兜底 + title
 t_conversation_message   # role, content, sources JSONB
 t_rag_intent             # 扁平意图：KB_RETRIEVAL / CHAT，绑定 kb_id
+# LLM 计费/运维（2026-11 后新增）：
+t_llm_usage, t_llm_provider_setting, t_llm_model_price,
+t_llm_holiday, t_llm_seed_marker, t_llm_balance_snapshot
 
 Schema init: docker/init/schema.sql + ragent-schema.sql（手帐增量见 journal-schema.sql）
 ```
@@ -209,7 +214,7 @@ Configured in `application.yaml` under `rag.llm.providers`:
 | 2 | BaiLian (Alibaba) | `enabled: true` | Fallback + embedding (text-embedding-v4) + rerank (qwen3-rerank) |
 | 3 | SiliconFlow | disabled | |
 | 4 | AIHubMix | disabled | |
-| 5 | Ollama | disabled | Local, requires `--profile ollama` |
+| 9 | Ollama | disabled | Local, requires `--profile ollama` |
 
 All providers use OpenAI-compatible `/chat/completions` API via `AbstractOpenAiProvider`.
 
@@ -250,12 +255,11 @@ Swagger UI: `http://localhost:8081/swagger-ui.html` (backend must be running).
 
 ### Project Documentation
 
-Design docs and implementation plans are in `docs/`:
-- `docs/ragent-integration-design.md` — RAG architecture design
-- `docs/ragent-integration-plan.md` — Implementation plan with phases
-- `docs/ragent-frontend-design.md` — Frontend design specs (SSE client, ChatWidget, KB management)
-- `docs/ragent-project-summary.md` — Learning notes and project summary
-- `docs/DESIGN.md` — Original site design doc
+Project docs: `docs/MAP.md` is the authoritative map (modules/entry points/data flow).
+Living docs in `docs/`: `DESIGN.md` (decision log), `DEPLOYMENT_GUIDE.md`,
+`分类模块API文档.md`, `error-code-reference.md`, `ragent/RAG问题与方案笔记.md`.
+Completed plans/designs are archived under `docs/archive/` (rag/, collections/,
+frontend/ v1–v4, features/, ops/) — historical reference only.
 
 ### Production Deployment
 

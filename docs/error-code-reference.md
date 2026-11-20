@@ -1,5 +1,9 @@
 # 错误状态码体系文档
 
+> 更新于 2026-11：对照 `ErrorCode.java` 补全 A08–A12 模块及 A03 导入错误码；角色枚举更正为 ADMIN/CREATOR/USER。
+> 权威来源是 `src/main/java/io/github/somehow/mysite/commons/framework/errorcode/ErrorCode.java`，本文档如与代码冲突以代码为准。
+
+
 ## 编码规范
 
 ### 格式定义
@@ -9,7 +13,7 @@
 | 位置 | 含义 | 说明 |
 |------|------|------|
 | X | 错误来源 | A=客户端错误, B=服务端错误, C=远程服务错误 |
-| YY | 业务模块 | 00=通用, 01=认证, 02=用户, 03=文章, 04=分类, 05=标签, 06=管理, 07=安全 |
+| YY | 业务模块 | 00=通用, 01=认证, 02=用户, 03=文章, 04=分类, 05=标签, 06=管理, 07=安全, 08=图片, 09=评论, 10=合集, 11=手帐, 12=RAG |
 | ZZZZ | 具体错误 | 模块内唯一编号，0001=模块通用错误，0100+=具体错误 |
 
 ### 响应结构
@@ -101,6 +105,13 @@
 | A030107 | `ARTICLE_FAVORITE_PARAM_INCOMPLETE` | 收藏参数不完整 | 收藏请求中文章ID或用户ID为空 | 提供完整的收藏参数 |
 | A030108 | `ARTICLE_OWNERSHIP_VERIFY_FAILED` | 无法验证文章所有权，请重新登录 | 用户上下文中无用户信息 | 重新登录获取有效Token |
 | A030109 | `ARTICLE_PERMISSION_DENIED` | 权限不足，只能操作自己的文章 | 非管理员尝试操作他人文章 | 仅操作自己的文章或联系管理员 |
+| A030110 | `ARTICLE_VISIBILITY_MIXED` | 选中的文章包含公开和隐藏两种状态，无法批量操作 | 批量操作混入不同可见性的文章 | 按可见性分组后分别操作 |
+| A030111 | `ARTICLE_IMPORT_FILE_REQUIRED` | 请选择要导入的文档 | 导入请求未携带文件 | 选择 TXT/Markdown 文件重试 |
+| A030112 | `ARTICLE_IMPORT_TYPE_NOT_ALLOWED` | 仅支持导入 TXT / Markdown 文档 | 文件类型不在白名单 | 转换为 TXT/MD 后导入 |
+| A030113 | `ARTICLE_IMPORT_FILE_TOO_LARGE` | 文档文件过大（最大 2MB） | 超过导入大小限制 | 压缩内容或拆分文件 |
+| A030114 | `ARTICLE_IMPORT_EMPTY` | 文档内容为空 | 文件无有效文本 | 检查文件内容 |
+| A030115 | `ARTICLE_IMPORT_READ_FAILED` | 文档读取失败 | 文件读取异常 | 检查文件权限/完整性 |
+| A030116 | `ARTICLE_IMPORT_ENCODING_UNSUPPORTED` | 无法识别文档编码，请另存为 UTF-8 后重试 | 非 UTF-8 编码 | 编辑器另存为 UTF-8 后重试 |
 
 ### A04 分类模块错误
 
@@ -131,7 +142,7 @@
 |--------|--------|---------|---------|---------|
 | A060001 | `ADMIN_ERROR` | 管理模块错误 | 管理模块通用异常 | 检查管理操作参数 |
 | A060100 | `ADMIN_USER_NOT_FOUND` | 用户不存在 | 管理操作的目标用户不存在 | 确认目标用户ID |
-| A060101 | `ADMIN_INVALID_ROLE_TYPE` | 无效的角色类型 | 指定的角色名称不在枚举范围内 | 使用有效的角色类型（DEVELOPER/USER） |
+| A060101 | `ADMIN_INVALID_ROLE_TYPE` | 无效的角色类型 | 指定的角色名称不在枚举范围内 | 使用有效的角色类型（ADMIN/CREATOR/USER） |
 | A060102 | `ADMIN_INVALID_STATUS_VALUE` | 无效的状态值 | 状态值不是0或1 | 使用 0（禁用）或 1（启用） |
 | A060103 | `ADMIN_CANNOT_MODIFY_OWN_ROLE` | 不能修改自己的角色 | 管理员尝试修改自身角色 | 让其他管理员操作 |
 | A060104 | `ADMIN_CANNOT_MODIFY_OWN_STATUS` | 不能修改自己的状态 | 管理员尝试禁用自身 | 让其他管理员操作 |
@@ -144,6 +155,78 @@
 | A070001 | `SECURITY_ERROR` | 安全模块错误 | 安全模块通用异常 | 检查认证和授权状态 |
 | A070100 | `SECURITY_NOT_AUTHENTICATED` | 未登录或Token已过期 | 请求未携带有效Token | 重新登录获取有效Token |
 | A070101 | `SECURITY_ACCESS_DENIED` | 权限不足，无法访问该资源 | 当前用户角色无权访问该接口 | 联系管理员获取相应权限 |
+
+### A08 图片模块错误
+
+| 错误码 | 枚举值 | 错误信息 | 可能原因 | 处理建议 |
+|--------|--------|---------|---------|---------|
+| A080001 | `IMAGE_ERROR` | 图片模块错误 | 图片模块通用异常 | 检查图片相关参数 |
+| A080100 | `IMAGE_UPLOAD_FAILED` | 图片上传失败 | 磁盘/权限/IO 异常 | 查看服务端日志，检查上传目录权限 |
+| A080101 | `IMAGE_FILE_TOO_LARGE` | 图片文件大小超出限制 | 超过 5MB 限制 | 压缩图片后重试 |
+| A080102 | `IMAGE_TYPE_NOT_ALLOWED` | 不支持的图片类型 | 类型不在白名单 | 转为 JPEG/PNG/GIF/WebP/SVG |
+| A080103 | `IMAGE_FILE_INVALID` | 图片文件内容无效 | 文件内容与扩展名不符 | 重新导出有效图片文件 |
+| A080104 | `IMAGE_NOT_FOUND` | 图片不存在 | 图片ID不存在或已删除 | 确认图片ID |
+| A080105 | `IMAGE_DELETE_FAILED` | 图片删除失败 | 记录不存在或删除异常 | 确认图片存在后重试 |
+| A080200 | `IMAGE_URL_INVALID` | 图片URL格式无效 | URL 非法 | 检查 URL 格式 |
+| A080201 | `IMAGE_URL_UNREACHABLE` | 图片URL不可访问 | 目标不可达/超时 | 检查网络与目标可用性 |
+| A080202 | `IMAGE_URL_NOT_IMAGE` | URL指向的不是图片文件 | Content-Type 非图片 | 确认 URL 指向图片资源 |
+| A080203 | `IMAGE_URL_TOO_LARGE` | 远程图片文件大小超出限制 | 远程文件超限 | 更换较小图片 |
+| A080204 | `IMAGE_URL_FETCH_FAILED` | 远程图片拉取失败 | 网络/SSL/超时异常 | 稍后重试或改用本地上传 |
+| A080205 | `IMAGE_SSRF_BLOCKED` | 不允许访问内网地址 | URL 指向内网/保留地址（SSRF 防护） | 使用公网可访问的图片 URL |
+| A080300 | `IMAGE_UPLOAD_RATE_LIMITED` | 上传频率过高，请稍后再试 | 触发上传限流（10/min） | 降低频率后重试 |
+
+### A09 评论模块错误
+
+| 错误码 | 枚举值 | 错误信息 | 可能原因 | 处理建议 |
+|--------|--------|---------|---------|---------|
+| A090001 | `COMMENT_ERROR` | 评论模块错误 | 评论模块通用异常 | 检查评论相关参数 |
+| A090100 | `COMMENT_NOT_FOUND` | 评论不存在 | 评论ID不存在或已删除 | 确认评论ID |
+| A090101 | `COMMENT_CONTENT_REQUIRED` | 评论内容不能为空 | 未提交评论内容 | 填写评论内容 |
+| A090102 | `COMMENT_ARTICLE_REQUIRED` | 文章ID不能为空 | 评论未指定文章 | 提供文章ID |
+| A090103 | `COMMENT_NICKNAME_REQUIRED` | 昵称不能为空 | 游客评论缺昵称 | 填写昵称 |
+| A090104 | `COMMENT_CONTENT_TOO_LONG` | 评论内容过长 | 超过长度限制 | 精简评论内容 |
+| A090105 | `COMMENT_RATE_LIMITED` | 评论频率过高，请稍后再试 | 触发评论限流 | 降低频率后重试 |
+| A090106 | `COMMENT_PERMISSION_DENIED` | 权限不足，只能删除自己的评论 | 非作者非管理员删除他人评论 | 仅删除自己的评论 |
+| A090107 | `COMMENT_ALREADY_LIKED` | 已经点赞过了 | 重复点赞 | 无需处理，已点赞状态 |
+| A090108 | `COMMENT_PARENT_NOT_FOUND` | 父评论不存在 | 回复的父评论已删除 | 刷新后重新回复 |
+| A090109 | `COMMENT_STATUS_INVALID` | 无效的评论状态 | 审核状态值非法 | 使用合法状态值 |
+
+### A10 合集模块错误
+
+| 错误码 | 枚举值 | 错误信息 | 可能原因 | 处理建议 |
+|--------|--------|---------|---------|---------|
+| A100001 | `COLLECTION_ERROR` | 合集模块错误 | 合集模块通用异常 | 检查合集相关参数 |
+| A100100 | `COLLECTION_NOT_FOUND` | 合集不存在 | 合集ID不存在或不可见 | 确认合集ID与可见性 |
+| A100101 | `COLLECTION_TITLE_REQUIRED` | 合集标题不能为空 | 未填写标题 | 填写合集标题 |
+| A100102 | `COLLECTION_ARTICLE_ALREADY_EXISTS` | 文章已在该合集中 | 重复添加 | 无需重复添加 |
+| A100103 | `COLLECTION_ARTICLE_NOT_IN_COLLECTION` | 文章不在该合集中 | 移除不存在的关联 | 确认文章已在合集内 |
+| A100104 | `COLLECTION_PERMISSION_DENIED` | 权限不足，只能操作自己的合集 | 非作者非管理员操作他人合集 | 仅操作自己的合集 |
+
+### A11 学习手帐模块错误（`/api/journal`，仅 ADMIN）
+
+| 错误码 | 枚举值 | 错误信息 | 可能原因 | 处理建议 |
+|--------|--------|---------|---------|---------|
+| A110001 | `JOURNAL_ERROR` | 学习手帐模块错误 | 手帐模块通用异常 | 检查请求参数 |
+| A110100 | `JOURNAL_DATE_INVALID` | 日期格式无效，应为 YYYY-MM-DD | 日期格式错误 | 使用 YYYY-MM-DD |
+| A110101 | `JOURNAL_MOOD_INVALID` | 心情值无效：需为预设心情或已创建的自定义心情 | 心情值不在预设/自定义集合 | 使用预设或已创建的心情ID |
+| A110102 | `JOURNAL_MOOD_NOT_FOUND` | 自定义心情不存在 | 心情ID不存在 | 确认心情ID或先创建 |
+| A110103 | `JOURNAL_MOOD_DUPLICATE` | 自定义心情 ID 已存在 | 心情ID重复 | 更换心情ID |
+| A110104 | `JOURNAL_IMPORT_INVALID` | 导入数据格式无效 | 导入 JSON/数据结构错误 | 按导入格式修正数据 |
+| A110200 | `JOURNAL_GOAL_NOT_FOUND` | 学习目标不存在 | 目标ID不存在 | 确认目标ID |
+| A110201 | `JOURNAL_GOAL_TYPE_MISMATCH` | 目标类型不匹配 | 操作与目标类型不符 | 核对目标类型 |
+| A110202 | `JOURNAL_PERIOD_INVALID` | 月份格式无效，应为 YYYY-MM | 月份格式错误 | 使用 YYYY-MM |
+| A110203 | `JOURNAL_GOAL_TARGET_INVALID` | 数量型目标值必须大于 0 | 目标值为 0 或负数 | 设置大于 0 的目标值 |
+| A110204 | `JOURNAL_GOAL_DUPLICATE` | 学习目标 ID 已存在 | 目标ID重复 | 更换目标ID |
+| A110205 | `JOURNAL_TASK_NOT_FOUND` | 子任务不存在 | 任务ID不存在 | 确认任务ID |
+
+### A12 RAG 模块错误（`/v1/rag/*`）
+
+| 错误码 | 枚举值 | 错误信息 | 可能原因 | 处理建议 |
+|--------|--------|---------|---------|---------|
+| A120001 | `RAG_ERROR` | RAG 模块错误 | RAG 模块通用异常 | 查看服务端日志 |
+| A120100 | `RAG_CONVERSATION_NOT_FOUND` | 会话不存在 | 会话ID不存在或非本人所有 | 确认会话ID与登录态 |
+| A120101 | `RAG_CONVERSATION_TITLE_REQUIRED` | 会话标题不能为空 | 重命名时标题为空 | 填写标题 |
+| A120102 | `RAG_CONVERSATION_TITLE_TOO_LONG` | 会话标题过长 | 超过长度限制 | 精简标题 |
 
 ---
 

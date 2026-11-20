@@ -1,7 +1,7 @@
 # MySite RAG 前端设计配套方案
 
-> 配套文档：[ragent-integration-plan.md](./ragent-integration-plan.md)（后端集成方案，本文对应其 Phase 4 / Phase 5 的前端部分）+
-> [ragent-integration-design.md](./ragent-integration-design.md)。
+> 配套文档：[ragent-integration-plan-v1.md](./ragent-integration-plan-v1.md)（后端集成方案，本文对应其 Phase 4 / Phase 5 的前端部分）+
+> [ragent-integration-design-v1.md](./ragent-integration-design-v1.md)。
 >
 > 编写日期：2026-07-21
 > 定位：后端方案的"前端落地篇"——给出与当前 Vue 3 站点**无缝融合**的 UI 设计、

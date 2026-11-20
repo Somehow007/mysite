@@ -1,8 +1,9 @@
 # MySite 云服务器部署操作文档
 
-**文档版本**: v2.0
-**创建日期**: 2026-05-18
-**适用项目**: MySite 博客系统 (Spring Boot 3 + Vue 3)
+**文档版本**: v2.1
+**创建日期**: 2026-05-18 ｜ **更新于**: 2026-11（移除已下线的 Artalk 评论系统；补充 RAG PG / LLM / SITE 环境变量）
+**适用项目**: MySite 博客系统 (Spring Boot 3 + Vue 3 + RAG)
+**推荐路径**: 日常部署优先使用 `./deploy/deploy.sh`（本地构建打包）+ `./deploy/server-deploy.sh`（服务器端部署），本文档覆盖其手动步骤与排障参考
 
 ---
 
@@ -21,7 +22,6 @@
    - 2.6 [步骤五：初始化数据库](#26-步骤五初始化数据库)
    - 2.7 [步骤六：执行部署脚本](#27-步骤六执行部署脚本)
    - 2.8 [步骤七：配置 Nginx](#28-步骤七配置-nginx)
-   - 2.9 [步骤八：部署 Artalk 评论系统](#29-步骤八部署-artalk-评论系统)
 3. [环境变量(.env)配置指南](#3-环境变量env配置指南)
    - 3.1 [.env 文件位置与创建方法](#31-env-文件位置与创建方法)
    - 3.2 [各配置项详细说明](#32-各配置项详细说明)
@@ -86,8 +86,9 @@
 | npm | 9 | 10+ | 前端依赖管理 |
 | MySQL | 8.0 | 8.4 | 数据库 |
 | Redis | 7.0 | 7.x | 缓存 |
+| PostgreSQL | 15 | 17 + pgvector | RAG 向量数据库（推荐用 compose 的 postgres 服务） |
 | Nginx | 1.24 | 最新稳定版 | 反向代理与静态文件服务 |
-| Docker | 24 | 最新稳定版 | 运行 Artalk 等容器化服务 |
+| Docker | 24 | 最新稳定版 | 运行 MySQL / Redis / PostgreSQL(pgvector) 容器 |
 | Git | 2.30+ | 最新 | 代码拉取 |
 
 ### 1.2 必要软件安装步骤
@@ -178,8 +179,8 @@ redis-cli ping
 | 3306 | TCP | MySQL 数据库 | 数据泄露、未授权访问 |
 | 6379 | TCP | Redis 缓存 | 数据泄露、Redis 攻击 |
 | 8081 | TCP | Spring Boot 后端 | 绕过 Nginx 直接访问 |
-| 23366 | TCP | Artalk 评论服务 | 未授权管理操作 |
 | 9200 | TCP | Elasticsearch（如启用） | 数据泄露、远程代码执行 |
+| 5432 | TCP | PostgreSQL（RAG 向量库） | 数据泄露 |
 
 #### UFW 防火墙配置示例
 
@@ -208,16 +209,16 @@ sudo ufw status
               │  反向代理/静态  │
               └───────┬────────┘
                       │
-           ┌──────────┼──────────┐
-           ▼          ▼          ▼
-   /var/www/    localhost:8081  localhost:8081
-   mysite/      /api/*, /v1/*  /artalk/*
-   (前端静态)   (后端 API)     (评论代理)
+           ┌──────────────┼──────────────┐
+           ▼              ▼              ▼
+   /var/www/mysite  localhost:8081  /var/www/journal/
+   (博客静态)       /v1/*, /api/*   (手帐静态，可选)
+                   (后端 API)
                       │
-           ┌──────────┼──────────┐
-           ▼          ▼          ▼
-     MySQL:3306  Redis:6379  Artalk:23366
-     (数据库)    (缓存)     (评论系统)
+           ┌──────────┼──────────────┐
+           ▼          ▼              ▼
+     MySQL:3306  Redis:6379  PostgreSQL:5432
+     (博客+手帐)   (缓存)      (pgvector，RAG)
 ```
 
 **关键说明**：
@@ -294,11 +295,13 @@ EOF'
 sudo systemctl restart redis-server
 ```
 
+**PostgreSQL（RAG 向量库）**：RAG 子系统依赖 PostgreSQL 17 + pgvector。推荐直接使用方案 B 的 compose `postgres` 服务；如需本地安装，装 PG17 后执行 `CREATE EXTENSION vector;`，并按 `.env` 中 `RAGENT_PG_*` 建库建用户。PG 表结构由应用启动时 `RagentSchemaMigration` 幂等自动创建，也可手动执行 `psql -f docker/init/ragent-schema.sql`。
+
 #### 方案 B：Docker Compose 部署（推荐）
 
 ```bash
 # 创建数据目录
-sudo mkdir -p /data/mysite/mysql /data/mysite/redis /data/mysite/artalk
+sudo mkdir -p /data/mysite/mysql /data/mysite/redis /data/mysite/pgvector
 
 # 从项目复制 docker-compose 配置
 cd ~/project/mysite/docker
@@ -306,12 +309,12 @@ cp .env.example .env
 vim .env
 # 修改 MYSQL_ROOT_PASSWORD 为强密码
 
-# 启动 MySQL 和 Redis（Elasticsearch 默认注释不启动）
-docker compose up -d mysql redis
+# 启动全部中间件：MySQL + Redis + PostgreSQL(pgvector)（ES/Ollama 默认注释不启动）
+docker compose up -d
 
 # 验证
 docker ps
-# 预期输出: mysite-mysql 和 mysite-redis 两个容器处于 running 状态
+# 预期输出: mysite-mysql、mysite-redis、mysite-pgvector 三个容器处于 running 状态
 ```
 
 #### 方案 C：云数据库（生产环境推荐）
@@ -366,9 +369,16 @@ REDIS_PASSWORD=            # 无密码留空即可
 # JWT 配置
 JWT_SECRET=请替换为至少32字符的随机字符串  # 生产环境必须更换！
 
-# Artalk 评论系统配置
-ARTALK_SERVER=http://localhost:23366
-ARTALK_SITE=MySite博客
+# RAG PostgreSQL 配置（必填，RAG 子系统依赖）
+RAGENT_PG_HOST=localhost
+RAGENT_PG_PORT=5432
+RAGENT_PG_DB=ragent
+RAGENT_PG_USER=ragent
+RAGENT_PG_PASSWORD=你的PG密码
+
+# LLM 服务商密钥（至少配置一个 enabled 的 provider，详见 §3.2）
+DEEPSEEK_API_KEY=sk-...
+BAILIAN_API_KEY=sk-...
 ```
 
 **验证 .env 文件是否正确**：
@@ -389,21 +399,8 @@ grep -E '^[A-Z]' ~/project/mysite/deploy/config/.env
 # 使用项目中的 schema.sql 初始化表结构
 mysql -u root -p mysite < ~/project/mysite/docker/init/schema.sql
 
-# 验证表是否创建成功
+# 验证表是否创建成功（共 20 张：14 张 t_* 博客表 + 6 张 sj_* 手帐表）
 mysql -u root -p -e "USE mysite; SHOW TABLES;"
-# 预期输出:
-# +------------------+
-# | Tables_in_mysite |
-# +------------------+
-# | t_article        |
-# | t_article_tag    |
-# | t_category       |
-# | t_tag            |
-# | t_user           |
-# | t_user_article_favorites |
-# | t_user_follow    |
-# | t_user_operation_log     |
-# +------------------+
 ```
 
 如需初始数据（管理员账号等），可额外执行 `data.sql`：
@@ -411,6 +408,8 @@ mysql -u root -p -e "USE mysite; SHOW TABLES;"
 ```bash
 mysql -u root -p mysite < ~/project/mysite/docker/init/data.sql
 ```
+
+> **PostgreSQL（RAG）无需手动初始化**：`docker/init/ragent-schema.sql` 已挂载进 compose 的 postgres 容器首启自动执行，应用启动时 `RagentSchemaMigration` 也会幂等补齐。手帐表已包含在 `schema.sql` 内，`journal-schema.sql` 为幂等增量脚本。
 
 ### 2.7 步骤六：执行部署脚本
 
@@ -431,7 +430,7 @@ chmod +x deploy/scripts/start.sh
 | 步骤 | 操作 | 预期结果 |
 |------|------|----------|
 | 1 | `git pull origin main` | 代码更新到最新版本 |
-| 2 | `mvn clean package -DskipTests` | 后端 JAR 构建成功 |
+| 2 | `mvn clean package -Dmaven.test.skip=true` | 后端 JAR 构建成功（服务器侧跳过测试编译——部分 RAG 测试源码签名漂移；测试门禁在本地 `deploy.sh`/CI 执行） |
 | 3 | `npm install && npm run build` | 前端 dist 目录生成 |
 | 4 | 停止旧服务 | 旧进程终止，端口 8081 释放 |
 | 5 | 复制 JAR、配置、脚本到 /opt/mysite/ | 文件部署完成 |
@@ -484,41 +483,9 @@ sudo systemctl reload nginx
 |------|----------|------|
 | `/` | `/var/www/mysite` | 前端静态文件，SPA 路由回退到 index.html |
 | `/api/` | `http://localhost:8081/api/` | 后端 API 代理 |
-| `/v[0-9]/` | `http://localhost:8081` | 版本化 API 代理（如 /v1/auth/login） |
-| `/artalk/` | `http://localhost:8081/artalk/` | 评论系统代理 |
+| `/v[0-9]/` | `http://localhost:8081` | 版本化 API 代理（如 /v1/auth/login，含 /v1/rag/*） |
+| `/journal/` | `/var/www/journal/` | 手帐静态子应用（独立仓库部署，可选） |
 
-### 2.9 步骤八：部署 Artalk 评论系统
-
-#### Docker 方式（推荐）
-
-```bash
-# 创建数据目录
-sudo mkdir -p /data/mysite/artalk
-
-# 复制 Artalk 配置
-sudo cp ~/project/mysite/docker/artalk.yml /data/mysite/artalk/artalk.yml
-
-# 启动 Artalk 容器
-docker run -d \
-  --name mysite-artalk \
-  --restart unless-stopped \
-  -p 23366:23366 \
-  -v /data/mysite/artalk:/data \
-  -v /data/mysite/artalk/artalk.yml:/data/artalk.yml:ro \
-  -e TZ=Asia/Shanghai \
-  artalk/artalk-go:latest
-
-# 验证
-docker ps | grep artalk
-curl -s http://localhost:23366
-```
-
-#### Docker Compose 方式
-
-```bash
-cd ~/project/mysite/docker
-docker compose up -d artalk
-```
 
 ---
 
@@ -596,12 +563,35 @@ jwt:
   secret: ${JWT_SECRET:mysite-jwt-secret-key-must-be-at-least-256-bits-long-for-hs256-algorithm-2026}
 ```
 
-#### Artalk 评论系统配置
+#### RAG PostgreSQL 配置
 
 | 变量名 | 必填 | 默认值 | 说明 |
 |--------|------|--------|------|
-| `ARTALK_SERVER` | 否 | `http://localhost:23366` | Artalk 服务端地址 |
-| `ARTALK_SITE` | 否 | `MySite博客` | Artalk 站点名称 |
+| `RAGENT_PG_HOST` | 否 | `localhost` | PG 主机地址 |
+| `RAGENT_PG_PORT` | 否 | `5432` | PG 端口 |
+| `RAGENT_PG_DB` | 否 | `ragent` | RAG 库名 |
+| `RAGENT_PG_USER` | 否 | `ragent` | RAG 用户名 |
+| `RAGENT_PG_PASSWORD` | **是** | `ragent123` | **生产必须更换**，否则 RAG 库可被默认口令访问 |
+
+#### LLM 服务商配置
+
+密钥只走 `.env`，provider 启用/优先级在 `application.yaml` 的 `rag.llm.providers` 中配置：
+
+| 变量名 | 必填 | 说明 |
+|--------|------|------|
+| `DEEPSEEK_API_KEY`、`DEEPSEEK_CHAT_MODEL` | 至少一个 provider 必填 | 优先级 1，主力聊天模型 |
+| `BAILIAN_API_KEY`、`BAILIAN_CHAT_MODEL`、`BAILIAN_EMBEDDING_MODEL`、`BAILIAN_EMBEDDING_DIMENSION`、`BAILIAN_RERANK_MODEL` | 建议配置 | 优先级 2，备用聊天 + embedding + rerank |
+| `SILICONFLOW_API_KEY`、`AIHUBMIX_API_KEY`、`OLLAMA_CHAT_MODEL` | 否 | 备用 provider，默认 disabled |
+
+#### 站点信息配置（SITE_*）
+
+`SITE_TITLE`、`SITE_SUBTITLE`、`SITE_DESCRIPTION`、`SITE_AUTHOR`、`SITE_AUTHOR_BIO`、`SITE_AUTHOR_TAGLINE`、`SITE_ABOUT_CONTENT`、`SITE_TECH_STACK`、`SITE_AVATAR`、`SITE_URL`、`SITE_GITHUB`、`SITE_RSS`、`SITE_COMMENT_ENABLED` —— 均有默认值，按需覆盖，用于前台展示与评论开关。
+
+#### 其他
+
+| 变量名 | 说明 |
+|--------|------|
+| `MYSITE_CRYPTO_KEY` | LLM 密钥落库加密密钥（`ragent/llm/SecretCrypto`），生产建议设置强随机值 |
 
 ### 3.3 安全设置规范
 
@@ -612,6 +602,8 @@ jwt:
 | `DB_PASSWORD` | 8 位以上，含大小写字母和数字 | 使用密码管理器生成 16 位以上随机密码 |
 | `REDIS_PASSWORD` | 8 位以上 | 生产环境建议设置 |
 | `JWT_SECRET` | 32 字符以上 | 使用 `openssl rand -base64 48` 生成 |
+| `RAGENT_PG_PASSWORD` | 16 位以上 | compose 默认 `ragent123` 仅限本地开发 |
+| `DEEPSEEK_API_KEY` / `BAILIAN_API_KEY` | 平台签发 | 不得写入代码或提交 |
 
 #### 生成安全密钥
 
@@ -709,11 +701,10 @@ redis-cli -h ${REDIS_HOST} -p ${REDIS_PORT} ping
 │   ├── mysite.access.log                    # 访问日志
 │   └── mysite.error.log                     # 错误日志
 │
-├── data/mysite/                             # Docker 数据目录（如使用 Docker）
-│   ├── mysql/                               # MySQL 数据
-│   ├── redis/                               # Redis 数据
-│   └── artalk/                              # Artalk 数据
-│       └── artalk.yml                       # Artalk 配置
+├── home/{user}/project/mysite/docker/      # Docker Compose 工作目录
+│   ├── mysql_data/                          # MySQL volume（./mysql_data）
+│   ├── redis_data/                          # Redis volume（./redis_data）
+│   └── pgvector_data/                       # PostgreSQL volume（./pgvector_data，RAG）
 │
 └── home/{user}/project/mysite/              # 项目源码目录
     ├── deploy/                              # 部署配置目录
@@ -730,7 +721,6 @@ redis-cli -h ${REDIS_HOST} -p ${REDIS_PORT} ping
 | `/opt/mysite/.env` | 环境变量 | 首次部署时必改 | 包含敏感信息，权限 600 |
 | `/opt/mysite/application-production.yml` | Spring Boot 生产配置 | 极少修改 | 由部署脚本自动同步 |
 | `/etc/nginx/sites-available/mysite.conf` | Nginx 站点配置 | 配置域名/SSL 时修改 | 由部署脚本自动同步 |
-| `/data/mysite/artalk/artalk.yml` | Artalk 评论系统配置 | 极少修改 | 需重启 Artalk 容器 |
 
 ### 4.3 应用文件清单
 
@@ -765,10 +755,11 @@ redis-cli -h ${REDIS_HOST} -p ${REDIS_PORT} ping
 | `deploy/config/.env.example` | `/opt/mysite/.env.example` | 环境变量模板 |
 | `deploy/config/application-production.yml` | `/opt/mysite/application-production.yml` | 生产配置 |
 | `deploy/nginx/mysite.conf` | `/etc/nginx/sites-available/mysite.conf` | Nginx 站点配置 |
-| `docker/init/schema.sql` | 不复制到服务器 | 数据库表结构初始化脚本 |
+| `docker/init/schema.sql` | 不复制到服务器 | MySQL 表结构初始化（含 t_* + sj_* 共 20 张） |
 | `docker/init/data.sql` | 不复制到服务器 | 数据库初始数据脚本 |
+| `docker/init/ragent-schema.sql` | 不复制到服务器 | PG(RAG) 表结构，compose postgres 首启自动执行 |
+| `docker/init/journal-schema.sql` | 不复制到服务器 | 手帐表幂等增量脚本 |
 | `docker/docker-compose.yml` | 不复制到服务器 | Docker Compose 编排文件 |
-| `docker/artalk.yml` | `/data/mysite/artalk/artalk.yml` | Artalk 配置 |
 
 ---
 
@@ -833,6 +824,7 @@ tail -200 /var/log/mysite/console.log
 | `Communications link failure` / `Connection refused` | MySQL 未运行或连接信息错误 | 检查 MySQL 状态和 `.env` 中 `DB_HOST`/`DB_PORT`/`DB_PASSWORD` |
 | `Unable to connect to Redis` | Redis 未运行或连接信息错误 | 检查 Redis 状态和 `.env` 中 `REDIS_HOST`/`REDIS_PORT` |
 | `Table 'mysite.t_user' doesn't exist` | 数据库表未初始化 | 执行 `schema.sql` 初始化表结构 |
+| `Could not resolve placeholder 'RAGENT_PG_PASSWORD'` / PG `Connection refused` | `.env` 缺 RAG PG 配置或 postgres 容器未启动 | 检查 `RAGENT_PG_*` 与 `docker ps` 中 `mysite-pgvector` |
 | `OutOfMemoryError` | JVM 内存不足 | 调整 `start.sh` 中 `-Xmx` 参数或增加服务器内存 |
 
 #### 问题 2：部署脚本报错 "服务启动后进程不存在"
@@ -974,18 +966,17 @@ redis-cli ping
 sudo systemctl status nginx
 # 预期: active (running)
 
-# 5. 检查 Artalk（如使用 Docker）
-docker ps | grep artalk
-curl -s http://localhost:23366 | head -5
+# 5. 检查 PostgreSQL（RAG；compose 部署时）
+docker ps | grep pgvector
 
 # 6. 检查端口监听
-sudo ss -tlnp | grep -E '8080|8081|3306|6379|23366'
+sudo ss -tlnp | grep -E '8080|8081|3306|6379|5432'
 # 预期:
 # 8080 - nginx
 # 8081 - java
 # 3306 - mysql
 # 6379 - redis
-# 23366 - artalk
+# 5432 - postgres（docker 内部网络，不对外暴露）
 ```
 
 ### 6.2 后端 API 验证
@@ -1027,7 +1018,7 @@ curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8081/v1/auth/me | pyt
 | 文章详情 | 点击任意文章 | 文章内容正常渲染 |
 | 登录页面 | 点击登录按钮 | 登录表单正常显示 |
 | 登录功能 | 输入用户名密码登录 | 登录成功，跳转到首页 |
-| 评论系统 | 在文章详情页底部 | Artalk 评论区正常显示 |
+| 评论系统 | 在文章详情页底部 | 评论区正常显示（内置评论，/v1/comments） |
 | 分类/标签 | 点击分类或标签 | 筛选结果正常显示 |
 
 ### 6.4 性能测试步骤
@@ -1132,10 +1123,10 @@ sudo systemctl status nginx      # 查看状态
 docker ps                        # 查看运行中的容器
 docker logs mysite-mysql         # 查看 MySQL 日志
 docker logs mysite-redis         # 查看 Redis 日志
-docker logs mysite-artalk        # 查看 Artalk 日志
+docker logs mysite-pgvector      # 查看 PostgreSQL(RAG) 日志
 docker restart mysite-mysql      # 重启 MySQL
 docker restart mysite-redis      # 重启 Redis
-docker restart mysite-artalk     # 重启 Artalk
+docker restart mysite-pgvector   # 重启 PostgreSQL
 
 # MySQL 管理（本地安装方式）
 sudo systemctl start mysql
@@ -1163,6 +1154,9 @@ mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} mysite | gzip > /var/back
 
 # 备份 .env 配置
 cp /opt/mysite/.env /var/backups/mysite/env_$(date +%Y%m%d_%H%M%S).bak
+
+# 备份 RAG PostgreSQL（compose 部署时，可选）
+docker exec mysite-pgvector pg_dump -U ragent ragent | gzip > /var/backups/mysite/rag_$(date +%Y%m%d_%H%M%S).sql.gz
 ```
 
 #### 自动备份（定时任务）
@@ -1251,7 +1245,7 @@ rm -f /var/log/mysite/heapdump.hprof
 | 8081 | Spring Boot | 127.0.0.1 | 否 | 后端 API |
 | 3306 | MySQL | 127.0.0.1 | 否 | 数据库 |
 | 6379 | Redis | 127.0.0.1 | 否 | 缓存 |
-| 23366 | Artalk | 127.0.0.1 | 否 | 评论系统 |
+| 5432 | PostgreSQL | 127.0.0.1 | 否 | RAG 向量库（pgvector） |
 | 22 | SSH | 0.0.0.0 | 是 | 远程管理 |
 
 ### 8.2 常用命令速查

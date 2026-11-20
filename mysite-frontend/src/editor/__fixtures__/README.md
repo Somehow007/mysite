@@ -1,6 +1,6 @@
 # Round-trip 测试用例集
 
-用于编辑器重构（见 `docs/editor-redesign-plan.md` §6 第 1 阶段）的兼容性验证。
+用于编辑器重构（见 `docs/archive/frontend/v4-editor-redesign-plan.md` §6 第 1 阶段）的兼容性验证。
 
 ## 用途
 

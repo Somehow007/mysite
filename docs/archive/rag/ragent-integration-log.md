@@ -38,7 +38,7 @@
 | 2 | 向量粗排阈值 `score-threshold` 0.3 → **0.5** | `application.yaml`、`config/RagProperties.java` |
 | 3 | 新增 `rerank-score-threshold: 0.5`：精排后按 relevance_score 二次过滤，低于阈值的来源丢弃（降级到向量截断的路径天然兼容，因其分数已过粗排阈值） | 同上 + `core/RetrievalEngine.java` |
 | 4 | 新增 Part 3 live 测试（真实百炼 embedding + qwen3-rerank API）：相关问题质量断言、无关问题零来源断言、集成链路 rerank 真实调用断言 | `Phase3IntegrationTest.java` |
-| 5 | 同步设计文档示例配置 | `docs/ragent-integration-design.md` |
+| 5 | 同步设计文档示例配置 | `docs/archive/rag/ragent-integration-design-v1.md` |
 
 最终配置：
 

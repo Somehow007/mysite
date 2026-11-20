@@ -8,7 +8,7 @@ import type { EditorHandle } from '@/editor/createEditor'
  * 对外契约与原编辑器保持一致：`v-model` 双向绑定 Markdown 源文本，
  * `Cmd/Ctrl+S` 触发 `save` 事件。Milkdown 相关实现收敛在 `@/editor/` 内。
  *
- * 健壮性设计（docs/editor-redesign-plan.md §4.3 / §5.2）：
+ * 健壮性设计（docs/archive/frontend/v4-editor-redesign-plan.md §4.3 / §5.2）：
  * - 回声短路：组件自身 emit 的值经 props 回来时直接忽略，避免
  *   「编辑 → 回写 → 重建文档 → 光标跳动」循环；
  * - 序列化防抖：编辑期间 300ms 防抖 emit，save / 卸载时立即 flush；

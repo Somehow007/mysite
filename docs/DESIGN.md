@@ -4,7 +4,7 @@
 
 ### 2026-07-29: 合集可见性功能（手动隐藏 + 空合集自动隐藏 + 按访问者动态计数）
 
-> 更新于 2026-07-29：合集支持两层可见性管理——"手动隐藏"（所有者把合集设为私有）与"自动隐藏"（合集对某访问者可见文章数为 0 时对其自动隐藏）；合集列表的文章数/浏览量改为按访问者视角动态统计，解决游客看到合集显示 7 篇文章、进去却可见 0 篇的一致性问题。变更清单见根目录 `CHANGELOG.md`。
+> 更新于 2026-07-29：合集支持两层可见性管理——"手动隐藏"（所有者把合集设为私有）与"自动隐藏"（合集对某访问者可见文章数为 0 时对其自动隐藏）；合集列表的文章数/浏览量改为按访问者视角动态统计，解决游客看到合集显示 7 篇文章、进去却可见 0 篇的一致性问题。（注：根目录 `CHANGELOG.md` 已于 2026-11 文档整理移除，后续变更记录由 `.trellis/CHANGES.md` 承担）。
 
 #### 决策背景
 
@@ -86,7 +86,7 @@
 
 #### 影响范围
 
-- `ragent/core/RetrievalEngine.java`、`ragent/config/RagProperties.java`、`application.yaml`、`Phase3IntegrationTest.java`；详细根源分析与实测数据见 `docs/ragent-integration-log.md`（2026-07-28 条目）
+- `ragent/core/RetrievalEngine.java`、`ragent/config/RagProperties.java`、`application.yaml`、`Phase3IntegrationTest.java`；详细根源分析与实测数据见 `docs/archive/rag/ragent-integration-log.md`（2026-07-28 条目）
 
 ### 2026-07-28: 管理表格长标题挤压修复（table-layout: fixed 标准实践）
 
@@ -220,7 +220,7 @@
 
 #### 决策背景
 
-移动端真机使用反馈：① 聊天面板打开即吞掉全屏，压迫感强；② 软键盘弹起后输入框与对话被遮挡（iOS Safari 键盘弹起时布局视口不收缩，而面板高度基于布局视口）。调研确认根因：原设计有意采用全屏抽屉（见 ragent-frontend-design.md）；`open()` 无条件聚焦 textarea 导致打开即弹键盘；全项目无 visualViewport 代码。
+移动端真机使用反馈：① 聊天面板打开即吞掉全屏，压迫感强；② 软键盘弹起后输入框与对话被遮挡（iOS Safari 键盘弹起时布局视口不收缩，而面板高度基于布局视口）。调研确认根因：原设计有意采用全屏抽屉（见 docs/archive/rag/ragent-frontend-design-v1.md）；`open()` 无条件聚焦 textarea 导致打开即弹键盘；全项目无 visualViewport 代码。
 
 #### 决策内容
 
@@ -230,7 +230,7 @@
 
 #### 影响范围
 
-- `mysite-frontend/index.html`、`src/composables/useVisualViewport.ts`（新增）、`src/components/chat/ChatWidget.vue`、`src/components/chat/ChatInput.vue`、`docs/ragent-frontend-design.md`
+- `mysite-frontend/index.html`、`src/composables/useVisualViewport.ts`（新增）、`src/components/chat/ChatWidget.vue`、`src/components/chat/ChatInput.vue`、`docs/archive/rag/ragent-frontend-design-v1.md`
 
 ### 2026-07-27: 生产环境 RAG 数据源配置修复（PG 用户名不一致）
 

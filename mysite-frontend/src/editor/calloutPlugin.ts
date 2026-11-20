@@ -8,7 +8,7 @@ import { getCalloutConfig, isCalloutType } from '@/utils/callouts'
 /**
  * Callout 扩展（`> [!NOTE] 标题` → 带颜色/图标的卡片块）。
  *
- * Milkdown 标准三段式（见 docs/editor-redesign-plan.md §5.4）：
+ * Milkdown 标准三段式（见 docs/archive/frontend/v4-editor-redesign-plan.md §5.4）：
  * 1. remark 侧：解析时把首段匹配 `[!TYPE]` 的 blockquote 改写为 callout 节点；
  *    序列化时还原为 `> [!TYPE] 标题` 引用块（remark-stringify 会把 `[` 转义为
  *    `\[`，渲染管线 useMarkdown.ts 两种写法都能识别）。
