@@ -38,3 +38,8 @@ PG `t_llm_provider_setting`（bailian 行）+ `/opt/mysite/.env` 的 `BAILIAN_EM
 - `curl .../embeddings`：`qwen3.7-text-embedding`→400、`text-embedding-v4`→200
 - `curl .../rerank`：`qwen3.7-text-rerank`→200、`qwen3-rerank`→200、`gte-rerank-v2`→200、`gte-rerank`→403
 - 重启后外部 `/v1/categories`、`/v1/articles/page` 均 200；无新增 embedding 失败日志
+
+## Resolution
+
+2026-11-17 已修复并重启生效：PG + .env 模型名改回 `text-embedding-v4`，
+embedding/rerank 外网实测全通，问答链路恢复。任务归档。
