@@ -83,10 +83,11 @@ public class KnowledgeDocumentService {
      */
     @Async("ragAsyncExecutor")
     public void syncArticle(ArticleDO article) {
-        // 公开性门：草稿/私有文章不入库。取消发布或转私有时走 removeArticle 清掉已入库向量，
-        // 否则旧分块仍可经 AI 问答泄漏非公开内容。
+        // 公开性门：草稿/私有文章不入库。取消发布或转私有时走 hideArticle 软隐藏已入库文档
+        // （status=HIDDEN，检索的 status='READY' 过滤自动排除），向量保留——
+        // 文章恢复公开且内容未变时由 hash 门禁零成本翻回 READY。
         if (!isPubliclySyncable(article)) {
-            removeArticle(article.getId());
+            hideArticle(article.getId());
             return;
         }
         List<KnowledgeBaseDO> enabledKbs = kbMapper.selectList(
@@ -112,10 +113,20 @@ public class KnowledgeDocumentService {
         List<KnowledgeBaseDO> rebuildKbs = new ArrayList<>(enabledKbs.size());
         for (KnowledgeBaseDO kb : enabledKbs) {
             KnowledgeDocumentDO doc = docByKb.get(kb.getId());
-            if (doc != null && "READY".equals(doc.getStatus()) && hash.equals(doc.getContentHash())) {
-                // hash 不含标题：标题变更不重建，但要把展示用的标题刷成最新
-                if (!Objects.equals(doc.getTitle(), article.getTitle())) {
+            boolean restorable = doc != null && hash.equals(doc.getContentHash())
+                && ("READY".equals(doc.getStatus()) || "HIDDEN".equals(doc.getStatus()));
+            if (restorable) {
+                // hash 不含标题：标题变更不重建，但要把展示用的标题刷成最新；
+                // HIDDEN + hash 匹配 = 文章恢复公开且内容未变，翻回 READY 零成本恢复检索
+                boolean wasHidden = "HIDDEN".equals(doc.getStatus());
+                boolean titleChanged = !Objects.equals(doc.getTitle(), article.getTitle());
+                if (wasHidden) {
+                    doc.setStatus("READY");
+                }
+                if (titleChanged) {
                     doc.setTitle(article.getTitle());
+                }
+                if (wasHidden || titleChanged) {
                     docMapper.updateById(doc);
                 }
                 continue;
@@ -271,8 +282,10 @@ public class KnowledgeDocumentService {
                         pair.kb().setEmbeddingModel(usedModel);
                         kbMapper.updateById(pair.kb());
                     }
-                    pair.doc().setStatus("READY");
-                    docMapper.updateById(pair.doc());
+                    // 条件翻转：入库期间文章可能已转私有/草稿被软隐藏（HIDDEN），
+                    // HIDDEN 优先——向量照写但保持不可见，文章恢复公开时由 hash 门禁翻回
+                    int flipped = docMapper.markReadyUnlessHidden(pair.doc().getId());
+                    pair.doc().setStatus(flipped > 0 ? "READY" : "HIDDEN");
                 } catch (Exception e) {
                     log.error("知识库向量写入失败, kbId={}, articleId={}",
                         pair.kb().getId(), article.getId(), e);
@@ -296,6 +309,26 @@ public class KnowledgeDocumentService {
             docMapper.updateById(doc);
         } catch (Exception ex) {
             log.error("标记文档 FAILED 失败, docId={}", doc.getId(), ex);
+        }
+    }
+
+    /**
+     * 文章转非公开（私有/草稿）→ 软隐藏所有知识库中对应文档（异步执行）。
+     *
+     * 只改状态不删数据：READY/PENDING/CHUNKING → HIDDEN，检索侧 WHERE status='READY'
+     * 自动排除，向量/分块保留。文章恢复公开时由 syncArticle 的 hash 门禁翻回 READY
+     * （内容未变零成本）或走正常重建（内容已变）。FAILED 保持原样——本就不可检索，
+     * 且避免半截向量被误翻回。全程 try/catch：隐藏失败只记日志，不影响文章操作主流程。
+     */
+    @Async("ragAsyncExecutor")
+    public void hideArticle(Long articleId) {
+        try {
+            int hidden = docMapper.hideArticleDocs(articleId.toString());
+            if (hidden > 0) {
+                log.info("文章 RAG 文档已软隐藏: articleId={}, 文档数={}", articleId, hidden);
+            }
+        } catch (Exception e) {
+            log.error("软隐藏文章 RAG 文档失败, articleId={}", articleId, e);
         }
     }
 

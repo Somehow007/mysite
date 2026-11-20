@@ -307,6 +307,29 @@ class Phase2EndToEndTest {
                 }
             }).when(docMapper).updateById(any(KnowledgeDocumentDO.class));
 
+            // markReadyUnlessHidden / hideArticleDocs：条件 UPDATE 真正执行 SQL
+            doAnswer(inv -> {
+                long id = inv.getArgument(0);
+                try (Connection conn = dataSource.getConnection();
+                     PreparedStatement ps = conn.prepareStatement(
+                         "UPDATE t_knowledge_document SET status = 'READY' WHERE id = ? AND status <> 'HIDDEN'")) {
+                    ps.setLong(1, id);
+                    return ps.executeUpdate();
+                }
+            }).when(docMapper).markReadyUnlessHidden(anyLong());
+
+            doAnswer(inv -> {
+                String sourceRef = inv.getArgument(0);
+                try (Connection conn = dataSource.getConnection();
+                     PreparedStatement ps = conn.prepareStatement(
+                         "UPDATE t_knowledge_document SET status = 'HIDDEN' " +
+                         "WHERE source_type = 'ARTICLE' AND source_ref = ? " +
+                         "AND status IN ('READY','PENDING','CHUNKING')")) {
+                    ps.setString(1, sourceRef);
+                    return ps.executeUpdate();
+                }
+            }).when(docMapper).hideArticleDocs(anyString());
+
             // 创建 chunker
             ragProps = new RagProperties();
             ragProps.getChunk().setSize(800);

@@ -146,7 +146,7 @@ sj_goal, sj_goal_task, sj_goal_checkin              # 月目标/任务/打卡
 
 ```
 t_knowledge_base         # KB definitions
-t_knowledge_document     # sourceType: ARTICLE|UPLOAD, status: PENDING→CHUNKING→READY|FAILED
+t_knowledge_document     # sourceType: ARTICLE|UPLOAD, status: PENDING→CHUNKING→READY|FAILED|HIDDEN(文章非公开时软隐藏,向量保留)
 t_knowledge_chunk        # Text chunks
 t_knowledge_vector       # vector(1024), HNSW, cosine (<=>)
 t_conversation           # user_id 主归属 / visitor_id 兜底 + title

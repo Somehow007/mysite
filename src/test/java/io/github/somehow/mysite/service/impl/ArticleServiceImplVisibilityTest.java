@@ -13,6 +13,7 @@ import io.github.somehow.mysite.dao.mapper.CollectionArticleMapper;
 import io.github.somehow.mysite.dao.mapper.TagMapper;
 import io.github.somehow.mysite.dao.mapper.UserFavoriteArticleMapper;
 import io.github.somehow.mysite.dao.mapper.UserMapper;
+import io.github.somehow.mysite.ragent.ingestion.ArticleVisibilityChangedEvent;
 import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.CategoryService;
 import io.github.somehow.mysite.service.CollectionService;
@@ -162,6 +163,8 @@ class ArticleServiceImplVisibilityTest {
         // 传给搜索索引的对象应已带上目标 visibility
         assertEquals(1, a1.getVisibility());
         assertEquals(1, a2.getVisibility());
+        // RAG：发布可见性变更事件（AFTER_COMMIT 监听 → 软隐藏/翻回）
+        verify(eventPublisher).publishEvent(any(ArticleVisibilityChangedEvent.class));
     }
 
     @Test
@@ -190,6 +193,7 @@ class ArticleServiceImplVisibilityTest {
 
         verify(articleMapper, never()).update(any());
         verify(articleSearchService, never()).updateArticle(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -204,6 +208,7 @@ class ArticleServiceImplVisibilityTest {
         assertEquals(ErrorCode.ARTICLE_PERMISSION_DENIED.code(), ex.errorCode);
 
         verify(articleMapper, never()).update(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -223,6 +228,7 @@ class ArticleServiceImplVisibilityTest {
 
         verify(articleMapper).update(any());
         verify(articleSearchService).updateArticle(a1);
+        verify(eventPublisher).publishEvent(any(ArticleVisibilityChangedEvent.class));
     }
 
     @Test
@@ -235,6 +241,7 @@ class ArticleServiceImplVisibilityTest {
         assertEquals(ErrorCode.ARTICLE_NOT_FOUND.code(), ex.errorCode);
 
         verify(articleMapper, never()).update(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 
     @Test
@@ -245,5 +252,21 @@ class ArticleServiceImplVisibilityTest {
         assertEquals(ErrorCode.ARTICLE_PARAM_REQUIRED.code(), ex.errorCode);
 
         verify(articleMapper, never()).update(any());
+        verify(eventPublisher, never()).publishEvent(any());
+    }
+
+    @Test
+    @DisplayName("全部已是目标状态：空操作，不写库不发事件")
+    void batchUpdateVisibility_alreadyAtTarget_shouldNoop() {
+        ArticleDO a1 = article(1L, AUTHOR_ID, 1);
+        ArticleDO a2 = article(2L, AUTHOR_ID, 1);
+        when(articleMapper.selectList(any())).thenReturn(List.of(a1, a2));
+
+        assertDoesNotThrow(() -> articleService.batchUpdateVisibility(List.of(1L, 2L), 1));
+
+        verify(articleMapper, never()).update(any());
+        verify(articleSearchService, never()).updateArticle(any());
+        verify(articleCacheService, never()).evictArticleDetail(any());
+        verify(eventPublisher, never()).publishEvent(any());
     }
 }

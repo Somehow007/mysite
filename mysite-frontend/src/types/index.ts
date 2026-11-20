@@ -390,7 +390,7 @@ export interface KnowledgeDocument {
   sourceType: 'ARTICLE' | 'UPLOAD'
   sourceRef: string | null
   fileType: string | null
-  status: 'PENDING' | 'CHUNKING' | 'READY' | 'FAILED'
+  status: 'PENDING' | 'CHUNKING' | 'READY' | 'FAILED' | 'HIDDEN'
   failReason: string | null
   chunkCount: number
   charCount: number

@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS t_knowledge_document (
     source_type VARCHAR(20) NOT NULL,
     source_ref VARCHAR(500),
     file_type VARCHAR(20),
-    status VARCHAR(20) DEFAULT 'PENDING',   -- PENDING/CHUNKING/READY/FAILED
+    status VARCHAR(20) DEFAULT 'PENDING',   -- PENDING/CHUNKING/READY/FAILED/HIDDEN(文章转私有或草稿时软隐藏,向量保留)
     fail_reason TEXT,                        -- 摄取失败原因（embedding API 挂了就记录在这里）
     content_hash VARCHAR(64),                -- 正文+分块参数+embedding 模型/维度的 sha256，READY 且匹配时事件路径跳过重建
     chunk_count INT DEFAULT 0,

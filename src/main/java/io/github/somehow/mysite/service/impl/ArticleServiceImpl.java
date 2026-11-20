@@ -22,6 +22,7 @@ import io.github.somehow.mysite.dto.resp.ArticleFavoriteRespDTO;
 import io.github.somehow.mysite.ragent.ingestion.ArticleCreatedEvent;
 import io.github.somehow.mysite.ragent.ingestion.ArticleDeletedEvent;
 import io.github.somehow.mysite.ragent.ingestion.ArticleUpdatedEvent;
+import io.github.somehow.mysite.ragent.ingestion.ArticleVisibilityChangedEvent;
 import io.github.somehow.mysite.service.ArticleSearchService;
 import io.github.somehow.mysite.service.ArticleService;
 import io.github.somehow.mysite.service.CategoryService;
@@ -306,6 +307,11 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             throw new ClientException(ErrorCode.ARTICLE_VISIBILITY_MIXED);
         }
 
+        // 全部已是目标状态：无实际变更，跳过写库/索引/缓存/事件
+        if (currentVisibility.size() == 1 && currentVisibility.contains(visibility)) {
+            return;
+        }
+
         int rows = baseMapper.update(Wrappers.lambdaUpdate(ArticleDO.class)
                 .set(ArticleDO::getVisibility, visibility)
                 .in(ArticleDO::getId, ids)
@@ -320,6 +326,10 @@ public class ArticleServiceImpl extends ServiceImpl<ArticleMapper, ArticleDO> im
             articleSearchService.updateArticle(article);
             articleCacheService.evictArticleDetail(article.getId());
         }
+
+        // ★ RAG 集成：发布可见性变更事件（AFTER_COMMIT 监听），
+        // 转私有 → 软隐藏向量；转公开 → hash 门禁零成本翻回或重建
+        eventPublisher.publishEvent(new ArticleVisibilityChangedEvent(articles));
     }
 
     @Override

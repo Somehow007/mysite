@@ -143,7 +143,7 @@ async function doDelKb() {
 const docs = ref<KnowledgeDocument[]>([])
 const loadingDocs = ref(false)
 const docSearch = ref('')
-const docStatusFilter = ref<'ALL' | 'READY' | 'CHUNKING' | 'PENDING' | 'FAILED'>('ALL')
+const docStatusFilter = ref<'ALL' | 'READY' | 'CHUNKING' | 'PENDING' | 'FAILED' | 'HIDDEN'>('ALL')
 const docPage = ref(1)
 const docTotal = ref(0)
 const docPageSize = 20
@@ -339,6 +339,7 @@ function statusBadge(s: DocStatus): { icon: typeof CheckCircle2; cls: string; la
     case 'CHUNKING': return { icon: Loader2, cls: 'text-warning', label: '分块中' }
     case 'PENDING': return { icon: Clock, cls: 'text-warning', label: '排队中' }
     case 'FAILED': return { icon: AlertCircle, cls: 'text-danger', label: '失败' }
+    case 'HIDDEN': return { icon: Eye, cls: 'text-text-muted', label: '已隐藏' }
     default: return { icon: FileText, cls: 'text-text-muted', label: s }
   }
 }
@@ -366,6 +367,7 @@ function statusDotCls(s: DocStatus): string {
     case 'CHUNKING': return 'bg-warning animate-pulse'
     case 'PENDING': return 'bg-warning'
     case 'FAILED': return 'bg-danger'
+    case 'HIDDEN': return 'bg-text-muted'
     default: return 'bg-text-muted'
   }
 }
@@ -664,7 +666,7 @@ watch(selectedKbId, () => {
             </div>
             <div class="flex items-center gap-1.5">
               <button
-                v-for="f in (['ALL','READY','CHUNKING','PENDING','FAILED'] as const)"
+                v-for="f in (['ALL','READY','CHUNKING','PENDING','FAILED','HIDDEN'] as const)"
                 :key="f"
                 class="px-3 py-1.5 rounded-full text-xs font-medium border transition-colors"
                 :class="docStatusFilter === f
@@ -672,7 +674,7 @@ watch(selectedKbId, () => {
                   : 'border-border text-text-muted hover:text-text-secondary hover:border-text-muted'"
                 @click="setDocFilter(f)"
               >
-                {{ f === 'ALL' ? '全部' : f === 'CHUNKING' ? '处理中' : f === 'PENDING' ? '排队' : f === 'READY' ? '就绪' : '失败' }}
+                {{ f === 'ALL' ? '全部' : f === 'CHUNKING' ? '处理中' : f === 'PENDING' ? '排队' : f === 'READY' ? '就绪' : f === 'HIDDEN' ? '已隐藏' : '失败' }}
               </button>
             </div>
             <div class="flex-1" />

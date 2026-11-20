@@ -38,4 +38,4 @@ alwaysApply: false
 
 `t_knowledge_base` `t_knowledge_document` `t_knowledge_chunk` `t_knowledge_vector(1024)` `t_conversation` `t_conversation_message` `t_rag_intent`
 
-文档状态：`PENDING → CHUNKING → READY | FAILED`。限流：ADMIN 无限制，CREATOR 20/h，USER 10/h，问题最长 500 字。
+文档状态：`PENDING → CHUNKING → READY | FAILED`，另有 `HIDDEN`（文章转私有/草稿时软隐藏，向量保留，恢复公开且内容未变时 hash 门禁翻回 READY）。限流：ADMIN 无限制，CREATOR 20/h，USER 10/h，问题最长 500 字。

@@ -101,6 +101,10 @@ class KnowledgeDocumentServiceTest {
             return 1;
         }).when(chunkMapper).insert(any(KnowledgeChunkDO.class));
 
+        // Phase C 条件翻转 READY + hideArticle 软隐藏（具名 @Update 方法）
+        when(docMapper.markReadyUnlessHidden(anyLong())).thenReturn(1);
+        when(docMapper.hideArticleDocs(anyString())).thenReturn(1);
+
         service = new KnowledgeDocumentService(
             kbMapper, docMapper, chunkMapper, chunker, embeddingService, vectorStore, props);
     }
@@ -146,11 +150,12 @@ class KnowledgeDocumentServiceTest {
 
             service.syncArticle(article);
 
-            // 验证 insert 被调，updateById 至少被调（CHUNKING + READY）
+            // 验证 insert 被调；CHUNKING 走 updateById，READY 走条件 update（防入库期被隐藏覆盖）
             verify(docMapper).insert(any(KnowledgeDocumentDO.class));
             verify(chunkMapper, atLeastOnce()).insert(any(KnowledgeChunkDO.class));
             verify(vectorStore, atLeastOnce()).insert(anyList());
-            verify(docMapper, atLeast(2)).updateById(any(KnowledgeDocumentDO.class));
+            verify(docMapper, times(1)).updateById(any(KnowledgeDocumentDO.class));
+            verify(docMapper, times(1)).markReadyUnlessHidden(anyLong());
         }
     }
 
@@ -309,29 +314,26 @@ class KnowledgeDocumentServiceTest {
     class PublicGate {
 
         @Test
-        @DisplayName("草稿文章 → 不同步，且清掉知识库里已入库的旧索引")
-        void draftArticleShouldSkipAndRemoveStale() {
+        @DisplayName("草稿文章 → 不同步，且把已入库文档软隐藏（HIDDEN，保留向量待恢复）")
+        void draftArticleShouldSkipAndHideStale() {
             ArticleDO draft = new ArticleDO();
             draft.setId(700L);
             draft.setPublished(0);
             draft.setTitle("草稿");
             draft.setContent("未发布内容");
 
-            KnowledgeDocumentDO stale = new KnowledgeDocumentDO();
-            stale.setId(9001L);
-            stale.setKbId(1L);
-            when(docMapper.findBySource("ARTICLE", "700")).thenReturn(List.of(stale));
-
             service.syncArticle(draft);
 
             verify(docMapper, never()).insert(any(KnowledgeDocumentDO.class));
             verify(embeddingService, never()).embedBatch(anyList());
-            verify(vectorStore).deleteByDocId(9001L);
-            verify(docMapper).deleteById(9001L);
+            // 软隐藏：一次条件 UPDATE，不删向量/分块/文档
+            verify(docMapper, times(1)).hideArticleDocs("700");
+            verify(vectorStore, never()).deleteByDocId(anyLong());
+            verify(docMapper, never()).deleteById(anyLong());
         }
 
         @Test
-        @DisplayName("私有文章（visibility=1）→ 同样跳过")
+        @DisplayName("私有文章（visibility=1）→ 同样跳过并软隐藏")
         void privateArticleShouldSkip() {
             ArticleDO priv = new ArticleDO();
             priv.setId(702L);
@@ -344,6 +346,8 @@ class KnowledgeDocumentServiceTest {
 
             verify(docMapper, never()).insert(any(KnowledgeDocumentDO.class));
             verify(embeddingService, never()).embedBatch(anyList());
+            verify(docMapper, times(1)).hideArticleDocs("702");
+            verify(vectorStore, never()).deleteByDocId(anyLong());
         }
 
         @Test
@@ -415,7 +419,9 @@ class KnowledgeDocumentServiceTest {
                 captor.getAllValues().get(0).get(0).kbId(),
                 captor.getAllValues().get(1).get(0).kbId());
 
-            assertEquals(List.of("CHUNKING", "CHUNKING", "READY", "READY"), statuses);
+            // CHUNKING 走 updateById，READY 走条件翻转（各 2 次）
+            assertEquals(List.of("CHUNKING", "CHUNKING"), statuses);
+            verify(docMapper, times(2)).markReadyUnlessHidden(anyLong());
             verify(docMapper, times(2)).insert(any(KnowledgeDocumentDO.class));
         }
 
@@ -618,6 +624,81 @@ class KnowledgeDocumentServiceTest {
 
             verify(docMapper).deleteById(7007L);
             verify(embeddingService, times(1)).embedBatch(anyList());
+        }
+
+        @Test
+        @DisplayName("HIDDEN + hash 匹配（文章恢复公开且内容未变）→ 翻回 READY，零重建")
+        void hiddenDocWithMatchingHashShouldFlipBack() {
+            ArticleDO article = article(817L, "正文不变。");
+            KnowledgeDocumentDO doc = docInKb(7008L, 1L, "HIDDEN",
+                service.contentHash(article), article.getTitle());
+            when(docMapper.findBySource("ARTICLE", "817")).thenReturn(List.of(doc));
+
+            service.syncArticle(article);
+
+            assertEquals("READY", doc.getStatus());
+            verify(docMapper, times(1)).updateById(
+                org.mockito.Mockito.<KnowledgeDocumentDO>argThat(d -> "READY".equals(d.getStatus())));
+            verify(embeddingService, never()).embedBatch(anyList());
+            verify(docMapper, never()).insert(any(KnowledgeDocumentDO.class));
+            verify(vectorStore, never()).insert(anyList());
+        }
+
+        @Test
+        @DisplayName("HIDDEN + hash 匹配但标题变了 → 翻回 READY 同时刷标题")
+        void hiddenDocTitleChangeShouldFlipAndRefresh() {
+            ArticleDO article = article(818L, "正文不变。");
+            article.setTitle("新标题");
+            KnowledgeDocumentDO doc = docInKb(7009L, 1L, "HIDDEN",
+                service.contentHash(article), "旧标题");
+            when(docMapper.findBySource("ARTICLE", "818")).thenReturn(List.of(doc));
+
+            service.syncArticle(article);
+
+            assertEquals("READY", doc.getStatus());
+            assertEquals("新标题", doc.getTitle());
+            verify(docMapper, times(1)).updateById(any(KnowledgeDocumentDO.class));
+            verify(embeddingService, never()).embedBatch(anyList());
+        }
+
+        @Test
+        @DisplayName("HIDDEN + hash 不匹配（私有期间改过内容）→ 正常重建")
+        void hiddenDocWithMismatchedHashShouldRebuild() {
+            ArticleDO article = article(819L, "私有期间改过的正文。");
+            KnowledgeDocumentDO doc = docInKb(7010L, 1L, "HIDDEN", "stale-hash", article.getTitle());
+            when(docMapper.findBySource("ARTICLE", "819")).thenReturn(List.of(doc));
+            when(docMapper.findBySourceRef(1L, "ARTICLE", "819")).thenReturn(doc);
+
+            service.syncArticle(article);
+
+            verify(docMapper).deleteById(7010L);
+            verify(docMapper, times(1)).insert(any(KnowledgeDocumentDO.class));
+            verify(embeddingService, times(1)).embedBatch(anyList());
+        }
+    }
+
+    @Nested
+    @DisplayName("软隐藏：hideArticle")
+    class HideArticle {
+
+        @Test
+        @DisplayName("hideArticle → 一次条件 UPDATE，不删向量/分块/文档")
+        void shouldHideViaSingleUpdate() {
+            service.hideArticle(123L);
+
+            verify(docMapper, times(1)).hideArticleDocs("123");
+            verify(vectorStore, never()).deleteByDocId(anyLong());
+            verify(chunkMapper, never()).deleteByDocId(anyLong());
+            verify(docMapper, never()).deleteById(anyLong());
+        }
+
+        @Test
+        @DisplayName("hideArticle 异常 → 被吞掉，不向外抛")
+        void shouldSwallowException() {
+            doThrow(new RuntimeException("PG 连接断开"))
+                .when(docMapper).hideArticleDocs(anyString());
+
+            assertDoesNotThrow(() -> service.hideArticle(456L));
         }
     }
 }

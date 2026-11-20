@@ -174,12 +174,11 @@ public class KnowledgeDocumentController {
             if (article == null || article.getContent() == null) {
                 continue;
             }
-            // 文章已转草稿/私有：syncArticle 会跳过但旧向量仍在，这里直接清档
+            // 文章已转草稿/私有：软隐藏保留向量（恢复公开时 hash 门禁零成本翻回），
+            // 不再物理删除——删除会让转回公开的文章丢失已建索引
             if (!Integer.valueOf(1).equals(article.getPublished())
                     || (article.getVisibility() != null && article.getVisibility() == 1)) {
-                vectorStore.deleteByDocId(doc.getId());
-                chunkMapper.deleteByDocId(doc.getId());
-                docMapper.deleteById(doc.getId());
+                docService.hideArticle(Long.valueOf(doc.getSourceRef()));
                 removed++;
                 continue;
             }
@@ -218,25 +217,28 @@ public class KnowledgeDocumentController {
         if (!"FAILED".equals(doc.getStatus()) && !"READY".equals(doc.getStatus())) {
             throw new ClientException("只有 READY 或 FAILED 状态的文档可以重新处理");
         }
+
+        // ARTICLE 文档先查文章可见性：已转草稿/私有 → 软隐藏保留向量
+        // （恢复公开时 hash 门禁零成本翻回），不进入删向量/重建流程
+        ArticleDO article = null;
+        if ("ARTICLE".equals(doc.getSourceType()) && doc.getSourceRef() != null) {
+            article = articleMapper.selectById(Long.valueOf(doc.getSourceRef()));
+            if (article != null
+                    && (!Integer.valueOf(1).equals(article.getPublished())
+                        || (article.getVisibility() != null && article.getVisibility() == 1))) {
+                docService.hideArticle(Long.valueOf(doc.getSourceRef()));
+                return Results.success();
+            }
+        }
+
         vectorStore.deleteByDocId(docId);
         chunkMapper.deleteByDocId(docId);
         doc.setStatus("PENDING");
         doc.setFailReason(null);
         docMapper.updateById(doc);
 
-        if ("ARTICLE".equals(doc.getSourceType()) && doc.getSourceRef() != null) {
-            ArticleDO article = articleMapper.selectById(Long.valueOf(doc.getSourceRef()));
-            if (article != null) {
-                // 文章已转草稿/私有：清档而非重建，避免 PENDING 卡死 + 旧向量残留
-                if (!Integer.valueOf(1).equals(article.getPublished())
-                        || (article.getVisibility() != null && article.getVisibility() == 1)) {
-                    vectorStore.deleteByDocId(docId);
-                    chunkMapper.deleteByDocId(docId);
-                    docMapper.deleteById(docId);
-                    return Results.success();
-                }
-                docService.syncArticle(article, kbId);
-            }
+        if (article != null) {
+            docService.syncArticle(article, kbId);
         }
         return Results.success();
     }
