@@ -95,10 +95,18 @@ hide 与在途 ingest 存在秒级窄竞态（向量写完但状态保持 HIDDEN
 
 ## Resolution
 
-2026-11-20 实现完成：事件走 AFTER_COMMIT 批量事件，RAG 侧按用户拍板改软隐藏（HIDDEN）。
-`syncArticle` 公开性门对非公开文章调 `hideArticle`（跨 KB 状态置 HIDDEN，向量保留）；
-hash 门禁放行 `READY|HIDDEN + hash 匹配` 翻回 READY（零 embedding）；
-Phase C 条件翻转防入库期被隐藏覆盖。verify quick 全绿，待部署。
-部署后建议跑一次存量核对 SQL（见遗留项）。
+2026-11-20 实现完成并上线：
 
-（commit 与部署信息待补）
+- commit `f9f86c2`（17 文件，+412/-45），已 push 并经 `server-deploy.sh` 部署（版本 f9f86c2，健康检查全过）
+- 事件走 AFTER_COMMIT 批量事件，RAG 侧按用户拍板改软隐藏（HIDDEN）
+- `syncArticle` 公开性门对非公开文章调 `hideArticle`（跨 KB 状态置 HIDDEN，向量保留）；
+  hash 门禁放行 `READY|HIDDEN + hash 匹配` 翻回 READY（零 embedding）；
+  Phase C 条件翻转 `markReadyUnlessHidden` 防入库期被隐藏覆盖
+- verify quick 全绿（hermetic + 前端 type-check）；Phase2/3 集成测试 15/15（真实 PG 验证 READY 落库）
+- **存量清理已执行**（部署后 PG↔MySQL 交叉核对发现）：
+  - 10 篇私有文章（visibility=1）的 READY 文档 → `UPDATE status='HIDDEN'`（UPDATE 10）
+  - 11 篇已删除文章（del_flag=1）+ 1 条孤儿 PENDING（source_ref=5）→
+    向量 36 + 分块 36 + 文档 12 物理清除（单事务）
+  - 清理后 PG 侧 ARTICLE 文档：READY 29 / HIDDEN 10，无残留
+
+遗留：Created/Updated 事件 commit 前派发竞态、ids 无 @Size 上限（见上文备查）。
